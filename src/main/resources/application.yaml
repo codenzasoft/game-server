@@ -1,0 +1,38 @@
+spring:
+  application.name: hearts
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_NAME}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+    hibernate.ddl-auto: update
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+  profiles:
+    default: development
+server:
+  port: 8082
+  shutdown: graceful
+
+management.endpoint:
+  info.enabled: true
+  beans.enabled: true
+
+---
+spring.config.activate.on-profile: development
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5435/postgres
+    username: postgres
+    password: postgres
+  thymeleaf:
+    cache: false
+
+logging.level.org.springframework.messaging.simp: DEBUG
+
+---
+spring.config.activate.on-profile: env-development
+

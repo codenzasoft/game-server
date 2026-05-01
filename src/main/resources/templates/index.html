@@ -1,0 +1,10 @@
+fragments<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <!-- The content of the H1 will be replaced by the "message" from the controller -->
+        <h1 th:text="${message}">Default Message</h1>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+    </body>
+</html>
