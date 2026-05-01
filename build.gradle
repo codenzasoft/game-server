@@ -50,3 +50,5 @@ test {
         events "passed", "skipped", "failed"
     }
 }
+
+compileJava.dependsOn('spotlessApply')
