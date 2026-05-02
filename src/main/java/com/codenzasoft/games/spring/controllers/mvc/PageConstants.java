@@ -3,7 +3,8 @@ package com.codenzasoft.games.spring.controllers.mvc;
 /** Variable names used in Thymeleaf pages. */
 public final class PageConstants {
 
-  public static final String PAGE_TITLE = "pageTitle";
+  /** The title that appears in the title bar or page's tab. */
+  public static final String PAGE_TITLE = "title";
 
   /** The logged in {@link org.springframework.security.core.userdetails.UserDetails}. */
   public static final String PAGE_USER = "user";
