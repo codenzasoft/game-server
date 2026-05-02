@@ -13,6 +13,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+/**
+ * A custom {@link UserDetailsService} that loads users and roles from the {@link UsersRepository}.
+ */
 @Service
 public class GamesUserDetailsService implements UserDetailsService {
   private static final Logger log = LoggerFactory.getLogger(GamesUserDetailsService.class);
