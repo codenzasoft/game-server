@@ -5,8 +5,8 @@ public final class PageConstants {
 
   public static final String PAGE_TITLE = "pageTitle";
 
-  /** The username of the user logged in. */
-  public static final String PAGE_USERNAME = "username";
+  /** The logged in {@link org.springframework.security.core.userdetails.UserDetails}. */
+  public static final String PAGE_USER = "user";
 
   private PageConstants() {}
 }

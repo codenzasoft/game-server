@@ -2,11 +2,12 @@ package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,8 +28,13 @@ public class GamesUserDetailsService implements UserDetailsService {
     } else {
       log.info("User {} found", username);
     }
+    final UserEntity entity = user.get();
+    List<SimpleGrantedAuthority> roles =
+        entity.getRoles().stream()
+            .map(r -> new SimpleGrantedAuthority(r.getRole().name()))
+            .toList();
     return new org.springframework.security.core.userdetails.User(
-        user.get().getUsername(), user.get().getPassword(), new ArrayList<>());
+        entity.getUsername(), entity.getPassword(), roles);
   }
 
   public Optional<UserEntity> getUserByUsernameOrEmail(final String name) {

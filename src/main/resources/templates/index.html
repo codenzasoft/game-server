@@ -3,7 +3,7 @@
     <head th:replace="~{fragments/links :: head-js-css}"></head>
     <body>
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
-        <h1>Admin Ops</h1>
+        <h1 th:text="'Admin Ops (' + ${user.getUsername()} + ')'">Admin Ops</h1>
         <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
     </body>
 </html>

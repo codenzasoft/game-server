@@ -23,7 +23,7 @@ public class IndexController {
   @GetMapping("/")
   public String games(Model model, @AuthenticationPrincipal UserDetails user) {
     model.addAttribute(PageConstants.PAGE_TITLE, "Admin Operations");
-    model.addAttribute(PageConstants.PAGE_USERNAME, user.getUsername());
+    model.addAttribute(PageConstants.PAGE_USER, user);
     return "index";
   }
 }

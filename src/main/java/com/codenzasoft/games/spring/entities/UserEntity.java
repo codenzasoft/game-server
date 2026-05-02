@@ -3,7 +3,9 @@ package com.codenzasoft.games.spring.entities;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 @Entity(name = "USERS")
@@ -16,14 +18,18 @@ public class UserEntity {
   @Column(name = "created_at", updatable = false, nullable = false)
   Date createdAt;
 
-  @Column(name = "modified_at", updatable = true, nullable = false)
+  @Column(name = "modified_at", nullable = false)
   Date modifiedAt;
 
-  @Column(name = "email", unique = true, nullable = true)
+  @Column(name = "email", unique = true)
   String email;
 
-  @Column(name = "password", nullable = true)
+  @Column(name = "password")
   String password;
+
+  @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+  @JoinColumn(name = "user_id", updatable = false)
+  List<RoleEntity> roles = new ArrayList<>();
 
   @PreUpdate
   public void setModifiedAt() {
@@ -66,5 +72,10 @@ public class UserEntity {
 
   public void setPassword(final String password) {
     this.password = password;
+  }
+
+  @JsonProperty("roles")
+  public List<RoleEntity> getRoles() {
+    return roles;
   }
 }
