@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <div class="container mt-4" style="max-width: 540px;">
+            <h4 class="mb-4">Profile</h4>
+            <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+            <form th:action="@{/profile}" method="post">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" name="userName" th:value="${user.username}" required/>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" th:value="${user.email}"/>
+                </div>
+                <hr class="my-4"/>
+                <h6 class="mb-3">Change Password</h6>
+                <div class="mb-3">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" class="form-control" name="currentPassword" autocomplete="current-password"/>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Password</label>
+                    <input type="password" class="form-control" name="newPassword" autocomplete="new-password"/>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" name="confirmPassword" autocomplete="new-password"/>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+    </body>
+</html>

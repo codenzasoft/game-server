@@ -70,6 +70,14 @@ public class UserEntity {
     return password;
   }
 
+  public void setUserName(final String userName) {
+    this.userName = userName;
+  }
+
+  public void setEmail(final String email) {
+    this.email = email;
+  }
+
   public void setPassword(final String password) {
     this.password = password;
   }
