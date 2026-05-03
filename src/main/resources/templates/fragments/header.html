@@ -8,7 +8,7 @@
                 <li th:if="${helper.isAdmin(user)}" class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Admin</a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="#">Manage Users</a></li>
+                        <li><a class="dropdown-item" th:href="@{/admin/users}">Manage Users</a></li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown">

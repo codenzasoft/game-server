@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <div class="container mt-4">
+            <h4 class="mb-4">Manage Users</h4>
+            <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+            <form th:action="@{/admin/users/delete}" method="post" id="usersForm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small"
+                          th:text="${users.numberOfElements + ' of ' + users.totalElements + ' users'}"></span>
+                    <button type="submit" class="btn btn-danger btn-sm">Delete Selected</button>
+                </div>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:2.5rem"><input type="checkbox" id="selectAll"/></th>
+                            <th>
+                                <a class="text-decoration-none text-dark"
+                                   th:href="@{/admin/users(page=0,sort='userName',dir=${sort == 'userName' && dir == 'asc' ? 'desc' : 'asc'})}">
+                                    Username
+                                    <span th:if="${sort == 'userName'}" th:text="${dir == 'asc' ? '↑' : '↓'}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a class="text-decoration-none text-dark"
+                                   th:href="@{/admin/users(page=0,sort='email',dir=${sort == 'email' && dir == 'asc' ? 'desc' : 'asc'})}">
+                                    Email
+                                    <span th:if="${sort == 'email'}" th:text="${dir == 'asc' ? '↑' : '↓'}"></span>
+                                </a>
+                            </th>
+                            <th>
+                                <a class="text-decoration-none text-dark"
+                                   th:href="@{/admin/users(page=0,sort='createdAt',dir=${sort == 'createdAt' && dir == 'asc' ? 'desc' : 'asc'})}">
+                                    Created
+                                    <span th:if="${sort == 'createdAt'}" th:text="${dir == 'asc' ? '↑' : '↓'}"></span>
+                                </a>
+                            </th>
+                            <th>Roles</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="u : ${users.content}"
+                            th:classappend="${u.id == currentUserId ? 'table-secondary' : ''}">
+                            <td>
+                                <input type="checkbox" name="ids" th:value="${u.id}"
+                                       th:disabled="${u.id == currentUserId}"/>
+                            </td>
+                            <td th:text="${u.username}"></td>
+                            <td th:text="${u.email}"></td>
+                            <td th:text="${#dates.format(u.createdAt, 'yyyy-MM-dd')}"></td>
+                            <td>
+                                <span class="badge bg-secondary me-1"
+                                      th:each="r : ${u.roles}"
+                                      th:text="${r.role.name()}"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <nav th:if="${users.totalPages > 1}">
+                    <ul class="pagination pagination-sm">
+                        <li class="page-item" th:classappend="${users.first ? 'disabled' : ''}">
+                            <a class="page-link"
+                               th:href="@{/admin/users(page=${users.number - 1},sort=${sort},dir=${dir})}">Previous</a>
+                        </li>
+                        <li class="page-item"
+                            th:each="i : ${#numbers.sequence(0, users.totalPages - 1)}"
+                            th:classappend="${i == users.number ? 'active' : ''}">
+                            <a class="page-link"
+                               th:href="@{/admin/users(page=${i},sort=${sort},dir=${dir})}"
+                               th:text="${i + 1}"></a>
+                        </li>
+                        <li class="page-item" th:classappend="${users.last ? 'disabled' : ''}">
+                            <a class="page-link"
+                               th:href="@{/admin/users(page=${users.number + 1},sort=${sort},dir=${dir})}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </form>
+        </div>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+        <script>
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = () => document.querySelectorAll('input[name="ids"]:not(:disabled)');
+
+            selectAll.addEventListener('change', () =>
+                checkboxes().forEach(cb => cb.checked = selectAll.checked));
+
+            checkboxes().forEach(cb => cb.addEventListener('change', () => {
+                const all = checkboxes();
+                selectAll.checked = all.length > 0 && [...all].every(c => c.checked);
+            }));
+
+            document.getElementById('usersForm').addEventListener('submit', e => {
+                if (!document.querySelector('input[name="ids"]:checked')) {
+                    e.preventDefault();
+                    alert('Select at least one user to delete.');
+                }
+            });
+        </script>
+    </body>
+</html>

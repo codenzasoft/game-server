@@ -2,11 +2,11 @@ package com.codenzasoft.games.spring.repositories;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
 import java.util.UUID;
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface UsersRepository extends CrudRepository<UserEntity, UUID> {
+public interface UsersRepository extends JpaRepository<UserEntity, UUID> {
   UserEntity findByEmail(final String email);
 
   UserEntity findByUserName(final String userName);

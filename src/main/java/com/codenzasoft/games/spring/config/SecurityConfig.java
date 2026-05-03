@@ -51,6 +51,8 @@ public class SecurityConfig {
               .permitAll()
               .requestMatchers("/login")
               .permitAll()
+              .requestMatchers("/admin/**")
+              .hasAuthority("ADMIN")
               .anyRequest()
               .authenticated();
         });
