@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.controllers.mvc;
 
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import com.codenzasoft.games.spring.views.ViewHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,11 +20,13 @@ public class IndexController {
   private static final Logger log = LoggerFactory.getLogger(IndexController.class);
 
   @Autowired GamesUserDetailsService gamesUserDetailsService;
+  @Autowired ViewHelper viewHelper;
 
   @GetMapping("/")
   public String games(Model model, @AuthenticationPrincipal UserDetails user) {
     model.addAttribute(PageConstants.PAGE_TITLE, "Admin Operations");
     model.addAttribute(PageConstants.PAGE_USER, user);
+    model.addAttribute(PageConstants.PAGE_HELPER, viewHelper);
     return "index";
   }
 }

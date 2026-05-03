@@ -9,5 +9,8 @@ public final class PageConstants {
   /** The logged in {@link org.springframework.security.core.userdetails.UserDetails}. */
   public static final String PAGE_USER = "user";
 
+  /** A {@link com.codenzasoft.games.spring.views.ViewHelper}. */
+  public static final String PAGE_HELPER = "helper";
+
   private PageConstants() {}
 }
