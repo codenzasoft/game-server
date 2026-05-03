@@ -23,4 +23,8 @@ public enum Role {
   public static Role fromGrantedAuthority(GrantedAuthority grantedAuthority) {
     return fromString(Objects.requireNonNull(grantedAuthority.getAuthority()));
   }
+
+  public boolean isAdmin() {
+    return this == Role.ADMIN;
+  }
 }
