@@ -26,3 +26,6 @@ replay_pid*
 /.gradle/
 /.idea/
 /build/
+/bin/
+
+.DS_Store
