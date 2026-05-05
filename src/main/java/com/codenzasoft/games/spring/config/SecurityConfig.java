@@ -51,6 +51,8 @@ public class SecurityConfig {
               .permitAll()
               .requestMatchers("/login")
               .permitAll()
+              .requestMatchers("/register")
+              .permitAll()
               .requestMatchers("/admin/**")
               .hasAuthority("ADMIN")
               .anyRequest()
