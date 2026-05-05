@@ -7,11 +7,6 @@ public enum Season {
   WINTER;
 
   public Season next() {
-    return switch (this) {
-      case SPRING -> SUMMER;
-      case SUMMER -> FALL;
-      case FALL -> WINTER;
-      case WINTER -> SPRING;
-    };
+    return values()[(this.ordinal() + 1) % values().length];
   }
 }

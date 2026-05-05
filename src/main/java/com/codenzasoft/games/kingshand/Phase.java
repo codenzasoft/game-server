@@ -6,10 +6,6 @@ public enum Phase {
   PLAY;
 
   public Phase next() {
-    return switch (this) {
-      case ADD -> RANDOM_EVENT;
-      case RANDOM_EVENT -> PLAY;
-      case PLAY -> ADD;
-    };
+    return values()[(this.ordinal() + 1) % values().length];
   }
 }
