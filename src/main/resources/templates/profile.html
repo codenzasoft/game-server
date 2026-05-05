@@ -10,7 +10,18 @@
             <form th:action="@{/profile}" method="post">
                 <div class="mb-3">
                     <label class="form-label">Username</label>
-                    <input type="text" class="form-control" name="userName" th:value="${user.username}" required/>
+                    <input type="text" class="form-control" id="userNameInput" name="userName"
+                           th:value="${user.username}" th:attr="data-original=${user.username}" required/>
+                    <div id="usernameWarning"
+                         class="alert alert-warning border-warning shadow-sm mt-2 mb-0 fw-bold"
+                         style="overflow: hidden; max-height: 0; padding-top: 0; padding-bottom: 0;
+                                margin-top: 0 !important; border-width: 0;
+                                transition: max-height 0.3s ease, padding 0.3s ease,
+                                            margin-top 0.3s ease, border-width 0.3s ease;"
+                         role="alert" aria-live="polite">
+                        🚨 Heads up! Saving a new username will sign you out — you'll need to log
+                        back in with your new credentials. 🚨
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Email</label>
@@ -34,5 +45,78 @@
             </form>
         </div>
         <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+        <script>
+            (function () {
+                const input = document.getElementById('userNameInput');
+                const warning = document.getElementById('usernameWarning');
+                if (!input || !warning) return;
+
+                const original = input.dataset.original;
+                let shown = false;
+
+                const expand = () => {
+                    // Use a generous fixed max-height so the banner can never clip its own
+                    // content; the transition still animates 0 -> 20rem and stops growing
+                    // once the natural content height is reached.
+                    warning.style.maxHeight = '20rem';
+                    warning.style.paddingTop = '0.75rem';
+                    warning.style.paddingBottom = '0.75rem';
+                    warning.style.marginTop = '0.5rem';
+                    warning.style.borderWidth = '1px';
+                };
+                const collapse = () => {
+                    warning.style.maxHeight = '0';
+                    warning.style.paddingTop = '0';
+                    warning.style.paddingBottom = '0';
+                    warning.style.marginTop = '0';
+                    warning.style.borderWidth = '0';
+                };
+
+                // Synthesize a brief two-tone siren via Web Audio API so we don't need to ship an
+                // audio asset. Plays only when the warning first appears (not on every keystroke).
+                const playSiren = () => {
+                    try {
+                        const Ctx = window.AudioContext || window.webkitAudioContext;
+                        if (!Ctx) return;
+                        const ctx = new Ctx();
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sawtooth';
+                        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.05);
+
+                        // Three wails between ~520 Hz and ~880 Hz.
+                        const start = ctx.currentTime;
+                        const wail = 0.35;
+                        for (let i = 0; i < 3; i++) {
+                            osc.frequency.setValueAtTime(520, start + i * wail);
+                            osc.frequency.linearRampToValueAtTime(880, start + i * wail + wail / 2);
+                            osc.frequency.linearRampToValueAtTime(520, start + (i + 1) * wail);
+                        }
+                        const end = start + 3 * wail;
+                        gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+                        osc.connect(gain).connect(ctx.destination);
+                        osc.start();
+                        osc.stop(end + 0.05);
+                        osc.onended = () => ctx.close();
+                    } catch (e) {
+                        // Audio is best-effort; silently ignore failures (e.g. autoplay blocked).
+                    }
+                };
+
+                input.addEventListener('input', () => {
+                    const differs = input.value !== original;
+                    if (differs && !shown) {
+                        expand();
+                        playSiren();
+                        shown = true;
+                    } else if (!differs && shown) {
+                        collapse();
+                        shown = false;
+                    }
+                });
+            })();
+        </script>
     </body>
 </html>
