@@ -6,7 +6,7 @@ class GameStateSpec extends Specification {
 
     def "game starts in spring year 1 with initial values"() {
         when:
-        GameState state = new GameState()
+        GameState state = GameState.newGame()
 
         then:
         state.curSeason == Season.SPRING
@@ -15,10 +15,10 @@ class GameStateSpec extends Specification {
         state.production == 100
         state.board.size() == 4
     }
-    
+
     def "test that advancing season changes current season correctly"() {
         setup:
-        def state = new GameState()
+        def state = GameState.newGame()
         state.curSeason = startSeason
 
         when:
@@ -37,7 +37,7 @@ class GameStateSpec extends Specification {
 
     def "test only recurring effects are triggered"() {
         setup:
-        def state = new GameState()
+        def state = GameState.newGame()
 
         def card = new Card(
                 0,
@@ -46,7 +46,7 @@ class GameStateSpec extends Specification {
                 new Effect(prodModifier, prodValueType, prodFreq)
         )
 
-        state.board.get(1).cards.add(card)
+        state.board.get(Season.SUMMER).add(card)
 
         when:
         state.advanceSeason()
