@@ -13,7 +13,7 @@ spring:
   profiles:
     default: development
 server:
-  port: 8082
+  port: ${PORT:8082}
   shutdown: graceful
 
 management.endpoint:
@@ -36,3 +36,12 @@ logging.level.org.springframework.messaging.simp: DEBUG
 ---
 spring.config.activate.on-profile: env-development
 
+---
+spring.config.activate.on-profile: cloud
+
+server:
+  forward-headers-strategy: native
+
+spring:
+  datasource:
+    url: "jdbc:postgresql:///${POSTGRES_NAME}?socketFactory=com.google.cloud.sql.postgres.SocketFactory&cloudSqlInstance=crafty-dynamics-495319-e2:us-central1:codenza-games-db"

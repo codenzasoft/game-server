@@ -1,0 +1,61 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PROJECT_ID: crafty-dynamics-495319-e2
+  REGION: us-central1
+  SERVICE: game-server
+  IMAGE: us-central1-docker.pkg.dev/crafty-dynamics-495319-e2/game-server/game-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: github-actions@crafty-dynamics-495319-e2.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:cache,mode=max
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy $SERVICE \
+            --image=$IMAGE:${{ github.sha }} \
+            --region=$REGION \
+            --project=$PROJECT_ID \
+            --platform=managed \
+            --add-cloudsql-instances=crafty-dynamics-495319-e2:us-central1:codenza-games-db \
+            --set-env-vars=SPRING_PROFILES_ACTIVE=cloud \
+            --update-secrets=POSTGRES_USER=game-server-db-user:latest,POSTGRES_PASSWORD=game-server-db-password:latest,POSTGRES_NAME=game-server-db-name:latest \
+            --service-account=game-server-sa@crafty-dynamics-495319-e2.iam.gserviceaccount.com \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=2 \
+            --port=8080
