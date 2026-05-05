@@ -1,7 +1,7 @@
 package com.codenzasoft.games.kingshand;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -14,7 +14,7 @@ public class GameState {
   private double production;
   private Season curSeason;
   private Phase curPhase;
-  private double year;
+  private int year;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -25,23 +25,10 @@ public class GameState {
     this.year = b.year;
   }
 
-
-//Creates a fresh game state: empty season tables, starting population/production, spring of year 1
-  public static GameState newGame() {
-    Map<Season, List<Card>> board = new EnumMap<>(Season.class);
-    board.put(Season.SPRING, new ArrayList<>());
-    board.put(Season.SUMMER, new ArrayList<>());
-    board.put(Season.FALL, new ArrayList<>());
-    board.put(Season.WINTER, new ArrayList<>());
-
-    return builder()
-        .board(board)
-        .population(5)
-        .production(100)
-        .curSeason(Season.SPRING)
-        .curPhase(Phase.ADD)
-        .year(1)
-        .build();
+  // Creates a fresh game state: empty season tables, starting population/production, spring of year
+  // 1
+  public static GameState newState() {
+    return builder().build();
   }
 
   public static Builder builder() {
@@ -72,7 +59,7 @@ public class GameState {
     return board.get(curSeason);
   }
 
-  public void addCard(Season season, Card card) {
+  public synchronized void addCard(Season season, Card card) {
     List<Card> table = board.get(season);
     if (table.size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(season + " table is full");
@@ -80,11 +67,11 @@ public class GameState {
     table.add(card);
   }
 
-  public void removeCard(Season season, Card card) {
+  public synchronized void removeCard(Season season, Card card) {
     board.get(season).remove(card);
   }
 
-  private void triggerCurrentSeasonTable() {
+  private synchronized void triggerCurrentSeasonTable() {
     List<Card> table = getCurrentTable();
 
     // trigger all cards on the table and update population and production accordingly
@@ -146,24 +133,29 @@ public class GameState {
     this.curPhase = curPhase;
   }
 
-  public void setYear(double year) {
+  public void setYear(int year) {
     this.year = year;
   }
 
   // ----- Builder -----
 
   public static final class Builder {
-    private Map<Season, List<Card>> board;
-    private double population;
-    private double production;
-    private Season curSeason;
-    private Phase curPhase;
-    private double year;
+    private Map<Season, List<Card>> board = new HashMap<>();
+    private double population = 5.0;
+    private double production = 100.0;
+    private Season curSeason = Season.SPRING;
+    private Phase curPhase = Phase.ADD;
+    private int year = 1;
 
-    private Builder() {}
+    private Builder() {
+      board.put(Season.SPRING, new ArrayList<>());
+      board.put(Season.SUMMER, new ArrayList<>());
+      board.put(Season.FALL, new ArrayList<>());
+      board.put(Season.WINTER, new ArrayList<>());
+    }
 
-    public Builder board(Map<Season, List<Card>> board) {
-      this.board = board;
+    public Builder table(Season season, List<Card> cards) {
+      board.put(season, new ArrayList<>(cards));
       return this;
     }
 
@@ -187,12 +179,32 @@ public class GameState {
       return this;
     }
 
-    public Builder year(double year) {
+    public Builder year(int year) {
       this.year = year;
       return this;
     }
 
     public GameState build() {
+      if (curSeason == null) {
+        throw new IllegalStateException("missing current season");
+      }
+      if (curPhase == null) {
+        throw new IllegalStateException("missing current phase");
+      }
+      for (Season s : Season.values()) {
+        if (!board.containsKey(s)) {
+          throw new IllegalStateException("missing table for season " + s.name());
+        }
+      }
+      if (population < 0.0) {
+        throw new IllegalStateException("population cannot be negative");
+      }
+      if (production < 0.0) {
+        throw new IllegalStateException("production cannot be negative");
+      }
+      if (year < 0) {
+        throw new IllegalStateException("year cannot be negative");
+      }
       return new GameState(this);
     }
   }
