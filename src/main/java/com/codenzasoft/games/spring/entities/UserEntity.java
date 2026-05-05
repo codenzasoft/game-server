@@ -10,7 +10,9 @@ import java.util.UUID;
 
 @Entity(name = "USERS")
 public class UserEntity {
-  @Id UUID id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  UUID id;
 
   @Column(name = "user_name", nullable = false)
   String userName;
@@ -30,6 +32,17 @@ public class UserEntity {
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
   @JoinColumn(name = "user_id", updatable = false)
   List<RoleEntity> roles = new ArrayList<>();
+
+  @PrePersist
+  public void onCreate() {
+    final Date now = new Date();
+    if (createdAt == null) {
+      createdAt = now;
+    }
+    if (modifiedAt == null) {
+      modifiedAt = now;
+    }
+  }
 
   @PreUpdate
   public void setModifiedAt() {

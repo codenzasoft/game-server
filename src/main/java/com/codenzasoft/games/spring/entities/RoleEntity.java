@@ -22,6 +22,13 @@ public class RoleEntity {
   @Column(name = "created_at", updatable = false, nullable = false)
   Date createdAt;
 
+  @PrePersist
+  void onCreate() {
+    if (createdAt == null) {
+      createdAt = new Date();
+    }
+  }
+
   public RoleEntity() {}
 
   public RoleEntity(final UUID userId, final Role role) {

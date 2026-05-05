@@ -11,6 +11,7 @@
                 <div th:if="${param.logout}">
                     You have been logged out.
                 </div>
+                <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
             </div>
             <div class="row">
                 <form th:action="@{/login}" method="post">
@@ -24,6 +25,12 @@
                         <input class="btn btn-primary" type="submit" value="Sign in" />
                     </div>
                 </form>
+            </div>
+            <div class="row mt-3">
+                <small class="text-muted">
+                    Don't have an account?
+                    <a th:href="@{/register}">Create one</a>
+                </small>
             </div>
         </div>
     </body>
