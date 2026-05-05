@@ -28,6 +28,7 @@ dependencies {
             'org.springframework.boot:spring-boot-starter-actuator',
             'org.springframework.boot:spring-boot-starter-websocket',
             'org.postgresql:postgresql',
+            'com.google.cloud.sql:postgres-socket-factory:1.21.0',
     )
 
     testImplementation(
