@@ -106,18 +106,27 @@ public class GameService {
   }
 
   @Transactional
-  public XoGameEntity createNextXoGame(final UUID nextId, final XoGameEntity currentGame) {
-    final XoGame game = buildTicTacToeGame(currentGame);
+  public XoGameEntity createNextXoGame(final UUID nextId, final XoGame currentGame) {
     final Piece nextLeader =
-        game.getNextGameLeader()
+        currentGame
+            .getNextGameLeader()
             .orElseThrow(() -> new IllegalStateException("game is not over or quit"));
     final Map<Piece, UserEntity> players =
-        currentGame.getGamePieces().stream()
+        Arrays.stream(Piece.values())
             .collect(
                 Collectors.toMap(
-                    XoPieceEntity::getPiece,
-                    gp -> usersRepository.findById(gp.getUserId()).orElseThrow()));
+                    piece -> piece,
+                    piece ->
+                        usersRepository.findById(currentGame.getPlayer(piece).id()).orElseThrow()));
     return createXoGame(nextId, players, nextLeader);
+  }
+
+  public Optional<XoGame> getOrBuildXoGame(final UUID id) {
+    final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
+    if (cached.isPresent()) {
+      return Optional.of(cached.get().getGame());
+    }
+    return findXoGame(id).map(this::buildTicTacToeGame);
   }
 
   public Optional<GameEntity> findGame(final UUID id) {
