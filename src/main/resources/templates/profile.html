@@ -2,6 +2,16 @@
 <html xmlns:th="http://www.thymeleaf.org">
     <head th:replace="~{fragments/links :: head-js-css}"></head>
     <body>
+        <style>
+            /* The username field uses type="search" to dodge password-manager heuristics;
+               suppress the browser's built-in clear ("X") button so it looks like a normal
+               text input. */
+            #userNameInput::-webkit-search-cancel-button,
+            #userNameInput::-webkit-search-decoration {
+                -webkit-appearance: none;
+                appearance: none;
+            }
+        </style>
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
         <div class="container mt-4" style="max-width: 540px;">
             <h4 class="mb-4">Profile</h4>
@@ -10,8 +20,14 @@
             <form th:action="@{/profile}" method="post">
                 <div class="mb-3">
                     <label class="form-label">Username</label>
-                    <input type="text" class="form-control" id="userNameInput" name="userName"
-                           th:value="${user.username}" th:attr="data-original=${user.username}" required/>
+                    <!-- type="search" (rather than "text") keeps password managers like LastPass
+                         from treating this as a credentials-form username and injecting their
+                         autofill icon. The data-*ignore attributes below are kept as belt-and-
+                         braces for managers that do scan non-text inputs. -->
+                    <input type="search" class="form-control" id="userNameInput" name="userName"
+                           th:value="${user.username}" th:attr="data-original=${user.username}"
+                           autocomplete="off" data-lpignore="true" data-1p-ignore="true"
+                           data-form-type="other" required/>
                     <div id="usernameWarning"
                          class="alert alert-warning border-warning shadow-sm mt-2 mb-0 fw-bold"
                          style="overflow: hidden; max-height: 0; padding-top: 0; padding-bottom: 0;
@@ -25,7 +41,9 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Email</label>
-                    <input type="email" class="form-control" name="email" th:value="${user.email}"/>
+                    <input type="email" class="form-control" name="email" th:value="${user.email}"
+                           autocomplete="off" data-lpignore="true" data-1p-ignore="true"
+                           data-form-type="other"/>
                 </div>
                 <hr class="my-4"/>
                 <h6 class="mb-3">Change Password</h6>
