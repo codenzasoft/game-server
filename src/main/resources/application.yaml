@@ -1,5 +1,5 @@
 spring:
-  application.name: hearts
+  application.name: game-server
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_NAME}
