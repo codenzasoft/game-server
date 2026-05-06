@@ -61,6 +61,11 @@ node {
     nodeProjectDir = file('ui')
 }
 
+tasks.register('cleanFrontend', Delete) {
+    delete 'ui/dist'
+}
+clean.dependsOn('cleanFrontend')
+
 tasks.register('buildFrontend', NpmTask) {
     dependsOn npmInstall
     args = ['run', 'build:gradle']
