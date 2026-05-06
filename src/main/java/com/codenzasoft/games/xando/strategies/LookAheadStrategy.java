@@ -8,7 +8,7 @@ import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LookAheadStrategy implements XsAndOsListener {
+public class LookAheadStrategy implements XoGameListener {
   private static final Logger log = LoggerFactory.getLogger(LookAheadStrategy.class);
 
   private final Player player;
@@ -20,7 +20,7 @@ public class LookAheadStrategy implements XsAndOsListener {
     this.piece = piece;
   }
 
-  void play(final XsAndOs game, final State state) {
+  void play(final XoGame game, final XoState state) {
     final Board board = game.getBoard();
     if (board.getEmptyPositions().size() == 9) {
       // start of game, choose at random
@@ -101,18 +101,18 @@ public class LookAheadStrategy implements XsAndOsListener {
   }
 
   @Override
-  public void gameStarted(final XsAndOs game, final State state) {
+  public void gameStarted(final XoGame game, final XoState state) {
     play(game, state);
   }
 
   @Override
-  public void gameChanged(final XsAndOs game, final State state) {
+  public void gameChanged(final XoGame game, final XoState state) {
     play(game, state);
   }
 
   @Override
-  public void gameOver(final XsAndOs game, final State state) {}
+  public void gameOver(final XoGame game, final XoState state) {}
 
   @Override
-  public void gameQuit(XsAndOs game, State state) {}
+  public void gameQuit(XoGame game, XoState state) {}
 }

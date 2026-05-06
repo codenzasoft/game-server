@@ -5,7 +5,7 @@ import com.codenzasoft.games.xando.*;
 import java.util.List;
 import java.util.Random;
 
-public class RandomStrategy implements XsAndOsListener {
+public class RandomStrategy implements XoGameListener {
 
   private final Player player;
   private final Piece piece;
@@ -16,7 +16,7 @@ public class RandomStrategy implements XsAndOsListener {
     this.piece = piece;
   }
 
-  void play(final XsAndOs game, final State state) {
+  void play(final XoGame game, final XoState state) {
     final List<Position> moves = state.moves().getOrDefault(piece, List.of());
     if (!moves.isEmpty()) {
       final Position move = moves.get(RANDOM.nextInt(moves.size()));
@@ -25,18 +25,18 @@ public class RandomStrategy implements XsAndOsListener {
   }
 
   @Override
-  public void gameStarted(final XsAndOs game, final State state) {
+  public void gameStarted(final XoGame game, final XoState state) {
     play(game, state);
   }
 
   @Override
-  public void gameChanged(final XsAndOs game, final State state) {
+  public void gameChanged(final XoGame game, final XoState state) {
     play(game, state);
   }
 
   @Override
-  public void gameOver(final XsAndOs game, final State state) {}
+  public void gameOver(final XoGame game, final XoState state) {}
 
   @Override
-  public void gameQuit(XsAndOs game, State state) {}
+  public void gameQuit(XoGame game, XoState state) {}
 }

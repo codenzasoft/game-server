@@ -1,12 +1,12 @@
 package com.codenzasoft.games.xando;
 
-public interface XsAndOsListener {
+public interface XoGameListener {
 
-  void gameStarted(final XsAndOs game, final State state);
+  void gameStarted(final XoGame game, final XoState state);
 
-  void gameChanged(final XsAndOs game, final State state);
+  void gameChanged(final XoGame game, final XoState state);
 
-  void gameOver(final XsAndOs game, final State state);
+  void gameOver(final XoGame game, final XoState state);
 
-  void gameQuit(final XsAndOs game, final State state);
+  void gameQuit(final XoGame game, final XoState state);
 }

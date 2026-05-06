@@ -6,7 +6,7 @@ import com.codenzasoft.games.xando.strategies.RandomStrategy
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-class XsAndOsSpec extends Specification {
+class XoGameSpec extends Specification {
 
     def "test creating and playing a tic tac toe game"() {
         setup:

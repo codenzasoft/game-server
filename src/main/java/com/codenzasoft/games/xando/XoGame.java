@@ -11,14 +11,14 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class XsAndOs implements Game<XsAndOs> {
+public class XoGame implements Game<XoGame> {
 
   public static class Builder {
     private Player leader;
     private boolean quit;
     private final Map<Player, Piece> pieces = new HashMap<>();
     private final List<Player> players = new ArrayList<>();
-    private final List<XsAndOsListener> listeners = new ArrayList<>();
+    private final List<XoGameListener> listeners = new ArrayList<>();
     private Executor executor;
     private UUID id;
     private final Map<Player, List<Position>> plays = new HashMap<>();
@@ -55,12 +55,12 @@ public class XsAndOs implements Game<XsAndOs> {
       return this;
     }
 
-    public Builder addListener(final XsAndOsListener listener) {
+    public Builder addListener(final XoGameListener listener) {
       listeners.add(listener);
       return this;
     }
 
-    public XsAndOs build() {
+    public XoGame build() {
       if (id == null) {
         throw new IllegalStateException("must specify a game id");
       }
@@ -76,7 +76,7 @@ public class XsAndOs implements Game<XsAndOs> {
       if (executor == null) {
         withNotificationExecutor(Executors.newSingleThreadExecutor());
       }
-      return new XsAndOs(
+      return new XoGame(
           id,
           Board.emptyBoard(pieces.get(leader)),
           players,
@@ -88,28 +88,28 @@ public class XsAndOs implements Game<XsAndOs> {
     }
   }
 
-  private static final Logger log = LoggerFactory.getLogger(XsAndOs.class.getName());
+  private static final Logger log = LoggerFactory.getLogger(XoGame.class.getName());
 
-  private static final GameStartedNotification STARTED_NOTIFICATION = new GameStartedNotification();
-  private static final GameOverNotification ENDED_NOTIFICATION = new GameOverNotification();
-  private static final GameChangedNotification CHANGED_NOTIFICATION = new GameChangedNotification();
-  private static final GameQuitNotification QUIT_NOTIFICATION = new GameQuitNotification();
+  private static final XoStartedNotification STARTED_NOTIFICATION = new XoStartedNotification();
+  private static final XoOverNotification ENDED_NOTIFICATION = new XoOverNotification();
+  private static final XoChangedNotification CHANGED_NOTIFICATION = new XoChangedNotification();
+  private static final XoQuitNotification QUIT_NOTIFICATION = new XoQuitNotification();
 
   private final UUID id;
   private final Map<Player, Piece> pieces;
   private final List<Player> players;
-  private final List<XsAndOsListener> listeners = new ArrayList<>();
+  private final List<XoGameListener> listeners = new ArrayList<>();
   private Board board;
   private boolean quit = false;
   private int nextPlayerIndex = 0;
   private final Executor executor;
 
-  private XsAndOs(
+  private XoGame(
       final UUID id,
       final Board board,
       final List<Player> players,
       final Map<Player, Piece> pieces,
-      final List<XsAndOsListener> listeners,
+      final List<XoGameListener> listeners,
       final Executor executor,
       final Map<Player, List<Position>> plays,
       final boolean isQuit) {
@@ -160,7 +160,7 @@ public class XsAndOs implements Game<XsAndOs> {
     return GameType.XO;
   }
 
-  public XsAndOs getGame() {
+  public XoGame getGame() {
     return this;
   }
 
@@ -172,10 +172,10 @@ public class XsAndOs implements Game<XsAndOs> {
     return players;
   }
 
-  void notifyListeners(final GameNotification notification) {
-    final State state = buildState();
-    final XsAndOs game = this;
-    for (final XsAndOsListener listener : listeners) {
+  void notifyListeners(final XoNotification notification) {
+    final XoState state = buildState();
+    final XoGame game = this;
+    for (final XoGameListener listener : listeners) {
       executor.execute(() -> notification.execute(game, state, listener));
     }
   }
@@ -246,20 +246,20 @@ public class XsAndOs implements Game<XsAndOs> {
         .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
   }
 
-  public synchronized State buildState() {
+  public synchronized XoState buildState() {
     final Map<Piece, Player> playerMap = getPlayerMap();
     final Map<Piece, List<Position>> positions =
         Arrays.stream(Piece.values())
             .collect(Collectors.toMap(piece -> piece, piece -> board.getPositions(piece)));
     final Optional<Line> winningLine = board.getWinner();
-    final State state;
+    final XoState state;
     final Map<Piece, String> names =
         playerMap.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, key -> key.getValue().name()));
     if (winningLine.isPresent()) {
       final Line line = winningLine.get();
       state =
-          new State(
+          new XoState(
               board.sequence(),
               names,
               positions,
@@ -272,7 +272,7 @@ public class XsAndOs implements Game<XsAndOs> {
       final Player next = getPlayer();
       final Map<Piece, List<Position>> moves = Map.of(pieces.get(next), board.getEmptyPositions());
       state =
-          new State(
+          new XoState(
               board.sequence(),
               names,
               positions,

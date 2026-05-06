@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Describes the state of a game of X's and O's.
+ * Describes the state of an X's and O's game.
  *
  * @param players Maps {@link Piece} to {@link Player} name.
  * @param board Maps {@link Piece} to occupied {@link Position}s in the order they were selected.
@@ -16,7 +16,7 @@ import java.util.Map;
  * @param winner The {@link Piece} that won the game, possibly <code>null</code>.
  * @param line The {@link Line} that won the game, possible <code>null</code>.
  */
-public record State(
+public record XoState(
     int sequence,
     Map<Piece, String> players,
     Map<Piece, List<Position>> board,
