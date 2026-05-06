@@ -98,7 +98,7 @@ public class GameService {
   }
 
   List<UserEntity> getBots(final int count) {
-    List<UserEntity> bots = usersRepository.findByRole(Role.BOT);
+    List<UserEntity> bots = usersRepository.findByRolesRole(Role.BOT);
     if (bots.size() < count) {
       throw new IllegalStateException("Not enough bots to create a game");
     }

@@ -6,6 +6,7 @@ import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.xo.XoGame;
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -14,8 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -27,7 +26,7 @@ public class XoController {
   @Autowired private XoBroadcastService xoBroadcastService;
 
   @MessageMapping("/xo/{gameId}/load")
-  public void load(@DestinationVariable String gameId, @AuthenticationPrincipal UserDetails user) {
+  public void load(@DestinationVariable String gameId) {
     gameService
         .getOrBuildXoGame(UUID.fromString(gameId))
         .ifPresent(game -> xoBroadcastService.gameStarted(game, game.buildState()));
@@ -35,24 +34,22 @@ public class XoController {
 
   @MessageMapping("/xo/{gameId}/play")
   public void play(
-      @DestinationVariable String gameId,
-      @Payload XoPlayMessage message,
-      @AuthenticationPrincipal UserDetails user) {
+      @DestinationVariable String gameId, @Payload XoPlayMessage message, Principal principal) {
     final Optional<XoGame> game = gameService.getOrBuildXoGame(UUID.fromString(gameId));
-    final Optional<UserEntity> userEntity = findUser(user);
+    final Optional<UserEntity> userEntity = findUser(principal);
     if (game.isEmpty() || userEntity.isEmpty()) {
       return;
     }
-    game.get().playPiece(userEntity.get().toPlayer(), message.row(), message.col());
+    game.get().playPiece(userEntity.get().toPlayer(), message.row(), message.column());
   }
 
   @MessageMapping("/xo/{gameId}/quit")
-  public void quit(@DestinationVariable String gameId, @AuthenticationPrincipal UserDetails user) {
+  public void quit(@DestinationVariable String gameId) {
     gameService.getOrBuildXoGame(UUID.fromString(gameId)).ifPresent(XoGame::quit);
   }
 
   @MessageMapping("/xo/{gameId}/again")
-  public void again(@DestinationVariable String gameId, @AuthenticationPrincipal UserDetails user) {
+  public void again(@DestinationVariable String gameId) {
     final Optional<XoGame> optGame = gameService.getOrBuildXoGame(UUID.fromString(gameId));
     if (optGame.isEmpty()) {
       return;
@@ -67,7 +64,7 @@ public class XoController {
     xoBroadcastService.playAgain(game, game.buildState(), nextGameId.toString());
   }
 
-  private Optional<UserEntity> findUser(final UserDetails user) {
-    return gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+  private Optional<UserEntity> findUser(final Principal principal) {
+    return gamesUserDetailsService.getUserByUsernameOrEmail(principal.getName());
   }
 }
