@@ -1,4 +1,4 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xando.strategies;
 
 public record WinLoss(int wins, int losses) implements Comparable<WinLoss> {
 

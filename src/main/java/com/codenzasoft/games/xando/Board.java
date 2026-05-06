@@ -81,7 +81,7 @@ public record Board(int sequence, Piece leader, Map<Piece, List<Position>> posit
     return Optional.empty();
   }
 
-  Board set(final Position position, final Piece piece) {
+  public Board set(final Position position, final Piece piece) {
     validate(position);
     if (getWinner().isPresent()) {
       throw new IllegalStateException("hearts is over");
