@@ -17,9 +17,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * Broadcasts {@link XoMessage}s to all registered sessions by registering as a {@link XoGameListener} for each game.
+ */
 @Service
-public class GameStateBroadcastService implements XoGameListener {
-  private static final Logger log = LoggerFactory.getLogger(GameStateBroadcastService.class);
+public class XoBroadcastService implements XoGameListener {
+  private static final Logger log = LoggerFactory.getLogger(XoBroadcastService.class);
 
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private SimpMessagingTemplate messagingTemplate;
