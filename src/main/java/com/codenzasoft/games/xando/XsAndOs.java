@@ -157,7 +157,7 @@ public class XsAndOs implements Game<XsAndOs> {
   }
 
   public GameType getGameType() {
-    return GameType.X_AND_O;
+    return GameType.XO;
   }
 
   public XsAndOs getGame() {
