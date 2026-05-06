@@ -31,9 +31,6 @@ spring:
   thymeleaf:
     cache: false
 
-service.uri:
-  xo.ui: http://localhost:8085
-
 logging.level.org.springframework.messaging.simp: DEBUG
 
 ---

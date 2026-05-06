@@ -6,7 +6,6 @@ import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.views.ViewHelper;
 import com.codenzasoft.games.xo.Piece;
-import java.net.URI;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -62,8 +61,7 @@ public class IndexController {
     if (entity.isPresent()) {
       final XoGameEntity game =
           gameService.createXoGame(UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
-      final URI uri = viewHelper.getGameURI(game);
-      return "redirect:" + uri.toString();
+      return "redirect:/" + game.getId().toString();
     }
 
     return "redirect:/";
