@@ -43,6 +43,11 @@ public class IndexController {
     return "index";
   }
 
+  @GetMapping("/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+  public String game() {
+    return "forward:/index.html";
+  }
+
   /**
    * Creates a new single user {@link com.codenzasoft.games.xo.XoGame}.
    *

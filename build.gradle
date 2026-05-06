@@ -4,6 +4,7 @@ plugins {
     id 'org.springframework.boot' version '4.0.5'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.github.node-gradle.node' version '7.1.0'
 }
 
 group = 'com.codenzasoft'
@@ -53,3 +54,24 @@ test {
 }
 
 compileJava.dependsOn('spotlessApply')
+
+node {
+    version = '22.11.0'
+    download = true
+    nodeProjectDir = file('ui')
+}
+
+tasks.register('buildFrontend', NpmTask) {
+    dependsOn npmInstall
+    args = ['run', 'build:gradle']
+    inputs.dir('ui/src')
+    inputs.files('ui/package.json', 'ui/package-lock.json', 'ui/tsconfig.json', 'ui/vite.config.ts')
+    outputs.dir('ui/dist')
+}
+
+processResources {
+    dependsOn buildFrontend
+    from('ui/dist') {
+        into('static')
+    }
+}

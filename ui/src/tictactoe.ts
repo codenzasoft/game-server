@@ -10,8 +10,9 @@ import {
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
-const wsUrl = import.meta.env.VITE_WS_URL;
-const loginUrl = import.meta.env.VITE_LOGIN_URL;
+const wsUrl = import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games-connect`;
+const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
 const newGameUrl = import.meta.env.VITE_NEW_GAME_URL;
 
 export enum GamePiece {
@@ -528,8 +529,8 @@ export class GameEventHandler {
       }
     } else {
       const myMove = state.isPieceMove(myPiece);
-      this.myMove.visible = myMove;
-      this.yourMove.visible = !myMove;
+      this.myMove!.visible = myMove;
+      this.yourMove!.visible = !myMove;
     }
   }
 
@@ -571,7 +572,7 @@ export class GameEventHandler {
     app.stage.addChild(text);
   }
 
-  displayWin(app: Application, message: string, state: GameState) {
+  displayWin(app: Application, message: string, _state: GameState) {
     // Create the text objects
     const style = this.getTextStyle();
     const winText = new Text({ text: message, style });
@@ -613,7 +614,7 @@ export class GameEventHandler {
     });
   }
 
-  onWebSocketError(error) {
+  onWebSocketError(error: unknown) {
     console.error("Error with websocket", error);
     // redirect to login page to ensure user is authenticated
     window.location.href = loginUrl;
@@ -642,7 +643,7 @@ export class GameEventHandler {
    *
    * @param settings
    */
-  async createNewGame(settings: GameSettings): Promise<string> {
+  async createNewGame(settings: GameSettings): Promise<void> {
     const response = await fetch(newGameUrl, {
       method: "POST",
       headers: {

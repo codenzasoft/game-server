@@ -1,7 +1,7 @@
 import { Application } from "pixi.js";
 import { GameEventHandler } from "./tictactoe.ts";
 
-const loginUrl = import.meta.env.VITE_LOGIN_URL;
+const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
 
 const getLastPathSegment = (url) => {
   const pathname = new URL(url).pathname;

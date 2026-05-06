@@ -45,6 +45,9 @@ spring.config.activate.on-profile: cloud
 server:
   forward-headers-strategy: native
 
+service.uri:
+  xo.ui: /
+
 spring:
   datasource:
     url: "jdbc:postgresql:///${POSTGRES_NAME}?socketFactory=com.google.cloud.sql.postgres.SocketFactory&cloudSqlInstance=crafty-dynamics-495319-e2:us-central1:codenza-games-db"
