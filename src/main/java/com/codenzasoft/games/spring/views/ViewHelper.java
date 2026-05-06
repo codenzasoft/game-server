@@ -4,10 +4,9 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.RoleEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import java.net.URI;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.net.URI;
 
 /** Helper methods for Thymeleaf views. */
 @Component

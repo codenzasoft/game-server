@@ -18,14 +18,13 @@ import com.codenzasoft.games.xo.Position;
 import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.strategies.LookAheadStrategy;
 import jakarta.transaction.Transactional;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class GameService {
@@ -38,7 +37,6 @@ public class GameService {
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
-
 
   /**
    * Returns a new single user game for the provided {@link UserEntity} playing the provided {@link
@@ -107,6 +105,20 @@ public class GameService {
     return bots.subList(0, count);
   }
 
+  @Transactional
+  public XoGameEntity createNextXoGame(final UUID nextId, final XoGameEntity currentGame) {
+    final XoGame game = buildTicTacToeGame(currentGame);
+    final Piece nextLeader =
+        game.getNextGameLeader()
+            .orElseThrow(() -> new IllegalStateException("game is not over or quit"));
+    final Map<Piece, UserEntity> players =
+        currentGame.getGamePieces().stream()
+            .collect(
+                Collectors.toMap(
+                    XoPieceEntity::getPiece,
+                    gp -> usersRepository.findById(gp.getUserId()).orElseThrow()));
+    return createXoGame(nextId, players, nextLeader);
+  }
 
   public Optional<GameEntity> findGame(final UUID id) {
     return gamesRepository.findById(id);
@@ -146,8 +158,7 @@ public class GameService {
             .withNotificationExecutor(gameNotificationExecutor);
     final Map<Player, Piece> playerGamePieceMap =
         gameEntity.getGamePieces().stream()
-            .collect(
-                Collectors.toMap(gp -> gp.getUser().toPlayer(), XoPieceEntity::getPiece));
+            .collect(Collectors.toMap(gp -> gp.getUser().toPlayer(), XoPieceEntity::getPiece));
 
     gameEntity
         .getPlayers()
@@ -176,5 +187,4 @@ public class GameService {
     gameCache.addGame(game);
     return game;
   }
-
 }

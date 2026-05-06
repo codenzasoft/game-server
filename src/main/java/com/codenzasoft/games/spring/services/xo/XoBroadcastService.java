@@ -18,7 +18,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Broadcasts {@link XoMessage}s to all registered sessions by registering as a {@link XoGameListener} for each game.
+ * Broadcasts {@link XoMessage}s to all registered sessions by registering as a {@link
+ * XoGameListener} for each game.
  */
 @Service
 public class XoBroadcastService implements XoGameListener {

@@ -5,13 +5,10 @@ import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.views.ViewHelper;
-
+import com.codenzasoft.games.xo.Piece;
 import java.net.URI;
 import java.util.Optional;
 import java.util.UUID;
-
-import com.codenzasoft.games.xo.Piece;
-import com.codenzasoft.games.xo.XoGame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +29,7 @@ public class IndexController {
 
   @Autowired GamesUserDetailsService gamesUserDetailsService;
   @Autowired ViewHelper viewHelper;
-  @Autowired
-  GameService gameService;
+  @Autowired GameService gameService;
 
   @GetMapping("/")
   public String games(Model model, @AuthenticationPrincipal UserDetails user) {
@@ -60,8 +56,7 @@ public class IndexController {
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
       final XoGameEntity game =
-          gameService.createXoGame(
-              UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
+          gameService.createXoGame(UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
       final URI uri = viewHelper.getGameURI(game);
       return "redirect:" + uri.toString();
     }
