@@ -21,11 +21,10 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
   /**
-   * Defines the role hierarchy. Higher roles inherit every privilege of the roles below them, so
-   * an admin can do anything a developer / user / bot can do, and so on. With this in place,
-   * users only need to be assigned their highest role rather than every role they should
-   * implicitly have. Spring Security 6.3+ auto-wires this bean into both URL-based and
-   * method-based authorization.
+   * Defines the role hierarchy. Higher roles inherit every privilege of the roles below them, so an
+   * admin can do anything a developer / user / bot can do, and so on. With this in place, users
+   * only need to be assigned their highest role rather than every role they should implicitly have.
+   * Spring Security 6.3+ auto-wires this bean into both URL-based and method-based authorization.
    */
   @Bean
   static RoleHierarchy roleHierarchy() {
