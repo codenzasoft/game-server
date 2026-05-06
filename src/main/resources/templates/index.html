@@ -3,6 +3,12 @@
     <head th:replace="~{fragments/links :: head-js-css}"></head>
     <body>
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <main class="container mt-4">
+            <h2>Games</h2>
+            <form th:action="@{/games/xo}" method="post">
+                <button type="submit" class="btn btn-primary">New Xs &amp; Os Game</button>
+            </form>
+        </main>
         <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
     </body>
 </html>

@@ -29,3 +29,6 @@ replay_pid*
 /bin/
 
 .DS_Store
+
+/ui/node_modules/
+/ui/dist/

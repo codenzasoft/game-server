@@ -1,5 +1,7 @@
 package com.codenzasoft.games.spring.entities;
 
+import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.spring.config.Role;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -98,5 +100,13 @@ public class UserEntity {
   @JsonProperty("roles")
   public List<RoleEntity> getRoles() {
     return roles;
+  }
+
+  public Player toPlayer() {
+    return new Player(getId(), getUsername());
+  }
+
+  public boolean isBot() {
+    return getRoles().stream().anyMatch(role -> role.getRole().equals(Role.BOT));
   }
 }
