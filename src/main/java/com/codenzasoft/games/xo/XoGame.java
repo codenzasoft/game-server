@@ -1,9 +1,9 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xo;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
-import com.codenzasoft.games.xando.notifications.*;
+import com.codenzasoft.games.xo.notifications.*;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;

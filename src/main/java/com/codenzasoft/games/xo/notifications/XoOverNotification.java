@@ -1,8 +1,8 @@
-package com.codenzasoft.games.xando.notifications;
+package com.codenzasoft.games.xo.notifications;
 
-import com.codenzasoft.games.xando.XoGame;
-import com.codenzasoft.games.xando.XoGameListener;
-import com.codenzasoft.games.xando.XoState;
+import com.codenzasoft.games.xo.XoGame;
+import com.codenzasoft.games.xo.XoGameListener;
+import com.codenzasoft.games.xo.XoState;
 
 public class XoOverNotification extends XoNotification {
 

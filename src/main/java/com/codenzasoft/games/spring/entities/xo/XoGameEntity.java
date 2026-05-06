@@ -1,4 +1,4 @@
-package com.codenzasoft.games.spring.entities.xando;
+package com.codenzasoft.games.spring.entities.xo;
 
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.spring.entities.GameEntity;

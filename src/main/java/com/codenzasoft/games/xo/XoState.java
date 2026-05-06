@@ -1,4 +1,4 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xo;
 
 import com.codenzasoft.games.common.Player;
 import com.fasterxml.jackson.annotation.JsonInclude;

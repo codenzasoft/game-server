@@ -1,4 +1,4 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xo;
 
 /** The pieces for a game of X's and O's. */
 public enum Piece {

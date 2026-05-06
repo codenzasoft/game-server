@@ -1,4 +1,4 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xo;
 
 import java.util.*;
 

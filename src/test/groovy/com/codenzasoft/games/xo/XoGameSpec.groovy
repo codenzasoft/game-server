@@ -1,8 +1,8 @@
-package com.codenzasoft.games.xando
+package com.codenzasoft.games.xo
 
 import com.codenzasoft.games.common.Player
-import com.codenzasoft.games.xando.strategies.LookAheadStrategy
-import com.codenzasoft.games.xando.strategies.RandomStrategy
+import com.codenzasoft.games.xo.strategies.LookAheadStrategy
+import com.codenzasoft.games.xo.strategies.RandomStrategy
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

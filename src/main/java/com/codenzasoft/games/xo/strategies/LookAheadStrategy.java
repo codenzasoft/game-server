@@ -1,7 +1,7 @@
-package com.codenzasoft.games.xando.strategies;
+package com.codenzasoft.games.xo.strategies;
 
 import com.codenzasoft.games.common.Player;
-import com.codenzasoft.games.xando.*;
+import com.codenzasoft.games.xo.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;

@@ -1,4 +1,4 @@
-package com.codenzasoft.games.xando;
+package com.codenzasoft.games.xo;
 
 /**
  * A position of a cell in a game of X's and O's. A {@link Position} is defined as the row-column

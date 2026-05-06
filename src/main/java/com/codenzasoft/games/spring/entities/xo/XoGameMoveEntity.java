@@ -1,4 +1,4 @@
-package com.codenzasoft.games.spring.entities.xando;
+package com.codenzasoft.games.spring.entities.xo;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.fasterxml.jackson.annotation.JsonIgnore;

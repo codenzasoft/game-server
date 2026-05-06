@@ -29,7 +29,7 @@ public class IndexController {
     final Optional<UserEntity> optionalUser =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (optionalUser.isPresent()) {
-      model.addAttribute(PageConstants.PAGE_TITLE, "Admin Operations");
+      model.addAttribute(PageConstants.PAGE_TITLE, "Codenza Games");
       model.addAttribute(PageConstants.PAGE_USER, optionalUser.get());
       model.addAttribute(PageConstants.PAGE_HELPER, viewHelper);
     }

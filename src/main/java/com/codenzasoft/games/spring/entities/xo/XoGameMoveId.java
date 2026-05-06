@@ -1,4 +1,4 @@
-package com.codenzasoft.games.spring.entities.xando;
+package com.codenzasoft.games.spring.entities.xo;
 
 import jakarta.persistence.Column;
 import java.util.Objects;
