@@ -13,6 +13,7 @@ class GameStateSpec extends Specification {
         state.year == 1
         state.population == 5
         state.production == 100
+        state.food == 50
         state.board.size() == 4
     }
 
@@ -128,6 +129,25 @@ class GameStateSpec extends Specification {
 
     }
 
+    def "test that builder throws exception when food is negative"() {
+        setup:
+        def builder = GameState.builder()
+                .food(food)
+
+        when:
+        builder.build()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == expected_msg
+
+        where:
+        food   || expected_msg
+        -1.0   || "food cannot be negative"
+        -5.5   || "food cannot be negative"
+        -100.0 || "food cannot be negative"
+    }
+
     def "test that builder throws exception when year is negative"() {
         setup:
         def builder = GameState.builder()
@@ -154,12 +174,14 @@ class GameStateSpec extends Specification {
         def state = GameState.builder()
                 .population(0.0)
                 .production(0.0)
+                .food(0.0)
                 .year(0)
                 .build()
 
         expect:
         state.getPopulation() == 0.0
         state.getProduction() == 0.0
+        state.getFood() == 0.0
         state.getYear() == 0.0
     }
 }
