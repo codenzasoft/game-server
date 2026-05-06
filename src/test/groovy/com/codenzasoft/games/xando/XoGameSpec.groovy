@@ -12,7 +12,7 @@ class XsAndOsSpec extends Specification {
         setup:
         var p1 = newPlayer("me")
         var p2 = newPlayer("you")
-        var game = new XsAndOs.Builder()
+        var game = new XoGame.Builder()
                 .addPlayer(p1, Piece.X)
                 .addPlayer(p2, Piece.O)
                 .withId(UUID.randomUUID())
@@ -46,7 +46,7 @@ class XsAndOsSpec extends Specification {
         var poll = new PollingConditions(timeout: 5, initialDelay: 0.5, delay: 0.5)
 
         when:
-        var game = new XsAndOs.Builder()
+        var game = new XoGame.Builder()
                 .addPlayer(p1, Piece.X)
                 .addPlayer(p2, Piece.O)
                 .addListener(s1)
@@ -69,7 +69,7 @@ class XsAndOsSpec extends Specification {
         var poll = new PollingConditions(timeout: 60, initialDelay: 0.5, delay: 0.5)
 
         when:
-        var game = new XsAndOs.Builder()
+        var game = new XoGame.Builder()
                 .addPlayer(p1, Piece.X)
                 .addPlayer(p2, Piece.O)
                 .addListener(s1)
@@ -87,7 +87,7 @@ class XsAndOsSpec extends Specification {
         setup:
         var p1 = newPlayer("me")
         var p2 = newPlayer("you")
-        var builder = new XsAndOs.Builder()
+        var builder = new XoGame.Builder()
                 .addPlayer(p1, Piece.X)
                 .addPlayer(p2, Piece.O)
                 .addPlay(p1, new Position(1,1))
