@@ -12,6 +12,7 @@ public class GameState {
   private Map<Season, List<Card>> board;
   private double population;
   private double production;
+  private double food;
   private Season curSeason;
   private Phase curPhase;
   private int year;
@@ -20,6 +21,7 @@ public class GameState {
     this.board = b.board;
     this.population = b.population;
     this.production = b.production;
+    this.food = b.food;
     this.curSeason = b.curSeason;
     this.curPhase = b.curPhase;
     this.year = b.year;
@@ -99,6 +101,10 @@ public class GameState {
     return production;
   }
 
+  public double getFood() {
+    return food;
+  }
+
   public Season getCurSeason() {
     return curSeason;
   }
@@ -125,6 +131,10 @@ public class GameState {
     this.production = production;
   }
 
+  public void setFood(double food) {
+    this.food = food;
+  }
+
   public void setCurSeason(Season curSeason) {
     this.curSeason = curSeason;
   }
@@ -143,6 +153,7 @@ public class GameState {
     private Map<Season, List<Card>> board = new HashMap<>();
     private double population = 5.0;
     private double production = 100.0;
+    private double food = 50.0;
     private Season curSeason = Season.SPRING;
     private Phase curPhase = Phase.ADD;
     private int year = 1;
@@ -166,6 +177,11 @@ public class GameState {
 
     public Builder production(double production) {
       this.production = production;
+      return this;
+    }
+
+    public Builder food(double food) {
+      this.food = food;
       return this;
     }
 
@@ -201,6 +217,9 @@ public class GameState {
       }
       if (production < 0.0) {
         throw new IllegalStateException("production cannot be negative");
+      }
+      if (food < 0.0) {
+        throw new IllegalStateException("food cannot be negative");
       }
       if (year < 0) {
         throw new IllegalStateException("year cannot be negative");
