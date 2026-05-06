@@ -42,7 +42,7 @@ public class IndexController {
     return "index";
   }
 
-  @GetMapping("/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+  @GetMapping("/games/xo/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
   public String game() {
     return "forward:/index.html";
   }
@@ -61,7 +61,7 @@ public class IndexController {
     if (entity.isPresent()) {
       final XoGameEntity game =
           gameService.createXoGame(UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
-      return "redirect:/" + game.getId().toString();
+      return "redirect:/games/xo/" + game.getId().toString();
     }
 
     return "redirect:/";
