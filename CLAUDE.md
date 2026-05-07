@@ -117,7 +117,7 @@ STOMP over WebSocket. Connection endpoint: `/games/connect` (`WebSocketConfig.ja
 
 ### Schema management
 
-JPA is configured with `hibernate.ddl-auto: update`. Schema evolves automatically; no migration tool is in use.
+JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).
 
 ## Deployment
 

@@ -7,7 +7,7 @@ spring:
     password: ${POSTGRES_PASSWORD}
   jpa:
     properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
-    hibernate.ddl-auto: update
+    hibernate.ddl-auto: none
   lifecycle:
     timeout-per-shutdown-phase: 10s
   profiles:
