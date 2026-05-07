@@ -5,9 +5,66 @@
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
         <main class="container mt-4">
             <h2>Games</h2>
-            <form th:action="@{/games/xo}" method="post">
-                <button type="submit" class="btn btn-primary">New Xs &amp; Os Game</button>
-            </form>
+
+            <!-- Incoming invites -->
+            <section class="mb-4" th:if="${not #lists.isEmpty(incomingInvites)}">
+                <h5>Pending Invites</h5>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        th:each="game : ${incomingInvites}">
+                        <span>
+                            Challenge from
+                            <strong th:text="${game.createdBy.userName}"></strong>
+                        </span>
+                        <span class="d-flex gap-2">
+                            <form th:action="@{/games/xo/{id}/accept(id=${game.id})}" method="post">
+                                <button type="submit" class="btn btn-success btn-sm">Accept</button>
+                            </form>
+                            <form th:action="@{/games/xo/{id}/decline(id=${game.id})}" method="post">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Decline</button>
+                            </form>
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- Outgoing invites -->
+            <section class="mb-4" th:if="${not #lists.isEmpty(outgoingInvites)}">
+                <h5>Sent Invites</h5>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        th:each="game : ${outgoingInvites}">
+                        <span>
+                            Waiting for
+                            <strong th:text="${game.players[1].userName}"></strong>
+                        </span>
+                        <form th:action="@{/games/xo/{id}/cancel(id=${game.id})}" method="post">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
+                        </form>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- New vs-bot game -->
+            <section class="mb-3">
+                <h5>Xs &amp; Os</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <form th:action="@{/games/xo}" method="post">
+                        <button type="submit" class="btn btn-primary">Play vs Bot</button>
+                    </form>
+                    <form th:action="@{/games/xo/invite}" method="post"
+                          class="d-flex gap-2 align-items-center"
+                          th:if="${not #lists.isEmpty(opponents)}">
+                        <select name="opponentId" class="form-select form-select-sm" required>
+                            <option value="" disabled selected>Select opponent…</option>
+                            <option th:each="u : ${opponents}"
+                                    th:value="${u.id}"
+                                    th:text="${u.userName}"></option>
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary">Challenge</button>
+                    </form>
+                </div>
+            </section>
         </main>
         <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
     </body>
