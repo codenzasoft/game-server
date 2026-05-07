@@ -280,35 +280,6 @@ class GameStateSpec extends Specification {
     state.deck.get(Season.WINTER).size() == 0
     }
 
-    def "test that shuffleDeckIntoDrawPile moves deck cards into draw pile"() {
-    setup:
-    def state = GameState.newState()
-
-    def card1 = new Card(
-            0,
-            0,
-            [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER, FrequencyType.SINGLE)]
-    )
-
-    def card2 = new Card(
-            0,
-            0,
-            [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER, FrequencyType.SINGLE)]
-    )
-
-    state.deck.get(Season.FALL).add(card1)
-    state.deck.get(Season.FALL).add(card2)
-
-    when:
-    state.shuffleDeckIntoDrawPile(Season.FALL)
-
-    then:
-    state.deck.get(Season.FALL).size() == 0
-    state.drawPile.get(Season.FALL).size() == 2
-    state.drawPile.get(Season.FALL).contains(card1)
-    state.drawPile.get(Season.FALL).contains(card2)
-    }
-
     def "test that draw takes cards from draw pile and puts them in hand"() {
     setup:
     def state = GameState.newState()

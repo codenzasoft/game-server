@@ -109,7 +109,7 @@ public class GameState {
     }
   }
 
-  // when we add a card to one of our decks, shuffle the deck.
+  // when we add a card to one of our decks, add it to the drawpile and shuffle the drawpile.
   public void addToDeck(Season season, Card card) {
     if (season == null) {
       throw new IllegalStateException("season cannot be null");
@@ -119,10 +119,11 @@ public class GameState {
     }
 
     deck.get(season).add(card);
-    Collections.shuffle(deck.get(season));
+    drawPile.get(season).add(card);
+    Collections.shuffle(drawPile.get(season));
   }
 
-  //add multiple cards and shuffle.
+  // add multiple cards and shuffle.
   public void addToDeck(Season season, List<Card> cards) {
     if (season == null) {
       throw new IllegalStateException("season cannot be null");
@@ -130,9 +131,10 @@ public class GameState {
     if (cards == null) {
       throw new IllegalStateException("cards cannot be null");
     }
-  
+
     deck.get(season).addAll(cards);
-    Collections.shuffle(deck.get(season));
+    drawPile.get(season).addAll(cards);
+    Collections.shuffle(drawPile.get(season));
   }
 
   // draw n cards, if drawpile empty, shuffle discard into draw.
