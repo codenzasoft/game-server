@@ -44,6 +44,7 @@ public class IndexController {
       model.addAttribute("opponents", gameService.getAvailableOpponents(currentUser));
       model.addAttribute("outgoingInvites", gameService.getPendingOutgoingInvites(currentUser));
       model.addAttribute("incomingInvites", gameService.getPendingIncomingInvites(currentUser));
+      model.addAttribute("activeGames", gameService.getActiveGames(currentUser));
     }
     return "index";
   }
@@ -81,8 +82,7 @@ public class IndexController {
 
   /** Accepts a pending game invite and redirects to the game. */
   @PostMapping("/games/xo/{gameId}/accept")
-  public String acceptInvite(
-      @PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
+  public String acceptInvite(@PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
     final Optional<UserEntity> actor =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (actor.isPresent()) {
@@ -104,8 +104,7 @@ public class IndexController {
 
   /** Cancels an outgoing pending game invite. */
   @PostMapping("/games/xo/{gameId}/cancel")
-  public String cancelInvite(
-      @PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
+  public String cancelInvite(@PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
     final Optional<UserEntity> actor =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     actor.ifPresent(u -> gameService.cancelInvite(gameId, u));

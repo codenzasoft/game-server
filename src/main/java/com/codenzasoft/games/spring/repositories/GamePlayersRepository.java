@@ -33,4 +33,11 @@ public interface GamePlayersRepository extends PagingAndSortingRepository<GamePl
           + " AND gp.game.createdBy.id != :userId")
   List<GamePlayerEntity> findIncomingByUserAndStatus(
       @Param("userId") UUID userId, @Param("status") GameStatus status);
+
+  @Query(
+      "SELECT gp FROM GAME_PLAYERS gp"
+          + " WHERE gp.userId = :userId AND gp.game.status = 'ACTIVE'"
+          + " AND gp.game.overAt IS NULL AND gp.game.quitAt IS NULL"
+          + " ORDER BY gp.game.createdAt DESC")
+  List<GamePlayerEntity> findActiveGamesByUser(@Param("userId") UUID userId);
 }

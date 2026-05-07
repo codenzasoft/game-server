@@ -206,6 +206,13 @@ public class GameService {
         .toList();
   }
 
+  public List<XoGameEntity> getActiveGames(final UserEntity user) {
+    return gamePlayersRepository.findActiveGamesByUser(user.getId()).stream()
+        .map(gp -> (XoGameEntity) gp.getGame())
+        .distinct()
+        .toList();
+  }
+
   public List<UserEntity> getAvailableOpponents(final UserEntity currentUser) {
     return usersRepository.findAll().stream()
         .filter(u -> !u.getId().equals(currentUser.getId()))
