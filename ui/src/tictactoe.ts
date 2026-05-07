@@ -11,7 +11,7 @@ import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
 const wsUrl = import.meta.env.VITE_WS_URL ||
-  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games-connect`;
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games/connect`;
 const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
 const newGameUrl = import.meta.env.VITE_NEW_GAME_URL;
 

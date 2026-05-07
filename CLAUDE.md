@@ -36,11 +36,11 @@ Gradle compiles the frontend via `vite build --mode development` and serves it a
 cd ui && npm run dev
 # Access app at http://localhost:8085
 ```
-The Vite dev server at `localhost:8085` proxies all requests to Spring Boot at `localhost:8082`. The game page (`/games/xo/{uuid}`) is served by Vite directly (for HMR), while all other routes (auth, home, APIs) are proxied to Spring Boot. The `/games-connect` WebSocket has its own proxy entry.
+The Vite dev server at `localhost:8085` proxies all requests to Spring Boot at `localhost:8082`. The game page (`/games/xo/{uuid}`) is served by Vite directly (for HMR), while all other routes (auth, home, APIs) are proxied to Spring Boot. The `/games/connect` WebSocket has its own proxy entry.
 
 **Key proxy design decisions:**
 - No `changeOrigin` on the HTTP proxy — Spring Boot must see `Host: localhost:8085` so its redirect `Location` headers point back to port 8085 (not 8082).
-- The WebSocket proxy (`/games-connect`) is a separate entry from the HTTP proxy — if `ws: true` is on the general `/` rule it intercepts Vite's own HMR WebSocket and sends it to Spring Boot, causing an infinite reload loop.
+- The WebSocket proxy (`/games/connect`) is a separate entry from the HTTP proxy — if `ws: true` is on the general `/` rule it intercepts Vite's own HMR WebSocket and sends it to Spring Boot, causing an infinite reload loop.
 - Game-page bypass returns `/index.html` so Vite serves its own `index.html` (with HMR) instead of proxying to Spring Boot's compiled version.
 
 **Environment files:**
@@ -95,6 +95,25 @@ Thymeleaf templates live in `src/main/resources/templates/`. Caching is disabled
 - `development` (default) — local Postgres at `localhost:5435`, template cache off
 - `env-development` — environment-variable-driven Postgres connection
 - `cloud` — Cloud Run / GCP; enables `forward-headers-strategy: native` and the Cloud SQL socket-factory JDBC URL
+
+### WebSocket routes
+
+STOMP over WebSocket. Connection endpoint: `/games/connect` (`WebSocketConfig.java`). Application destination prefix: `/games` (stripped server-side, so a client destination of `/games/xo/{id}/play` maps to `@MessageMapping("/xo/{id}/play")`).
+
+**Client → Server** (`XoController.java`):
+
+| Client destination | Handler | Description |
+|---|---|---|
+| `/games/xo/{gameId}/load` | `load()` | Request initial game state on connect |
+| `/games/xo/{gameId}/play` | `play()` | Submit a move (payload: `{row, column}`) |
+| `/games/xo/{gameId}/quit` | `quit()` | Forfeit the game |
+| `/games/xo/{gameId}/again` | `again()` | Request a rematch |
+
+**Server → Client** (`XoBroadcastService.java`):
+
+| Subscription | Sent by | Description |
+|---|---|---|
+| `/user/queue/games/{gameId}` | `convertAndSendToUser(...)` | Per-player game state updates |
 
 ### Schema management
 
