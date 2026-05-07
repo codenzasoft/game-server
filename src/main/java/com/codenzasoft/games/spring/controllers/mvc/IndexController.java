@@ -73,8 +73,7 @@ public class IndexController {
           gameService.createXoGame(
               UUID.randomUUID(),
               Map.of(Piece.X, creator.get(), Piece.O, opponent.get()),
-              Piece.X,
-              creator.get());
+              Piece.X);
       return "redirect:/games/xo/" + game.getId();
     }
     return "redirect:/";

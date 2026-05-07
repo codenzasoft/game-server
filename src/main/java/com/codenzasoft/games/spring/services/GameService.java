@@ -51,7 +51,7 @@ public class GameService {
   @Transactional
   public XoGameEntity createXoGame(
       final UUID id, final UserEntity user, final Piece piece, final Piece leader) {
-    return createXoGame(id, Map.of(piece, user), leader, user);
+    return createXoGame(id, Map.of(piece, user), leader);
   }
 
   /**
@@ -66,17 +66,7 @@ public class GameService {
   @Transactional
   public XoGameEntity createXoGame(
       final UUID id, final Map<Piece, UserEntity> users, final Piece leader) {
-    return createXoGame(id, users, leader, null);
-  }
-
-  @Transactional
-  public XoGameEntity createXoGame(
-      final UUID id,
-      final Map<Piece, UserEntity> users,
-      final Piece leader,
-      final UserEntity creator) {
     final XoGameEntity entity = new XoGameEntity(id);
-    entity.setCreatedBy(creator);
     if (users.isEmpty()) {
       throw new IllegalStateException("game must have at least one player");
     }
