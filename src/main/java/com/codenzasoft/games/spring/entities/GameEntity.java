@@ -28,10 +28,6 @@ public abstract class GameEntity {
   @Column(name = "quit_at")
   Date quitAt;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "game_status", nullable = false)
-  GameStatus status = GameStatus.ACTIVE;
-
   @ManyToOne(fetch = FetchType.EAGER)
   @JoinColumn(name = "created_by")
   UserEntity createdBy;
@@ -106,19 +102,6 @@ public abstract class GameEntity {
 
   public void setPlayers(final List<UserEntity> players) {
     this.users = players;
-  }
-
-  public GameStatus getStatus() {
-    return status;
-  }
-
-  public void setStatus(final GameStatus status) {
-    this.status = status;
-  }
-
-  @JsonIgnore
-  public boolean isPending() {
-    return status == GameStatus.PENDING;
   }
 
   public UserEntity getCreatedBy() {

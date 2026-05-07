@@ -5,7 +5,6 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
-import com.codenzasoft.games.spring.entities.GameStatus;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
@@ -24,10 +23,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class GameService {
@@ -134,78 +131,6 @@ public class GameService {
     return createXoGame(nextId, players, nextLeader);
   }
 
-  @Transactional
-  public XoGameEntity createXoInvite(
-      final UUID id, final UserEntity creator, final UserEntity invitee) {
-    final XoGameEntity entity = new XoGameEntity(id);
-    entity.setStatus(GameStatus.PENDING);
-    entity.setCreatedBy(creator);
-    entity.setPlayers(List.of(creator, invitee));
-    entity.setGamePieces(
-        List.of(
-            new XoPieceEntity(id, creator.getId(), Piece.X),
-            new XoPieceEntity(id, invitee.getId(), Piece.O)));
-    gamesRepository.save(entity);
-    return entity;
-  }
-
-  @Transactional
-  public XoGameEntity acceptInvite(final UUID gameId, final UserEntity actor) {
-    final XoGameEntity game = findXoGame(gameId).orElseThrow();
-    if (game.getStatus() != GameStatus.PENDING) {
-      throw new IllegalStateException("game is not pending");
-    }
-    if (!game.getPlayers().contains(actor) || game.getCreatedBy().getId().equals(actor.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-    }
-    game.setStatus(GameStatus.ACTIVE);
-    gamesRepository.save(game);
-    return game;
-  }
-
-  @Transactional
-  public void declineInvite(final UUID gameId, final UserEntity actor) {
-    final XoGameEntity game = findXoGame(gameId).orElseThrow();
-    if (game.getStatus() != GameStatus.PENDING) {
-      throw new IllegalStateException("game is not pending");
-    }
-    if (!game.getPlayers().contains(actor) || game.getCreatedBy().getId().equals(actor.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-    }
-    game.setStatus(GameStatus.DECLINED);
-    gamesRepository.save(game);
-  }
-
-  @Transactional
-  public void cancelInvite(final UUID gameId, final UserEntity actor) {
-    final XoGameEntity game = findXoGame(gameId).orElseThrow();
-    if (game.getStatus() != GameStatus.PENDING) {
-      throw new IllegalStateException("game is not pending");
-    }
-    if (!game.getCreatedBy().getId().equals(actor.getId())) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-    }
-    game.setStatus(GameStatus.CANCELLED);
-    gamesRepository.save(game);
-  }
-
-  public List<XoGameEntity> getPendingOutgoingInvites(final UserEntity user) {
-    return gamePlayersRepository
-        .findOutgoingByCreatorAndStatus(user.getId(), GameStatus.PENDING)
-        .stream()
-        .map(gp -> (XoGameEntity) gp.getGame())
-        .distinct()
-        .toList();
-  }
-
-  public List<XoGameEntity> getPendingIncomingInvites(final UserEntity user) {
-    return gamePlayersRepository
-        .findIncomingByUserAndStatus(user.getId(), GameStatus.PENDING)
-        .stream()
-        .map(gp -> (XoGameEntity) gp.getGame())
-        .toList();
-  }
-
   public List<XoGameEntity> getActiveGames(final UserEntity user) {
     return gamePlayersRepository.findActiveGamesByUser(user.getId()).stream()
         .map(gp -> (XoGameEntity) gp.getGame())
@@ -226,9 +151,7 @@ public class GameService {
     if (cached.isPresent()) {
       return Optional.of(cached.get().getGame());
     }
-    return findXoGame(id)
-        .filter(e -> e.getStatus() == GameStatus.ACTIVE)
-        .map(this::buildTicTacToeGame);
+    return findXoGame(id).map(this::buildTicTacToeGame);
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
