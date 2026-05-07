@@ -598,15 +598,15 @@ export class GameEventHandler {
   }
 
   displayWin(app: Application, message: string, _state: GameState) {
-    // Create the text objects
     const style = this.getTextStyle();
     const winText = new Text({ text: message, style });
     const playAgain = new Text({ text: "Play Again", style });
+    const exit = new Text({ text: "Exit", style });
 
-    // Position and Center
-    winText.anchor.set(0.5); // Center the anchor point
+    winText.anchor.set(0.5);
     winText.x = app.screen.width / 2;
     winText.y = winText.height / 2;
+
     playAgain.anchor.set(0.5);
     playAgain.x = app.screen.width / 2;
     playAgain.y = app.screen.height - winText.height / 2;
@@ -616,8 +616,17 @@ export class GameEventHandler {
       this.playAgain();
     });
 
-    // Add to stage
+    exit.anchor.set(0.5);
+    exit.x = app.screen.width / 2;
+    exit.y = app.screen.height - winText.height / 2 - playAgain.height;
+    exit.cursor = "pointer";
+    exit.eventMode = "static";
+    exit.on("pointerdown", () => {
+      window.location.href = "/";
+    });
+
     app.stage.addChild(winText);
+    app.stage.addChild(exit);
     app.stage.addChild(playAgain);
   }
 
