@@ -11,9 +11,8 @@ import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
 const wsUrl = import.meta.env.VITE_WS_URL ||
-  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games-connect`;
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games/connect`;
 const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
-const newGameUrl = import.meta.env.VITE_NEW_GAME_URL;
 
 export enum GamePiece {
   X = "X",
@@ -637,26 +636,4 @@ export class GameEventHandler {
     this.stompClient.activate();
   }
 
-  /**
-   * A CORS POST request to create another game.
-   * TODO: no longer used but here for reference in case we need other requests.
-   *
-   * @param settings
-   */
-  async createNewGame(settings: GameSettings): Promise<void> {
-    const response = await fetch(newGameUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(settings),
-    });
-    if (response.ok) {
-      const uuid = await response.text();
-      window.location.href = "/" + uuid;
-    } else {
-      console.error(response.status);
-    }
-  }
 }

@@ -19,6 +19,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   @Override
   public void registerStompEndpoints(StompEndpointRegistry registry) {
     // TODO: all origins is probably insecure
-    registry.addEndpoint("/games-connect").setAllowedOrigins("*");
+    registry.addEndpoint("/games/connect").setAllowedOrigins("*");
   }
 }

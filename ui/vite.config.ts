@@ -7,7 +7,7 @@ export default defineConfig({
     port: 8085,
     open: true,
     proxy: {
-      "/games-connect": {
+      "/games/connect": {
         target: "ws://localhost:8082",
         ws: true,
       },
