@@ -1,6 +1,7 @@
 package com.codenzasoft.games.kingshand;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,16 +10,28 @@ public class GameState {
 
   public static final int MAX_TABLE_SIZE = 5;
 
+  // per season
   private Map<Season, List<Card>> board;
+  private Map<Season, List<Card>> deck;
+  private Map<Season, List<Card>> drawPile;
+  private Map<Season, List<Card>> discardPile;
+  // current hand
+  private List<Card> hand;
+  // resources
   private double population;
   private double production;
   private double food;
+  // where are we
   private Season curSeason;
   private Phase curPhase;
   private int year;
 
   private GameState(Builder b) {
     this.board = b.board;
+    this.deck = b.deck;
+    this.drawPile = b.drawPile;
+    this.discardPile = b.discardPile;
+    this.hand = b.hand;
     this.population = b.population;
     this.production = b.production;
     this.food = b.food;
@@ -96,10 +109,85 @@ public class GameState {
     }
   }
 
+  // when we add a card to one of our decks, shuffle the deck.
+  public void addToDeck(Season season, Card card) {
+    if (season == null) {
+      throw new IllegalStateException("season cannot be null");
+    }
+    if (card == null) {
+      throw new IllegalStateException("card cannot be null");
+    }
+
+    deck.get(season).add(card);
+    Collections.shuffle(deck.get(season));
+  }
+
+  // draw n cards, if drawpile empty, shuffle discard into draw.
+  public List<Card> draw(Season season, int n) {
+    if (season == null) {
+      throw new IllegalStateException("season cannot be null");
+    }
+    if (n < 0) {
+      throw new IllegalStateException("cannot draw a negative number of cards");
+    }
+
+    List<Card> drawnCards = new ArrayList<>();
+
+    for (int i = 0; i < n; i++) {
+      if (drawPile.get(season).isEmpty()) {
+        reshuffleDiscardIntoDrawPile(season);
+      }
+
+      if (drawPile.get(season).isEmpty()) {
+        break;
+      }
+
+      Card drawnCard = drawPile.get(season).remove(0);
+      hand.add(drawnCard);
+      drawnCards.add(drawnCard);
+    }
+
+    return drawnCards;
+  }
+
+  // move discard to draw pile, clear discard pile, shuffle draw pile.
+  private void reshuffleDiscardIntoDrawPile(Season season) {
+
+    drawPile.get(season).addAll(discardPile.get(season));
+    discardPile.get(season).clear();
+    Collections.shuffle(drawPile.get(season));
+  }
+
+  // move hand to discrad pile, clear hand.
+  public void discardHand(Season season) {
+    if (season == null) {
+      throw new IllegalStateException("season cannot be null");
+    }
+
+    discardPile.get(season).addAll(hand);
+    hand.clear();
+  }
+
   // ----- Getters -----
 
   public Map<Season, List<Card>> getBoard() {
     return board;
+  }
+
+  public Map<Season, List<Card>> getDeck() {
+    return deck;
+  }
+
+  public Map<Season, List<Card>> getDiscardPile() {
+    return discardPile;
+  }
+
+  public Map<Season, List<Card>> getDrawPile() {
+    return drawPile;
+  }
+
+  public List<Card> getHand() {
+    return hand;
   }
 
   public double getPopulation() {
@@ -132,6 +220,22 @@ public class GameState {
     this.board = board;
   }
 
+  public void setDeck(Map<Season, List<Card>> deck) {
+    this.deck = deck;
+  }
+
+  public void setDiscardPile(Map<Season, List<Card>> discardPile) {
+    this.discardPile = discardPile;
+  }
+
+  public void setDrawPile(Map<Season, List<Card>> drawPile) {
+    this.drawPile = drawPile;
+  }
+
+  public void setHand(List<Card> hand) {
+    this.hand = hand;
+  }
+
   public void setPopulation(double population) {
     this.population = population;
   }
@@ -160,6 +264,10 @@ public class GameState {
 
   public static final class Builder {
     private Map<Season, List<Card>> board = new HashMap<>();
+    private Map<Season, List<Card>> deck = new HashMap<>();
+    private Map<Season, List<Card>> discardPile = new HashMap<>();
+    private Map<Season, List<Card>> drawPile = new HashMap<>();
+    private List<Card> hand = new ArrayList<>();
     private double population = 5.0;
     private double production = 100.0;
     private double food = 50.0;
@@ -167,15 +275,39 @@ public class GameState {
     private Phase curPhase = Phase.ADD;
     private int year = 1;
 
+    // fill similar data types with seasons
     private Builder() {
-      board.put(Season.SPRING, new ArrayList<>());
-      board.put(Season.SUMMER, new ArrayList<>());
-      board.put(Season.FALL, new ArrayList<>());
-      board.put(Season.WINTER, new ArrayList<>());
+      for (Season season : Season.values()) {
+
+        board.put(season, new ArrayList<>());
+        deck.put(season, new ArrayList<>());
+        discardPile.put(season, new ArrayList<>());
+        drawPile.put(season, new ArrayList<>());
+      }
     }
 
     public Builder table(Season season, List<Card> cards) {
       board.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder deck(Season season, List<Card> cards) {
+      deck.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder discardPile(Season season, List<Card> cards) {
+      discardPile.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder drawPile(Season season, List<Card> cards) {
+      drawPile.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder hand(List<Card> cards) {
+      this.hand = new ArrayList<>(cards);
       return this;
     }
 
