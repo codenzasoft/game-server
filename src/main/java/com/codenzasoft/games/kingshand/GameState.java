@@ -76,13 +76,22 @@ public class GameState {
   private synchronized void triggerCurrentSeasonTable() {
     List<Card> table = getCurrentTable();
 
-    // trigger all cards on the table and update population and production accordingly
+    // Walk every effect on every card on the current season's table. For now, only RECURRING
+    // effects targeting a global resource (population / production / food) fire here. SELF and
+    // CARD targets — and SINGLE-frequency effects — are handled by the end-of-PLAY resolver
+    // landing in a later PR.
     for (Card card : table) {
-      if (card.populationEffect().frequencyType() == FrequencyType.RECURRING) {
-        population = card.nextPopulation(population);
-      }
-      if (card.productionEffect().frequencyType() == FrequencyType.RECURRING) {
-        production = card.nextProduction(production);
+      for (Effect effect : card.effects()) {
+        if (effect.frequencyType() != FrequencyType.RECURRING) {
+          continue;
+        }
+        if (effect.target() instanceof ResourceTarget rt) {
+          switch (rt) {
+            case POPULATION -> population = effect.nextValue(population);
+            case PRODUCTION -> production = effect.nextValue(production);
+            case FOOD -> food = effect.nextValue(food);
+          }
+        }
       }
     }
   }

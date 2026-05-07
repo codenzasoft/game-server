@@ -43,8 +43,10 @@ class GameStateSpec extends Specification {
         def card = new Card(
                 0,
                 0,
-                new Effect(popModifier, popValueType, popFreq),
-                new Effect(prodModifier, prodValueType, prodFreq)
+                [
+                        new Effect(ResourceTarget.POPULATION, popModifier, popValueType, popFreq),
+                        new Effect(ResourceTarget.PRODUCTION, prodModifier, prodValueType, prodFreq)
+                ]
         )
 
         state.board.get(Season.SUMMER).add(card)
@@ -61,7 +63,51 @@ class GameStateSpec extends Specification {
         10          | ValueType.INTEGER | FrequencyType.SINGLE    | 20           | ValueType.INTEGER | FrequencyType.RECURRING  || 5                  | 120
         10          | ValueType.INTEGER | FrequencyType.RECURRING | 20           | ValueType.INTEGER | FrequencyType.SINGLE     || 15                 | 100
         10          | ValueType.INTEGER | FrequencyType.SINGLE    | 20           | ValueType.INTEGER | FrequencyType.SINGLE     || 5                  | 100
-        10          | ValueType.INTEGER | FrequencyType.RECURRING    | 20           | ValueType.INTEGER | FrequencyType.RECURRING     || 15                  | 120
+        10          | ValueType.INTEGER | FrequencyType.RECURRING | 20           | ValueType.INTEGER | FrequencyType.RECURRING  || 15                 | 120
+    }
+
+    def "test card with recurring effects on all three resources fires every one of them"() {
+        setup:
+        def state = GameState.newState()
+
+        def card = new Card(
+                0,
+                0,
+                [
+                        new Effect(ResourceTarget.POPULATION, 1, ValueType.INTEGER, FrequencyType.RECURRING),
+                        new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER, FrequencyType.RECURRING),
+                        new Effect(ResourceTarget.FOOD, 3, ValueType.INTEGER, FrequencyType.RECURRING)
+                ]
+        )
+
+        state.board.get(Season.SUMMER).add(card)
+
+        when:
+        state.advanceSeason()
+
+        then:
+        state.population == 6     // 5 + 1
+        state.production == 105   // 100 + 5
+        state.food == 53          // 50 + 3
+    }
+
+    def "test single-frequency effects do not fire on the season trigger"() {
+        setup:
+        def state = GameState.newState()
+
+        def card = new Card(
+                0,
+                0,
+                [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.SINGLE)]
+        )
+
+        state.board.get(Season.SUMMER).add(card)
+
+        when:
+        state.advanceSeason()
+
+        then:
+        state.food == 50    // unchanged because the effect is SINGLE
     }
 
     def "test that builder throws exception when current season is missing"() {
