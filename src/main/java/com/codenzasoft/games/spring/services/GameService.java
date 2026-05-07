@@ -5,6 +5,7 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
+import com.codenzasoft.games.spring.entities.GameStatus;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
@@ -20,6 +21,8 @@ import com.codenzasoft.games.xo.strategies.LookAheadStrategy;
 import jakarta.transaction.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,7 +54,7 @@ public class GameService {
   @Transactional
   public XoGameEntity createXoGame(
       final UUID id, final UserEntity user, final Piece piece, final Piece leader) {
-    return createXoGame(id, Map.of(piece, user), leader);
+    return createXoGame(id, Map.of(piece, user), leader, user);
   }
 
   /**
@@ -66,7 +69,17 @@ public class GameService {
   @Transactional
   public XoGameEntity createXoGame(
       final UUID id, final Map<Piece, UserEntity> users, final Piece leader) {
+    return createXoGame(id, users, leader, null);
+  }
+
+  @Transactional
+  public XoGameEntity createXoGame(
+      final UUID id,
+      final Map<Piece, UserEntity> users,
+      final Piece leader,
+      final UserEntity creator) {
     final XoGameEntity entity = new XoGameEntity(id);
+    entity.setCreatedBy(creator);
     if (users.isEmpty()) {
       throw new IllegalStateException("game must have at least one player");
     }
@@ -121,12 +134,94 @@ public class GameService {
     return createXoGame(nextId, players, nextLeader);
   }
 
+  @Transactional
+  public XoGameEntity createXoInvite(
+      final UUID id, final UserEntity creator, final UserEntity invitee) {
+    final XoGameEntity entity = new XoGameEntity(id);
+    entity.setStatus(GameStatus.PENDING);
+    entity.setCreatedBy(creator);
+    entity.setPlayers(List.of(creator, invitee));
+    entity.setGamePieces(
+        List.of(
+            new XoPieceEntity(id, creator.getId(), Piece.X),
+            new XoPieceEntity(id, invitee.getId(), Piece.O)));
+    gamesRepository.save(entity);
+    return entity;
+  }
+
+  @Transactional
+  public XoGameEntity acceptInvite(final UUID gameId, final UserEntity actor) {
+    final XoGameEntity game = findXoGame(gameId).orElseThrow();
+    if (game.getStatus() != GameStatus.PENDING) {
+      throw new IllegalStateException("game is not pending");
+    }
+    if (!game.getPlayers().contains(actor) || game.getCreatedBy().getId().equals(actor.getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    game.setStatus(GameStatus.ACTIVE);
+    gamesRepository.save(game);
+    return game;
+  }
+
+  @Transactional
+  public void declineInvite(final UUID gameId, final UserEntity actor) {
+    final XoGameEntity game = findXoGame(gameId).orElseThrow();
+    if (game.getStatus() != GameStatus.PENDING) {
+      throw new IllegalStateException("game is not pending");
+    }
+    if (!game.getPlayers().contains(actor) || game.getCreatedBy().getId().equals(actor.getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    game.setStatus(GameStatus.DECLINED);
+    gamesRepository.save(game);
+  }
+
+  @Transactional
+  public void cancelInvite(final UUID gameId, final UserEntity actor) {
+    final XoGameEntity game = findXoGame(gameId).orElseThrow();
+    if (game.getStatus() != GameStatus.PENDING) {
+      throw new IllegalStateException("game is not pending");
+    }
+    if (!game.getCreatedBy().getId().equals(actor.getId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    game.setStatus(GameStatus.CANCELLED);
+    gamesRepository.save(game);
+  }
+
+  public List<XoGameEntity> getPendingOutgoingInvites(final UserEntity user) {
+    return gamePlayersRepository
+        .findOutgoingByCreatorAndStatus(user.getId(), GameStatus.PENDING)
+        .stream()
+        .map(gp -> (XoGameEntity) gp.getGame())
+        .distinct()
+        .toList();
+  }
+
+  public List<XoGameEntity> getPendingIncomingInvites(final UserEntity user) {
+    return gamePlayersRepository
+        .findIncomingByUserAndStatus(user.getId(), GameStatus.PENDING)
+        .stream()
+        .map(gp -> (XoGameEntity) gp.getGame())
+        .toList();
+  }
+
+  public List<UserEntity> getAvailableOpponents(final UserEntity currentUser) {
+    return usersRepository.findAll().stream()
+        .filter(u -> !u.getId().equals(currentUser.getId()))
+        .filter(u -> !u.isBot())
+        .sorted(Comparator.comparing(UserEntity::getUserName))
+        .toList();
+  }
+
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
     final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
     if (cached.isPresent()) {
       return Optional.of(cached.get().getGame());
     }
-    return findXoGame(id).map(this::buildTicTacToeGame);
+    return findXoGame(id)
+        .filter(e -> e.getStatus() == GameStatus.ACTIVE)
+        .map(this::buildTicTacToeGame);
   }
 
   public Optional<GameEntity> findGame(final UUID id) {
