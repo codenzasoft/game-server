@@ -224,6 +224,10 @@ public class GameService {
         .map(this::buildTicTacToeGame);
   }
 
+  public Optional<UserEntity> findUser(final UUID id) {
+    return usersRepository.findById(id);
+  }
+
   public Optional<GameEntity> findGame(final UUID id) {
     return gamesRepository.findById(id);
   }

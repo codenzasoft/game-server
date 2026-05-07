@@ -16,7 +16,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The {@link IndexController} serves the home (index) page and requires authentication. Its
@@ -35,9 +37,13 @@ public class IndexController {
     final Optional<UserEntity> optionalUser =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (optionalUser.isPresent()) {
+      final UserEntity currentUser = optionalUser.get();
       model.addAttribute(PageConstants.PAGE_TITLE, "Codenza Games");
-      model.addAttribute(PageConstants.PAGE_USER, optionalUser.get());
+      model.addAttribute(PageConstants.PAGE_USER, currentUser);
       model.addAttribute(PageConstants.PAGE_HELPER, viewHelper);
+      model.addAttribute("opponents", gameService.getAvailableOpponents(currentUser));
+      model.addAttribute("outgoingInvites", gameService.getPendingOutgoingInvites(currentUser));
+      model.addAttribute("incomingInvites", gameService.getPendingIncomingInvites(currentUser));
     }
     return "index";
   }
@@ -47,23 +53,62 @@ public class IndexController {
     return "forward:/index.html";
   }
 
-  /**
-   * Creates a new single user {@link com.codenzasoft.games.xo.XoGame}.
-   *
-   * @param user The game player.
-   * @return A redirect to the new game.
-   */
+  /** Creates a new vs-bot {@link com.codenzasoft.games.xo.XoGame}. */
   @PostMapping("/games/xo")
   public String newGame(@AuthenticationPrincipal UserDetails user) {
-    // TODO: limit new game creation - avoid attacks
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
       final XoGameEntity game =
           gameService.createXoGame(UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
-      return "redirect:/games/xo/" + game.getId().toString();
+      return "redirect:/games/xo/" + game.getId();
     }
+    return "redirect:/";
+  }
 
+  /** Sends a game invite to the selected opponent. */
+  @PostMapping("/games/xo/invite")
+  public String newInvite(
+      @AuthenticationPrincipal UserDetails user, @RequestParam UUID opponentId) {
+    final Optional<UserEntity> creator =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    final Optional<UserEntity> invitee = gameService.findUser(opponentId);
+    if (creator.isPresent() && invitee.isPresent()) {
+      gameService.createXoInvite(UUID.randomUUID(), creator.get(), invitee.get());
+    }
+    return "redirect:/";
+  }
+
+  /** Accepts a pending game invite and redirects to the game. */
+  @PostMapping("/games/xo/{gameId}/accept")
+  public String acceptInvite(
+      @PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> actor =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (actor.isPresent()) {
+      gameService.acceptInvite(gameId, actor.get());
+      return "redirect:/games/xo/" + gameId;
+    }
+    return "redirect:/";
+  }
+
+  /** Declines a pending game invite. */
+  @PostMapping("/games/xo/{gameId}/decline")
+  public String declineInvite(
+      @PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> actor =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    actor.ifPresent(u -> gameService.declineInvite(gameId, u));
+    return "redirect:/";
+  }
+
+  /** Cancels an outgoing pending game invite. */
+  @PostMapping("/games/xo/{gameId}/cancel")
+  public String cancelInvite(
+      @PathVariable UUID gameId, @AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> actor =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    actor.ifPresent(u -> gameService.cancelInvite(gameId, u));
     return "redirect:/";
   }
 }
