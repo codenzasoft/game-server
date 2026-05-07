@@ -44,8 +44,13 @@ public class XoController {
   }
 
   @MessageMapping("/xo/{gameId}/quit")
-  public void quit(@DestinationVariable String gameId) {
-    gameService.getOrBuildXoGame(UUID.fromString(gameId)).ifPresent(XoGame::quit);
+  public void quit(@DestinationVariable String gameId, Principal principal) {
+    final Optional<XoGame> game = gameService.getOrBuildXoGame(UUID.fromString(gameId));
+    final Optional<UserEntity> userEntity = findUser(principal);
+    if (game.isEmpty() || userEntity.isEmpty()) {
+      return;
+    }
+    game.get().quit(userEntity.get().toPlayer());
   }
 
   @MessageMapping("/xo/{gameId}/again")
