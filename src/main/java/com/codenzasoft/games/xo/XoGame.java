@@ -101,6 +101,7 @@ public class XoGame implements Game<XoGame> {
   private final List<XoGameListener> listeners = new ArrayList<>();
   private Board board;
   private boolean quit = false;
+  private Player quitter = null;
   private int nextPlayerIndex = 0;
   private final Executor executor;
 
@@ -204,11 +205,12 @@ public class XoGame implements Game<XoGame> {
     return board.getWinner();
   }
 
-  public synchronized void quit() {
+  public synchronized void quit(final Player player) {
     if (isOver() || isQuit()) {
       return;
     }
     quit = true;
+    quitter = player;
     notifyListeners(QUIT_NOTIFICATION);
   }
 
@@ -266,6 +268,7 @@ public class XoGame implements Game<XoGame> {
               Map.of(),
               board.leader(),
               isOverOrQuit(),
+              quitter != null ? pieces.get(quitter) : null,
               line.piece(),
               line);
     } else {
@@ -279,6 +282,7 @@ public class XoGame implements Game<XoGame> {
               moves,
               board.leader(),
               isOverOrQuit(),
+              quitter != null ? pieces.get(quitter) : null,
               null,
               null);
     }

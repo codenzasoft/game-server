@@ -113,9 +113,11 @@ public class XoGamePersistenceService implements XoGameListener {
     final Optional<XoGameEntity> optional = xoGameRepository.findById(game.getId());
     if (optional.isPresent()) {
       final XoGameEntity entity = optional.get();
-      entity.setQuitAt(new Date());
-      xoGameRepository.save(entity);
-      entityManager.flush();
+      if (!entity.isComplete()) {
+        entity.setQuitAt(new Date());
+        xoGameRepository.save(entity);
+        entityManager.flush();
+      }
     }
   }
 }

@@ -11,9 +11,8 @@ import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
 const wsUrl = import.meta.env.VITE_WS_URL ||
-  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games-connect`;
+  `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games/connect`;
 const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
-const newGameUrl = import.meta.env.VITE_NEW_GAME_URL;
 
 export enum GamePiece {
   X = "X",
@@ -91,6 +90,7 @@ export class GameState {
   board: Map<GamePiece, Position[]>;
   moves: Map<GamePiece, Position[]>;
   over: boolean;
+  quitter: GamePiece | undefined;
   leader: GamePiece;
   winner: GamePiece | undefined;
   line: Line | undefined;
@@ -102,6 +102,7 @@ export class GameState {
     this.moves = data.moves;
     this.leader = data.leader;
     this.over = data.over;
+    this.quitter = data.quitter;
     this.winner = data.winner;
     this.line = data.line;
   }
@@ -215,6 +216,7 @@ export const GameStateSchema = z.object({
   moves: PieceToPositionSchema,
   leader: z.enum(GamePiece),
   over: z.boolean(),
+  quitter: z.enum(GamePiece).optional(),
   winner: z.enum(GamePiece).optional(),
   line: LineSchema.optional(),
 }).transform((data) => new GameState(data as GameStateData));
@@ -444,6 +446,7 @@ export class GameEventHandler {
   spritePool: SpritePool = new SpritePool(5);
   myMove: Text | undefined = undefined;
   yourMove: Text | undefined = undefined;
+  quitButton: Text | undefined = undefined;
 
   constructor(app: Application) {
     this.app = app;
@@ -471,6 +474,12 @@ export class GameEventHandler {
     });
   }
 
+  public quit() {
+    this.stompClient.publish({
+      destination: `/games/xo/${this.gameId}/quit`,
+    });
+  }
+
   async processMessage(message: GameMessage) {
     this.messageQueue.push(message);
 
@@ -492,14 +501,16 @@ export class GameEventHandler {
           this.board.updateSquares(nextMessage, this.spritePool);
           this.displayGameOver(nextMessage, this.app);
         } else {
-          // same as previous state - might contain a "play again" link
-          if (nextMessage.context.nextGameId !== undefined) {
-            if (nextMessage.state.over) {
-              // clean up and go to next game
-              this.subscription.unsubscribe();
-              this.app.destroy(true, true);
-              window.location.href = nextMessage.context.nextGameId;
-            }
+          // same sequence - game was quit (no board move) or contains a "play again" link
+          if (nextMessage.state.over) {
+            this.board.updateSquares(nextMessage, this.spritePool);
+            this.displayGameOver(nextMessage, this.app);
+          }
+          if (nextMessage.context.nextGameId !== undefined && nextMessage.state.over) {
+            // clean up and go to next game
+            this.subscription.unsubscribe();
+            this.app.destroy(true, true);
+            window.location.href = nextMessage.context.nextGameId;
           }
         }
       } else {
@@ -518,12 +529,17 @@ export class GameEventHandler {
     if (state.over) {
       this.myMove.visible = false;
       this.yourMove.visible = false;
+      this.quitButton.visible = false;
       if (state.winner !== undefined) {
         if (state.winner == myPiece) {
           this.displayWin(app, "You Win!", state);
         } else {
           this.displayWin(app, "You Loose!", state);
         }
+      } else if (state.quitter !== undefined) {
+        const myPiece = state.getMyPiece(message.context);
+        const quitMessage = state.quitter === myPiece ? "You quit" : "Opponent quit";
+        this.displayWin(app, quitMessage, state);
       } else {
         this.displayWin(app, "Draw!", state);
       }
@@ -560,8 +576,17 @@ export class GameEventHandler {
       text: `Waiting for ${message.state.getOpponentName(message.context)}`,
       style,
     });
+    this.quitButton = new Text({ text: "Quit", style });
+    this.quitButton.cursor = "pointer";
+    this.quitButton.eventMode = "static";
+    this.quitButton.on("pointerdown", () => this.quit());
     this.positionTitle(app, this.myMove);
     this.positionTitle(app, this.yourMove);
+    this.quitButton.anchor.set(1, 0);
+    this.quitButton.x = app.screen.width;
+    this.quitButton.y = 0;
+    this.quitButton.visible = true;
+    app.stage.addChild(this.quitButton);
   }
 
   positionTitle(app: Application, text: Text) {
@@ -573,15 +598,15 @@ export class GameEventHandler {
   }
 
   displayWin(app: Application, message: string, _state: GameState) {
-    // Create the text objects
     const style = this.getTextStyle();
     const winText = new Text({ text: message, style });
     const playAgain = new Text({ text: "Play Again", style });
+    const exit = new Text({ text: "Exit", style });
 
-    // Position and Center
-    winText.anchor.set(0.5); // Center the anchor point
+    winText.anchor.set(0.5);
     winText.x = app.screen.width / 2;
     winText.y = winText.height / 2;
+
     playAgain.anchor.set(0.5);
     playAgain.x = app.screen.width / 2;
     playAgain.y = app.screen.height - winText.height / 2;
@@ -591,8 +616,17 @@ export class GameEventHandler {
       this.playAgain();
     });
 
-    // Add to stage
+    exit.anchor.set(0.5);
+    exit.x = app.screen.width / 2;
+    exit.y = app.screen.height - winText.height / 2 - playAgain.height;
+    exit.cursor = "pointer";
+    exit.eventMode = "static";
+    exit.on("pointerdown", () => {
+      window.location.href = "/";
+    });
+
     app.stage.addChild(winText);
+    app.stage.addChild(exit);
     app.stage.addChild(playAgain);
   }
 
@@ -637,26 +671,4 @@ export class GameEventHandler {
     this.stompClient.activate();
   }
 
-  /**
-   * A CORS POST request to create another game.
-   * TODO: no longer used but here for reference in case we need other requests.
-   *
-   * @param settings
-   */
-  async createNewGame(settings: GameSettings): Promise<void> {
-    const response = await fetch(newGameUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(settings),
-    });
-    if (response.ok) {
-      const uuid = await response.text();
-      window.location.href = "/" + uuid;
-    } else {
-      console.error(response.status);
-    }
-  }
 }
