@@ -14,7 +14,7 @@
                         th:each="game : ${incomingInvites}">
                         <span>
                             Challenge from
-                            <strong th:text="${game.createdBy.userName}"></strong>
+                            <strong th:text="${game.createdBy.username}"></strong>
                         </span>
                         <span class="d-flex gap-2">
                             <form th:action="@{/games/xo/{id}/accept(id=${game.id})}" method="post">
@@ -36,7 +36,7 @@
                         th:each="game : ${outgoingInvites}">
                         <span>
                             Waiting for
-                            <strong th:text="${game.players[1].userName}"></strong>
+                            <strong th:text="${game.players[1].username}"></strong>
                         </span>
                         <form th:action="@{/games/xo/{id}/cancel(id=${game.id})}" method="post">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Cancel</button>
@@ -59,7 +59,7 @@
                             <option value="" disabled selected>Select opponent…</option>
                             <option th:each="u : ${opponents}"
                                     th:value="${u.id}"
-                                    th:text="${u.userName}"></option>
+                                    th:text="${u.username}"></option>
                         </select>
                         <button type="submit" class="btn btn-outline-primary">Challenge</button>
                     </form>
