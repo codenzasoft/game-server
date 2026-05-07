@@ -12,7 +12,8 @@ import java.util.Map;
  * @param board Maps {@link Piece} to occupied {@link Position}s in the order they were selected.
  * @param moves Maps {@link Piece} to possible {@link Position}s that can be selected next.
  * @param leader The {@link Piece} that started the game.
- * @param over Whether the game is over.
+ * @param over Whether the game is over (won, drawn, or quit).
+ * @param quitter The {@link Piece} belonging to the player who quit, possibly <code>null</code>.
  * @param winner The {@link Piece} that won the game, possibly <code>null</code>.
  * @param line The {@link Line} that won the game, possible <code>null</code>.
  */
@@ -23,5 +24,6 @@ public record XoState(
     Map<Piece, List<Position>> moves,
     Piece leader,
     boolean over,
+    @JsonInclude(JsonInclude.Include.NON_NULL) Piece quitter,
     @JsonInclude(JsonInclude.Include.NON_NULL) Piece winner,
     @JsonInclude(JsonInclude.Include.NON_NULL) Line line) {}
