@@ -122,6 +122,19 @@ public class GameState {
     Collections.shuffle(deck.get(season));
   }
 
+  //add multiple cards and shuffle.
+  public void addToDeck(Season season, List<Card> cards) {
+    if (season == null) {
+      throw new IllegalStateException("season cannot be null");
+    }
+    if (cards == null) {
+      throw new IllegalStateException("cards cannot be null");
+    }
+  
+    deck.get(season).addAll(cards);
+    Collections.shuffle(deck.get(season));
+  }
+
   // draw n cards, if drawpile empty, shuffle discard into draw.
   public List<Card> draw(Season season, int n) {
     if (season == null) {
