@@ -121,12 +121,31 @@ public class GameService {
     return createXoGame(nextId, players, nextLeader);
   }
 
+  public List<XoGameEntity> getActiveGames(final UserEntity user) {
+    return gamePlayersRepository.findActiveGamesByUser(user.getId()).stream()
+        .map(gp -> (XoGameEntity) gp.getGame())
+        .distinct()
+        .toList();
+  }
+
+  public List<UserEntity> getAvailableOpponents(final UserEntity currentUser) {
+    return usersRepository.findAll().stream()
+        .filter(u -> !u.getId().equals(currentUser.getId()))
+        .filter(u -> !u.isBot())
+        .sorted(Comparator.comparing(UserEntity::getUsername))
+        .toList();
+  }
+
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
     final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
     if (cached.isPresent()) {
       return Optional.of(cached.get().getGame());
     }
     return findXoGame(id).map(this::buildTicTacToeGame);
+  }
+
+  public Optional<UserEntity> findUser(final UUID id) {
+    return usersRepository.findById(id);
   }
 
   public Optional<GameEntity> findGame(final UUID id) {

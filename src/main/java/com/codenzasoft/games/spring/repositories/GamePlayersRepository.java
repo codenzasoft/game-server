@@ -4,7 +4,9 @@ import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -17,4 +19,11 @@ public interface GamePlayersRepository extends PagingAndSortingRepository<GamePl
           final UUID userId, final Pageable pageable);
 
   public List<GamePlayerEntity> findByGameId(final UUID gameId);
+
+  @Query(
+      "SELECT gp FROM GAME_PLAYERS gp"
+          + " WHERE gp.userId = :userId"
+          + " AND gp.game.overAt IS NULL AND gp.game.quitAt IS NULL"
+          + " ORDER BY gp.game.createdAt DESC")
+  List<GamePlayerEntity> findActiveGamesByUser(@Param("userId") UUID userId);
 }

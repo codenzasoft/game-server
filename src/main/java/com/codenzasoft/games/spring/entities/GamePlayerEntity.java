@@ -57,4 +57,8 @@ public class GamePlayerEntity {
   public void setOrder(final int order) {
     this.order = order;
   }
+
+  public GameEntity getGame() {
+    return game;
+  }
 }
