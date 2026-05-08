@@ -2,6 +2,11 @@ package com.codenzasoft.games.kingshand
 
 import spock.lang.Specification
 
+/**
+ * Pure-data invariants for {@link GameState}: initial values, builder defaults, and the
+ * preconditions enforced by {@code Builder#build}. Engine behavior (phase/season advancement,
+ * table mutations, season triggers, pile mutations) is covered by {@link GameEngineSpec}.
+ */
 class GameStateSpec extends Specification {
 
     def "game starts in spring year 1 with initial values"() {
@@ -17,51 +22,22 @@ class GameStateSpec extends Specification {
         state.board.size() == 4
     }
 
-    def "test that advancing season changes current season correctly"() {
-        setup:
-        def state = GameState.newState()
-        state.curSeason = startSeason
-
+    def "fresh state has empty board, drawPile, discardPile for every season and an empty hand"() {
         when:
-        state.advanceSeason()
+        def state = GameState.newState()
 
         then:
-        state.curSeason == expectedSeason
-
-        where:
-        startSeason   || expectedSeason
-        Season.SPRING || Season.SUMMER
-        Season.SUMMER || Season.FALL
-        Season.FALL   || Season.WINTER
-        Season.WINTER || Season.SPRING
+        state.hand.isEmpty()
+        Season.values().each { s ->
+            assert state.board.get(s) == []
+            assert state.drawPile.get(s) == []
+            assert state.discardPile.get(s) == []
+        }
     }
 
-    def "test only recurring effects are triggered"() {
-        setup:
-        def state = GameState.newState()
-
-        def card = new Card(
-                0,
-                0,
-                new Effect(popModifier, popValueType, popFreq),
-                new Effect(prodModifier, prodValueType, prodFreq)
-        )
-
-        state.board.get(Season.SUMMER).add(card)
-
-        when:
-        state.advanceSeason()
-
-        then:
-        state.population == expectedPopulation
-        state.production == expectedProduction
-
-        where:
-        popModifier | popValueType      | popFreq                 | prodModifier | prodValueType     | prodFreq                 || expectedPopulation | expectedProduction
-        10          | ValueType.INTEGER | FrequencyType.SINGLE    | 20           | ValueType.INTEGER | FrequencyType.RECURRING  || 5                  | 120
-        10          | ValueType.INTEGER | FrequencyType.RECURRING | 20           | ValueType.INTEGER | FrequencyType.SINGLE     || 15                 | 100
-        10          | ValueType.INTEGER | FrequencyType.SINGLE    | 20           | ValueType.INTEGER | FrequencyType.SINGLE     || 5                  | 100
-        10          | ValueType.INTEGER | FrequencyType.RECURRING    | 20           | ValueType.INTEGER | FrequencyType.RECURRING     || 15                  | 120
+    def "fresh state starts in the ADD phase"() {
+        expect:
+        GameState.newState().curPhase == Phase.ADD
     }
 
     def "test that builder throws exception when current season is missing"() {
@@ -104,9 +80,9 @@ class GameStateSpec extends Specification {
 
         where:
         population || expected_msg
-        -1.0   || "population cannot be negative"
-        -10.5   || "population cannot be negative"
-        -100.0 || "population cannot be negative"
+        -1.0       || "population cannot be negative"
+        -10.5      || "population cannot be negative"
+        -100.0     || "population cannot be negative"
     }
 
     def "test that builder throws exception when production is negative"() {
@@ -123,10 +99,9 @@ class GameStateSpec extends Specification {
 
         where:
         production || expected_msg
-        -1.0   || "production cannot be negative"
-        -5.5   || "production cannot be negative"
-        -100.0 || "production cannot be negative"
-
+        -1.0       || "production cannot be negative"
+        -5.5       || "production cannot be negative"
+        -100.0     || "production cannot be negative"
     }
 
     def "test that builder throws exception when food is negative"() {
@@ -167,8 +142,6 @@ class GameStateSpec extends Specification {
         -100 || "year cannot be negative"
     }
 
-   
-
     def "test that builder allows zero values"() {
         setup:
         def state = GameState.builder()
@@ -183,5 +156,16 @@ class GameStateSpec extends Specification {
         state.getProduction() == 0.0
         state.getFood() == 0.0
         state.getYear() == 0.0
+    }
+
+    def "getCurrentTable returns the table for the current season"() {
+        setup:
+        def state = GameState.builder().curSeason(Season.FALL).build()
+        def card = new Card(0, 0, [])
+        state.board.get(Season.FALL).add(card)
+
+        expect:
+        state.getCurrentTable().is(state.board.get(Season.FALL))
+        state.getCurrentTable() == [card]
     }
 }

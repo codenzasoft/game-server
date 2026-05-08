@@ -5,20 +5,33 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Pure data carrier for a King's Hand game. All rule-based mutations live in {@link GameEngine};
+ * this class only holds fields, exposes getters/setters, and validates static invariants on
+ * construction via its {@link Builder}.
+ */
 public class GameState {
 
-  public static final int MAX_TABLE_SIZE = 5;
-
+  // per season
   private Map<Season, List<Card>> board;
+  private Map<Season, List<Card>> drawPile;
+  private Map<Season, List<Card>> discardPile;
+  // current hand
+  private List<Card> hand;
+  // resources
   private double population;
   private double production;
   private double food;
+  // where are we
   private Season curSeason;
   private Phase curPhase;
   private int year;
 
   private GameState(Builder b) {
     this.board = b.board;
+    this.drawPile = b.drawPile;
+    this.discardPile = b.discardPile;
+    this.hand = b.hand;
     this.population = b.population;
     this.production = b.production;
     this.food = b.food;
@@ -37,60 +50,27 @@ public class GameState {
     return new Builder();
   }
 
-  public synchronized void advancePhase() {
-    // if play phase ends, move to the next season
-    if (curPhase == Phase.PLAY) {
-      advanceSeason();
-    }
-
-    curPhase = curPhase.next();
-  }
-
-  public synchronized void advanceSeason() {
-    // new year if we end winter
-    if (curSeason == Season.WINTER) {
-      year++;
-    }
-
-    curSeason = curSeason.next();
-
-    triggerCurrentSeasonTable();
-  }
-
-  public List<Card> getCurrentTable() {
-    return board.get(curSeason);
-  }
-
-  public synchronized void addCard(Season season, Card card) {
-    List<Card> table = board.get(season);
-    if (table.size() >= MAX_TABLE_SIZE) {
-      throw new IllegalStateException(season + " table is full");
-    }
-    table.add(card);
-  }
-
-  public synchronized void removeCard(Season season, Card card) {
-    board.get(season).remove(card);
-  }
-
-  private synchronized void triggerCurrentSeasonTable() {
-    List<Card> table = getCurrentTable();
-
-    // trigger all cards on the table and update population and production accordingly
-    for (Card card : table) {
-      if (card.populationEffect().frequencyType() == FrequencyType.RECURRING) {
-        population = card.nextPopulation(population);
-      }
-      if (card.productionEffect().frequencyType() == FrequencyType.RECURRING) {
-        production = card.nextProduction(production);
-      }
-    }
-  }
-
   // ----- Getters -----
 
   public Map<Season, List<Card>> getBoard() {
     return board;
+  }
+
+  /** Convenience accessor for the table belonging to the current season. */
+  public List<Card> getCurrentTable() {
+    return board.get(curSeason);
+  }
+
+  public Map<Season, List<Card>> getDiscardPile() {
+    return discardPile;
+  }
+
+  public Map<Season, List<Card>> getDrawPile() {
+    return drawPile;
+  }
+
+  public List<Card> getHand() {
+    return hand;
   }
 
   public double getPopulation() {
@@ -113,15 +93,11 @@ public class GameState {
     return curPhase;
   }
 
-  public double getYear() {
+  public int getYear() {
     return year;
   }
 
   // ----- Setters -----
-
-  public void setBoard(Map<Season, List<Card>> board) {
-    this.board = board;
-  }
 
   public void setPopulation(double population) {
     this.population = population;
@@ -151,6 +127,9 @@ public class GameState {
 
   public static final class Builder {
     private Map<Season, List<Card>> board = new HashMap<>();
+    private Map<Season, List<Card>> discardPile = new HashMap<>();
+    private Map<Season, List<Card>> drawPile = new HashMap<>();
+    private List<Card> hand = new ArrayList<>();
     private double population = 5.0;
     private double production = 100.0;
     private double food = 50.0;
@@ -158,15 +137,33 @@ public class GameState {
     private Phase curPhase = Phase.ADD;
     private int year = 1;
 
+    // fill similar data types with seasons
     private Builder() {
-      board.put(Season.SPRING, new ArrayList<>());
-      board.put(Season.SUMMER, new ArrayList<>());
-      board.put(Season.FALL, new ArrayList<>());
-      board.put(Season.WINTER, new ArrayList<>());
+      for (Season season : Season.values()) {
+
+        board.put(season, new ArrayList<>());
+        discardPile.put(season, new ArrayList<>());
+        drawPile.put(season, new ArrayList<>());
+      }
     }
 
     public Builder table(Season season, List<Card> cards) {
       board.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder discardPile(Season season, List<Card> cards) {
+      discardPile.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder drawPile(Season season, List<Card> cards) {
+      drawPile.put(season, new ArrayList<>(cards));
+      return this;
+    }
+
+    public Builder hand(List<Card> cards) {
+      this.hand = new ArrayList<>(cards);
       return this;
     }
 
