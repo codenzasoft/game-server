@@ -93,7 +93,7 @@ public class GameState {
     return curPhase;
   }
 
-  public double getYear() {
+  public int getYear() {
     return year;
   }
 

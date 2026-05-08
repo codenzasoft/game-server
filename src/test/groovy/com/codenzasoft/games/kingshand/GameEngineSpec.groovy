@@ -123,10 +123,10 @@ class GameEngineSpec extends Specification {
                 ]
         )
 
-        state.board.get(Season.SUMMER).add(card)
+        engine.addCard(Season.SPRING, card)
 
         when:
-        engine.advanceSeason()
+        engine.triggerCurrentSeasonTable()
 
         then:
         state.population == expectedPopulation
@@ -155,10 +155,10 @@ class GameEngineSpec extends Specification {
                 ]
         )
 
-        state.board.get(Season.SUMMER).add(card)
+        engine.addCard(Season.SPRING, card)
 
         when:
-        engine.advanceSeason()
+        engine.triggerCurrentSeasonTable()
 
         then:
         state.population == 6     // 5 + 1

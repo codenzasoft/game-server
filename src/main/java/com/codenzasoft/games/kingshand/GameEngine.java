@@ -40,12 +40,10 @@ public class GameEngine {
   public synchronized void advanceSeason() {
     // new year if we end winter
     if (state.getCurSeason() == Season.WINTER) {
-      state.setYear((int) state.getYear() + 1);
+      state.setYear(state.getYear() + 1);
     }
 
     state.setCurSeason(state.getCurSeason().next());
-
-    triggerCurrentSeasonTable();
   }
 
   // ----- Table mutations -----
@@ -64,7 +62,7 @@ public class GameEngine {
 
   // ----- Season trigger -----
 
-  private synchronized void triggerCurrentSeasonTable() {
+  protected synchronized void triggerCurrentSeasonTable() {
     List<Card> table = state.getCurrentTable();
 
     // Walk every effect on every card on the current season's table. For now, only RECURRING
@@ -124,9 +122,10 @@ public class GameEngine {
         reshuffleDiscardIntoDrawPile(season);
       }
 
-      if (!state.getDrawPile().get(season).isEmpty()) {
+      List<Card> pile = state.getDrawPile().get(season);
+      if (!pile.isEmpty()) {
 
-        Card drawnCard = state.getDrawPile().get(season).remove(0);
+        Card drawnCard = pile.remove(0);
         state.getHand().add(drawnCard);
         drawnCards.add(drawnCard);
       }
