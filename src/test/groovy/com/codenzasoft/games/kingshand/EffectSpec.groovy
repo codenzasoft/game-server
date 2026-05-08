@@ -9,7 +9,7 @@ class EffectSpec extends Specification {
         def effect = new Effect(ResourceTarget.POPULATION, modifier, ValueType.INTEGER, FrequencyType.SINGLE)
 
         when:
-        def result = effect.nextValue(currentValue)
+        def result = effect.apply(currentValue)
 
         then:
         result == expected
@@ -29,7 +29,7 @@ class EffectSpec extends Specification {
         def effect = new Effect(ResourceTarget.PRODUCTION, modifier, ValueType.PERCENTAGE, FrequencyType.SINGLE)
 
         when:
-        def result = effect.nextValue(currentValue)
+        def result = effect.apply(currentValue)
 
         then:
         result == expected
