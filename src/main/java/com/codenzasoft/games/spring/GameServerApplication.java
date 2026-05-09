@@ -3,9 +3,11 @@ package com.codenzasoft.games.spring;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @SpringBootApplication
+@EnableScheduling
 public class GameServerApplication {
 
   public static void main(final String[] args) {
