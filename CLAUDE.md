@@ -119,6 +119,10 @@ STOMP over WebSocket. Connection endpoint: `/games/connect` (`WebSocketConfig.ja
 
 JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).
 
+### Background tasks
+
+`GameCleanupService` runs 2 minutes after startup and every 6 hours. It evicts completed games (where `overAt` or `quitAt` is set) from the in-memory cache and bulk-deletes them from the database; child rows in `game_players`, `xo_game_pieces`, and `xo_game_moves` are removed via `ON DELETE CASCADE`. Timing is overridable via `game.cleanup.initialDelay` and `game.cleanup.fixedDelay` (milliseconds).
+
 ## Deployment
 
 The app is deployed to **Google Cloud Run** at `https://games.dev.codenzasoft.ca`.
