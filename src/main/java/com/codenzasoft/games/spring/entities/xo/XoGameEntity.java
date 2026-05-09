@@ -14,10 +14,10 @@ public class XoGameEntity extends GameEntity {
 
   static final String XO_GAME_TYPE = "XO";
 
-  @OneToMany(mappedBy = "gameId", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+  @OneToMany(mappedBy = "gameId", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.EAGER)
   List<XoPieceEntity> gamePieces = new ArrayList<>();
 
-  @OneToMany(mappedBy = "gameId", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+  @OneToMany(mappedBy = "gameId", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.EAGER)
   @OrderColumn(name = "move_order")
   List<XoGameMoveEntity> gameMoves = new ArrayList<>();
 
