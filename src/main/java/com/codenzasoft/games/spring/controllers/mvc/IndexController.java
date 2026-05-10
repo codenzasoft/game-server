@@ -54,8 +54,7 @@ public class IndexController {
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
-      final XoGameEntity game =
-          gameService.createXoGame(UUID.randomUUID(), entity.get(), Piece.X, Piece.X);
+      final XoGameEntity game = gameService.createXoGame(entity.get(), Piece.X, Piece.X);
       return "redirect:/games/xo/" + game.getId();
     }
     return "redirect:/";
@@ -71,7 +70,7 @@ public class IndexController {
     if (creator.isPresent() && opponent.isPresent()) {
       final XoGameEntity game =
           gameService.createXoGame(
-              UUID.randomUUID(), Map.of(Piece.X, creator.get(), Piece.O, opponent.get()), Piece.X);
+              Map.of(Piece.X, creator.get(), Piece.O, opponent.get()), Piece.X);
       return "redirect:/games/xo/" + game.getId();
     }
     return "redirect:/";
