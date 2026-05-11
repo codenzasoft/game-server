@@ -13,7 +13,7 @@ class EventCatalogSpec extends Specification {
         def spring = evt("s1", Season.SPRING, 1)
         def summer = evt("u1", Season.SUMMER, 1)
         def catalog = new EventCatalog(
-                [(Season.SPRING): [spring], (Season.SUMMER): [summer]], [])
+                [(Season.SPRING): [spring], (Season.SUMMER): [summer]])
 
         expect:
         catalog.eligibleEvents(Season.SPRING, 1) == [spring]
@@ -24,7 +24,7 @@ class EventCatalogSpec extends Specification {
         setup:
         def early = evt("early", Season.SPRING, 1)
         def late  = evt("late",  Season.SPRING, 5)
-        def catalog = new EventCatalog([(Season.SPRING): [early, late]], [])
+        def catalog = new EventCatalog([(Season.SPRING): [early, late]])
 
         expect:
         catalog.eligibleEvents(Season.SPRING, 1) == [early]
@@ -33,25 +33,12 @@ class EventCatalogSpec extends Specification {
         catalog.eligibleEvents(Season.SPRING, 9) == [early, late]
     }
 
-    def "winter escalating events are returned only in winter"() {
+    def "winter events with minYear gating escalate as the year advances"() {
         setup:
-        def winterEvt = evt("w.cold", Season.WINTER, 1)
-        def escalating = evt("w.long_dark", Season.WINTER, 1)
-        def catalog = new EventCatalog([(Season.WINTER): [winterEvt]], [escalating])
-
-        expect:
-        catalog.eligibleEvents(Season.SPRING, 10) == []
-        catalog.eligibleEvents(Season.SUMMER, 10) == []
-        catalog.eligibleEvents(Season.FALL, 10) == []
-        catalog.eligibleEvents(Season.WINTER, 1) == [winterEvt, escalating]
-    }
-
-    def "winter escalating events are also gated by minYear"() {
-        setup:
-        def early = evt("early", Season.WINTER, 1)
-        def mid   = evt("mid",   Season.WINTER, 3)
-        def late  = evt("late",  Season.WINTER, 5)
-        def catalog = new EventCatalog([(Season.WINTER): []], [early, mid, late])
+        def early = evt("winter.early", Season.WINTER, 1)
+        def mid   = evt("winter.mid",   Season.WINTER, 3)
+        def late  = evt("winter.late",  Season.WINTER, 5)
+        def catalog = new EventCatalog([(Season.WINTER): [early, mid, late]])
 
         expect:
         catalog.eligibleEvents(Season.WINTER, 1) == [early]
@@ -59,10 +46,22 @@ class EventCatalogSpec extends Specification {
         catalog.eligibleEvents(Season.WINTER, 5) == [early, mid, late]
     }
 
+    def "events for a season do not leak into other seasons"() {
+        setup:
+        def winterEvt = evt("w1", Season.WINTER, 1)
+        def catalog = new EventCatalog([(Season.WINTER): [winterEvt]])
+
+        expect:
+        catalog.eligibleEvents(Season.SPRING, 10) == []
+        catalog.eligibleEvents(Season.SUMMER, 10) == []
+        catalog.eligibleEvents(Season.FALL,   10) == []
+        catalog.eligibleEvents(Season.WINTER, 1)  == [winterEvt]
+    }
+
     def "eligible events returns an immutable snapshot"() {
         setup:
         def catalog = new EventCatalog(
-                [(Season.SPRING): [evt("s1", Season.SPRING, 1)]], [])
+                [(Season.SPRING): [evt("s1", Season.SPRING, 1)]])
 
         when:
         catalog.eligibleEvents(Season.SPRING, 1).add(evt("x", Season.SPRING, 1))
@@ -73,7 +72,7 @@ class EventCatalogSpec extends Specification {
 
     def "constructor handles null seasonal map by treating every season as empty"() {
         setup:
-        def catalog = new EventCatalog(null, [])
+        def catalog = new EventCatalog(null)
 
         expect:
         Season.values().every { catalog.eligibleEvents(it, 99).isEmpty() }
@@ -82,11 +81,11 @@ class EventCatalogSpec extends Specification {
     def "constructor handles missing seasons in the seasonal map"() {
         setup:
         def catalog = new EventCatalog(
-                [(Season.SPRING): [evt("s1", Season.SPRING, 1)]], [])
+                [(Season.SPRING): [evt("s1", Season.SPRING, 1)]])
 
         expect:
         catalog.getSeasonalEvents(Season.SUMMER) == []
-        catalog.getSeasonalEvents(Season.FALL) == []
+        catalog.getSeasonalEvents(Season.FALL)   == []
         catalog.getSeasonalEvents(Season.WINTER) == []
     }
 
@@ -94,7 +93,7 @@ class EventCatalogSpec extends Specification {
         setup:
         def list = new ArrayList<Event>()
         list.add(evt("s1", Season.SPRING, 1))
-        def catalog = new EventCatalog([(Season.SPRING): list], [])
+        def catalog = new EventCatalog([(Season.SPRING): list])
 
         when:
         list.clear()
@@ -103,22 +102,9 @@ class EventCatalogSpec extends Specification {
         catalog.getSeasonalEvents(Season.SPRING).size() == 1
     }
 
-    def "constructor defensively copies the winter escalating list"() {
-        setup:
-        def escalating = new ArrayList<Event>()
-        escalating.add(evt("w1", Season.WINTER, 1))
-        def catalog = new EventCatalog([:], escalating)
-
-        when:
-        escalating.clear()
-
-        then:
-        catalog.getWinterEscalating().size() == 1
-    }
-
     def "eligibleEvents throws when season is null"() {
         setup:
-        def catalog = new EventCatalog([:], [])
+        def catalog = new EventCatalog([:])
 
         when:
         catalog.eligibleEvents(null, 1)
@@ -128,9 +114,12 @@ class EventCatalogSpec extends Specification {
         e.message == "season cannot be null"
     }
 
-    def "default catalog produces a non-empty winter escalating list"() {
+    def "default catalog populates events for every season"() {
+        setup:
+        def catalog = EventCatalog.defaultCatalog()
+
         expect:
-        !EventCatalog.defaultCatalog().getWinterEscalating().isEmpty()
+        Season.values().every { !catalog.getSeasonalEvents(it).isEmpty() }
     }
 
     def "default catalog escalates winter events as the year advances"() {
@@ -138,6 +127,6 @@ class EventCatalogSpec extends Specification {
         def catalog = EventCatalog.defaultCatalog()
 
         expect:
-        catalog.eligibleEvents(Season.WINTER, 1).size() <= catalog.eligibleEvents(Season.WINTER, 5).size()
+        catalog.eligibleEvents(Season.WINTER, 1).size() < catalog.eligibleEvents(Season.WINTER, 5).size()
     }
 }

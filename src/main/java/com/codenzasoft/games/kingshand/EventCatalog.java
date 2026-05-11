@@ -1,39 +1,31 @@
 package com.codenzasoft.games.kingshand;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Static catalog of {@link Event}s available to the {@link Phase#RANDOM_EVENT} phase. Holds two
- * pools:
+ * Static catalog of {@link Event}s available to the {@link Phase#RANDOM_EVENT} phase.
  *
  * <ul>
  *   <li><b>Per-season events</b>
- *   <li><b>Winter-only escalating events</b>
  * </ul>
  *
  * <p>Eligibility is the only filter the catalog applies: an event is eligible iff {@code minYear
  * &le; currentYear}. Random selection / weighting is the resolver's job, not the catalog's.
- *
- * <p>The seasonal map and winter-escalating list are defensively copied at construction so callers
- * can't mutate them after the fact.
  */
 public class EventCatalog {
 
   private final Map<Season, List<Event>> seasonalEvents;
-  private final List<Event> winterEscalating;
 
-  public EventCatalog(Map<Season, List<Event>> seasonalEvents, List<Event> winterEscalating) {
+  public EventCatalog(Map<Season, List<Event>> seasonalEvents) {
     Map<Season, List<Event>> copy = new EnumMap<>(Season.class);
     for (Season s : Season.values()) {
       List<Event> events = seasonalEvents == null ? null : seasonalEvents.get(s);
       copy.put(s, events == null ? List.of() : List.copyOf(events));
     }
     this.seasonalEvents = Collections.unmodifiableMap(copy);
-    this.winterEscalating = winterEscalating == null ? List.of() : List.copyOf(winterEscalating);
   }
 
   /** All per-season events for {@code season}, regardless of year eligibility. */
@@ -41,36 +33,17 @@ public class EventCatalog {
     return seasonalEvents.get(season);
   }
 
-  /** The winter-only escalating event list, regardless of year eligibility. */
-  public List<Event> getWinterEscalating() {
-    return winterEscalating;
-  }
-
   /**
-   * Events eligible in a season given currentYear when the season is winter, the escalating list.
-   * Each event is included only if event.minYear() <= currentYear.
+   * Events eligible in {@code season} given {@code currentYear}: every event in the season's pool
+   * whose {@link Event#minYear()} is at most {@code currentYear}.
    *
-   * @return eligible events
+   * @return an immutable snapshot of the eligible events
    */
   public List<Event> eligibleEvents(Season season, int currentYear) {
     if (season == null) {
       throw new IllegalArgumentException("season cannot be null");
     }
-
-    List<Event> result = new ArrayList<>();
-    for (Event e : seasonalEvents.get(season)) {
-      if (e.minYear() <= currentYear) {
-        result.add(e);
-      }
-    }
-    if (season == Season.WINTER) {
-      for (Event e : winterEscalating) {
-        if (e.minYear() <= currentYear) {
-          result.add(e);
-        }
-      }
-    }
-    return List.copyOf(result);
+    return seasonalEvents.get(season).stream().filter(e -> e.minYear() <= currentYear).toList();
   }
 
   /** Prototype events, subject to change */
@@ -144,10 +117,8 @@ public class EventCatalog {
                                 ValueType.INTEGER,
                                 FrequencyType.SINGLE)))))));
 
-    seasonal.put(Season.WINTER, List.of());
-
-    // Winter only escalating events:
-    List<Event> winterEscalating =
+    seasonal.put(
+        Season.WINTER,
         List.of(
             new Event(
                 "winter.cold_snap",
@@ -208,8 +179,8 @@ public class EventCatalog {
                                 ResourceTarget.POPULATION,
                                 -2,
                                 ValueType.INTEGER,
-                                FrequencyType.SINGLE))))));
+                                FrequencyType.SINGLE)))))));
 
-    return new EventCatalog(seasonal, winterEscalating);
+    return new EventCatalog(seasonal);
   }
 }
