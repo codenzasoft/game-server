@@ -140,7 +140,36 @@ The app is deployed to **Google Cloud Run** at `https://games.dev.codenzasoft.ca
 
 ## Testing
 
-JUnit 4 + Spock (Groovy) are on the test classpath. No tests exist yet. The Gradle test task is configured to log `passed`, `skipped`, and `failed` events.
+All tests are written in Groovy using the Spock framework. Unit tests (game logic) live in `src/test/groovy/` and extend `spock.lang.Specification` with no Spring context.
+
+### Database integration tests
+
+Database tests use `@SpringBootTest` + `@ActiveProfiles("test")` to load the full Spring context against a real Postgres instance. The test profile is configured in `src/test/resources/application-test.yaml`:
+
+- Connects to `localhost:5435` (the dev Postgres locally; the CI service container on the same port in GitHub Actions)
+- Runs Flyway migrations from `../game-database/migrations` (sibling checkout)
+
+Use `@Transactional` on the spec class so each feature method runs in a rolled-back transaction. Add a `setup()` block to delete rows in FK-safe order before each test — this keeps local runs clean when the dev database has existing data:
+
+```groovy
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class MyRepositorySpec extends Specification {
+
+    @Autowired MyRepository myRepository
+    @Autowired JdbcTemplate jdbcTemplate
+
+    def setup() {
+        jdbcTemplate.execute("DELETE FROM xo_game_moves")
+        jdbcTemplate.execute("DELETE FROM xo_game_pieces")
+        jdbcTemplate.execute("DELETE FROM game_players")
+        jdbcTemplate.execute("DELETE FROM games")
+    }
+}
+```
+
+In CI, the GitHub Actions Postgres service starts with an empty database, so the `setup()` deletes are no-ops — but `@Transactional` rollback still ensures test isolation.
 
 ## Deployment
 
