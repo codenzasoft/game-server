@@ -9,6 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: game-server
+
+      - uses: actions/checkout@v4
+        with:
+          repository: codenzasoft/game-database
+          path: game-database
 
       - uses: actions/setup-java@v4
         with:
@@ -18,4 +25,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
+        working-directory: game-server
         run: ./gradlew build
