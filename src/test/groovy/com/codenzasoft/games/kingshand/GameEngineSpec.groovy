@@ -518,4 +518,287 @@ class GameEngineSpec extends Specification {
         def e = thrown(IllegalStateException)
         e.message == "season cannot be null"
     }
+
+    // ----- ADD phase: offerAddChoices -----
+
+    def "offerAddChoices returns exactly three cards"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).build()
+        def engine = new GameEngine(state)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        choices.size() == 3
+    }
+
+    def "offerAddChoices returns only cards from the current season's catalog"() {
+        setup:
+        def catalog = CardCatalog.defaultCatalog()
+        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
+        def engine = new GameEngine(state, catalog)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        catalog.forSeason(Season.SPRING).containsAll(choices)
+    }
+
+    def "offerAddChoices draws from the correct season — not another season's pool"() {
+        setup:
+        def catalog = CardCatalog.defaultCatalog()
+        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.WINTER).build()
+        def engine = new GameEngine(state, catalog)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        catalog.forSeason(Season.WINTER).containsAll(choices)
+        choices.every { !catalog.forSeason(Season.SPRING).contains(it) }
+    }
+
+    def "offerAddChoices stores choices in state and resets reroll count"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).rerollCount(2).build()
+        def engine = new GameEngine(state)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        state.addChoices == choices
+        state.rerollCount == 0
+    }
+
+    def "offerAddChoices throws when phase is not ADD"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.offerAddChoices()
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    // ----- ADD phase: pickCard -----
+
+    def "pickCard shuffles the chosen card into the current season's draw pile"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
+        def engine = new GameEngine(state)
+        def card = CardCatalog.FARM
+
+        when:
+        engine.pickCard(card)
+
+        then:
+        state.drawPile.get(Season.SPRING).contains(card)
+    }
+
+    def "pickCard advances the phase to RANDOM_EVENT"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.pickCard(CardCatalog.FARM)
+
+        then:
+        state.curPhase == Phase.RANDOM_EVENT
+    }
+
+    def "pickCard clears addChoices and resets reroll count"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .rerollCount(1)
+                .build()
+        def engine = new GameEngine(state)
+        // pre-populate some choices so we can verify they're cleared
+        state.addChoices = [CardCatalog.FARM]
+
+        when:
+        engine.pickCard(CardCatalog.FARM)
+
+        then:
+        state.addChoices.isEmpty()
+        state.rerollCount == 0
+    }
+
+    def "pickCard throws when phase is not ADD"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.pickCard(CardCatalog.FARM)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    // ----- ADD phase: rerollAddChoices -----
+
+    def "rerollAddChoices charges 5 production for the first reroll"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .production(100.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.rerollAddChoices()
+
+        then:
+        state.production == 95.0
+        state.rerollCount == 1
+    }
+
+    def "rerollAddChoices cost escalates with each reroll within an ADD phase"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .production(200.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when: "first reroll costs 5"
+        engine.rerollAddChoices()
+
+        then:
+        state.production == 195.0
+        state.rerollCount == 1
+
+        when: "second reroll costs 10"
+        engine.rerollAddChoices()
+
+        then:
+        state.production == 185.0
+        state.rerollCount == 2
+
+        when: "third reroll costs 15"
+        engine.rerollAddChoices()
+
+        then:
+        state.production == 170.0
+        state.rerollCount == 3
+    }
+
+    def "rerollAddChoices replaces the offered cards and updates state"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .production(100.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        def choices = engine.rerollAddChoices()
+
+        then:
+        choices.size() == 3
+        CardCatalog.defaultCatalog().forSeason(Season.SPRING).containsAll(choices)
+        state.addChoices == choices
+    }
+
+    def "rerollAddChoices throws when player cannot afford the cost"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .production(3.0)   // less than the first-reroll cost of 5
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.rerollAddChoices()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("not enough production to reroll")
+    }
+
+    def "rerollAddChoices does not charge or change state when player can't afford"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .production(4.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.rerollAddChoices()
+
+        then:
+        thrown(IllegalStateException)
+        state.production == 4.0      // unchanged
+        state.rerollCount == 0       // unchanged
+    }
+
+    def "rerollAddChoices throws when phase is not ADD"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.rerollAddChoices()
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    // ----- ADD phase: skipAdd -----
+
+    def "skipAdd advances the phase to RANDOM_EVENT without adding a card"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .curSeason(Season.SPRING)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.skipAdd()
+
+        then:
+        state.curPhase == Phase.RANDOM_EVENT
+        state.drawPile.get(Season.SPRING).isEmpty()
+        state.drawPile.get(Season.SUMMER).isEmpty()
+        state.drawPile.get(Season.FALL).isEmpty()
+        state.drawPile.get(Season.WINTER).isEmpty()
+    }
+
+    def "skipAdd clears addChoices and resets reroll count"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .rerollCount(2)
+                .build()
+        state.addChoices = [CardCatalog.SEEDS]
+        def engine = new GameEngine(state)
+
+        when:
+        engine.skipAdd()
+
+        then:
+        state.addChoices.isEmpty()
+        state.rerollCount == 0
+    }
+
+    def "skipAdd throws when phase is not ADD"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.skipAdd()
+
+        then:
+        thrown(IllegalStateException)
+    }
 }
