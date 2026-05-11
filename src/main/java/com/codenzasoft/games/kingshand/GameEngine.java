@@ -13,7 +13,7 @@ import java.util.Random;
 public class GameEngine {
 
   public static final int MAX_TABLE_SIZE = 5;
-  public static final int REROLL_COST_STEP = 5;
+  public static final int REROLL_COST_STEP = 10;
   static final int ADD_OFFER_SIZE = 3;
 
   private final GameState state;
