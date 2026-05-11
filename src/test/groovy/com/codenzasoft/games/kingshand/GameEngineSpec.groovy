@@ -644,7 +644,7 @@ class GameEngineSpec extends Specification {
 
     // ----- ADD phase: rerollAddChoices -----
 
-    def "rerollAddChoices charges 5 production for the first reroll"() {
+    def "rerollAddChoices charges 10 production for the first reroll"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.ADD)
@@ -656,7 +656,7 @@ class GameEngineSpec extends Specification {
         engine.rerollAddChoices()
 
         then:
-        state.production == 95.0
+        state.production == 90.0
         state.rerollCount == 1
     }
 
@@ -668,25 +668,25 @@ class GameEngineSpec extends Specification {
                 .build()
         def engine = new GameEngine(state)
 
-        when: "first reroll costs 5"
+        when: "first reroll costs 10"
         engine.rerollAddChoices()
 
         then:
-        state.production == 195.0
+        state.production == 190.0
         state.rerollCount == 1
 
-        when: "second reroll costs 10"
-        engine.rerollAddChoices()
-
-        then:
-        state.production == 185.0
-        state.rerollCount == 2
-
-        when: "third reroll costs 15"
+        when: "second reroll costs 20"
         engine.rerollAddChoices()
 
         then:
         state.production == 170.0
+        state.rerollCount == 2
+
+        when: "third reroll costs 30"
+        engine.rerollAddChoices()
+
+        then:
+        state.production == 140.0
         state.rerollCount == 3
     }
 
