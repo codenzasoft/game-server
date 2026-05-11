@@ -22,12 +22,6 @@ repositories {
     mavenCentral()
 }
 
-dependencyManagement {
-    imports {
-        mavenBom 'org.testcontainers:testcontainers-bom:1.20.4'
-    }
-}
-
 dependencies {
     implementation(
             'org.springframework.boot:spring-boot-starter-security',
@@ -49,8 +43,6 @@ dependencies {
             'org.spockframework:spock-core:2.4-M7-groovy-5.0',
             'org.spockframework:spock-spring:2.4-M7-groovy-5.0',
             'org.springframework.boot:spring-boot-starter-test',
-            'org.springframework.boot:spring-boot-testcontainers',
-            'org.testcontainers:postgresql',
             'org.flywaydb:flyway-core',
             'org.flywaydb:flyway-database-postgresql',
     )
@@ -67,17 +59,6 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
     }
-    systemProperty 'testcontainers.enabled', System.getProperty('testcontainers.enabled', 'true')
-}
-
-tasks.register('testLocal', Test) {
-    useJUnitPlatform()
-    testLogging {
-        events "passed", "skipped", "failed"
-    }
-    systemProperty 'testcontainers.enabled', 'false'
-    description = 'Run tests against local Postgres (no Docker required)'
-    group = 'verification'
 }
 
 tasks.register('copyNewRelicAgent', Copy) {
