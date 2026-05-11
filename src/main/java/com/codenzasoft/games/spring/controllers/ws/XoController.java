@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.controllers.ws;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.messages.XoPlayMessage;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -64,9 +65,8 @@ public class XoController {
       log.warn("again: game {} is not over or quit", gameId);
       return;
     }
-    final UUID nextGameId = UUID.randomUUID();
-    gameService.createNextXoGame(nextGameId, game);
-    xoBroadcastService.playAgain(game, game.buildState(), nextGameId.toString());
+    final XoGameEntity nextGame = gameService.createNextXoGame(game);
+    xoBroadcastService.playAgain(game, game.buildState(), nextGame.getId());
   }
 
   private Optional<UserEntity> findUser(final Principal principal) {

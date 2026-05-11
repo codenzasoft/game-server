@@ -42,31 +42,27 @@ public class GameService {
    * Returns a new single user game for the provided {@link UserEntity} playing the provided {@link
    * Piece}.
    *
-   * @param id The game identifier.
    * @param user The user.
    * @param piece The {@link Piece} associated with the user.
    * @param leader The {@link Piece} that starts the game.
    * @return A new game.
    */
   @Transactional
-  public XoGameEntity createXoGame(
-      final UUID id, final UserEntity user, final Piece piece, final Piece leader) {
-    return createXoGame(id, Map.of(piece, user), leader);
+  public XoGameEntity createXoGame(final UserEntity user, final Piece piece, final Piece leader) {
+    return createXoGame(Map.of(piece, user), leader);
   }
 
   /**
    * Creates a new game with assigned {@link Piece}s. Must specify at least a single {@link
    * UserEntity}. A bot will be added as needed.
    *
-   * @param id The game ID.
    * @param users The {@link UserEntity}s and corresponding {@link Piece}s.
    * @param leader The leading {@link Piece}
    * @return A new game.
    */
   @Transactional
-  public XoGameEntity createXoGame(
-      final UUID id, final Map<Piece, UserEntity> users, final Piece leader) {
-    final XoGameEntity entity = new XoGameEntity(id);
+  public XoGameEntity createXoGame(final Map<Piece, UserEntity> users, final Piece leader) {
+    final XoGameEntity game = new XoGameEntity(UUID.randomUUID());
     if (users.isEmpty()) {
       throw new IllegalStateException("game must have at least one player");
     }
@@ -87,14 +83,14 @@ public class GameService {
     final List<UserEntity> playerOrder = new ArrayList<>();
     playerOrder.add(players.get(leader));
     playerOrder.add(players.get(leader.opposite()));
-    entity.setPlayers(playerOrder);
+    game.setPlayers(playerOrder);
 
     final List<XoPieceEntity> pieces = new ArrayList<>();
-    pieces.add(new XoPieceEntity(id, players.get(Piece.X).getId(), Piece.X));
-    pieces.add(new XoPieceEntity(id, players.get(Piece.O).getId(), Piece.O));
-    entity.setGamePieces(pieces);
-    gamesRepository.save(entity);
-    return entity;
+    pieces.add(new XoPieceEntity(game.getId(), players.get(Piece.X).getId(), Piece.X));
+    pieces.add(new XoPieceEntity(game.getId(), players.get(Piece.O).getId(), Piece.O));
+    game.setGamePieces(pieces);
+    gamesRepository.save(game);
+    return game;
   }
 
   List<UserEntity> getBots(final int count) {
@@ -105,8 +101,16 @@ public class GameService {
     return bots.subList(0, count);
   }
 
+  /**
+   * Creates and returns a next game based on the provided game. The leader of the next game is
+   * based on the outcome of the current game (the loser gets to lead, or in case of a draw, the
+   * lead switches to the next player).
+   *
+   * @param currentGame The current {@link XoGameEntity}
+   * @return The next {@link XoGameEntity}
+   */
   @Transactional
-  public XoGameEntity createNextXoGame(final UUID nextId, final XoGame currentGame) {
+  public XoGameEntity createNextXoGame(final XoGame currentGame) {
     final Piece nextLeader =
         currentGame
             .getNextGameLeader()
@@ -118,7 +122,7 @@ public class GameService {
                     piece -> piece,
                     piece ->
                         usersRepository.findById(currentGame.getPlayer(piece).id()).orElseThrow()));
-    return createXoGame(nextId, players, nextLeader);
+    return createXoGame(players, nextLeader);
   }
 
   public List<XoGameEntity> getActiveGames(final UserEntity user) {
@@ -138,18 +142,11 @@ public class GameService {
 
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
     final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
-    if (cached.isPresent()) {
-      return Optional.of(cached.get().getGame());
-    }
-    return findXoGame(id).map(this::buildTicTacToeGame);
+    return cached.map(Game::getGame).or(() -> findXoGame(id).map(this::buildXoGame));
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
     return usersRepository.findById(id);
-  }
-
-  public Optional<GameEntity> findGame(final UUID id) {
-    return gamesRepository.findById(id);
   }
 
   public <T extends GameEntity> Optional<T> findGame(final UUID id, final Class<T> clazz) {
@@ -167,7 +164,7 @@ public class GameService {
   }
 
   // TODO: should synchronize on smaller scope
-  public synchronized XoGame buildTicTacToeGame(final XoGameEntity gameEntity) {
+  public synchronized XoGame buildXoGame(final XoGameEntity gameEntity) {
     log.info("Building XO game from entity: {}", gameEntity.getId());
     final Optional<Game<XoGame>> optionalGame =
         gameCache.getGameOfType(gameEntity.getId(), GameType.XO);

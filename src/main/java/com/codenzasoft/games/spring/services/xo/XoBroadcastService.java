@@ -11,6 +11,7 @@ import com.codenzasoft.games.xo.XoGameListener;
 import com.codenzasoft.games.xo.XoState;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Broadcasts {@link XoMessage}s to all registered sessions by registering as a {@link
- * XoGameListener} for each game.
+ * Sends game state to players via websockets. The {@link XoBroadcastService} is added to each
+ * {@link XoGame} as a {@link XoGameListener} and sends messages to players for each state change.
  */
 @Service
 public class XoBroadcastService implements XoGameListener {
@@ -48,26 +49,35 @@ public class XoBroadcastService implements XoGameListener {
     notifyUsers(game, state, null);
   }
 
-  public void playAgain(final XoGame game, final XoState state, final String nextGameId) {
+  public void playAgain(final XoGame game, final XoState state, final UUID nextGameId) {
     notifyUsers(game, state, nextGameId);
   }
 
-  private void notifyUsers(final XoGame game, final XoState state, final String nextGameId) {
+  /**
+   * Sends the provided game state to all (non-bot) users playing the game. This results in a STOMP
+   * websocket message being sent to each player that has registered for game specific messages. A
+   * user specific context is created for each user such that the client (user interface) can
+   * determine which {@link com.codenzasoft.games.xo.Piece} they are playing.
+   *
+   * @param game The {@link XoGame} the state describes.
+   * @param state The {@link XoState} of the game.
+   * @param nextGameId The id of the next game to play if the current game is over and a new game
+   *     was requested, or <code>null</code> if none.
+   */
+  private void notifyUsers(final XoGame game, final XoState state, final UUID nextGameId) {
     final List<UserEntity> users = getNonBots(game);
     for (final UserEntity user : users) {
-      final XoContext context = buildContext(user, game, state, nextGameId);
+      final XoContext context = buildContext(user, game, nextGameId);
       final XoMessage message = new XoMessage(context, state);
-      // identifies the user ("self") in the state so the client knows which piece they are playing
       messagingTemplate.convertAndSendToUser(
           user.getUsername(), "/queue/games/" + context.gameId(), message);
       log.info("attempted to send message to user {}", user.getUsername());
     }
   }
 
-  public XoContext buildContext(
-      final UserEntity user, final XoGame game, final XoState state, final String nextGameId) {
+  public XoContext buildContext(final UserEntity user, final XoGame game, final UUID nextGameId) {
     final Player player = user.toPlayer();
-    return new XoContext(player.name(), game.getId().toString(), nextGameId);
+    return new XoContext(player.name(), game.getId(), nextGameId);
   }
 
   private List<UserEntity> getNonBots(final Game<?> game) {
