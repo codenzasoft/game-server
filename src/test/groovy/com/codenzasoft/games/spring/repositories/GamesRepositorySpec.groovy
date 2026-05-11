@@ -7,7 +7,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import spock.lang.Specification
 
-@SpringBootTest
+@SpringBootTest(properties = ["debug=true"])
 @ActiveProfiles("test")
 @Transactional
 class GamesRepositorySpec extends Specification {
