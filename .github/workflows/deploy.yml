@@ -52,8 +52,8 @@ jobs:
             --project=$PROJECT_ID \
             --platform=managed \
             --add-cloudsql-instances=crafty-dynamics-495319-e2:us-central1:codenza-games-db \
-            --set-env-vars=SPRING_PROFILES_ACTIVE=cloud \
-            --update-secrets=POSTGRES_USER=game-server-db-user:latest,POSTGRES_PASSWORD=game-server-db-password:latest,POSTGRES_NAME=game-server-db-name:latest \
+            --set-env-vars=SPRING_PROFILES_ACTIVE=cloud,NEW_RELIC_APP_NAME=codenzasoft-game-server \
+            --update-secrets=POSTGRES_USER=game-server-db-user:latest,POSTGRES_PASSWORD=game-server-db-password:latest,POSTGRES_NAME=game-server-db-name:latest,NEW_RELIC_LICENSE_KEY=newrelic-license-key:latest \
             --service-account=game-server-sa@crafty-dynamics-495319-e2.iam.gserviceaccount.com \
             --allow-unauthenticated \
             --min-instances=0 \
