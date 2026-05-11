@@ -219,17 +219,34 @@ public class GameEngine {
     }
   }
 
-  // ----- ADD phase: card offer, pick, reroll, skip -----
+  // ----- ADD phase: card offer, pick, skip -----
 
   /**
-   * Returns three uniformly-random cards from the full catalog as the player's choices for this ADD
-   * phase. Resets the reroll counter so costs start fresh at {@value #REROLL_COST_STEP} production.
+   * Offers three uniformly-random cards drawn from the current season's catalog.
    *
-   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
+   * <p>The <em>first</em> call each ADD phase is free. Every subsequent call within the same phase
+   * is a paid reroll: the cost of the <em>n</em>-th reroll (1-indexed) is {@code n × }{@value
+   * #REROLL_COST_STEP} production, so costs escalate as 10, 20, 30, … The offer counter is reset to
+   * zero by {@link #pickCard(Card)} and {@link #skipAdd()}, so it is always phase-scoped.
+   *
+   * @return the three offered cards
+   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}, or if this is a
+   *     reroll the player cannot afford
    */
   public synchronized List<Card> offerAddChoices() {
     requirePhase(Phase.ADD, "offerAddChoices");
-    state.setRerollCount(0);
+    if (state.getRerollCount() > 0) {
+      int cost = state.getRerollCount() * REROLL_COST_STEP;
+      if (state.getProduction() < cost) {
+        throw new IllegalStateException(
+            "not enough production to reroll: need "
+                + cost
+                + ", have "
+                + (int) state.getProduction());
+      }
+      state.setProduction(state.getProduction() - cost);
+    }
+    state.setRerollCount(state.getRerollCount() + 1);
     List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
     state.setAddChoices(choices);
     return choices;
@@ -246,31 +263,6 @@ public class GameEngine {
     addToDeck(state.getCurSeason(), card);
     clearAddState();
     state.setCurPhase(Phase.RANDOM_EVENT);
-  }
-
-  /**
-   * Replaces the currently offered cards with a fresh set, deducting an escalating production cost.
-   * The cost for the <em>n</em>-th reroll (1-indexed) is {@code n * }{@value #REROLL_COST_STEP}.
-   *
-   * @return the new set of three offered cards
-   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}, or if the player
-   *     cannot afford the reroll
-   */
-  public synchronized List<Card> rerollAddChoices() {
-    requirePhase(Phase.ADD, "rerollAddChoices");
-    int cost = (state.getRerollCount() + 1) * REROLL_COST_STEP;
-    if (state.getProduction() < cost) {
-      throw new IllegalStateException(
-          "not enough production to reroll: need "
-              + cost
-              + ", have "
-              + (int) state.getProduction());
-    }
-    state.setProduction(state.getProduction() - cost);
-    state.setRerollCount(state.getRerollCount() + 1);
-    List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
-    state.setAddChoices(choices);
-    return choices;
   }
 
   /**
