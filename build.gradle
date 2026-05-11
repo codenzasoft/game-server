@@ -14,6 +14,10 @@ java {
     sourceCompatibility = '17'
 }
 
+configurations {
+    newrelic
+}
+
 repositories {
     mavenCentral()
 }
@@ -31,6 +35,8 @@ dependencies {
             'org.postgresql:postgresql',
             'com.google.cloud.sql:postgres-socket-factory:1.21.0',
     )
+
+    newrelic 'com.newrelic.agent.java:newrelic-agent:9.2.0'
 
     testImplementation(
             'junit:junit:4.13.2',
@@ -52,6 +58,14 @@ test {
         events "passed", "skipped", "failed"
     }
 }
+
+tasks.register('copyNewRelicAgent', Copy) {
+    from configurations.newrelic
+    into layout.buildDirectory.dir('newrelic')
+    rename { 'newrelic.jar' }
+}
+
+bootJar.dependsOn copyNewRelicAgent
 
 compileJava.dependsOn('spotlessApply')
 
