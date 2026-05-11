@@ -6,6 +6,7 @@ spring:
   flyway:
     locations: filesystem:../game-database/migrations
     enabled: true
+    fail-on-missing-locations: true
   jpa:
     hibernate:
       ddl-auto: none
