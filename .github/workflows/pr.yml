@@ -30,6 +30,7 @@ jobs:
         with:
           repository: codenzasoft/game-database
           path: game-database
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - uses: actions/setup-java@v4
         with:
