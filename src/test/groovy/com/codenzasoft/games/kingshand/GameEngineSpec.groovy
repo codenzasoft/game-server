@@ -572,9 +572,9 @@ class GameEngineSpec extends Specification {
         choices.every { !catalog.forSeason(Season.SPRING).contains(it) }
     }
 
-    def "offerAddChoices stores choices in state and resets reroll count"() {
+    def "first call each ADD phase is free and stores choices in state"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.ADD).rerollCount(2).build()
+        def state = GameState.builder().curPhase(Phase.ADD).production(100.0).build()
         def engine = new GameEngine(state)
 
         when:
@@ -582,7 +582,85 @@ class GameEngineSpec extends Specification {
 
         then:
         state.addChoices == choices
-        state.rerollCount == 0
+        state.rerollCount == 1        // incremented from 0
+        state.production  == 100.0   // no charge on first call
+    }
+
+    def "second call costs 10 production (first reroll)"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).production(100.0).build()
+        def engine = new GameEngine(state)
+        engine.offerAddChoices()   // free first call
+
+        when:
+        engine.offerAddChoices()   // first paid reroll
+
+        then:
+        state.production == 90.0
+        state.rerollCount == 2
+    }
+
+    def "reroll cost escalates with each subsequent call within the same ADD phase"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).production(200.0).build()
+        def engine = new GameEngine(state)
+
+        when: "free first offer"
+        engine.offerAddChoices()
+
+        then:
+        state.production == 200.0
+        state.rerollCount == 1
+
+        when: "first reroll costs 10"
+        engine.offerAddChoices()
+
+        then:
+        state.production == 190.0
+        state.rerollCount == 2
+
+        when: "second reroll costs 20"
+        engine.offerAddChoices()
+
+        then:
+        state.production == 170.0
+        state.rerollCount == 3
+
+        when: "third reroll costs 30"
+        engine.offerAddChoices()
+
+        then:
+        state.production == 140.0
+        state.rerollCount == 4
+    }
+
+    def "offerAddChoices throws when player cannot afford a reroll"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
+        def engine = new GameEngine(state)
+        engine.offerAddChoices()   // free first call; rerollCount is now 1
+
+        when:
+        engine.offerAddChoices()   // would cost 10, but only 5 available
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("not enough production to reroll")
+    }
+
+    def "offerAddChoices does not charge or advance reroll count when player can't afford"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
+        def engine = new GameEngine(state)
+        engine.offerAddChoices()   // free; rerollCount == 1
+
+        when:
+        engine.offerAddChoices()   // would cost 10
+
+        then:
+        thrown(IllegalStateException)
+        state.production  == 5.0   // unchanged
+        state.rerollCount == 1     // unchanged
     }
 
     def "offerAddChoices throws when phase is not ADD"() {
@@ -649,116 +727,6 @@ class GameEngineSpec extends Specification {
 
         when:
         engine.pickCard(CardCatalog.FARM)
-
-        then:
-        thrown(IllegalStateException)
-    }
-
-    // ----- ADD phase: rerollAddChoices -----
-
-    def "rerollAddChoices charges 10 production for the first reroll"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.ADD)
-                .production(100.0)
-                .build()
-        def engine = new GameEngine(state)
-
-        when:
-        engine.rerollAddChoices()
-
-        then:
-        state.production == 90.0
-        state.rerollCount == 1
-    }
-
-    def "rerollAddChoices cost escalates with each reroll within an ADD phase"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.ADD)
-                .production(200.0)
-                .build()
-        def engine = new GameEngine(state)
-
-        when: "first reroll costs 10"
-        engine.rerollAddChoices()
-
-        then:
-        state.production == 190.0
-        state.rerollCount == 1
-
-        when: "second reroll costs 20"
-        engine.rerollAddChoices()
-
-        then:
-        state.production == 170.0
-        state.rerollCount == 2
-
-        when: "third reroll costs 30"
-        engine.rerollAddChoices()
-
-        then:
-        state.production == 140.0
-        state.rerollCount == 3
-    }
-
-    def "rerollAddChoices replaces the offered cards and updates state"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.ADD)
-                .production(100.0)
-                .build()
-        def engine = new GameEngine(state)
-
-        when:
-        def choices = engine.rerollAddChoices()
-
-        then:
-        choices.size() == 3
-        CardCatalog.defaultCatalog().forSeason(Season.SPRING).containsAll(choices)
-        state.addChoices == choices
-    }
-
-    def "rerollAddChoices throws when player cannot afford the cost"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.ADD)
-                .production(3.0)   // less than the first-reroll cost of 5
-                .build()
-        def engine = new GameEngine(state)
-
-        when:
-        engine.rerollAddChoices()
-
-        then:
-        def e = thrown(IllegalStateException)
-        e.message.contains("not enough production to reroll")
-    }
-
-    def "rerollAddChoices does not charge or change state when player can't afford"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.ADD)
-                .production(4.0)
-                .build()
-        def engine = new GameEngine(state)
-
-        when:
-        engine.rerollAddChoices()
-
-        then:
-        thrown(IllegalStateException)
-        state.production == 4.0      // unchanged
-        state.rerollCount == 0       // unchanged
-    }
-
-    def "rerollAddChoices throws when phase is not ADD"() {
-        setup:
-        def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).build()
-        def engine = new GameEngine(state)
-
-        when:
-        engine.rerollAddChoices()
 
         then:
         thrown(IllegalStateException)
