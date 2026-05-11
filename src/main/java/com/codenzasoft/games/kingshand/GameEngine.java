@@ -7,8 +7,23 @@ import java.util.Random;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
- * the per-season card-trigger pass, and draw/discard/hand pile mutations. {@code GameState} is a
- * passive data carrier; this engine is the only place that should mutate it.
+ * the per-season card-trigger pass, draw/discard/hand pile mutations, and random-event resolution.
+ * {@code GameState} is a passive data carrier; this engine is the only place that should mutate it.
+ *
+ * <p><b>RANDOM_EVENT phase flow:</b>
+ *
+ * <ol>
+ *   <li>{@link #advancePhase()} transitions into {@link Phase#RANDOM_EVENT} and immediately rolls
+ *       one eligible event via the injected {@link EventCatalog}, storing it on the state.
+ *   <li>The caller reads the rolled event with {@link #currentEvent()}.
+ *   <li>The player picks an {@link EventOption}; the caller passes it to {@link
+ *       #chooseEventOption(EventOption)}, which applies its effects and advances the phase to
+ *       {@link Phase#PLAY}.
+ * </ol>
+ *
+ * <p><b>Winter scaling (KH-6):</b> when the current season is {@link Season#WINTER}, each effect's
+ * numeric modifier is multiplied by the current year before it is applied, so winters grow
+ * progressively harsher as the run extends.
  */
 public class GameEngine {
 
@@ -17,25 +32,58 @@ public class GameEngine {
   static final int ADD_OFFER_SIZE = 3;
 
   private final GameState state;
-  private final CardCatalog catalog;
-  private final Random random;
+  private final CardCatalog cardCatalog;
+  private final EventCatalog eventCatalog;
+  private final Random rng;
 
+  /**
+   * Convenience constructor that uses the {@link EventCatalog#defaultCatalog() default catalog} and
+   * an unseeded {@link Random}. Existing call-sites remain unaffected.
+   */
   public GameEngine(GameState state) {
-    this(state, CardCatalog.defaultCatalog(), new Random());
+    this(state, CardCatalog.defaultCatalog(), EventCatalog.defaultCatalog(), new Random());
   }
 
-  public GameEngine(GameState state, CardCatalog catalog) {
-    this(state, catalog, new Random());
+  /**
+   * Constructor that accepts a custom card catalog (uses default event catalog and unseeded RNG).
+   */
+  public GameEngine(GameState state, CardCatalog cardCatalog) {
+    this(state, cardCatalog, EventCatalog.defaultCatalog(), new Random());
   }
 
-  /** Package-visible constructor for testing with a deterministic {@link Random}. */
-  GameEngine(GameState state, CardCatalog catalog, Random random) {
+  /**
+   * Constructor that accepts a custom event catalog (uses default card catalog and unseeded RNG).
+   */
+  public GameEngine(GameState state, EventCatalog eventCatalog) {
+    this(state, CardCatalog.defaultCatalog(), eventCatalog, new Random());
+  }
+
+  /**
+   * Primary constructor — all fields injected. Prefer this form in tests so that the random
+   * selection is reproducible via a seeded {@link Random}.
+   */
+  public GameEngine(GameState state, EventCatalog eventCatalog, Random rng) {
+    this(state, CardCatalog.defaultCatalog(), eventCatalog, rng);
+  }
+
+  /** Full constructor with all dependencies injected. */
+  GameEngine(GameState state, CardCatalog cardCatalog, EventCatalog eventCatalog, Random rng) {
     if (state == null) {
       throw new IllegalArgumentException("state cannot be null");
     }
+    if (cardCatalog == null) {
+      throw new IllegalArgumentException("catalog cannot be null");
+    }
+    if (eventCatalog == null) {
+      throw new IllegalArgumentException("catalog cannot be null");
+    }
+    if (rng == null) {
+      throw new IllegalArgumentException("rng cannot be null");
+    }
     this.state = state;
-    this.catalog = catalog;
-    this.random = random;
+    this.cardCatalog = cardCatalog;
+    this.eventCatalog = eventCatalog;
+    this.rng = rng;
   }
 
   public GameState getState() {
@@ -51,6 +99,75 @@ public class GameEngine {
     }
 
     state.setCurPhase(state.getCurPhase().next());
+
+    // entering RANDOM_EVENT: roll one eligible event for the new season/year
+    if (state.getCurPhase() == Phase.RANDOM_EVENT) {
+      rollEvent();
+    }
+  }
+
+  // ----- RANDOM_EVENT resolution -----
+
+  /**
+   * Randomly selects one eligible event for the current season and year and stores it on the state.
+   * If no events are eligible the stored event is set to {@code null}.
+   */
+  private synchronized void rollEvent() {
+    List<Event> eligible = eventCatalog.eligibleEvents(state.getCurSeason(), state.getYear());
+    state.setCurrentEvent(eligible.isEmpty() ? null : eligible.get(rng.nextInt(eligible.size())));
+  }
+
+  /**
+   * Returns the event rolled at the start of the current {@link Phase#RANDOM_EVENT} turn, or {@code
+   * null} if no eligible events existed (or if the engine has not yet entered that phase).
+   */
+  public synchronized Event currentEvent() {
+    return state.getCurrentEvent();
+  }
+
+  /**
+   * Applies the effect list of the chosen {@link EventOption} to the current game state, then
+   * advances the phase to {@link Phase#PLAY}.
+   *
+   * <p>Winter scaling applies: each effect modifier is multiplied by {@link GameState#getYear()}
+   * when the current season is {@link Season#WINTER}.
+   *
+   * @param option the option chosen by the player; must not be {@code null}
+   * @throws IllegalArgumentException if {@code option} is {@code null}
+   */
+  public synchronized void chooseEventOption(EventOption option) {
+    if (option == null) {
+      throw new IllegalArgumentException("option cannot be null");
+    }
+
+    for (Effect effect : option.effects()) {
+      if (effect.target() instanceof ResourceTarget rt) {
+        Effect scaled = scaleForSeason(effect);
+        switch (rt) {
+          case POPULATION -> state.setPopulation(scaled.apply(state.getPopulation()));
+          case PRODUCTION -> state.setProduction(scaled.apply(state.getProduction()));
+          case FOOD -> state.setFood(scaled.apply(state.getFood()));
+        }
+      }
+      // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
+    }
+
+    state.setCurPhase(Phase.PLAY);
+  }
+
+  /**
+   * Returns the effect unchanged for non-winter seasons; for {@link Season#WINTER} returns a new
+   * {@link Effect} whose modifier is scaled by the current year (KH-6 winter scaling rule).
+   */
+  private Effect scaleForSeason(Effect effect) {
+    if (state.getCurSeason() != Season.WINTER) {
+      return effect;
+    }
+    return new Effect(
+        effect.target(),
+        effect.modifier() * state.getYear(),
+        effect.valueType(),
+        effect.frequencyType());
   }
 
   public synchronized void advanceSeason() {
@@ -113,7 +230,7 @@ public class GameEngine {
   public synchronized List<Card> offerAddChoices() {
     requirePhase(Phase.ADD, "offerAddChoices");
     state.setRerollCount(0);
-    List<Card> choices = pickRandom(catalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
+    List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
     state.setAddChoices(choices);
     return choices;
   }
@@ -151,7 +268,7 @@ public class GameEngine {
     }
     state.setProduction(state.getProduction() - cost);
     state.setRerollCount(state.getRerollCount() + 1);
-    List<Card> choices = pickRandom(catalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
+    List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
     state.setAddChoices(choices);
     return choices;
   }
@@ -188,7 +305,7 @@ public class GameEngine {
   /** Returns {@code count} distinct cards chosen uniformly at random from {@code source}. */
   private List<Card> pickRandom(List<Card> source, int count) {
     List<Card> pool = new ArrayList<>(source);
-    Collections.shuffle(pool, random);
+    Collections.shuffle(pool, rng);
     return List.copyOf(pool.subList(0, Math.min(count, pool.size())));
   }
 

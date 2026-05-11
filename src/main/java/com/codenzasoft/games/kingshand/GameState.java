@@ -29,6 +29,8 @@ public class GameState {
   // ADD-phase offer state
   private List<Card> addChoices;
   private int rerollCount;
+  // the event rolled for the current RANDOM_EVENT phase (null between phases)
+  private Event currentEvent;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -43,6 +45,7 @@ public class GameState {
     this.year = b.year;
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
+    this.currentEvent = b.currentEvent;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -110,6 +113,14 @@ public class GameState {
     return rerollCount;
   }
 
+  /**
+   * The event rolled at the start of the current {@link Phase#RANDOM_EVENT} turn, or {@code null}
+   * if no event has been rolled yet (or no eligible events existed).
+   */
+  public Event getCurrentEvent() {
+    return currentEvent;
+  }
+
   // ----- Setters -----
 
   public void setPopulation(double population) {
@@ -144,6 +155,10 @@ public class GameState {
     this.rerollCount = rerollCount;
   }
 
+  public void setCurrentEvent(Event currentEvent) {
+    this.currentEvent = currentEvent;
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -159,6 +174,7 @@ public class GameState {
     private int year = 1;
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
+    private Event currentEvent = null;
 
     // fill similar data types with seasons
     private Builder() {
@@ -227,6 +243,11 @@ public class GameState {
 
     public Builder rerollCount(int rerollCount) {
       this.rerollCount = rerollCount;
+      return this;
+    }
+
+    public Builder currentEvent(Event currentEvent) {
+      this.currentEvent = currentEvent;
       return this;
     }
 
