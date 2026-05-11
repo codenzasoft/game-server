@@ -147,7 +147,7 @@ All tests are written in Groovy using the Spock framework. Unit tests (game logi
 Database tests use `@SpringBootTest` + `@ActiveProfiles("test")` to load the full Spring context against a real Postgres instance. The test profile is configured in `src/test/resources/application-test.yaml`:
 
 - Connects to `localhost:5435` (the dev Postgres locally; the CI service container on the same port in GitHub Actions)
-- Runs Flyway migrations from `../game-database/migrations` (sibling checkout)
+- Runs Flyway migrations from `../game-database/migrations` (sibling checkout — in CI, `pr.yml` checks out `codenzasoft/game-database` as a sibling using the `REPO_ACCESS_TOKEN` secret)
 
 Use `@Transactional` on the spec class so each feature method runs in a rolled-back transaction. Add a `setup()` block to delete rows in FK-safe order before each test — this keeps local runs clean when the dev database has existing data:
 
