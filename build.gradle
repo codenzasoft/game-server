@@ -59,6 +59,9 @@ test {
     testLogging {
         events "passed", "skipped", "failed"
     }
+    systemProperty 'spring.flyway.enabled', 'true'
+    systemProperty 'spring.flyway.locations', 'filesystem:../game-database/migrations'
+    systemProperty 'spring.flyway.fail-on-missing-locations', 'true'
 }
 
 tasks.register('copyNewRelicAgent', Copy) {
