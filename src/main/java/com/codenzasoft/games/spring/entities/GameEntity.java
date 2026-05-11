@@ -28,7 +28,7 @@ public abstract class GameEntity {
   @Column(name = "quit_at")
   Date quitAt;
 
-  @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+  @OneToMany(fetch = FetchType.EAGER)
   @JoinTable(
       name = "game_players",
       joinColumns = @JoinColumn(name = "game_id", referencedColumnName = "id"),
