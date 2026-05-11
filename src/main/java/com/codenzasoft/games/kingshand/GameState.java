@@ -26,6 +26,9 @@ public class GameState {
   private Season curSeason;
   private Phase curPhase;
   private int year;
+  // ADD-phase offer state
+  private List<Card> addChoices;
+  private int rerollCount;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -38,6 +41,8 @@ public class GameState {
     this.curSeason = b.curSeason;
     this.curPhase = b.curPhase;
     this.year = b.year;
+    this.addChoices = b.addChoices;
+    this.rerollCount = b.rerollCount;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -97,6 +102,14 @@ public class GameState {
     return year;
   }
 
+  public List<Card> getAddChoices() {
+    return addChoices;
+  }
+
+  public int getRerollCount() {
+    return rerollCount;
+  }
+
   // ----- Setters -----
 
   public void setPopulation(double population) {
@@ -123,6 +136,14 @@ public class GameState {
     this.year = year;
   }
 
+  public void setAddChoices(List<Card> addChoices) {
+    this.addChoices = addChoices;
+  }
+
+  public void setRerollCount(int rerollCount) {
+    this.rerollCount = rerollCount;
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -136,6 +157,8 @@ public class GameState {
     private Season curSeason = Season.SPRING;
     private Phase curPhase = Phase.ADD;
     private int year = 1;
+    private List<Card> addChoices = new ArrayList<>();
+    private int rerollCount = 0;
 
     // fill similar data types with seasons
     private Builder() {
@@ -194,6 +217,16 @@ public class GameState {
 
     public Builder year(int year) {
       this.year = year;
+      return this;
+    }
+
+    public Builder addChoices(List<Card> addChoices) {
+      this.addChoices = new ArrayList<>(addChoices);
+      return this;
+    }
+
+    public Builder rerollCount(int rerollCount) {
+      this.rerollCount = rerollCount;
       return this;
     }
 

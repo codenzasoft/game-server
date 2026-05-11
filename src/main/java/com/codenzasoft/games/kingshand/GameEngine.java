@@ -3,6 +3,7 @@ package com.codenzasoft.games.kingshand;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
@@ -12,14 +13,29 @@ import java.util.List;
 public class GameEngine {
 
   public static final int MAX_TABLE_SIZE = 5;
+  public static final int REROLL_COST_STEP = 5;
+  static final int ADD_OFFER_SIZE = 3;
 
   private final GameState state;
+  private final CardCatalog catalog;
+  private final Random random;
 
   public GameEngine(GameState state) {
+    this(state, CardCatalog.defaultCatalog(), new Random());
+  }
+
+  public GameEngine(GameState state, CardCatalog catalog) {
+    this(state, catalog, new Random());
+  }
+
+  /** Package-visible constructor for testing with a deterministic {@link Random}. */
+  GameEngine(GameState state, CardCatalog catalog, Random random) {
     if (state == null) {
       throw new IllegalArgumentException("state cannot be null");
     }
     this.state = state;
+    this.catalog = catalog;
+    this.random = random;
   }
 
   public GameState getState() {
@@ -84,6 +100,96 @@ public class GameEngine {
         }
       }
     }
+  }
+
+  // ----- ADD phase: card offer, pick, reroll, skip -----
+
+  /**
+   * Returns three uniformly-random cards from the full catalog as the player's choices for this ADD
+   * phase. Resets the reroll counter so costs start fresh at {@value #REROLL_COST_STEP} production.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
+   */
+  public synchronized List<Card> offerAddChoices() {
+    requirePhase(Phase.ADD, "offerAddChoices");
+    state.setRerollCount(0);
+    List<Card> choices = pickRandom(catalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
+    state.setAddChoices(choices);
+    return choices;
+  }
+
+  /**
+   * Shuffles {@code card} into the current season's draw pile and advances the phase to {@link
+   * Phase#RANDOM_EVENT}. Clears the offer list and resets the reroll counter.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
+   */
+  public synchronized void pickCard(Card card) {
+    requirePhase(Phase.ADD, "pickCard");
+    addToDeck(state.getCurSeason(), card);
+    clearAddState();
+    state.setCurPhase(Phase.RANDOM_EVENT);
+  }
+
+  /**
+   * Replaces the currently offered cards with a fresh set, deducting an escalating production cost.
+   * The cost for the <em>n</em>-th reroll (1-indexed) is {@code n * }{@value #REROLL_COST_STEP}.
+   *
+   * @return the new set of three offered cards
+   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}, or if the player
+   *     cannot afford the reroll
+   */
+  public synchronized List<Card> rerollAddChoices() {
+    requirePhase(Phase.ADD, "rerollAddChoices");
+    int cost = (state.getRerollCount() + 1) * REROLL_COST_STEP;
+    if (state.getProduction() < cost) {
+      throw new IllegalStateException(
+          "not enough production to reroll: need "
+              + cost
+              + ", have "
+              + (int) state.getProduction());
+    }
+    state.setProduction(state.getProduction() - cost);
+    state.setRerollCount(state.getRerollCount() + 1);
+    List<Card> choices = pickRandom(catalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
+    state.setAddChoices(choices);
+    return choices;
+  }
+
+  /**
+   * Skips the ADD phase without adding a card, advancing the phase to {@link Phase#RANDOM_EVENT}.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
+   */
+  public synchronized void skipAdd() {
+    requirePhase(Phase.ADD, "skipAdd");
+    clearAddState();
+    state.setCurPhase(Phase.RANDOM_EVENT);
+  }
+
+  // ----- ADD helpers -----
+
+  private void requirePhase(Phase required, String operation) {
+    if (state.getCurPhase() != required) {
+      throw new IllegalStateException(
+          operation
+              + " requires phase "
+              + required
+              + " but current phase is "
+              + state.getCurPhase());
+    }
+  }
+
+  private void clearAddState() {
+    state.setAddChoices(List.of());
+    state.setRerollCount(0);
+  }
+
+  /** Returns {@code count} distinct cards chosen uniformly at random from {@code source}. */
+  private List<Card> pickRandom(List<Card> source, int count) {
+    List<Card> pool = new ArrayList<>(source);
+    Collections.shuffle(pool, random);
+    return List.copyOf(pool.subList(0, Math.min(count, pool.size())));
   }
 
   // ----- Pile mutations -----
