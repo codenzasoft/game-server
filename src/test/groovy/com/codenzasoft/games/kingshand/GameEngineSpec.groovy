@@ -850,9 +850,9 @@ class GameEngineSpec extends Specification {
         seen.containsAll(["w1", "w2", "w3"])
     }
 
-    // ----- RANDOM_EVENT: chooseEventOption — normal effect application -----
+    // ----- RANDOM_EVENT: applyEventOption — normal effect application -----
 
-    def "chooseEventOption applies a food bonus to state and advances to PLAY"() {
+    def "applyEventOption applies a food bonus to state and advances to PLAY"() {
         setup:
         def option = new EventOption("Take food", [ResourceTarget.FOOD.once(15)])
         def state = GameState.builder()
@@ -860,14 +860,14 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.food == 65.0
         state.curPhase == Phase.PLAY
     }
 
-    def "chooseEventOption applies a production penalty to state"() {
+    def "applyEventOption applies a production penalty to state"() {
         setup:
         def option = new EventOption("Pay cost", [ResourceTarget.PRODUCTION.once(-10)])
         def state = GameState.builder()
@@ -875,14 +875,14 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.production == 90.0
         state.curPhase == Phase.PLAY
     }
 
-    def "chooseEventOption applies multiple effects from one option"() {
+    def "applyEventOption applies multiple effects from one option"() {
         setup:
         def option = new EventOption(
                 "Plant aggressively",
@@ -893,7 +893,7 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.food == 65.0
@@ -901,14 +901,14 @@ class GameEngineSpec extends Specification {
         state.curPhase == Phase.PLAY
     }
 
-    def "chooseEventOption with an empty effect list still advances to PLAY"() {
+    def "applyEventOption with an empty effect list still advances to PLAY"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(1).build()
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(new EventOption("Do nothing", []))
+        engine.applyEventOption(new EventOption("Do nothing", []))
 
         then:
         state.curPhase == Phase.PLAY
@@ -917,13 +917,13 @@ class GameEngineSpec extends Specification {
         state.population == 5.0   // unchanged
     }
 
-    def "chooseEventOption throws when option is null"() {
+    def "applyEventOption throws when option is null"() {
         setup:
         def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1).build()
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(null)
+        engine.applyEventOption(null)
 
         then:
         def e = thrown(IllegalArgumentException)
@@ -941,7 +941,7 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.food == 50.0 + (-10 * 3)   // 20.0
@@ -960,7 +960,7 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.food       == 50.0  + (10  * 2)   // 70.0
@@ -975,7 +975,7 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         state.production == 100.0 + (-5 * 1)   // 95.0
@@ -989,7 +989,7 @@ class GameEngineSpec extends Specification {
         def engine = new GameEngine(state, new EventCatalog([:]))
 
         when:
-        engine.chooseEventOption(option)
+        engine.applyEventOption(option)
 
         then:
         // year is 5 but scaling must NOT apply outside winter; delta is flat +10
@@ -1003,7 +1003,7 @@ class GameEngineSpec extends Specification {
         when: "fall (year 4) — no scaling"
         def fallState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.FALL).year(4).food(50.0).build()
-        new GameEngine(fallState, new EventCatalog([:])).chooseEventOption(option)
+        new GameEngine(fallState, new EventCatalog([:])).applyEventOption(option)
 
         then:
         fallState.food == 60.0
@@ -1011,7 +1011,7 @@ class GameEngineSpec extends Specification {
         when: "winter (year 4) — scaled by 4"
         def winterState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
-        new GameEngine(winterState, new EventCatalog([:])).chooseEventOption(option)
+        new GameEngine(winterState, new EventCatalog([:])).applyEventOption(option)
 
         then:
         winterState.food == 50.0 + (10 * 4)   // 90.0

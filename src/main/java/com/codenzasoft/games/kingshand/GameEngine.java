@@ -94,16 +94,14 @@ public class GameEngine {
 
   public synchronized void advancePhase() {
     // if play phase ends, move to the next season
-    if (state.getCurPhase() == Phase.PLAY) {
-      advanceSeason();
+    switch (state.getCurPhase()) {
+      case ADD -> rollEvent();
+      case RANDOM_EVENT -> {}
+      case PLAY -> advanceSeason();
     }
+    ;
 
     state.setCurPhase(state.getCurPhase().next());
-
-    // entering RANDOM_EVENT: roll one eligible event for the new season/year
-    if (state.getCurPhase() == Phase.RANDOM_EVENT) {
-      rollEvent();
-    }
   }
 
   // ----- RANDOM_EVENT resolution -----
@@ -135,7 +133,7 @@ public class GameEngine {
    * @param option the option chosen by the player; must not be {@code null}
    * @throws IllegalArgumentException if {@code option} is {@code null}
    */
-  public synchronized void chooseEventOption(EventOption option) {
+  public synchronized void applyEventOption(EventOption option) {
     if (option == null) {
       throw new IllegalArgumentException("option cannot be null");
     }
