@@ -16,4 +16,15 @@ public record Card(
   public Card {
     effects = effects == null ? List.of() : List.copyOf(effects);
   }
+
+  /**
+   * Returns a new {@link Card} with identical requirements but every effect's modifier multiplied
+   * by {@code factor}. Used by the upgrade path when a duplicate is placed on the table.
+   *
+   * @param factor the multiplier to apply to every effect modifier (e.g. {@code 2} to double)
+   */
+  public Card amplify(double factor) {
+    List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
+    return new Card(populationRequirement, productionRequirement, amplified);
+  }
 }

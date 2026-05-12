@@ -420,12 +420,7 @@ public class GameEngine {
     List<Card> table = state.getCurrentTable();
 
     // Find a duplicate already on the table (structural equality via record equals).
-    int duplicateIndex = -1;
-    for (int i = 0; i < table.size(); i++) {
-      if (table.get(i).equals(card)) {
-        duplicateIndex = i;
-      }
-    }
+    int duplicateIndex = table.indexOf(card);
 
     // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
     if (duplicateIndex == -1 && table.size() >= MAX_TABLE_SIZE) {
@@ -456,17 +451,10 @@ public class GameEngine {
     // Upgrade: replace the existing table card with one whose every effect modifier is doubled.
     // index is above -1 if we found a duplicate.
     // else just add it to the table as a new card.
-    if (duplicateIndex >= 0) {
-      Card existing = table.get(duplicateIndex);
-      List<Effect> upgraded =
-          existing.effects().stream()
-              .map(e -> new Effect(e.target(), e.modifier() * 2, e.valueType(), e.frequencyType()))
-              .toList();
-      table.set(
-          duplicateIndex,
-          new Card(existing.populationRequirement(), existing.productionRequirement(), upgraded));
+    if (state.tableContains(card)) {
+      state.replaceTableCard(card, card.amplify(2));
     } else {
-      table.add(card);
+      state.addToTable(card);
     }
   }
 
@@ -499,6 +487,6 @@ public class GameEngine {
 
     // else pay and demolish card
     state.setProduction(state.getProduction() - cost);
-    table.remove(slot);
+    state.removeFromTableAt(slot);
   }
 }

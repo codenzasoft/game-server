@@ -19,4 +19,9 @@ public record Effect(
       case PERCENTAGE -> value + (value * (modifier * 0.01));
     };
   }
+
+  /** Returns a new {@link Effect} with the modifier scaled by {@code factor}. */
+  public Effect upgrade(double factor) {
+    return new Effect(target, modifier * factor, valueType, frequencyType);
+  }
 }

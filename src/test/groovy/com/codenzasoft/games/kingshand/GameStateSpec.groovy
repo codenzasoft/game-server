@@ -168,4 +168,130 @@ class GameStateSpec extends Specification {
         state.getCurrentTable().is(state.board.get(Season.FALL))
         state.getCurrentTable() == [card]
     }
+
+    // ----- tableContains -----
+
+    def "tableContains returns true when the card is on the current season's table"() {
+        setup:
+        def card = new Card(0, 0, [])
+        def state = GameState.builder().curSeason(Season.SPRING).table(Season.SPRING, [card]).build()
+
+        expect:
+        state.tableContains(card)
+    }
+
+    def "tableContains returns false when the card is not on the current season's table"() {
+        setup:
+        def card = new Card(0, 0, [])
+        def state = GameState.builder().curSeason(Season.SPRING).build()
+
+        expect:
+        !state.tableContains(card)
+    }
+
+    def "tableContains checks the current season's table only, not other seasons"() {
+        setup:
+        def card = new Card(0, 0, [])
+        def state = GameState.builder()
+                .curSeason(Season.SPRING)
+                .table(Season.SUMMER, [card])   // card is on SUMMER, not SPRING
+                .build()
+
+        expect:
+        !state.tableContains(card)
+    }
+
+    // ----- replaceTableCard -----
+
+    def "replaceTableCard swaps the matched card with the replacement"() {
+        setup:
+        def original    = new Card(1, 10, [])
+        def replacement = new Card(1, 10, [new Effect(ResourceTarget.FOOD, 20, ValueType.INTEGER, FrequencyType.RECURRING)])
+        def state = GameState.builder().curSeason(Season.FALL).table(Season.FALL, [original]).build()
+
+        when:
+        state.replaceTableCard(original, replacement)
+
+        then:
+        state.getCurrentTable() == [replacement]
+    }
+
+    def "replaceTableCard replaces only the first matching card when duplicates exist"() {
+        setup:
+        def card  = new Card(0, 0, [])
+        def other = new Card(1, 10, [])
+        def state = GameState.builder()
+                .curSeason(Season.WINTER)
+                .table(Season.WINTER, [card, other, card])
+                .build()
+
+        when:
+        state.replaceTableCard(card, other)
+
+        then:
+        state.getCurrentTable() == [other, other, card]   // only index 0 replaced
+    }
+
+    def "replaceTableCard throws when the card is not on the table"() {
+        setup:
+        def state = GameState.builder().curSeason(Season.SPRING).build()
+
+        when:
+        state.replaceTableCard(new Card(0, 0, []), new Card(1, 5, []))
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "card not found on current table"
+    }
+
+    // ----- addToTable -----
+
+    def "addToTable appends the card to the current season's table"() {
+        setup:
+        def card  = new Card(0, 0, [])
+        def state = GameState.builder().curSeason(Season.SUMMER).build()
+
+        when:
+        state.addToTable(card)
+
+        then:
+        state.getCurrentTable() == [card]
+        state.board.get(Season.SPRING).isEmpty()
+    }
+
+    // ----- removeFromTable -----
+
+    def "removeFromTable removes the first matching card from the current season's table"() {
+        setup:
+        def card  = new Card(0, 0, [])
+        def other = new Card(1, 10, [])
+        def state = GameState.builder()
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [card, other])
+                .build()
+
+        when:
+        state.removeFromTable(card)
+
+        then:
+        state.getCurrentTable() == [other]
+    }
+
+    // ----- removeFromTableAt -----
+
+    def "removeFromTableAt removes the card at the given slot index"() {
+        setup:
+        def first  = new Card(0, 0, [])
+        def second = new Card(1, 10, [])
+        def state = GameState.builder()
+                .curSeason(Season.FALL)
+                .table(Season.FALL, [first, second])
+                .build()
+
+        when:
+        state.removeFromTableAt(0)
+
+        then:
+        state.getCurrentTable() == [second]
+    }
 }
