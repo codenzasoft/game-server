@@ -1036,4 +1036,420 @@ class GameEngineSpec extends Specification {
         def e = thrown(IllegalArgumentException)
         e.message == "rng cannot be null"
     }
+
+    // ----- PLAY phase: startPlay -----
+
+    def "startPlay draws up to MAX_HAND_SIZE cards from the current season's draw pile"() {
+        setup:
+        def cards = (1..5).collect { new Card(0, 0, []) }
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .drawPile(Season.SPRING, cards)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        def drawn = engine.startPlay()
+
+        then:
+        drawn.size() == GameEngine.MAX_HAND_SIZE
+        state.hand.size() == GameEngine.MAX_HAND_SIZE
+        state.drawPile.get(Season.SPRING).isEmpty()
+    }
+
+    def "startPlay respects MAX_HAND_SIZE — draws at most five even when more cards are available"() {
+        setup:
+        def cards = (1..8).collect { new Card(0, 0, []) }
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SUMMER)
+                .drawPile(Season.SUMMER, cards)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        def drawn = engine.startPlay()
+
+        then:
+        drawn.size() == GameEngine.MAX_HAND_SIZE
+        state.hand.size() == GameEngine.MAX_HAND_SIZE
+        state.drawPile.get(Season.SUMMER).size() == 3
+    }
+
+    def "startPlay reshuffles the discard pile into the draw pile when the draw pile runs dry"() {
+        setup:
+        def drawCard   = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 1, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def discard1   = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 2, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def discard2   = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 3, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def discard3   = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 4, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def discard4   = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER, FrequencyType.SINGLE)])
+
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.FALL)
+                .drawPile(Season.FALL, [drawCard])
+                .discardPile(Season.FALL, [discard1, discard2, discard3, discard4])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        def drawn = engine.startPlay()
+
+        then:
+        drawn.size() == 5
+        state.hand.size() == 5
+        state.discardPile.get(Season.FALL).size() == 0
+    }
+
+    def "startPlay returns whatever is available when combined draw + discard is less than MAX_HAND_SIZE"() {
+        setup:
+        def card1 = new Card(0, 0, [])
+        def card2 = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 1, ValueType.INTEGER, FrequencyType.SINGLE)])
+
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.WINTER)
+                .drawPile(Season.WINTER, [card1])
+                .discardPile(Season.WINTER, [card2])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        def drawn = engine.startPlay()
+
+        then:
+        drawn.size() == 2
+        state.hand.size() == 2
+    }
+
+    def "startPlay throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.startPlay()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("startPlay")
+    }
+
+    // ----- PLAY phase: placeCard — validation failures -----
+
+    def "placeCard throws when the card is not in the hand"() {
+        setup:
+        def card = CardCatalog.FARM
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(10)
+                .production(100)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(card)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "card is not in hand"
+    }
+
+    def "placeCard throws when the table is full and the card is not a duplicate"() {
+        setup:
+        def filler = new Card(0, 0, [])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(10)
+                .production(200)
+                .table(Season.SPRING, (1..GameEngine.MAX_TABLE_SIZE).collect { filler })
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "SPRING table is full"
+    }
+
+    def "placeCard throws when the player cannot afford the production cost"() {
+        setup:
+        // FARM costs 30 production; give the player only 10
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(10)
+                .production(10)
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("not enough production to place card")
+        e.message.contains("30")   // cost
+        e.message.contains("10")   // have
+    }
+
+    def "placeCard throws when the player's population does not meet the requirement"() {
+        setup:
+        // FARM requires population 2; give the player only 1
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(1)
+                .production(100)
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("not enough population to place card")
+        e.message.contains("2")    // requirement
+        e.message.contains("1")    // have
+    }
+
+    def "placeCard throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT)
+                .curSeason(Season.SPRING)
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("placeCard")
+    }
+
+    // ----- PLAY phase: placeCard — successful place -----
+
+    def "placeCard moves the card from hand to the current season's table and deducts production"() {
+        setup:
+        // FARM: populationRequirement=2, productionRequirement=30
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        state.hand.isEmpty()
+        state.board.get(Season.SPRING) == [CardCatalog.FARM]
+        state.production == 70.0    // 100 - 30
+    }
+
+    def "placeCard is allowed when the table is full but the card is a duplicate of another on the board, for upgrading"() {
+        setup:
+        // Fill the table with 4 fillers + 1 FARM, then try to place another FARM.
+        def filler = new Card(0, 0, [])
+        def tableCards = [filler, filler, filler, filler, CardCatalog.FARM]
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .table(Season.SPRING, tableCards)
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        state.hand.isEmpty()
+        state.board.get(Season.SPRING).size() == GameEngine.MAX_TABLE_SIZE  // no new slot
+        state.production == 70.0
+    }
+
+    // ----- PLAY phase: placeCard — upgrade by duplicate -----
+
+    def "placing a duplicate doubles every effect's modifier on the existing table card"() {
+        setup:
+        // FARM has one recurring FOOD effect with modifier 10
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .table(Season.SPRING, [CardCatalog.FARM])
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def upgraded = state.board.get(Season.SPRING).get(0)
+        upgraded.effects().size() == 1
+        upgraded.effects().get(0).modifier() == 20.0    // doubled from 10
+    }
+
+    def "placing a duplicate doubles all effects when the card carries multiple effects"() {
+        setup:
+        // TRADE_ROUTES has two recurring effects: PRODUCTION +5 and FOOD +5
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SUMMER)
+                .population(10)
+                .production(200)
+                .table(Season.SUMMER, [CardCatalog.TRADE_ROUTES])
+                .hand([CardCatalog.TRADE_ROUTES])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.placeCard(CardCatalog.TRADE_ROUTES)
+
+        then:
+        def upgraded = state.board.get(Season.SUMMER).get(0)
+        upgraded.effects().size() == 2
+        upgraded.effects().every { it.modifier() == 10.0 }   // both doubled from 5
+    }
+
+    def "upgrade does not add a new slot — table size stays the same after placing a duplicate"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .table(Season.SPRING, [CardCatalog.FARM])
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+        def sizeBefore = state.board.get(Season.SPRING).size()
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        state.board.get(Season.SPRING).size() == sizeBefore
+    }
+
+    // ----- PLAY phase: demolishCard -----
+
+    def "demolishCard removes the card at the given slot and charges 20% of its production cost"() {
+        setup:
+        // FARM: productionRequirement=30 → demolish cost = 6
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(100)
+                .table(Season.SPRING, [CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.demolishCard(0)
+
+        then:
+        state.board.get(Season.SPRING).isEmpty()
+        state.production == 94.0    // 100 - 6
+    }
+
+    def "demolishCard removes the correct card when multiple cards are on the table"() {
+        setup:
+        // Slot 1 is SEEDS (productionRequirement=10 → cost=2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(100)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.FERTILIZER])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.demolishCard(1)   // remove SEEDS
+
+        then:
+        def table = state.board.get(Season.SPRING)
+        table.size() == 2
+        table.contains(CardCatalog.FARM)
+        !table.contains(CardCatalog.SEEDS)
+        table.contains(CardCatalog.FERTILIZER)
+        state.production == 98.0    // 100 - 2
+    }
+
+    def "demolishCard throws when the slot index is out of range"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(100)
+                .table(Season.SPRING, [CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.demolishCard(slot)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("invalid slot")
+
+        where:
+        slot << [-1, 1, 99]
+    }
+
+    def "demolishCard throws when the player cannot afford the demolition cost"() {
+        setup:
+        // MINE: productionRequirement=60 → demolish cost=12; give player only 5
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(5)
+                .table(Season.SPRING, [CardCatalog.MINE])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.demolishCard(0)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("not enough production to demolish")
+    }
+
+    def "demolishCard throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.demolishCard(0)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("demolishCard")
+    }
 }
