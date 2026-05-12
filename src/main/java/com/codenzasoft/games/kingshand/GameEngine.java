@@ -277,6 +277,29 @@ public class GameEngine {
       }
       // RECURRING-only cards remain in their slot — no action needed.
     }
+
+    // 3. Seasonal food consumption and starvation.
+    consumeFood();
+  }
+
+  /**
+   * Consumes food at the end of every PLAY phase.
+   *
+   * <p>The per-population rate is 2 for {@link Season#WINTER} and 1 for all other seasons. Total
+   * consumption is {@code floor(population) × rate}. If food is sufficient it is simply reduced; if
+   * food is insufficient, food is clamped to 0 and population drops by {@code 0.5 × deficit}.
+   */
+  private void consumeFood() {
+    int rate = (state.getCurSeason() == Season.WINTER) ? 2 : 1;
+    double consumed = Math.floor(state.getPopulation()) * rate;
+    double available = state.getFood();
+    if (available >= consumed) {
+      state.setFood(available - consumed);
+    } else {
+      double deficit = consumed - available;
+      state.setFood(0.0);
+      state.setPopulation(state.getPopulation() - 0.5 * deficit);
+    }
   }
 
   // ----- ADD phase: card offer, pick, skip -----

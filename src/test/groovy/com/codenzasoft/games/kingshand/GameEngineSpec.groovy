@@ -1512,7 +1512,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.hand.isEmpty()
-        state.food == 55.0
+        state.food == 50.0   // card +5 → 55, then consume floor(5)*1=5 → 50
     }
 
     // ----- PLAY phase: endAndRun — single vs recurring discard behaviour -----
@@ -1532,7 +1532,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.food == 60.0
+        state.food == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
         state.board.get(Season.SUMMER).isEmpty()
         state.discardPile.get(Season.SUMMER) == [singleCard]
     }
@@ -1576,7 +1576,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.food       == 55.0
+        state.food       == 50.0   // card +5 → 55, then consume floor(5)*1=5 → 50
         state.production == 105.0
         state.board.get(Season.FALL).isEmpty()
         state.discardPile.get(Season.FALL) == [mixedCard]
@@ -1598,7 +1598,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.food       == 60.0
+        state.food       == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
         state.production == 105.0
         state.board.get(Season.FALL) == [recurringCard]
         state.discardPile.get(Season.FALL) == [singleCard]
@@ -1625,8 +1625,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        // 50 + 10 = 60  (card A), then 60 + 60*0.10 = 66  (card B)
-        state.food == 66.0
+        // 50 + 10 = 60  (card A), then 60 + 60*0.10 = 66  (card B), then consume floor(5)*1=5 → 61
+        state.food == 61.0
         // both were SINGLE — both discarded
         state.board.get(Season.SPRING).isEmpty()
         state.discardPile.get(Season.SPRING).containsAll([cardA, cardB])
@@ -1655,5 +1655,83 @@ class GameEngineSpec extends Specification {
         // both RECURRING — both stay
         state.board.get(Season.SPRING) == [cardA, cardB]
         state.discardPile.get(Season.SPRING).isEmpty()
+    }
+
+    // ----- PLAY phase: endAndRun — food consumption and starvation -----
+
+    def "endAndRun consumes floor(pop) × 1 food in a non-winter season"() {
+        setup:
+        // pop=6.9 → floor=6; spring rate=1; consumed=6; food 40 → 34
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(6.9)
+                .food(40.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 34.0   // 40 - 6
+        state.population == 6.9    // unchanged — no deficit
+    }
+
+    def "endAndRun consumes floor(pop) × 2 food in winter"() {
+        setup:
+        // pop=4.0 → floor=4; winter rate=2; consumed=8; food 50 → 42
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.WINTER)
+                .population(4.0)
+                .food(50.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 42.0   // 50 - 8
+        state.population == 4.0    // unchanged — no deficit
+    }
+
+    def "endAndRun clamps food to zero and reduces population by half the deficit on starvation"() {
+        setup:
+        // pop=10; spring rate=1; consumed=10; food=4 → deficit=6; pop 10 → 7
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(10.0)
+                .food(4.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 0.0
+        state.population == 7.0   // 10 - 0.5*6
+    }
+
+    def "endAndRun starvation in winter: double rate magnifies deficit"() {
+        setup:
+        // pop=6; winter rate=2; consumed=12; food=2 → deficit=10; pop 6 → 1
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.WINTER)
+                .population(6.0)
+                .food(2.0)
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 0.0
+        state.population == 1.0   // 6 - 0.5*10
     }
 }
