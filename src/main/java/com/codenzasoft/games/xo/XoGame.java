@@ -230,7 +230,7 @@ public class XoGame implements Game<XoGame> {
       throw new IllegalArgumentException("unable to play - player is out of order");
     }
     board = board.set(Position.of(row, col), piece);
-    log.info("'{}' playing '{}' at ({},{})", player.name(), piece, row, col);
+    log.debug("'{}' playing '{}' at ({},{})", player.name(), piece, row, col);
     if (board.getWinner().isPresent() || board.getEmptyPositions().isEmpty()) {
       notifyListeners(ENDED_NOTIFICATION);
       // TODO: clear listeners and any other cleanup

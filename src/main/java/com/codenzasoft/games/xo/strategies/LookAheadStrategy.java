@@ -36,7 +36,7 @@ public class LookAheadStrategy implements XoGameListener {
         // try offense - play any square that will win
         for (final Position move : moves) {
           if (isWin(piece, move, board)) {
-            log.info("Choosing OFFENSIVE move {}", move);
+            log.debug("Choosing OFFENSIVE move {}", move);
             game.playPiece(player, move.row(), move.column());
             return;
           }
@@ -45,7 +45,7 @@ public class LookAheadStrategy implements XoGameListener {
         // be defensive - block any opponent win
         for (final Position move : moves) {
           if (isWin(piece.opposite(), move, board)) {
-            log.info("Choosing DEFENSIVE move {}", move);
+            log.debug("Choosing DEFENSIVE move {}", move);
             game.playPiece(player, move.row(), move.column());
             return;
           }
@@ -67,7 +67,7 @@ public class LookAheadStrategy implements XoGameListener {
         if (!choices.isEmpty()) {
           final Position choice = choices.get(RANDOM.nextInt(choices.size()));
           game.playPiece(player, choice.row(), choice.column());
-          log.info("Choosing BEST move {} with W/L record {}", choice, best);
+          log.debug("Choosing BEST move {} with W/L record {}", choice, best);
         }
       }
     }

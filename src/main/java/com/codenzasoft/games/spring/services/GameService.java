@@ -165,7 +165,7 @@ public class GameService {
 
   // TODO: should synchronize on smaller scope
   public synchronized XoGame buildXoGame(final XoGameEntity gameEntity) {
-    log.info("Building XO game from entity: {}", gameEntity.getId());
+    log.debug("Building XO game from entity: {}", gameEntity.getId());
     final Optional<Game<XoGame>> optionalGame =
         gameCache.getGameOfType(gameEntity.getId(), GameType.XO);
     if (optionalGame.isPresent()) {

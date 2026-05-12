@@ -36,7 +36,7 @@ public class XoGamePersistenceService implements XoGameListener {
     final Optional<XoGameEntity> optional = xoGameRepository.findById(game.getId());
     if (optional.isPresent()) {
       // already created
-      log.info("XO Game entity already exists: {}", game);
+      log.debug("XO Game entity already exists: {}", game);
       return;
     }
 
@@ -57,7 +57,7 @@ public class XoGamePersistenceService implements XoGameListener {
 
     xoGameRepository.save(entity);
     entityManager.flush();
-    log.info("XO Game entity created: {}", entity);
+    log.debug("XO Game entity created: {}", entity);
   }
 
   @Override
