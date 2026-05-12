@@ -147,7 +147,7 @@ public class GameEngine {
       if (effect.target() instanceof ResourceTarget rt) {
         Effect scaled = scaleForSeason(effect);
         switch (rt) {
-          case POPULATION -> state.setPopulation(scaled.apply(state.getPopulation()));
+          case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
           case PRODUCTION -> state.setProduction(scaled.apply(state.getProduction()));
           case FOOD -> state.setFood(scaled.apply(state.getFood()));
         }
@@ -155,7 +155,10 @@ public class GameEngine {
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
     }
 
-    state.setCurPhase(Phase.PLAY);
+    // Only advance to PLAY if the game is still running (population may have hit zero above).
+    if (state.getCurPhase() != Phase.GAME_OVER) {
+      state.setCurPhase(Phase.PLAY);
+    }
   }
 
   /**
@@ -212,7 +215,7 @@ public class GameEngine {
 
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
-              case POPULATION -> state.setPopulation(effect.apply(state.getPopulation()));
+              case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
               case FOOD -> state.setFood(effect.apply(state.getFood()));
             }
@@ -260,7 +263,7 @@ public class GameEngine {
       for (Effect effect : card.effects()) {
         if (effect.target() instanceof ResourceTarget rt) {
           switch (rt) {
-            case POPULATION -> state.setPopulation(effect.apply(state.getPopulation()));
+            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
             case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
             case FOOD -> state.setFood(effect.apply(state.getFood()));
           }
@@ -283,6 +286,19 @@ public class GameEngine {
   }
 
   /**
+   * Applies a population change, clamping to zero and transitioning to {@link Phase#GAME_OVER} if
+   * the result is zero or below. All engine-level population mutations route through this method so
+   * game-over detection is never scattered.
+   */
+  private void applyPopulation(double value) {
+    double clamped = Math.max(0.0, value);
+    state.setPopulation(clamped);
+    if (clamped == 0.0) {
+      state.setCurPhase(Phase.GAME_OVER);
+    }
+  }
+
+  /**
    * Consumes food at the end of every PLAY phase.
    *
    * <p>The per-population rate is 2 for {@link Season#WINTER} and 1 for all other seasons. Total
@@ -298,7 +314,7 @@ public class GameEngine {
     } else {
       double deficit = consumed - available;
       state.setFood(0.0);
-      state.setPopulation(state.getPopulation() - 0.5 * deficit);
+      applyPopulation(state.getPopulation() - 0.5 * deficit);
     }
   }
 

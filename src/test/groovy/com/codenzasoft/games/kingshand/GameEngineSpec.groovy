@@ -1734,4 +1734,89 @@ class GameEngineSpec extends Specification {
         state.food       == 0.0
         state.population == 1.0   // 6 - 0.5*10
     }
+
+    // ----- Game Over: population reaching zero -----
+
+    def "population dropping to exactly zero via an event option triggers GAME_OVER"() {
+        setup:
+        // pop=5, event -5 → raw 0.0 → GAME_OVER
+        def option = new EventOption("Plague", [ResourceTarget.POPULATION.once(-5)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .population(5.0).build()
+        def engine = new GameEngine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        state.curPhase   == Phase.GAME_OVER
+        state.population == 0.0
+    }
+
+    def "population driven below zero by an event is clamped to zero and triggers GAME_OVER"() {
+        setup:
+        // pop=2, event -5 → raw -3 → clamped to 0
+        def option = new EventOption("Catastrophe", [ResourceTarget.POPULATION.once(-5)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .population(2.0).build()
+        def engine = new GameEngine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        state.curPhase   == Phase.GAME_OVER
+        state.population == 0.0
+    }
+
+    def "GAME_OVER is not set when population stays above zero after an event"() {
+        setup:
+        def option = new EventOption("Minor loss", [ResourceTarget.POPULATION.once(-2)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .population(5.0).build()
+        def engine = new GameEngine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        state.curPhase   == Phase.PLAY   // normal transition
+        state.population == 3.0
+    }
+
+    def "population dropping to zero by starvation triggers GAME_OVER"() {
+        setup:
+        // pop=1, winter: consumed=floor(1)*2=2, available=0, deficit=2, pop = 1 - 1 = 0 → GAME_OVER
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.WINTER)
+                .population(1.0).food(0.0).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.curPhase   == Phase.GAME_OVER
+        state.population == 0.0
+        state.food       == 0.0
+    }
+
+    def "sufficient food after endAndRun does not trigger GAME_OVER"() {
+        setup:
+        // pop=5, spring: consumed=5, food=10 → food=5, pop unchanged, still PLAY
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(5.0).food(10.0).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.curPhase   == Phase.PLAY
+        state.population == 5.0
+    }
 }
