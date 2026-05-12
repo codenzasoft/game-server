@@ -54,4 +54,82 @@ class EffectSpec extends Specification {
         effect.target() == target
         (effect.target() as CardTarget).slotOffset() == -1
     }
+
+    // ----- Effect.upgrade -----
+
+    def "upgrade returns a new effect with the modifier scaled by the factor"() {
+        setup:
+        def effect = new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.RECURRING)
+
+        when:
+        def upgraded = effect.upgrade(2)
+
+        then:
+        upgraded.modifier() == 20.0
+    }
+
+    def "upgrade preserves the target, valueType, and frequencyType"() {
+        setup:
+        def effect = new Effect(ResourceTarget.PRODUCTION, 5, ValueType.PERCENTAGE, FrequencyType.SINGLE)
+
+        when:
+        def upgraded = effect.upgrade(3)
+
+        then:
+        upgraded.target()        == ResourceTarget.PRODUCTION
+        upgraded.valueType()     == ValueType.PERCENTAGE
+        upgraded.frequencyType() == FrequencyType.SINGLE
+        upgraded.modifier()      == 15.0
+    }
+
+    def "upgrade does not mutate the original effect"() {
+        setup:
+        def original = new Effect(ResourceTarget.FOOD, 8, ValueType.INTEGER, FrequencyType.RECURRING)
+
+        when:
+        original.upgrade(10)
+
+        then:
+        original.modifier() == 8.0
+    }
+
+    // ----- Card.amplify -----
+
+    def "amplify returns a new card with every effect's modifier scaled by the factor"() {
+        setup:
+        def card = new Card(2, 30, [
+                new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.RECURRING),
+                new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER, FrequencyType.RECURRING)
+        ])
+
+        when:
+        def amplified = card.amplify(2)
+
+        then:
+        amplified.effects()[0].modifier() == 20.0
+        amplified.effects()[1].modifier() == 10.0
+    }
+
+    def "amplify preserves the card's population and production requirements"() {
+        setup:
+        def card = new Card(3, 60, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.RECURRING)])
+
+        when:
+        def amplified = card.amplify(2)
+
+        then:
+        amplified.populationRequirement()  == 3.0
+        amplified.productionRequirement()  == 60.0
+    }
+
+    def "amplify does not mutate the original card"() {
+        setup:
+        def card = new Card(2, 30, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.RECURRING)])
+
+        when:
+        card.amplify(2)
+
+        then:
+        card.effects()[0].modifier() == 10.0
+    }
 }

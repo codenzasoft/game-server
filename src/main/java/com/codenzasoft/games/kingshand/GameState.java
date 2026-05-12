@@ -69,6 +69,45 @@ public class GameState {
     return board.get(curSeason);
   }
 
+  /** Returns {@code true} if the current season's table contains {@code card}. */
+  public boolean tableContains(Card card) {
+    return getCurrentTable().contains(card);
+  }
+
+  /**
+   * Replaces the first occurrence of {@code oldCard} on the current season's table with {@code
+   * newCard}.
+   *
+   * @throws IllegalArgumentException if {@code oldCard} is not present on the table
+   */
+  public void replaceTableCard(Card oldCard, Card newCard) {
+    List<Card> table = getCurrentTable();
+    int index = table.indexOf(oldCard);
+    if (index == -1) {
+      throw new IllegalArgumentException("card not found on current table");
+    }
+    table.set(index, newCard);
+  }
+
+  /** Appends {@code card} to the current season's table. */
+  public void addToTable(Card card) {
+    getCurrentTable().add(card);
+  }
+
+  /** Removes the first occurrence of {@code card} from the current season's table. */
+  public void removeFromTable(Card card) {
+    getCurrentTable().remove(card);
+  }
+
+  /**
+   * Removes the card at {@code slot} from the current season's table.
+   *
+   * @throws IndexOutOfBoundsException if {@code slot} is out of range
+   */
+  public void removeFromTableAt(int slot) {
+    getCurrentTable().remove(slot);
+  }
+
   public Map<Season, List<Card>> getDiscardPile() {
     return discardPile;
   }

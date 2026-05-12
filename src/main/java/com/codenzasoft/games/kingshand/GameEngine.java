@@ -28,7 +28,9 @@ import java.util.Random;
 public class GameEngine {
 
   public static final int MAX_TABLE_SIZE = 5;
+  public static final int MAX_HAND_SIZE = 5;
   public static final int REROLL_COST_STEP = 10;
+  public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
 
   private final GameState state;
@@ -94,14 +96,17 @@ public class GameEngine {
 
   public synchronized void advancePhase() {
     // if play phase ends, move to the next season
-
-    switch (state.getCurPhase()) {
-      case ADD -> rollEvent();
-      case RANDOM_EVENT -> {}
-      case PLAY -> advanceSeason();
+    if (state.getCurPhase() == Phase.PLAY) {
+      advanceSeason();
     }
 
     state.setCurPhase(state.getCurPhase().next());
+
+    switch (state.getCurPhase()) {
+      case ADD -> offerAddChoices();
+      case RANDOM_EVENT -> rollEvent();
+      case PLAY -> startPlay();
+    }
   }
 
   // ----- RANDOM_EVENT resolution -----
@@ -362,5 +367,122 @@ public class GameEngine {
 
     state.getDiscardPile().get(season).addAll(state.getHand());
     state.getHand().clear();
+  }
+
+  // ----- PLAY phase: draw hand, place card, demolish card -----
+
+  /**
+   * Draws up to {@value #MAX_HAND_SIZE} cards from the current season's draw pile into the hand,
+   * auto-reshuffling the discard pile whenever the draw pile empties mid-draw. If the combined draw
+   * + discard count is less than {@value #MAX_HAND_SIZE}, the hand receives whatever cards are
+   * available.
+   *
+   * @return the newly drawn cards (may be fewer than {@value #MAX_HAND_SIZE})
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}
+   */
+  public synchronized List<Card> startPlay() {
+    requirePhase(Phase.PLAY, "startPlay");
+    return draw(state.getCurSeason(), MAX_HAND_SIZE);
+  }
+
+  /**
+   * Places {@code card} from the player's hand onto the current season's table, after validating:
+   *
+   * <ol>
+   *   <li>The card is present in the hand.
+   *   <li>The table has an open slot (<{@value #MAX_TABLE_SIZE} cards) <em>or</em> the card
+   *       duplicates one already on the table (upgrade path).
+   *   <li>Current production ≥ {@link Card#productionRequirement()}.
+   *   <li>Current population ≥ {@link Card#populationRequirement()}.
+   * </ol>
+   *
+   * <p>On success the production cost is deducted and the card is removed from the hand. If a
+   * matching card already sits on the table, every effect's modifier on that table card is doubled
+   * (upgrade) rather than adding a new slot.
+   *
+   * @param card the card to place; must not be {@code null}
+   * @throws IllegalArgumentException if {@code card} is {@code null}
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, or if any
+   *     validation check fails
+   */
+  // we will eventually want to be able to choose where this card is placed with an index parameter.
+  public synchronized void placeCard(Card card) {
+    requirePhase(Phase.PLAY, "placeCard");
+
+    if (card == null) {
+      throw new IllegalArgumentException("card cannot be null");
+    }
+
+    if (!state.getHand().contains(card)) {
+      throw new IllegalStateException("card is not in hand");
+    }
+
+    List<Card> table = state.getCurrentTable();
+
+    // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
+    if (!state.tableContains(card) && table.size() >= MAX_TABLE_SIZE) {
+      throw new IllegalStateException(state.getCurSeason() + " table is full");
+    }
+
+    // if you cannot afford the production cost, reject
+    if (state.getProduction() < card.productionRequirement()) {
+      throw new IllegalStateException(
+          "not enough production to place card: need "
+              + (int) card.productionRequirement()
+              + ", have "
+              + (int) state.getProduction());
+    }
+    // if you do not meet the population requirement, reject
+    if (state.getPopulation() < card.populationRequirement()) {
+      throw new IllegalStateException(
+          "not enough population to place card: need "
+              + (int) card.populationRequirement()
+              + ", have "
+              + (int) state.getPopulation());
+    }
+
+    // Pay the production cost and remove the card from the hand.
+    state.setProduction(state.getProduction() - card.productionRequirement());
+    state.getHand().remove(card);
+
+    // if duplicate exisits, replace with one whose every effect modifier is doubled.
+    // else just add it to the table as a new card.
+    if (state.tableContains(card)) {
+      state.replaceTableCard(card, card.amplify(2));
+    } else {
+      state.addToTable(card);
+    }
+  }
+
+  /**
+   * Demolishes the card at the given {@code slot} index on the current season's table, charging
+   * {@value #DEMOLISH_COST_RATE} × the card's original {@link Card#productionRequirement()} as the
+   * demolition cost and freeing the slot.
+   *
+   * @param slot zero-based index into the current season's table
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if {@code slot}
+   *     is out of range, or if the player cannot afford the cost
+   */
+  public synchronized void demolishCard(int slot) {
+    requirePhase(Phase.PLAY, "demolishCard");
+
+    List<Card> table = state.getCurrentTable();
+
+    if (slot < 0 || slot >= table.size()) {
+      throw new IllegalStateException("invalid slot: " + slot);
+    }
+
+    Card card = table.get(slot);
+    double cost = card.productionRequirement() * DEMOLISH_COST_RATE;
+
+    // if you cannot afford the production cost, reject.
+    if (state.getProduction() < cost) {
+      throw new IllegalStateException(
+          "not enough production to demolish: need " + cost + ", have " + state.getProduction());
+    }
+
+    // else pay and demolish card
+    state.setProduction(state.getProduction() - cost);
+    state.removeFromTableAt(slot);
   }
 }
