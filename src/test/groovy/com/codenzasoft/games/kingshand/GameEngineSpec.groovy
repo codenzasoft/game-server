@@ -1452,4 +1452,208 @@ class GameEngineSpec extends Specification {
         def e = thrown(IllegalStateException)
         e.message.contains("demolishCard")
     }
+
+    // ----- PLAY phase: endAndRun — phase guard -----
+
+    def "endAndRun throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder().curPhase(phase).curSeason(Season.SPRING).build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("endAndRun")
+
+        where:
+        phase << [Phase.ADD, Phase.RANDOM_EVENT]
+    }
+
+    // ----- PLAY phase: endAndRun — hand discard -----
+
+    def "endAndRun discards every remaining hand card to the current season's discard pile"() {
+        setup:
+        def card1 = new Card(0, 0, [])
+        def card2 = new Card(0, 0, [])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .hand([card1, card2])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.hand.isEmpty()
+        state.discardPile.get(Season.SPRING).containsAll([card1, card2])
+        // other seasons' discard piles untouched
+        state.discardPile.get(Season.SUMMER).isEmpty()
+        state.discardPile.get(Season.FALL).isEmpty()
+        state.discardPile.get(Season.WINTER).isEmpty()
+    }
+
+    def "endAndRun with an empty hand still resolves the table without error"() {
+        setup:
+        def card = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER, FrequencyType.RECURRING)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SUMMER)
+                .food(50.0)
+                .table(Season.SUMMER, [card])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.hand.isEmpty()
+        state.food == 55.0
+    }
+
+    // ----- PLAY phase: endAndRun — single vs recurring discard behaviour -----
+
+    def "endAndRun moves a SINGLE-frequency card to the discard pile after its effect fires"() {
+        setup:
+        def singleCard = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SUMMER)
+                .food(50.0)
+                .table(Season.SUMMER, [singleCard])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food == 60.0
+        state.board.get(Season.SUMMER).isEmpty()
+        state.discardPile.get(Season.SUMMER) == [singleCard]
+    }
+
+    def "endAndRun leaves a RECURRING-only card on the table after its effect fires"() {
+        setup:
+        def recurringCard = new Card(0, 0, [new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER, FrequencyType.RECURRING)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(100.0)
+                .table(Season.SPRING, [recurringCard])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.production == 105.0
+        state.board.get(Season.SPRING) == [recurringCard]
+        state.discardPile.get(Season.SPRING).isEmpty()
+    }
+
+    def "endAndRun: card with any SINGLE effect is discarded even when it also carries a RECURRING effect"() {
+        setup:
+        // Both SINGLE and RECURRING on the same card — card must be discarded.
+        def mixedCard = new Card(0, 0, [
+                new Effect(ResourceTarget.FOOD,       5, ValueType.INTEGER, FrequencyType.SINGLE),
+                new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER, FrequencyType.RECURRING)
+        ])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.FALL)
+                .food(50.0).production(100.0)
+                .table(Season.FALL, [mixedCard])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 55.0
+        state.production == 105.0
+        state.board.get(Season.FALL).isEmpty()
+        state.discardPile.get(Season.FALL) == [mixedCard]
+    }
+
+    def "endAndRun mixed table: SINGLE card discarded, RECURRING card kept, both effects fire"() {
+        setup:
+        def singleCard    = new Card(0, 0, [new Effect(ResourceTarget.FOOD,       10, ValueType.INTEGER, FrequencyType.SINGLE)])
+        def recurringCard = new Card(0, 0, [new Effect(ResourceTarget.PRODUCTION,  5, ValueType.INTEGER, FrequencyType.RECURRING)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.FALL)
+                .food(50.0).production(100.0)
+                .table(Season.FALL, [singleCard, recurringCard])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.food       == 60.0
+        state.production == 105.0
+        state.board.get(Season.FALL) == [recurringCard]
+        state.discardPile.get(Season.FALL) == [singleCard]
+    }
+
+    // ----- PLAY phase: endAndRun — left-to-right ordering / card-to-card effect chain -----
+
+    def "endAndRun fires effects left-to-right: each card sees resources already mutated by cards to its left"() {
+        // Card A (slot 0): FOOD +10 INTEGER SINGLE  →  food goes 50 → 60
+        // Card B (slot 1): FOOD +10 PERCENTAGE SINGLE  →  fires on 60, result 66
+        // If order were reversed the PERCENTAGE card would fire on 50 and result would be 65.
+        setup:
+        def cardA = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 10,   ValueType.INTEGER,    FrequencyType.SINGLE)])
+        def cardB = new Card(0, 0, [new Effect(ResourceTarget.FOOD, 10.0, ValueType.PERCENTAGE, FrequencyType.SINGLE)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .food(50.0)
+                .table(Season.SPRING, [cardA, cardB])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // 50 + 10 = 60  (card A), then 60 + 60*0.10 = 66  (card B)
+        state.food == 66.0
+        // both were SINGLE — both discarded
+        state.board.get(Season.SPRING).isEmpty()
+        state.discardPile.get(Season.SPRING).containsAll([cardA, cardB])
+    }
+
+    def "endAndRun card-to-card effect chain: card B sees production boosted by card A"() {
+        // Card A (slot 0): PRODUCTION +50 RECURRING — stays on table
+        // Card B (slot 1): PRODUCTION +10% RECURRING — fires on 150, not 100
+        setup:
+        def cardA = new Card(0, 0, [new Effect(ResourceTarget.PRODUCTION, 50,   ValueType.INTEGER,    FrequencyType.RECURRING)])
+        def cardB = new Card(0, 0, [new Effect(ResourceTarget.PRODUCTION, 10.0, ValueType.PERCENTAGE, FrequencyType.RECURRING)])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .production(100.0)
+                .table(Season.SPRING, [cardA, cardB])
+                .build()
+        def engine = new GameEngine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // 100 + 50 = 150  (card A), then 150 + 150*0.10 = 165  (card B)
+        state.production == 165.0
+        // both RECURRING — both stay
+        state.board.get(Season.SPRING) == [cardA, cardB]
+        state.discardPile.get(Season.SPRING).isEmpty()
+    }
 }

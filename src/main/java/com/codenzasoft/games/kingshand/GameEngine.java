@@ -201,10 +201,10 @@ public class GameEngine {
   protected synchronized void triggerCurrentSeasonTable() {
     List<Card> table = state.getCurrentTable();
 
-    // Walk every effect on every card on the current season's table. For now, only RECURRING
-    // effects targeting a global resource (population / production / food) fire here. SELF and
-    // CARD targets — and SINGLE-frequency effects — are handled by the end-of-PLAY resolver
-    // landing in a later PR.
+    // Walk every effect on every card on the current season's table. Only RECURRING effects
+    // targeting a global resource (population / production / food) fire here. The full
+    // end-of-PLAY resolver — including SINGLE-frequency effects and post-fire discard — lives
+    // in {@link #endAndRun()}.
     for (Card card : table) {
       for (Effect effect : card.effects()) {
 
@@ -219,6 +219,63 @@ public class GameEngine {
           }
         }
       }
+    }
+  }
+
+  // ----- End-of-PLAY resolution -----
+
+  /**
+   * Ends the player's turn: discards every card remaining in the hand to the current season's
+   * discard pile, then resolves the current season's table left-to-right.
+   *
+   * <p>Resolution iterates the table in slot order (index 0 first). For each card all effects fire
+   * in declaration order, so cards to the right see the resource state already mutated by cards to
+   * their left. After a card's effects fire:
+   *
+   * <ul>
+   *   <li>If the card carries <em>any</em> {@link FrequencyType#SINGLE} effect, the card is moved
+   *       to the current season's discard pile (one-shot exhaustion).
+   *   <li>If every effect on the card is {@link FrequencyType#RECURRING}, the card stays in its
+   *       table slot.
+   * </ul>
+   *
+   * <p>Note: {@link CardTarget} effects are not yet evaluated and are silently skipped.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}
+   */
+  public synchronized void endAndRun() {
+    requirePhase(Phase.PLAY, "endAndRun");
+
+    // 1. Discard everything remaining in hand.
+    discardHand(state.getCurSeason());
+
+    // 2. Snapshot the table order before resolution so that removals during the walk don't
+    //    disturb the iteration sequence.
+    List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
+
+    for (Card card : snapshot) {
+      boolean hasSingleEffect = false;
+
+      // Fire every ResourceTarget effect on this card.
+      for (Effect effect : card.effects()) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          switch (rt) {
+            case POPULATION -> state.setPopulation(effect.apply(state.getPopulation()));
+            case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
+            case FOOD -> state.setFood(effect.apply(state.getFood()));
+          }
+        }
+        if (effect.frequencyType() == FrequencyType.SINGLE) {
+          hasSingleEffect = true;
+        }
+      }
+
+      // SINGLE cards are exhausted: remove from table and send to discard.
+      if (hasSingleEffect) {
+        state.removeFromTable(card);
+        state.getDiscardPile().get(state.getCurSeason()).add(card);
+      }
+      // RECURRING-only cards remain in their slot — no action needed.
     }
   }
 
