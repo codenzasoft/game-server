@@ -94,15 +94,14 @@ public class GameEngine {
 
   public synchronized void advancePhase() {
     // if play phase ends, move to the next season
-    
+
     switch (state.getCurPhase()) {
       case ADD -> rollEvent();
       case RANDOM_EVENT -> {}
       case PLAY -> advanceSeason();
     }
-    
+
     state.setCurPhase(state.getCurPhase().next());
-    
   }
 
   // ----- RANDOM_EVENT resolution -----

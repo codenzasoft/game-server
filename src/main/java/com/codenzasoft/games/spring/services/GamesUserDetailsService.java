@@ -24,12 +24,12 @@ public class GamesUserDetailsService implements UserDetailsService {
 
   @Override
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-    log.info("Loading user {}", username);
+    log.debug("Loading user {}", username);
     final Optional<UserEntity> user = getUserByUsernameOrEmail(username);
     if (user.isEmpty()) {
       throw new UsernameNotFoundException("User not found");
     } else {
-      log.info("User {} found", username);
+      log.debug("User {} found", username);
     }
     final UserEntity entity = user.get();
     List<SimpleGrantedAuthority> roles =

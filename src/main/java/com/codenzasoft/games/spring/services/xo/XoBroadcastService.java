@@ -71,7 +71,7 @@ public class XoBroadcastService implements XoGameListener {
       final XoMessage message = new XoMessage(context, state);
       messagingTemplate.convertAndSendToUser(
           user.getUsername(), "/queue/games/" + context.gameId(), message);
-      log.info("attempted to send message to user {}", user.getUsername());
+      log.debug("attempted to send message to user {}", user.getUsername());
     }
   }
 
