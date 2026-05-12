@@ -419,11 +419,8 @@ public class GameEngine {
 
     List<Card> table = state.getCurrentTable();
 
-    // Find a duplicate already on the table (structural equality via record equals).
-    int duplicateIndex = table.indexOf(card);
-
     // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
-    if (duplicateIndex == -1 && table.size() >= MAX_TABLE_SIZE) {
+    if (!state.tableContains(card) && table.size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(state.getCurSeason() + " table is full");
     }
 
@@ -448,8 +445,7 @@ public class GameEngine {
     state.setProduction(state.getProduction() - card.productionRequirement());
     state.getHand().remove(card);
 
-    // Upgrade: replace the existing table card with one whose every effect modifier is doubled.
-    // index is above -1 if we found a duplicate.
+    // if duplicate exisits, replace with one whose every effect modifier is doubled.
     // else just add it to the table as a new card.
     if (state.tableContains(card)) {
       state.replaceTableCard(card, card.amplify(2));
