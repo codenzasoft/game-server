@@ -140,7 +140,37 @@ The app is deployed to **Google Cloud Run** at `https://games.dev.codenzasoft.ca
 
 ## Testing
 
-JUnit 4 + Spock (Groovy) are on the test classpath. No tests exist yet. The Gradle test task is configured to log `passed`, `skipped`, and `failed` events.
+All tests are written in Groovy using the Spock framework. Unit tests (game logic) live in `src/test/groovy/` and extend `spock.lang.Specification` with no Spring context.
+
+### Database integration tests
+
+Database tests use `@SpringBootTest` to load the full Spring context against a real Postgres instance — `localhost:5435` locally (the dev Postgres from game-database Docker), and the GitHub Actions Postgres service container on the same port in CI.
+
+**Flyway migrations** are applied via `DatabaseMigrationTestConfig` (`src/test/groovy/.../repositories/`), a `@Configuration` class that Spring Boot picks up through its normal component scan. It defines a `Flyway` bean that calls `migrate()` before JPA initialises the `EntityManagerFactory`. The migrations come from `../game-database/migrations` (sibling checkout — in CI, `pr.yml` checks out `codenzasoft/game-database` as a sibling using the `REPO_ACCESS_TOKEN` secret).
+
+> **Note:** `@ActiveProfiles` and `@TestPropertySource` are not reliably applied by `spock-spring:2.4-M7-groovy-5.0` with Spring Boot 4.0. Flyway configuration must go through the component-scan `@Configuration` bean, not through profile-specific YAML or test annotations.
+
+Use `@Transactional` on the spec class so each feature method runs in a rolled-back transaction. Add a `setup()` block to delete rows in FK-safe order before each test — this keeps local runs clean when the dev database has existing data:
+
+```groovy
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class MyRepositorySpec extends Specification {
+
+    @Autowired MyRepository myRepository
+    @Autowired JdbcTemplate jdbcTemplate
+
+    def setup() {
+        jdbcTemplate.execute("DELETE FROM xo_game_moves")
+        jdbcTemplate.execute("DELETE FROM xo_game_pieces")
+        jdbcTemplate.execute("DELETE FROM game_players")
+        jdbcTemplate.execute("DELETE FROM games")
+    }
+}
+```
+
+In CI, the GitHub Actions Postgres service starts with an empty database, so the `setup()` deletes are no-ops — but `@Transactional` rollback still ensures test isolation.
 
 ## Deployment
 

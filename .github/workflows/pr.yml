@@ -7,8 +7,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5435:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: game-server
+
+      - uses: actions/checkout@v4
+        with:
+          repository: codenzasoft/game-database
+          path: game-database
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - uses: actions/setup-java@v4
         with:
@@ -18,4 +40,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
+        working-directory: game-server
         run: ./gradlew build

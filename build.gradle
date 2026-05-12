@@ -43,6 +43,8 @@ dependencies {
             'org.spockframework:spock-core:2.4-M7-groovy-5.0',
             'org.spockframework:spock-spring:2.4-M7-groovy-5.0',
             'org.springframework.boot:spring-boot-starter-test',
+            'org.flywaydb:flyway-core',
+            'org.flywaydb:flyway-database-postgresql',
     )
 }
 

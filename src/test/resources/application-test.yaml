@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5435/postgres
+    username: postgres
+    password: postgres
+  flyway:
+    locations: filesystem:../game-database/migrations
+    enabled: true
+    fail-on-missing-locations: true
+  jpa:
+    hibernate:
+      ddl-auto: none
