@@ -95,6 +95,9 @@ public class GameEngine {
   // ----- Phase / season progression -----
 
   public synchronized void advancePhase() {
+    if (state.isGameOver()) {
+      return;
+    }
     // if play phase ends, move to the next season
     if (state.getCurPhase() == Phase.PLAY) {
       advanceSeason();
@@ -156,7 +159,7 @@ public class GameEngine {
     }
 
     // Only advance to PLAY if the game is still running (population may have hit zero above).
-    if (state.getCurPhase() != Phase.GAME_OVER) {
+    if (!state.isGameOver()) {
       state.setCurPhase(Phase.PLAY);
     }
   }
@@ -280,7 +283,7 @@ public class GameEngine {
     double clamped = Math.max(0.0, value);
     state.setPopulation(clamped);
     if (clamped == 0.0) {
-      state.setCurPhase(Phase.GAME_OVER);
+      state.setGameOver(true);
     }
   }
 

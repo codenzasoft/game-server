@@ -31,6 +31,8 @@ public class GameState {
   private int rerollCount;
   // the event rolled for the current RANDOM_EVENT phase (null between phases)
   private Event currentEvent;
+  // true once the player's population has reached zero; no further actions are possible
+  private boolean gameOver;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -46,6 +48,7 @@ public class GameState {
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
     this.currentEvent = b.currentEvent;
+    this.gameOver = b.gameOver;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -216,6 +219,14 @@ public class GameState {
     this.currentEvent = currentEvent;
   }
 
+  public boolean isGameOver() {
+    return gameOver;
+  }
+
+  public void setGameOver(boolean gameOver) {
+    this.gameOver = gameOver;
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -232,6 +243,7 @@ public class GameState {
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
     private Event currentEvent = null;
+    private boolean gameOver = false;
 
     // fill similar data types with seasons
     private Builder() {
@@ -305,6 +317,11 @@ public class GameState {
 
     public Builder currentEvent(Event currentEvent) {
       this.currentEvent = currentEvent;
+      return this;
+    }
+
+    public Builder gameOver(boolean gameOver) {
+      this.gameOver = gameOver;
       return this;
     }
 
