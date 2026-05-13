@@ -1,5 +1,5 @@
 import { Application } from "pixi.js";
-import { GameEventHandler } from "./tictactoe.ts";
+import { GameEventHandler } from "./xsandos.ts";
 
 const loginUrl = import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
 
