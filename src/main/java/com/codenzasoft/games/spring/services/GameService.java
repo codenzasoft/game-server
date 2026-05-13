@@ -5,6 +5,7 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
+import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
@@ -140,9 +141,9 @@ public class GameService {
     return createXoGame(players, nextLeader);
   }
 
-  public List<XoGameEntity> getActiveGames(final UserEntity user) {
+  public List<GameEntity> getActiveGames(final UserEntity user) {
     return gamePlayersRepository.findActiveGamesByUser(user.getId()).stream()
-        .map(gp -> (XoGameEntity) gp.getGame())
+        .map(GamePlayerEntity::getGame)
         .distinct()
         .toList();
   }

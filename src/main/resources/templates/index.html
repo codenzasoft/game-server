@@ -12,9 +12,10 @@
                 <ul class="list-group">
                     <li class="list-group-item d-flex justify-content-between align-items-center"
                         th:each="game : ${activeGames}">
-                        <span
-                            th:text="${game.players[0].username} + ' vs. ' + ${game.players[1].username}">
-                        </span>
+                            <span th:text="${#lists.size(game.players) > 1}
+                                ? ${game.players[0].username + ' vs. ' + game.players[1].username}
+                                : ${game.players[0].username}">
+                            </span>
                         <a th:href="@{/games/xo/{id}(id=${game.id})}"
                            class="btn btn-primary btn-sm">Join</a>
                     </li>
