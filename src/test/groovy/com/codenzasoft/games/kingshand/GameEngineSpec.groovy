@@ -1633,7 +1633,7 @@ class GameEngineSpec extends Specification {
         engine.applyEventOption(option)
 
         then:
-        state.curPhase   == Phase.GAME_OVER
+        state.gameOver   == true
         state.population == 0.0
     }
 
@@ -1650,7 +1650,7 @@ class GameEngineSpec extends Specification {
         engine.applyEventOption(option)
 
         then:
-        state.curPhase   == Phase.GAME_OVER
+        state.gameOver   == true
         state.population == 0.0
     }
 
@@ -1667,6 +1667,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.curPhase   == Phase.PLAY   // normal transition
+        state.gameOver   == false
         state.population == 3.0
     }
 
@@ -1682,7 +1683,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.curPhase   == Phase.GAME_OVER
+        state.gameOver   == true
         state.population == 0.0
         state.food       == 0.0
     }

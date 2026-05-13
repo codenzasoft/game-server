@@ -13,6 +13,5 @@ class PhaseSpec extends Specification {
         Phase.ADD          || Phase.RANDOM_EVENT
         Phase.RANDOM_EVENT || Phase.PLAY
         Phase.PLAY         || Phase.ADD
-        Phase.GAME_OVER    || Phase.GAME_OVER
     }
 }
