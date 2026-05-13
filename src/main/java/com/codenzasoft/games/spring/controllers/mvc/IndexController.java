@@ -61,17 +61,17 @@ public class IndexController {
     return "redirect:/";
   }
 
-    /** Creates a new kh game {@link com.codenzasoft.games.kingshand.GameEngine}. */
-    @PostMapping("/games/kh")
-    public String newKhGame(@AuthenticationPrincipal UserDetails user) {
-      final Optional<UserEntity> entity =
-          gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
-      if (entity.isPresent()) {
-        final KhGameEntity game = gameService.createKhGame(entity.get());
-        return "redirect:/games/kh/" + game.getId();
-      }
-      return "redirect:/";
+  /** Creates a new kh game {@link com.codenzasoft.games.kingshand.GameEngine}. */
+  @PostMapping("/games/kh")
+  public String newKhGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      final KhGameEntity game = gameService.createKhGame(entity.get());
+      return "redirect:/games/kh/" + game.getId();
     }
+    return "redirect:/";
+  }
 
   /** Creates a new two-player game and redirects the creator to it immediately. */
   @PostMapping("/games/xo/challenge")

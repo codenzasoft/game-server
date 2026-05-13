@@ -40,8 +40,8 @@ public class GameService {
   @Autowired private GameCache gameCache;
 
   /**
-   * Returns a new single user xo game for the provided {@link UserEntity} playing the provided {@link
-   * Piece}.
+   * Returns a new single user xo game for the provided {@link UserEntity} playing the provided
+   * {@link Piece}.
    *
    * @param user The user.
    * @param piece The {@link Piece} associated with the user.
