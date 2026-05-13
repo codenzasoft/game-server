@@ -147,7 +147,7 @@ public class GameEngine {
       if (effect.target() instanceof ResourceTarget rt) {
         Effect scaled = scaleForSeason(effect);
         switch (rt) {
-          case POPULATION -> state.setPopulation(scaled.apply(state.getPopulation()));
+          case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
           case PRODUCTION -> state.setProduction(scaled.apply(state.getProduction()));
           case FOOD -> state.setFood(scaled.apply(state.getFood()));
         }
@@ -155,7 +155,10 @@ public class GameEngine {
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
     }
 
-    state.setCurPhase(Phase.PLAY);
+    // Only advance to PLAY if the game is still running (population may have hit zero above).
+    if (state.getCurPhase() != Phase.GAME_OVER) {
+      state.setCurPhase(Phase.PLAY);
+    }
   }
 
   /**
@@ -166,11 +169,7 @@ public class GameEngine {
     if (state.getCurSeason() != Season.WINTER) {
       return effect;
     }
-    return new Effect(
-        effect.target(),
-        effect.modifier() * state.getYear(),
-        effect.valueType(),
-        effect.frequencyType());
+    return new Effect(effect.target(), effect.modifier() * state.getYear(), effect.valueType());
   }
 
   public synchronized void advanceSeason() {
@@ -201,24 +200,107 @@ public class GameEngine {
   protected synchronized void triggerCurrentSeasonTable() {
     List<Card> table = state.getCurrentTable();
 
-    // Walk every effect on every card on the current season's table. For now, only RECURRING
-    // effects targeting a global resource (population / production / food) fire here. SELF and
-    // CARD targets — and SINGLE-frequency effects — are handled by the end-of-PLAY resolver
-    // landing in a later PR.
+    // Walk every card on the current season's table. Only RECURRING cards fire here; frequency is
+    // checked once per card (it is a card-level property). The full end-of-PLAY resolver —
+    // including SINGLE-frequency cards and post-fire discard — lives in {@link #endAndRun()}.
     for (Card card : table) {
-      for (Effect effect : card.effects()) {
-
-        if (effect.frequencyType() == FrequencyType.RECURRING) {
-
+      if (card.frequencyType() == FrequencyType.RECURRING) {
+        for (Effect effect : card.effects()) {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
-              case POPULATION -> state.setPopulation(effect.apply(state.getPopulation()));
+              case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
               case FOOD -> state.setFood(effect.apply(state.getFood()));
             }
           }
         }
       }
+    }
+  }
+
+  // ----- End-of-PLAY resolution -----
+
+  /**
+   * Ends the player's turn: discards every card remaining in the hand to the current season's
+   * discard pile, then resolves the current season's table left-to-right.
+   *
+   * <p>Resolution iterates the table in slot order (index 0 first). For each card all effects fire
+   * in declaration order, so cards to the right see the resource state already mutated by cards to
+   * their left. After a card's effects fire:
+   *
+   * <ul>
+   *   <li>{@link FrequencyType#SINGLE} cards are moved to the current season's discard pile
+   *       (one-shot exhaustion).
+   *   <li>{@link FrequencyType#RECURRING} cards stay in their table slot.
+   * </ul>
+   *
+   * <p>Note: {@link CardTarget} effects are not yet evaluated and are silently skipped.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}
+   */
+  public synchronized void endAndRun() {
+    requirePhase(Phase.PLAY, "endAndRun");
+
+    // 1. Discard everything remaining in hand.
+    state.discardHand();
+
+    // 2. Snapshot the table order before resolution so that removals during the walk don't
+    //    disturb the iteration sequence.
+    List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
+
+    for (Card card : snapshot) {
+      // Fire every ResourceTarget effect on this card.
+      for (Effect effect : card.effects()) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          switch (rt) {
+            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
+            case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
+            case FOOD -> state.setFood(effect.apply(state.getFood()));
+          }
+        }
+      }
+
+      // SINGLE cards are exhausted: remove from table and send to discard.
+      if (card.frequencyType() == FrequencyType.SINGLE) {
+        state.discardFromTable(card);
+      }
+      // RECURRING cards remain in their slot — no action needed.
+    }
+
+    // 3. Seasonal food consumption and starvation.
+    consumeFood();
+  }
+
+  /**
+   * Applies a population change, clamping to zero and transitioning to {@link Phase#GAME_OVER} if
+   * the result is zero or below. All engine-level population mutations route through this method so
+   * game-over detection is never scattered.
+   */
+  private void applyPopulation(double value) {
+    double clamped = Math.max(0.0, value);
+    state.setPopulation(clamped);
+    if (clamped == 0.0) {
+      state.setCurPhase(Phase.GAME_OVER);
+    }
+  }
+
+  /**
+   * Consumes food at the end of every PLAY phase.
+   *
+   * <p>The per-population rate is 2 for {@link Season#WINTER} and 1 for all other seasons. Total
+   * consumption is {@code floor(population) × rate}. If food is sufficient it is simply reduced; if
+   * food is insufficient, food is clamped to 0 and population drops by {@code 0.5 × deficit}.
+   */
+  private void consumeFood() {
+    int rate = (state.getCurSeason() == Season.WINTER) ? 2 : 1;
+    double consumed = Math.floor(state.getPopulation()) * rate;
+    double available = state.getFood();
+    if (available >= consumed) {
+      state.setFood(available - consumed);
+    } else {
+      double deficit = consumed - available;
+      state.setFood(0.0);
+      applyPopulation(state.getPopulation() - 0.5 * deficit);
     }
   }
 
@@ -357,16 +439,6 @@ public class GameEngine {
     state.getDrawPile().get(season).addAll(state.getDiscardPile().get(season));
     state.getDiscardPile().get(season).clear();
     Collections.shuffle(state.getDrawPile().get(season));
-  }
-
-  // move hand to discard pile, clear hand.
-  public synchronized void discardHand(Season season) {
-    if (season == null) {
-      throw new IllegalStateException("season cannot be null");
-    }
-
-    state.getDiscardPile().get(season).addAll(state.getHand());
-    state.getHand().clear();
   }
 
   // ----- PLAY phase: draw hand, place card, demolish card -----

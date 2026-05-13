@@ -108,6 +108,24 @@ public class GameState {
     getCurrentTable().remove(slot);
   }
 
+  /**
+   * Removes {@code card} from the current season's table and adds it to the current season's
+   * discard pile in one step.
+   */
+  public void discardFromTable(Card card) {
+    removeFromTable(card);
+    getDiscardPile().get(curSeason).add(card);
+  }
+
+  /**
+   * Moves every card in the hand to the current season's discard pile and clears the hand. Uses
+   * {@link #getCurSeason()} so callers don't need to pass the season explicitly.
+   */
+  public void discardHand() {
+    getDiscardPile().get(curSeason).addAll(hand);
+    hand.clear();
+  }
+
   public Map<Season, List<Card>> getDiscardPile() {
     return discardPile;
   }
