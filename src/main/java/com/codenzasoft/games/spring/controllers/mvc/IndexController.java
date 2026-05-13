@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.controllers.mvc;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -59,6 +60,18 @@ public class IndexController {
     }
     return "redirect:/";
   }
+
+    /** Creates a new kh game {@link com.codenzasoft.games.kingshand.GameEngine}. */
+    @PostMapping("/games/kh")
+    public String newKhGame(@AuthenticationPrincipal UserDetails user) {
+      final Optional<UserEntity> entity =
+          gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+      if (entity.isPresent()) {
+        final KhGameEntity game = gameService.createKhGame(entity.get());
+        return "redirect:/games/kh/" + game.getId();
+      }
+      return "redirect:/";
+    }
 
   /** Creates a new two-player game and redirects the creator to it immediately. */
   @PostMapping("/games/xo/challenge")

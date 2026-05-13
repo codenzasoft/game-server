@@ -6,6 +6,7 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
@@ -39,7 +40,7 @@ public class GameService {
   @Autowired private GameCache gameCache;
 
   /**
-   * Returns a new single user game for the provided {@link UserEntity} playing the provided {@link
+   * Returns a new single user xo game for the provided {@link UserEntity} playing the provided {@link
    * Piece}.
    *
    * @param user The user.
@@ -50,6 +51,20 @@ public class GameService {
   @Transactional
   public XoGameEntity createXoGame(final UserEntity user, final Piece piece, final Piece leader) {
     return createXoGame(Map.of(piece, user), leader);
+  }
+
+  /**
+   * Returns a new single user kh game for the provided {@link UserEntity}.
+   *
+   * @param user The user.
+   * @return A new game.
+   */
+  @Transactional
+  public KhGameEntity createKhGame(final UserEntity user) {
+    KhGameEntity game = new KhGameEntity(UUID.randomUUID());
+    game.setPlayers(List.of(user));
+    gamesRepository.save(game);
+    return game;
   }
 
   /**
