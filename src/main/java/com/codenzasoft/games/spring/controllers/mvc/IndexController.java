@@ -46,7 +46,7 @@ public class IndexController {
 
   @GetMapping("/games/xo/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
   public String game() {
-    return "forward:/index.html";
+    return "forward:/xsandos.html";
   }
 
   @GetMapping("/games/kh/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
