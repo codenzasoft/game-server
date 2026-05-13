@@ -161,7 +161,7 @@ class GameStateSpec extends Specification {
     def "getCurrentTable returns the table for the current season"() {
         setup:
         def state = GameState.builder().curSeason(Season.FALL).build()
-        def card = new Card(0, 0, [])
+        def card = new Card(0, 0, FrequencyType.RECURRING, [])
         state.board.get(Season.FALL).add(card)
 
         expect:
@@ -173,7 +173,7 @@ class GameStateSpec extends Specification {
 
     def "tableContains returns true when the card is on the current season's table"() {
         setup:
-        def card = new Card(0, 0, [])
+        def card = new Card(0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder().curSeason(Season.SPRING).table(Season.SPRING, [card]).build()
 
         expect:
@@ -182,7 +182,7 @@ class GameStateSpec extends Specification {
 
     def "tableContains returns false when the card is not on the current season's table"() {
         setup:
-        def card = new Card(0, 0, [])
+        def card = new Card(0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder().curSeason(Season.SPRING).build()
 
         expect:
@@ -191,7 +191,7 @@ class GameStateSpec extends Specification {
 
     def "tableContains checks the current season's table only, not other seasons"() {
         setup:
-        def card = new Card(0, 0, [])
+        def card = new Card(0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder()
                 .curSeason(Season.SPRING)
                 .table(Season.SUMMER, [card])   // card is on SUMMER, not SPRING
@@ -205,8 +205,8 @@ class GameStateSpec extends Specification {
 
     def "replaceTableCard swaps the matched card with the replacement"() {
         setup:
-        def original    = new Card(1, 10, [])
-        def replacement = new Card(1, 10, [new Effect(ResourceTarget.FOOD, 20, ValueType.INTEGER, FrequencyType.RECURRING)])
+        def original    = new Card(1, 10, FrequencyType.RECURRING, [])
+        def replacement = new Card(1, 10, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 20, ValueType.INTEGER)])
         def state = GameState.builder().curSeason(Season.FALL).table(Season.FALL, [original]).build()
 
         when:
@@ -218,8 +218,8 @@ class GameStateSpec extends Specification {
 
     def "replaceTableCard replaces only the first matching card when duplicates exist"() {
         setup:
-        def card  = new Card(0, 0, [])
-        def other = new Card(1, 10, [])
+        def card  = new Card(0, 0, FrequencyType.RECURRING, [])
+        def other = new Card(1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
                 .curSeason(Season.WINTER)
                 .table(Season.WINTER, [card, other, card])
@@ -237,7 +237,7 @@ class GameStateSpec extends Specification {
         def state = GameState.builder().curSeason(Season.SPRING).build()
 
         when:
-        state.replaceTableCard(new Card(0, 0, []), new Card(1, 5, []))
+        state.replaceTableCard(new Card(0, 0, FrequencyType.RECURRING, []), new Card(1, 5, FrequencyType.RECURRING, []))
 
         then:
         def e = thrown(IllegalArgumentException)
@@ -248,7 +248,7 @@ class GameStateSpec extends Specification {
 
     def "addToTable appends the card to the current season's table"() {
         setup:
-        def card  = new Card(0, 0, [])
+        def card  = new Card(0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder().curSeason(Season.SUMMER).build()
 
         when:
@@ -263,8 +263,8 @@ class GameStateSpec extends Specification {
 
     def "removeFromTable removes the first matching card from the current season's table"() {
         setup:
-        def card  = new Card(0, 0, [])
-        def other = new Card(1, 10, [])
+        def card  = new Card(0, 0, FrequencyType.RECURRING, [])
+        def other = new Card(1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
                 .curSeason(Season.SPRING)
                 .table(Season.SPRING, [card, other])
@@ -281,8 +281,8 @@ class GameStateSpec extends Specification {
 
     def "removeFromTableAt removes the card at the given slot index"() {
         setup:
-        def first  = new Card(0, 0, [])
-        def second = new Card(1, 10, [])
+        def first  = new Card(0, 0, FrequencyType.RECURRING, [])
+        def second = new Card(1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
                 .curSeason(Season.FALL)
                 .table(Season.FALL, [first, second])
@@ -293,5 +293,64 @@ class GameStateSpec extends Specification {
 
         then:
         state.getCurrentTable() == [second]
+    }
+
+    // ----- discardHand -----
+
+    def "discardHand moves the hand into the current season's discard pile"() {
+        setup:
+        def card1 = new Card(0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
+        def card2 = new Card(0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)])
+        def state = GameState.builder().curSeason(Season.SPRING).build()
+        state.hand.add(card1)
+        state.hand.add(card2)
+
+        when:
+        state.discardHand()
+
+        then:
+        state.hand.isEmpty()
+        state.discardPile.get(Season.SPRING).size() == 2
+        state.discardPile.get(Season.SPRING).containsAll([card1, card2])
+        state.discardPile.get(Season.SUMMER).isEmpty()
+        state.discardPile.get(Season.FALL).isEmpty()
+        state.discardPile.get(Season.WINTER).isEmpty()
+    }
+
+    def "discardHand uses curSeason — discards to the correct pile when season is not SPRING"() {
+        setup:
+        def card = new Card(0, 0, FrequencyType.SINGLE, [])
+        def state = GameState.builder().curSeason(Season.WINTER).build()
+        state.hand.add(card)
+
+        when:
+        state.discardHand()
+
+        then:
+        state.hand.isEmpty()
+        state.discardPile.get(Season.WINTER) == [card]
+        state.discardPile.get(Season.SPRING).isEmpty()
+    }
+
+    // ----- discardFromTable -----
+
+    def "discardFromTable removes the card from the table and adds it to the current season's discard pile"() {
+        setup:
+        def card  = new Card(0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def other = new Card(0, 0, FrequencyType.RECURRING, [])
+        def state = GameState.builder()
+                .curSeason(Season.SUMMER)
+                .table(Season.SUMMER, [card, other])
+                .build()
+
+        when:
+        state.discardFromTable(card)
+
+        then:
+        state.getCurrentTable() == [other]
+        state.discardPile.get(Season.SUMMER) == [card]
+        state.discardPile.get(Season.SPRING).isEmpty()
+        state.discardPile.get(Season.FALL).isEmpty()
+        state.discardPile.get(Season.WINTER).isEmpty()
     }
 }

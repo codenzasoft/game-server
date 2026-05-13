@@ -169,11 +169,7 @@ public class GameEngine {
     if (state.getCurSeason() != Season.WINTER) {
       return effect;
     }
-    return new Effect(
-        effect.target(),
-        effect.modifier() * state.getYear(),
-        effect.valueType(),
-        effect.frequencyType());
+    return new Effect(effect.target(), effect.modifier() * state.getYear(), effect.valueType());
   }
 
   public synchronized void advanceSeason() {
@@ -204,15 +200,12 @@ public class GameEngine {
   protected synchronized void triggerCurrentSeasonTable() {
     List<Card> table = state.getCurrentTable();
 
-    // Walk every effect on every card on the current season's table. Only RECURRING effects
-    // targeting a global resource (population / production / food) fire here. The full
-    // end-of-PLAY resolver — including SINGLE-frequency effects and post-fire discard — lives
-    // in {@link #endAndRun()}.
+    // Walk every card on the current season's table. Only RECURRING cards fire here; frequency is
+    // checked once per card (it is a card-level property). The full end-of-PLAY resolver —
+    // including SINGLE-frequency cards and post-fire discard — lives in {@link #endAndRun()}.
     for (Card card : table) {
-      for (Effect effect : card.effects()) {
-
-        if (effect.frequencyType() == FrequencyType.RECURRING) {
-
+      if (card.frequencyType() == FrequencyType.RECURRING) {
+        for (Effect effect : card.effects()) {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
@@ -236,10 +229,9 @@ public class GameEngine {
    * their left. After a card's effects fire:
    *
    * <ul>
-   *   <li>If the card carries <em>any</em> {@link FrequencyType#SINGLE} effect, the card is moved
-   *       to the current season's discard pile (one-shot exhaustion).
-   *   <li>If every effect on the card is {@link FrequencyType#RECURRING}, the card stays in its
-   *       table slot.
+   *   <li>{@link FrequencyType#SINGLE} cards are moved to the current season's discard pile
+   *       (one-shot exhaustion).
+   *   <li>{@link FrequencyType#RECURRING} cards stay in their table slot.
    * </ul>
    *
    * <p>Note: {@link CardTarget} effects are not yet evaluated and are silently skipped.
@@ -250,15 +242,13 @@ public class GameEngine {
     requirePhase(Phase.PLAY, "endAndRun");
 
     // 1. Discard everything remaining in hand.
-    discardHand(state.getCurSeason());
+    state.discardHand();
 
     // 2. Snapshot the table order before resolution so that removals during the walk don't
     //    disturb the iteration sequence.
     List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
     for (Card card : snapshot) {
-      boolean hasSingleEffect = false;
-
       // Fire every ResourceTarget effect on this card.
       for (Effect effect : card.effects()) {
         if (effect.target() instanceof ResourceTarget rt) {
@@ -268,17 +258,13 @@ public class GameEngine {
             case FOOD -> state.setFood(effect.apply(state.getFood()));
           }
         }
-        if (effect.frequencyType() == FrequencyType.SINGLE) {
-          hasSingleEffect = true;
-        }
       }
 
       // SINGLE cards are exhausted: remove from table and send to discard.
-      if (hasSingleEffect) {
-        state.removeFromTable(card);
-        state.getDiscardPile().get(state.getCurSeason()).add(card);
+      if (card.frequencyType() == FrequencyType.SINGLE) {
+        state.discardFromTable(card);
       }
-      // RECURRING-only cards remain in their slot — no action needed.
+      // RECURRING cards remain in their slot — no action needed.
     }
 
     // 3. Seasonal food consumption and starvation.
@@ -453,16 +439,6 @@ public class GameEngine {
     state.getDrawPile().get(season).addAll(state.getDiscardPile().get(season));
     state.getDiscardPile().get(season).clear();
     Collections.shuffle(state.getDrawPile().get(season));
-  }
-
-  // move hand to discard pile, clear hand.
-  public synchronized void discardHand(Season season) {
-    if (season == null) {
-      throw new IllegalStateException("season cannot be null");
-    }
-
-    state.getDiscardPile().get(season).addAll(state.getHand());
-    state.getHand().clear();
   }
 
   // ----- PLAY phase: draw hand, place card, demolish card -----

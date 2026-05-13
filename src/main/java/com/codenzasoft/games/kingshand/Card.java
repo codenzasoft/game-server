@@ -4,14 +4,20 @@ import java.util.List;
 
 /**
  * A playable card. Carries its play requirements ({@code populationRequirement}, {@code
- * productionRequirement}) and an arbitrary list of {@link Effect}s, each with its own target /
- * magnitude / frequency / condition.
+ * productionRequirement}), a {@link FrequencyType} that applies to all of its effects (one-shot vs
+ * every season), and an arbitrary list of {@link Effect}s.
+ *
+ * <p>All effects on a card share the same {@link FrequencyType}; the engine reads frequency once
+ * per card during resolution rather than per-effect.
  *
  * <p>The effects list is defensively copied at construction so callers can't mutate it after the
  * fact.
  */
 public record Card(
-    double populationRequirement, double productionRequirement, List<Effect> effects) {
+    double populationRequirement,
+    double productionRequirement,
+    FrequencyType frequencyType,
+    List<Effect> effects) {
 
   public Card {
     effects = effects == null ? List.of() : List.copyOf(effects);
@@ -25,6 +31,6 @@ public record Card(
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    return new Card(populationRequirement, productionRequirement, amplified);
+    return new Card(populationRequirement, productionRequirement, frequencyType, amplified);
   }
 }

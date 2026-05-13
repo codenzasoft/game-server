@@ -41,7 +41,7 @@ class EventSpec extends Specification {
     def "event option constructor defensively copies the effects list"() {
         setup:
         def effects = new ArrayList<Effect>()
-        effects.add(new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER, FrequencyType.SINGLE))
+        effects.add(new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER))
 
         def option = new EventOption("opt", effects)
 
@@ -62,7 +62,7 @@ class EventSpec extends Specification {
 
     def "event option uses the same effect data shape as cards"() {
         setup:
-        def effect = new Effect(ResourceTarget.POPULATION, 2, ValueType.INTEGER, FrequencyType.RECURRING)
+        def effect = new Effect(ResourceTarget.POPULATION, 2, ValueType.INTEGER)
         def option = new EventOption("opt", [effect])
 
         expect:
