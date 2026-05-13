@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.views;
 
 import com.codenzasoft.games.spring.config.Role;
+import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.RoleEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import org.springframework.stereotype.Component;
@@ -17,5 +18,12 @@ public class ViewHelper {
    */
   public boolean isAdmin(final UserEntity user) {
     return user.getRoles().stream().map(RoleEntity::getRole).anyMatch(Role::isAdmin);
+  }
+
+  public String getGameUrl(final GameEntity game) {
+    return switch (game.getGameType()) {
+      case XO -> "/games/xo/" + game.getId().toString();
+      case KH -> "/games/kh/" + game.getId().toString();
+    };
   }
 }

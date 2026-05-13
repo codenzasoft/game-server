@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.controllers.mvc;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -48,6 +49,11 @@ public class IndexController {
     return "forward:/index.html";
   }
 
+  @GetMapping("/games/kh/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+  public String khGame() {
+    return "forward:/kingshand.html";
+  }
+
   /** Creates a new vs-bot {@link com.codenzasoft.games.xo.XoGame}. */
   @PostMapping("/games/xo")
   public String newGame(@AuthenticationPrincipal UserDetails user) {
@@ -56,6 +62,18 @@ public class IndexController {
     if (entity.isPresent()) {
       final XoGameEntity game = gameService.createXoGame(entity.get(), Piece.X, Piece.X);
       return "redirect:/games/xo/" + game.getId();
+    }
+    return "redirect:/";
+  }
+
+  /** Creates a new kh game {@link com.codenzasoft.games.kingshand.GameEngine}. */
+  @PostMapping("/games/kh")
+  public String newKhGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      final KhGameEntity game = gameService.createKhGame(entity.get());
+      return "redirect:/games/kh/" + game.getId();
     }
     return "redirect:/";
   }

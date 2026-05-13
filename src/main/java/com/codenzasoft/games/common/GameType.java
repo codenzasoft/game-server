@@ -4,4 +4,6 @@ package com.codenzasoft.games.common;
 public enum GameType {
   /** X's and O's type. */
   XO,
+  /** KingsHand type. */
+  KH
 }

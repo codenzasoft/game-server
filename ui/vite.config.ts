@@ -2,6 +2,14 @@ import { defineConfig } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        kingshand: "kingshand.html",
+      },
+    },
+  },
   server: {
     host: true,
     port: 8085,
@@ -29,6 +37,12 @@ export default defineConfig({
             /^\/games\/xo\/[0-9a-f-]{36}/.test(url)
           ) {
             return "/index.html";
+          }
+          if (
+            req.method === "GET" &&
+            /^\/games\/kh\/[0-9a-f-]{36}/.test(url)
+          ) {
+            return "/kingshand.html";
           }
         },
       },

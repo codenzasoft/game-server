@@ -12,13 +12,27 @@
                 <ul class="list-group">
                     <li class="list-group-item d-flex justify-content-between align-items-center"
                         th:each="game : ${activeGames}">
-                        <span
-                            th:text="${game.players[0].username} + ' vs. ' + ${game.players[1].username}">
-                        </span>
-                        <a th:href="@{/games/xo/{id}(id=${game.id})}"
+                            <span th:text="${#lists.size(game.players) > 1}
+                                ? ${game.players[0].username + ' vs. ' + game.players[1].username}
+                                : ${game.players[0].username}">
+                            </span>
+                        <a th:href="${helper.getGameUrl(game)}"
                            class="btn btn-primary btn-sm">Join</a>
                     </li>
                 </ul>
+            </section>
+
+            <!-- New King's Hand game -->
+            <section class="mb-3">
+                <h5>King's Hand</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <form th:action="@{/games/kh}" method="post">
+                        <button type="submit" class="btn"
+                                style="background-color: hotpink; border-color: hotpink; color: white;">
+                            Play King's Hand
+                        </button>
+                    </form>
+                </div>
             </section>
 
             <!-- New vs-bot game -->
