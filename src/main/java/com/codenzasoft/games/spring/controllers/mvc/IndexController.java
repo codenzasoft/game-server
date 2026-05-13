@@ -49,6 +49,11 @@ public class IndexController {
     return "forward:/index.html";
   }
 
+  @GetMapping("/games/kh/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+  public String khGame() {
+    return "forward:/kingshand.html";
+  }
+
   /** Creates a new vs-bot {@link com.codenzasoft.games.xo.XoGame}. */
   @PostMapping("/games/xo")
   public String newGame(@AuthenticationPrincipal UserDetails user) {

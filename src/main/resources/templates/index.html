@@ -16,7 +16,7 @@
                                 ? ${game.players[0].username + ' vs. ' + game.players[1].username}
                                 : ${game.players[0].username}">
                             </span>
-                        <a th:href="@{/games/xo/{id}(id=${game.id})}"
+                        <a th:href="${helper.getGameUrl(game)}"
                            class="btn btn-primary btn-sm">Join</a>
                     </li>
                 </ul>
