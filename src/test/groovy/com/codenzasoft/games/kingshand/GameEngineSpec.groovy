@@ -24,6 +24,10 @@ class GameEngineSpec extends Specification {
         new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, CardCatalog.defaultCatalog(), catalog, new Random())
     }
 
+    private static GameEngine engine(GameState state, EventCatalog catalog, Random random) {
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, CardCatalog.defaultCatalog(), catalog, random)
+    }
+
     private static GameEngine engine(GameState state, CardCatalog catalog) {
         new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, catalog, EventCatalog.defaultCatalog(), new Random())
     }
@@ -741,7 +745,7 @@ class GameEngineSpec extends Specification {
         def late  = simpleEvent("spring.late",  Season.SPRING, 5)
         // Use a seeded Random that always picks index 0; with a pool of [early] only early can appear
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(3).build()
-        def engine = new GameEngine(state, new EventCatalog([(Season.SPRING): [early, late]]), new Random(0))
+        def engine = engine(state, new EventCatalog([(Season.SPRING): [early, late]]), new Random(0))
 
         when:
         engine.advancePhase()   // ADD -> RANDOM_EVENT
@@ -764,7 +768,7 @@ class GameEngineSpec extends Specification {
         when:
         (0..99).each { seed ->
             def s = GameState.builder().curPhase(Phase.ADD).curSeason(Season.WINTER).year(1).build()
-            def eng = new GameEngine(s, catalog, new Random(seed))
+            def eng = engine(s, catalog, new Random(seed))
             eng.advancePhase()
             seen << eng.currentEvent().id()
         }
@@ -944,7 +948,7 @@ class GameEngineSpec extends Specification {
 
     def "constructing an engine with a null catalog throws"() {
         when:
-        new GameEngine(GameState.newState(), null, new Random())
+        engine(GameState.newState(), null, new Random())
 
         then:
         def e = thrown(IllegalArgumentException)
@@ -953,7 +957,7 @@ class GameEngineSpec extends Specification {
 
     def "constructing an engine with a null rng throws"() {
         when:
-        new GameEngine(GameState.newState(), new EventCatalog([:]), null)
+        engine(GameState.newState(), new EventCatalog([:]), null)
 
         then:
         def e = thrown(IllegalArgumentException)

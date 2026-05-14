@@ -158,43 +158,64 @@ public class GameService {
         .toList();
   }
 
+  /**
+   * Returns an {@link XoGame} with the provided ID or <code>empty</code> if a game with the
+   * provided ID does not exist. The game is retrieved from the {@link GameCache} if present,
+   * otherwise it is built from the persisted entity and added to the cache.
+   *
+   * @param id A game {@link UUID}.
+   * @return An {@link XoGame} or <code>empty</code> if a game with the provided id does not exist.
+   */
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
     final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
-    return cached
-        .map(Game::getGame)
-        .or(() -> findGame(id, XoGameEntity.class).map(this::buildXoGame));
+    if (cached.isPresent()) {
+      return cached.map(Game::getGame);
+    }
+    final Optional<XoGameEntity> persisted = findGameEntity(id, XoGameEntity.class);
+    if (persisted.isPresent()) {
+      final XoGame game = buildXoGame(persisted.get());
+      gameCache.addGame(game);
+      return Optional.of(game);
+    }
+    return Optional.empty();
   }
 
+  /**
+   * Returns an {@link GameEngine} with the provided ID or <code>empty</code> if a game with the
+   * provided ID does not exist. The game is retrieved from the {@link GameCache} if present,
+   * otherwise it is built from the persisted entity and added to the cache.
+   *
+   * @param id A game {@link UUID}.
+   * @return An {@link GameEngine} or <code>empty</code> if a game with the provided id does not
+   *     exist.
+   */
   public Optional<GameEngine> getOrBuildKhGame(final UUID id) {
     final Optional<Game<GameEngine>> cached = gameCache.getGameOfType(id, GameType.KH);
-    return cached.map(Game::getGame).or(() -> findKhGame(id).map(this::buildKhGame));
-  }
-
-  public Optional<KhGameEntity> findKhGame(final UUID id) {
-    return findGame(id, KhGameEntity.class);
-  }
-
-  public synchronized GameEngine buildKhGame(final KhGameEntity entity) {
-    log.debug("Building KH game from entity: {}", entity.getId());
-    final Optional<Game<GameEngine>> optionalGame =
-        gameCache.getGameOfType(entity.getId(), GameType.KH);
-    if (optionalGame.isPresent()) {
-      return optionalGame.get().getGame();
+    if (cached.isPresent()) {
+      return cached.map(Game::getGame);
     }
+    final Optional<KhGameEntity> persisted = findGameEntity(id, KhGameEntity.class);
+    if (persisted.isPresent()) {
+      final GameEngine game = buildKhGame(persisted.get());
+      gameCache.addGame(game);
+      return Optional.of(game);
+    }
+    return Optional.empty();
+  }
 
+  protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
+    log.debug("Building KH game from entity: {}", entity.getId());
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
     final GameState state = GameState.builder().gameOver(isOver).build();
-    final GameEngine engine = new GameEngine(entity.getId(), player, state);
-    gameCache.addGame(engine);
-    return engine;
+    return new GameEngine(entity.getId(), player, state);
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
     return usersRepository.findById(id);
   }
 
-  public <T extends GameEntity> Optional<T> findGame(final UUID id, final Class<T> clazz) {
+  protected <T extends GameEntity> Optional<T> findGameEntity(final UUID id, final Class<T> clazz) {
     final Optional<GameEntity> gameEntity = gamesRepository.findById(id);
     if (gameEntity.isPresent()) {
       if (clazz.isAssignableFrom(gameEntity.get().getClass())) {
@@ -205,13 +226,8 @@ public class GameService {
   }
 
   // TODO: should synchronize on smaller scope
-  public synchronized XoGame buildXoGame(final XoGameEntity gameEntity) {
+  protected synchronized XoGame buildXoGame(final XoGameEntity gameEntity) {
     log.debug("Building XO game from entity: {}", gameEntity.getId());
-    final Optional<Game<XoGame>> optionalGame =
-        gameCache.getGameOfType(gameEntity.getId(), GameType.XO);
-    if (optionalGame.isPresent()) {
-      return optionalGame.get().getGame();
-    }
 
     final Map<UUID, Piece> userIdToPiece =
         gameEntity.getGamePieces().stream()
@@ -249,8 +265,6 @@ public class GameService {
             new LookAheadStrategy(user.toPlayer(), playerGamePieceMap.get(user.toPlayer())));
       }
     }
-    final XoGame game = builder.build();
-    gameCache.addGame(game);
-    return game;
+    return builder.build();
   }
 }
