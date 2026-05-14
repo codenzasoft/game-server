@@ -160,7 +160,9 @@ public class GameService {
 
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
     final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
-    return cached.map(Game::getGame).or(() -> findXoGame(id).map(this::buildXoGame));
+    return cached
+        .map(Game::getGame)
+        .or(() -> findGame(id, XoGameEntity.class).map(this::buildXoGame));
   }
 
   public Optional<GameEngine> getOrBuildKhGame(final UUID id) {
@@ -200,10 +202,6 @@ public class GameService {
       }
     }
     return Optional.empty();
-  }
-
-  public Optional<XoGameEntity> findXoGame(final UUID id) {
-    return findGame(id, XoGameEntity.class);
   }
 
   // TODO: should synchronize on smaller scope
