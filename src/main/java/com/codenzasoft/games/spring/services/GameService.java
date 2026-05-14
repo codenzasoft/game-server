@@ -3,6 +3,8 @@ package com.codenzasoft.games.spring.services;
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.kingshand.GameEngine;
+import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
@@ -161,6 +163,31 @@ public class GameService {
     return cached
         .map(Game::getGame)
         .or(() -> findGame(id, XoGameEntity.class).map(this::buildXoGame));
+  }
+
+  public Optional<GameEngine> getOrBuildKhGame(final UUID id) {
+    final Optional<Game<GameEngine>> cached = gameCache.getGameOfType(id, GameType.KH);
+    return cached.map(Game::getGame).or(() -> findKhGame(id).map(this::buildKhGame));
+  }
+
+  public Optional<KhGameEntity> findKhGame(final UUID id) {
+    return findGame(id, KhGameEntity.class);
+  }
+
+  public synchronized GameEngine buildKhGame(final KhGameEntity entity) {
+    log.debug("Building KH game from entity: {}", entity.getId());
+    final Optional<Game<GameEngine>> optionalGame =
+        gameCache.getGameOfType(entity.getId(), GameType.KH);
+    if (optionalGame.isPresent()) {
+      return optionalGame.get().getGame();
+    }
+
+    final Player player = entity.getPlayers().get(0).toPlayer();
+    final boolean isOver = entity.isOver() || entity.isQuit();
+    final GameState state = GameState.builder().gameOver(isOver).build();
+    final GameEngine engine = new GameEngine(entity.getId(), player, state);
+    gameCache.addGame(engine);
+    return engine;
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
