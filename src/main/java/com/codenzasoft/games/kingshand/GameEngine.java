@@ -1,9 +1,13 @@
 package com.codenzasoft.games.kingshand;
 
+import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameType;
+import com.codenzasoft.games.common.Player;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
@@ -25,7 +29,7 @@ import java.util.Random;
  * numeric modifier is multiplied by the current year before it is applied, so winters grow
  * progressively harsher as the run extends.
  */
-public class GameEngine {
+public class GameEngine implements Game<GameEngine> {
 
   public static final int MAX_TABLE_SIZE = 5;
   public static final int MAX_HAND_SIZE = 5;
@@ -33,6 +37,8 @@ public class GameEngine {
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
 
+  private final UUID id;
+  private final Player player;
   private final GameState state;
   private final CardCatalog cardCatalog;
   private final EventCatalog eventCatalog;
@@ -43,21 +49,27 @@ public class GameEngine {
    * an unseeded {@link Random}. Existing call-sites remain unaffected.
    */
   public GameEngine(GameState state) {
-    this(state, CardCatalog.defaultCatalog(), EventCatalog.defaultCatalog(), new Random());
+    this(
+        null,
+        null,
+        state,
+        CardCatalog.defaultCatalog(),
+        EventCatalog.defaultCatalog(),
+        new Random());
   }
 
   /**
    * Constructor that accepts a custom card catalog (uses default event catalog and unseeded RNG).
    */
   public GameEngine(GameState state, CardCatalog cardCatalog) {
-    this(state, cardCatalog, EventCatalog.defaultCatalog(), new Random());
+    this(null, null, state, cardCatalog, EventCatalog.defaultCatalog(), new Random());
   }
 
   /**
    * Constructor that accepts a custom event catalog (uses default card catalog and unseeded RNG).
    */
   public GameEngine(GameState state, EventCatalog eventCatalog) {
-    this(state, CardCatalog.defaultCatalog(), eventCatalog, new Random());
+    this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, new Random());
   }
 
   /**
@@ -65,11 +77,28 @@ public class GameEngine {
    * selection is reproducible via a seeded {@link Random}.
    */
   public GameEngine(GameState state, EventCatalog eventCatalog, Random rng) {
-    this(state, CardCatalog.defaultCatalog(), eventCatalog, rng);
+    this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, rng);
+  }
+
+  /** Constructor for restoring a persisted game with its id and player. */
+  public GameEngine(UUID id, Player player, GameState state) {
+    this(
+        id,
+        player,
+        state,
+        CardCatalog.defaultCatalog(),
+        EventCatalog.defaultCatalog(),
+        new Random());
   }
 
   /** Full constructor with all dependencies injected. */
-  GameEngine(GameState state, CardCatalog cardCatalog, EventCatalog eventCatalog, Random rng) {
+  GameEngine(
+      UUID id,
+      Player player,
+      GameState state,
+      CardCatalog cardCatalog,
+      EventCatalog eventCatalog,
+      Random rng) {
     if (state == null) {
       throw new IllegalArgumentException("state cannot be null");
     }
@@ -82,10 +111,32 @@ public class GameEngine {
     if (rng == null) {
       throw new IllegalArgumentException("rng cannot be null");
     }
+    this.id = id;
+    this.player = player;
     this.state = state;
     this.cardCatalog = cardCatalog;
     this.eventCatalog = eventCatalog;
     this.rng = rng;
+  }
+
+  @Override
+  public GameType getGameType() {
+    return GameType.KH;
+  }
+
+  @Override
+  public GameEngine getGame() {
+    return this;
+  }
+
+  @Override
+  public UUID getId() {
+    return id;
+  }
+
+  @Override
+  public List<Player> getPlayers() {
+    return player == null ? List.of() : List.of(player);
   }
 
   public GameState getState() {
