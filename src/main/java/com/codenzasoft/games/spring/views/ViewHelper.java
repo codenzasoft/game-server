@@ -26,4 +26,17 @@ public class ViewHelper {
       case KH -> "/games/kh/" + game.getId().toString();
     };
   }
+
+  /**
+   * Returns a user-friendly display name for the type of the provided game.
+   *
+   * @param game A {@link GameEntity}.
+   * @return A human-readable game type label.
+   */
+  public String getGameTypeName(final GameEntity game) {
+    return switch (game.getGameType()) {
+      case XO -> "Xs & Os";
+      case KH -> "King's Hand";
+    };
+  }
 }

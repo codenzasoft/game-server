@@ -177,6 +177,7 @@ public class GameService {
     return gamePlayersRepository.findActiveGamesByUser(user.getId()).stream()
         .map(GamePlayerEntity::getGame)
         .distinct()
+        .sorted(Comparator.comparing(GameEntity::getCreatedAt).reversed())
         .toList();
   }
 
