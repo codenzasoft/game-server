@@ -32,6 +32,8 @@ import org.springframework.stereotype.Service;
 public class GameService {
   private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
+  public static final int MAX_ACTIVE_GAMES = 10;
+
   @Autowired private GamesRepository gamesRepository;
   @Autowired private GamePlayersRepository gamePlayersRepository;
   @Autowired private UsersRepository usersRepository;
@@ -41,6 +43,29 @@ public class GameService {
   @Autowired private GameCache gameCache;
 
   /**
+   * Returns whether the provided user has reached {@link #MAX_ACTIVE_GAMES} active (incomplete)
+   * games.
+   *
+   * @param user The user to check.
+   * @return {@code true} if the user is at or above the active-game limit.
+   */
+  public boolean isAtGameLimit(final UserEntity user) {
+    return gamePlayersRepository.countActiveGamesByUser(user.getId()) >= MAX_ACTIVE_GAMES;
+  }
+
+  /**
+   * Throws {@link IllegalStateException} if the provided user has reached the active game limit.
+   *
+   * @param user The user to check.
+   */
+  private void enforceGameLimit(final UserEntity user) {
+    if (isAtGameLimit(user)) {
+      throw new IllegalStateException(
+          "Active game limit of " + MAX_ACTIVE_GAMES + " reached for user: " + user.getUsername());
+    }
+  }
+
+  /**
    * Returns a new single user xo game for the provided {@link UserEntity} playing the provided
    * {@link Piece}.
    *
@@ -48,9 +73,11 @@ public class GameService {
    * @param piece The {@link Piece} associated with the user.
    * @param leader The {@link Piece} that starts the game.
    * @return A new game.
+   * @throws IllegalStateException if the user has reached the active game limit.
    */
   @Transactional
   public XoGameEntity createXoGame(final UserEntity user, final Piece piece, final Piece leader) {
+    enforceGameLimit(user);
     return createXoGame(Map.of(piece, user), leader);
   }
 
@@ -59,9 +86,11 @@ public class GameService {
    *
    * @param user The user.
    * @return A new game.
+   * @throws IllegalStateException if the user has reached the active game limit.
    */
   @Transactional
   public KhGameEntity createKhGame(final UserEntity user) {
+    enforceGameLimit(user);
     KhGameEntity game = new KhGameEntity(UUID.randomUUID());
     game.setPlayers(List.of(user));
     gamesRepository.save(game);
@@ -75,6 +104,7 @@ public class GameService {
    * @param users The {@link UserEntity}s and corresponding {@link Piece}s.
    * @param leader The leading {@link Piece}
    * @return A new game.
+   * @throws IllegalStateException if any human player has reached the active game limit.
    */
   @Transactional
   public XoGameEntity createXoGame(final Map<Piece, UserEntity> users, final Piece leader) {
@@ -85,6 +115,8 @@ public class GameService {
     if (users.size() > 2) {
       throw new IllegalStateException("game can only have two players");
     }
+
+    users.values().stream().filter(u -> !u.isBot()).forEach(this::enforceGameLimit);
 
     final Map<Piece, UserEntity> players = new HashMap<>(users);
 

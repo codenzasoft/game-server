@@ -22,12 +22,19 @@
                 </ul>
             </section>
 
+            <!-- Game limit notice -->
+            <div class="alert alert-warning" role="alert" th:if="${atGameLimit}">
+                You have reached the limit of <strong th:text="${@gameService.MAX_ACTIVE_GAMES}">10</strong>
+                active games. Finish or quit an existing game to start a new one.
+            </div>
+
             <!-- New King's Hand game -->
             <section class="mb-3">
                 <h5>King's Hand</h5>
                 <div class="d-flex gap-2 flex-wrap">
                     <form th:action="@{/games/kh}" method="post">
                         <button type="submit" class="btn"
+                                th:disabled="${atGameLimit}"
                                 style="background-color: hotpink; border-color: hotpink; color: white;">
                             Play King's Hand
                         </button>
@@ -40,18 +47,21 @@
                 <h5>Xs &amp; Os</h5>
                 <div class="d-flex gap-2 flex-wrap">
                     <form th:action="@{/games/xo}" method="post">
-                        <button type="submit" class="btn btn-primary">Play vs Bot</button>
+                        <button type="submit" class="btn btn-primary"
+                                th:disabled="${atGameLimit}">Play vs Bot</button>
                     </form>
                     <form th:action="@{/games/xo/challenge}" method="post"
                           class="d-flex gap-2 align-items-center"
                           th:if="${not #lists.isEmpty(opponents)}">
-                        <select name="opponentId" class="form-select form-select-sm" required>
+                        <select name="opponentId" class="form-select form-select-sm"
+                                th:disabled="${atGameLimit}" required>
                             <option value="" disabled selected>Select opponent…</option>
                             <option th:each="u : ${opponents}"
                                     th:value="${u.id}"
                                     th:text="${u.username}"></option>
                         </select>
-                        <button type="submit" class="btn btn-outline-primary">Challenge</button>
+                        <button type="submit" class="btn btn-outline-primary"
+                                th:disabled="${atGameLimit}">Challenge</button>
                     </form>
                 </div>
             </section>
