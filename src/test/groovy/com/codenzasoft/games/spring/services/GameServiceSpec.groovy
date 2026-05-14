@@ -1,6 +1,10 @@
 package com.codenzasoft.games.spring.services
 
+import com.codenzasoft.games.kingshand.GameEngine
 import com.codenzasoft.games.spring.entities.UserEntity
+import com.codenzasoft.games.spring.entities.kh.KhGameEntity
+import com.codenzasoft.games.spring.repositories.GamesRepository
+import com.codenzasoft.games.common.GameType
 import com.codenzasoft.games.spring.repositories.UsersRepository
 import com.codenzasoft.games.xo.Piece
 import org.springframework.beans.factory.annotation.Autowired
@@ -18,6 +22,8 @@ class GameServiceSpec extends Specification {
     @Autowired GameService gameService
     @Autowired UsersRepository usersRepository
     @Autowired JdbcTemplate jdbcTemplate
+    @Autowired GamesRepository gamesRepository
+    @Autowired GameCache gameCache
 
     UserEntity testUser
 
@@ -109,5 +115,48 @@ class GameServiceSpec extends Specification {
 
         and: "a new game can be created"
         gameService.createXoGame(testUser, Piece.X, Piece.X) != null
+
     }
+
+    def "createKhGame persists a new KH game with the given user as player"() {
+
+        when:
+        def entity = gameService.createKhGame(testUser)
+
+        then:
+        entity instanceof KhGameEntity
+        entity.id != null
+        entity.gameType == GameType.KH
+        entity.players == [testUser]
+    }
+
+    def "getOrBuildKhGame fetches from DB on first call and adds game to cache"() {
+        given:
+        def game = gameService.createKhGame(testUser)
+        def gameId = game.id
+
+        when:
+        def result = gameService.getOrBuildKhGame(gameId)
+
+        then:
+        result.isPresent()
+        result.get() instanceof GameEngine
+        result.get().id == gameId
+        result.get().players.size() == 1
+        result.get().players[0].id() == testUser.id
+        result.get().players[0].name() == "test-limit-user"
+    }
+
+    def "getOrBuildKhGame adds the built game to the cache"() {
+        given:
+        def game = gameService.createKhGame(testUser)
+        def gameId = game.id
+
+        when:
+        gameService.getOrBuildKhGame(gameId)
+
+        then:
+        gameCache.getGameOfType(gameId, GameType.KH).isPresent()
+    }
+
 }

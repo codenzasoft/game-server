@@ -5,7 +5,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: "index.html",
+        xsandos: "xsandos.html",
         kingshand: "kingshand.html",
       },
     },
@@ -36,7 +36,7 @@ export default defineConfig({
             req.method === "GET" &&
             /^\/games\/xo\/[0-9a-f-]{36}/.test(url)
           ) {
-            return "/index.html";
+            return "/xsandos.html";
           }
           if (
             req.method === "GET" &&
