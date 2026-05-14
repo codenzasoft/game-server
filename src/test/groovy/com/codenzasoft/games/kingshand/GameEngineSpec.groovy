@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand
 
+import com.codenzasoft.games.common.Player
 import spock.lang.Specification
 
 /**
@@ -13,6 +14,20 @@ class GameEngineSpec extends Specification {
 
     // ----- helpers -----
 
+    private static final Player TEST_PLAYER = new Player(UUID.randomUUID(), "test")
+
+    private static GameEngine engine(GameState state) {
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state)
+    }
+
+    private static GameEngine engine(GameState state, EventCatalog catalog) {
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, CardCatalog.defaultCatalog(), catalog, new Random())
+    }
+
+    private static GameEngine engine(GameState state, CardCatalog catalog) {
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, catalog, EventCatalog.defaultCatalog(), new Random())
+    }
+
     private static EventCatalog catalogWith(Season season, Event... events) {
         new EventCatalog([(season): events.toList()])
     }
@@ -25,7 +40,7 @@ class GameEngineSpec extends Specification {
 
     def "constructing an engine with a null state throws"() {
         when:
-        new GameEngine(null)
+        engine(null)
 
         then:
         def e = thrown(IllegalArgumentException)
@@ -37,7 +52,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
 
         expect:
-        new GameEngine(state).state.is(state)
+        engine(state).state.is(state)
     }
 
     // ----- season / phase progression -----
@@ -46,7 +61,7 @@ class GameEngineSpec extends Specification {
         setup:
         def state = GameState.newState()
         state.curSeason = startSeason
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.advanceSeason()
@@ -65,7 +80,7 @@ class GameEngineSpec extends Specification {
     def "advancing past winter increments the year"() {
         setup:
         def state = GameState.builder().curSeason(Season.WINTER).year(3).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.advanceSeason()
@@ -78,7 +93,7 @@ class GameEngineSpec extends Specification {
     def "advancing a non-winter season does not change the year"() {
         setup:
         def state = GameState.builder().curSeason(startSeason).year(7).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.advanceSeason()
@@ -93,7 +108,7 @@ class GameEngineSpec extends Specification {
     def "advancing the play phase advances both the season and the phase"() {
         setup:
         def state = GameState.builder().curPhase(Phase.PLAY).curSeason(Season.SPRING).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.advancePhase()
@@ -106,7 +121,7 @@ class GameEngineSpec extends Specification {
     def "advancing a non-play phase does not change the season"() {
         setup:
         def state = GameState.builder().curPhase(startPhase).curSeason(Season.SPRING).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.advancePhase()
@@ -124,7 +139,7 @@ class GameEngineSpec extends Specification {
     def "RECURRING cards fire all effects on the season trigger; SINGLE cards do not"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def recurringCard = new Card(0, 0, FrequencyType.RECURRING, [
                 new Effect(ResourceTarget.POPULATION, 10, ValueType.INTEGER),
@@ -148,7 +163,7 @@ class GameEngineSpec extends Specification {
     def "card with recurring effects on all three resources fires every one of them"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card = new Card(0, 0, FrequencyType.RECURRING, [
                         new Effect(ResourceTarget.POPULATION, 1, ValueType.INTEGER),
@@ -171,7 +186,7 @@ class GameEngineSpec extends Specification {
     def "single-frequency effects do not fire on the season trigger"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)]
         )
@@ -190,7 +205,7 @@ class GameEngineSpec extends Specification {
     def "addCard appends to the requested season's table"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         def card = new Card(0, 0, FrequencyType.RECURRING, [])
 
         when:
@@ -203,7 +218,7 @@ class GameEngineSpec extends Specification {
     def "addCard throws when the table is full"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         def card = new Card(0, 0, FrequencyType.RECURRING, [])
         GameEngine.MAX_TABLE_SIZE.times { engine.addCard(Season.SPRING, card) }
 
@@ -218,7 +233,7 @@ class GameEngineSpec extends Specification {
     def "removeCard removes the card from the requested season's table"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         def card = new Card(0, 0, FrequencyType.RECURRING, [])
         engine.addCard(Season.WINTER, card)
 
@@ -234,7 +249,7 @@ class GameEngineSpec extends Specification {
     def "addToDeck places the single card in the correct season's draw pile"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
         )
@@ -252,7 +267,7 @@ class GameEngineSpec extends Specification {
     def "addToDeck adds multiple cards to the correct season's draw pile"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card1 = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
         )
@@ -274,7 +289,7 @@ class GameEngineSpec extends Specification {
 
     def "addToDeck (single) throws when season is null"() {
         setup:
-        def engine = new GameEngine(GameState.newState())
+        def engine = engine(GameState.newState())
         def card = new Card(0, 0, FrequencyType.RECURRING, [])
 
         when:
@@ -287,7 +302,7 @@ class GameEngineSpec extends Specification {
 
     def "addToDeck (multi) throws when season is null"() {
         setup:
-        def engine = new GameEngine(GameState.newState())
+        def engine = engine(GameState.newState())
 
         when:
         engine.addToDeck(null, [new Card(0, 0, FrequencyType.RECURRING, [])])
@@ -299,7 +314,7 @@ class GameEngineSpec extends Specification {
 
     def "addToDeck (multi) throws when card list is null"() {
         setup:
-        def engine = new GameEngine(GameState.newState())
+        def engine = engine(GameState.newState())
 
         when:
         engine.addToDeck(Season.SPRING, (List<Card>) null)
@@ -314,7 +329,7 @@ class GameEngineSpec extends Specification {
     def "draw takes cards from the draw pile and puts them in the hand"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card1 = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
         )
@@ -342,7 +357,7 @@ class GameEngineSpec extends Specification {
     def "draw can draw multiple cards"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card1 = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
         )
@@ -376,7 +391,7 @@ class GameEngineSpec extends Specification {
     def "draw reshuffles the discard pile into the draw pile when draw pile is empty"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         def card1 = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
         )
@@ -403,7 +418,7 @@ class GameEngineSpec extends Specification {
     def "draw stops when no cards are available"() {
         setup:
         def state = GameState.newState()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def drawnCards = engine.draw(Season.WINTER, 5)
@@ -417,7 +432,7 @@ class GameEngineSpec extends Specification {
 
     def "draw throws exception when season is null"() {
         setup:
-        def engine = new GameEngine(GameState.newState())
+        def engine = engine(GameState.newState())
 
         when:
         engine.draw(null, 1)
@@ -429,7 +444,7 @@ class GameEngineSpec extends Specification {
 
     def "draw throws exception when amount is negative"() {
         setup:
-        def engine = new GameEngine(GameState.newState())
+        def engine = engine(GameState.newState())
 
         when:
         engine.draw(Season.SPRING, -1)
@@ -444,7 +459,7 @@ class GameEngineSpec extends Specification {
     def "offerAddChoices returns exactly three cards"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def choices = engine.offerAddChoices()
@@ -457,7 +472,7 @@ class GameEngineSpec extends Specification {
         setup:
         def catalog = CardCatalog.defaultCatalog()
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
-        def engine = new GameEngine(state, catalog)
+        def engine = engine(state, catalog)
 
         when:
         def choices = engine.offerAddChoices()
@@ -470,7 +485,7 @@ class GameEngineSpec extends Specification {
         setup:
         def catalog = CardCatalog.defaultCatalog()
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.WINTER).build()
-        def engine = new GameEngine(state, catalog)
+        def engine = engine(state, catalog)
 
         when:
         def choices = engine.offerAddChoices()
@@ -483,7 +498,7 @@ class GameEngineSpec extends Specification {
     def "first call each ADD phase is free and stores choices in state"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).production(100.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def choices = engine.offerAddChoices()
@@ -497,7 +512,7 @@ class GameEngineSpec extends Specification {
     def "second call costs 10 production (first reroll)"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).production(100.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         engine.offerAddChoices()   // free first call
 
         when:
@@ -511,7 +526,7 @@ class GameEngineSpec extends Specification {
     def "reroll cost escalates with each subsequent call within the same ADD phase"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).production(200.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when: "free first offer"
         engine.offerAddChoices()
@@ -545,7 +560,7 @@ class GameEngineSpec extends Specification {
     def "offerAddChoices throws when player cannot afford a reroll"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         engine.offerAddChoices()   // free first call; rerollCount is now 1
 
         when:
@@ -559,7 +574,7 @@ class GameEngineSpec extends Specification {
     def "offerAddChoices does not charge or advance reroll count when player can't afford"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         engine.offerAddChoices()   // free; rerollCount == 1
 
         when:
@@ -574,7 +589,7 @@ class GameEngineSpec extends Specification {
     def "offerAddChoices throws when phase is not ADD"() {
         setup:
         def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.offerAddChoices()
@@ -588,7 +603,7 @@ class GameEngineSpec extends Specification {
     def "pickCard shuffles the chosen card into the current season's draw pile"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         def card = CardCatalog.FARM
 
         when:
@@ -601,7 +616,7 @@ class GameEngineSpec extends Specification {
     def "pickCard advances the phase to RANDOM_EVENT"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.pickCard(CardCatalog.FARM)
@@ -616,7 +631,7 @@ class GameEngineSpec extends Specification {
                 .curPhase(Phase.ADD)
                 .rerollCount(1)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         // pre-populate some choices so we can verify they're cleared
         state.addChoices = [CardCatalog.FARM]
 
@@ -631,7 +646,7 @@ class GameEngineSpec extends Specification {
     def "pickCard throws when phase is not ADD"() {
         setup:
         def state = GameState.builder().curPhase(Phase.PLAY).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.pickCard(CardCatalog.FARM)
@@ -648,7 +663,7 @@ class GameEngineSpec extends Specification {
                 .curPhase(Phase.ADD)
                 .curSeason(Season.SPRING)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.skipAdd()
@@ -668,7 +683,7 @@ class GameEngineSpec extends Specification {
                 .rerollCount(2)
                 .build()
         state.addChoices = [CardCatalog.SEEDS]
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.skipAdd()
@@ -681,7 +696,7 @@ class GameEngineSpec extends Specification {
     def "skipAdd throws when phase is not ADD"() {
         setup:
         def state = GameState.builder().curPhase(Phase.PLAY).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.skipAdd()
@@ -696,7 +711,7 @@ class GameEngineSpec extends Specification {
         setup:
         def event = simpleEvent("spring.test", Season.SPRING, 1)
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(1).build()
-        def engine = new GameEngine(state, catalogWith(Season.SPRING, event))
+        def engine = engine(state, catalogWith(Season.SPRING, event))
 
         when:
         engine.advancePhase()   // ADD -> RANDOM_EVENT
@@ -711,7 +726,7 @@ class GameEngineSpec extends Specification {
         // event not eligible until year 5; state is at year 1
         def event = simpleEvent("spring.late", Season.SPRING, 5)
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(1).build()
-        def engine = new GameEngine(state, catalogWith(Season.SPRING, event))
+        def engine = engine(state, catalogWith(Season.SPRING, event))
 
         when:
         engine.advancePhase()   // ADD -> RANDOM_EVENT
@@ -765,7 +780,7 @@ class GameEngineSpec extends Specification {
         def option = new EventOption("Take food", [ResourceTarget.FOOD.integer(15)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1).food(50.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -780,7 +795,7 @@ class GameEngineSpec extends Specification {
         def option = new EventOption("Pay cost", [ResourceTarget.PRODUCTION.integer(-10)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(2).production(100.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -798,7 +813,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
                 .food(50.0).production(100.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -813,7 +828,7 @@ class GameEngineSpec extends Specification {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(1).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(new EventOption("Do nothing", []))
@@ -828,7 +843,7 @@ class GameEngineSpec extends Specification {
     def "applyEventOption throws when option is null"() {
         setup:
         def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(null)
@@ -846,7 +861,7 @@ class GameEngineSpec extends Specification {
         def option = new EventOption("Endure", [ResourceTarget.FOOD.integer(-10)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(3).food(50.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -865,7 +880,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(2)
                 .food(50.0).production(100.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -880,7 +895,7 @@ class GameEngineSpec extends Specification {
         def option = new EventOption("Burn firewood", [ResourceTarget.PRODUCTION.integer(-5)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(1).production(100.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -894,7 +909,7 @@ class GameEngineSpec extends Specification {
         def option = new EventOption("Trade", [ResourceTarget.PRODUCTION.integer(10)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(5).production(100.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -911,7 +926,7 @@ class GameEngineSpec extends Specification {
         when: "fall (year 4) — no scaling"
         def fallState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.FALL).year(4).food(50.0).build()
-        new GameEngine(fallState, new EventCatalog([:])).applyEventOption(option)
+        engine(fallState, new EventCatalog([:])).applyEventOption(option)
 
         then:
         fallState.food == 60.0
@@ -919,7 +934,7 @@ class GameEngineSpec extends Specification {
         when: "winter (year 4) — scaled by 4"
         def winterState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
-        new GameEngine(winterState, new EventCatalog([:])).applyEventOption(option)
+        engine(winterState, new EventCatalog([:])).applyEventOption(option)
 
         then:
         winterState.food == 50.0 + (10 * 4)   // 90.0
@@ -955,7 +970,7 @@ class GameEngineSpec extends Specification {
                 .curSeason(Season.SPRING)
                 .drawPile(Season.SPRING, cards)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def drawn = engine.startPlay()
@@ -974,7 +989,7 @@ class GameEngineSpec extends Specification {
                 .curSeason(Season.SUMMER)
                 .drawPile(Season.SUMMER, cards)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def drawn = engine.startPlay()
@@ -999,7 +1014,7 @@ class GameEngineSpec extends Specification {
                 .drawPile(Season.FALL, [drawCard])
                 .discardPile(Season.FALL, [discard1, discard2, discard3, discard4])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def drawn = engine.startPlay()
@@ -1021,7 +1036,7 @@ class GameEngineSpec extends Specification {
                 .drawPile(Season.WINTER, [card1])
                 .discardPile(Season.WINTER, [card2])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         def drawn = engine.startPlay()
@@ -1034,7 +1049,7 @@ class GameEngineSpec extends Specification {
     def "startPlay throws when the current phase is not PLAY"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.startPlay()
@@ -1055,7 +1070,7 @@ class GameEngineSpec extends Specification {
                 .population(10)
                 .production(100)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(card)
@@ -1076,7 +1091,7 @@ class GameEngineSpec extends Specification {
                 .table(Season.SPRING, (1..GameEngine.MAX_TABLE_SIZE).collect { filler })
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1096,7 +1111,7 @@ class GameEngineSpec extends Specification {
                 .production(10)
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1118,7 +1133,7 @@ class GameEngineSpec extends Specification {
                 .production(100)
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1137,7 +1152,7 @@ class GameEngineSpec extends Specification {
                 .curSeason(Season.SPRING)
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1159,7 +1174,7 @@ class GameEngineSpec extends Specification {
                 .production(100)
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1183,7 +1198,7 @@ class GameEngineSpec extends Specification {
                 .table(Season.SPRING, tableCards)
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1207,7 +1222,7 @@ class GameEngineSpec extends Specification {
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.FARM)
@@ -1229,7 +1244,7 @@ class GameEngineSpec extends Specification {
                 .table(Season.SUMMER, [CardCatalog.TRADE_ROUTES])
                 .hand([CardCatalog.TRADE_ROUTES])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.placeCard(CardCatalog.TRADE_ROUTES)
@@ -1250,7 +1265,7 @@ class GameEngineSpec extends Specification {
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .hand([CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
         def sizeBefore = state.board.get(Season.SPRING).size()
 
         when:
@@ -1271,7 +1286,7 @@ class GameEngineSpec extends Specification {
                 .production(100)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.demolishCard(0)
@@ -1290,7 +1305,7 @@ class GameEngineSpec extends Specification {
                 .production(100)
                 .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.FERTILIZER])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.demolishCard(1)   // remove SEEDS
@@ -1312,7 +1327,7 @@ class GameEngineSpec extends Specification {
                 .production(100)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.demolishCard(slot)
@@ -1334,7 +1349,7 @@ class GameEngineSpec extends Specification {
                 .production(5)
                 .table(Season.SPRING, [CardCatalog.MINE])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.demolishCard(0)
@@ -1351,7 +1366,7 @@ class GameEngineSpec extends Specification {
                 .curSeason(Season.SPRING)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.demolishCard(0)
@@ -1366,7 +1381,7 @@ class GameEngineSpec extends Specification {
     def "endAndRun throws when the current phase is not PLAY"() {
         setup:
         def state = GameState.builder().curPhase(phase).curSeason(Season.SPRING).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1390,7 +1405,7 @@ class GameEngineSpec extends Specification {
                 .curSeason(Season.SPRING)
                 .hand([card1, card2])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1413,7 +1428,7 @@ class GameEngineSpec extends Specification {
                 .food(50.0)
                 .table(Season.SUMMER, [card])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1434,7 +1449,7 @@ class GameEngineSpec extends Specification {
                 .food(50.0)
                 .table(Season.SUMMER, [singleCard])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1454,7 +1469,7 @@ class GameEngineSpec extends Specification {
                 .production(100.0)
                 .table(Season.SPRING, [recurringCard])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1475,7 +1490,7 @@ class GameEngineSpec extends Specification {
                 .food(50.0).production(100.0)
                 .table(Season.FALL, [singleCard, recurringCard])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1502,7 +1517,7 @@ class GameEngineSpec extends Specification {
                 .food(50.0)
                 .table(Season.SPRING, [cardA, cardB])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1527,7 +1542,7 @@ class GameEngineSpec extends Specification {
                 .production(100.0)
                 .table(Season.SPRING, [cardA, cardB])
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1551,7 +1566,7 @@ class GameEngineSpec extends Specification {
                 .population(6.9)
                 .food(40.0)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1570,7 +1585,7 @@ class GameEngineSpec extends Specification {
                 .population(4.0)
                 .food(50.0)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1589,7 +1604,7 @@ class GameEngineSpec extends Specification {
                 .population(10.0)
                 .food(4.0)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1608,7 +1623,7 @@ class GameEngineSpec extends Specification {
                 .population(6.0)
                 .food(2.0)
                 .build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1627,7 +1642,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
                 .population(5.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -1644,7 +1659,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
                 .population(2.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -1660,7 +1675,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
                 .population(5.0).build()
-        def engine = new GameEngine(state, new EventCatalog([:]))
+        def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
@@ -1677,7 +1692,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.WINTER)
                 .population(1.0).food(0.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()
@@ -1694,7 +1709,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
                 .population(5.0).food(10.0).build()
-        def engine = new GameEngine(state)
+        def engine = engine(state)
 
         when:
         engine.endAndRun()

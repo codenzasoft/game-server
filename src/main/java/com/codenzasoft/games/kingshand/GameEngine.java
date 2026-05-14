@@ -45,34 +45,6 @@ public class GameEngine implements Game<GameEngine> {
   private final Random rng;
 
   /**
-   * Convenience constructor that uses the {@link EventCatalog#defaultCatalog() default catalog} and
-   * an unseeded {@link Random}. Existing call-sites remain unaffected.
-   */
-  public GameEngine(GameState state) {
-    this(
-        null,
-        null,
-        state,
-        CardCatalog.defaultCatalog(),
-        EventCatalog.defaultCatalog(),
-        new Random());
-  }
-
-  /**
-   * Constructor that accepts a custom card catalog (uses default event catalog and unseeded RNG).
-   */
-  public GameEngine(GameState state, CardCatalog cardCatalog) {
-    this(null, null, state, cardCatalog, EventCatalog.defaultCatalog(), new Random());
-  }
-
-  /**
-   * Constructor that accepts a custom event catalog (uses default card catalog and unseeded RNG).
-   */
-  public GameEngine(GameState state, EventCatalog eventCatalog) {
-    this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, new Random());
-  }
-
-  /**
    * Primary constructor — all fields injected. Prefer this form in tests so that the random
    * selection is reproducible via a seeded {@link Random}.
    */
