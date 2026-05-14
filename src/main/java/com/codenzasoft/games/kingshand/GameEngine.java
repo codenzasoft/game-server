@@ -17,8 +17,8 @@ import java.util.Random;
  *       one eligible event via the injected {@link EventCatalog}, storing it on the state.
  *   <li>The caller reads the rolled event with {@link #currentEvent()}.
  *   <li>The player picks an {@link EventOption}; the caller passes it to {@link
- *       #chooseEventOption(EventOption)}, which applies its effects and advances the phase to
- *       {@link Phase#PLAY}.
+ *       #applyEventOption(EventOption)}, which applies its effects and advances the phase to {@link
+ *       Phase#PLAY}.
  * </ol>
  *
  * <p><b>Winter scaling (KH-6):</b> when the current season is {@link Season#WINTER}, each effect's
