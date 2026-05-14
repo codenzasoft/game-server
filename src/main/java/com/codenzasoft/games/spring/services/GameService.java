@@ -181,6 +181,35 @@ public class GameService {
         .toList();
   }
 
+  /**
+   * Marks the identified game as quit, removing it from the active games list. The requesting user
+   * must be a player in the game. If the game is already complete or does not exist this is a
+   * no-op.
+   *
+   * @param gameId The id of the game to delete.
+   * @param user The user requesting the deletion.
+   * @throws IllegalStateException if the user is not a player of the game.
+   */
+  @Transactional
+  public void deleteGame(final UUID gameId, final UserEntity user) {
+    final Optional<GameEntity> optional = gamesRepository.findById(gameId);
+    if (optional.isEmpty()) {
+      return;
+    }
+    final GameEntity game = optional.get();
+    final boolean isPlayer =
+        game.getPlayers().stream().anyMatch(p -> p.getId().equals(user.getId()));
+    if (!isPlayer) {
+      throw new IllegalStateException(
+          "User " + user.getUsername() + " is not a player of game " + gameId);
+    }
+    if (!game.isComplete()) {
+      game.setQuitAt(new Date());
+      gamesRepository.save(game);
+      gameCache.removeGame(gameId);
+    }
+  }
+
   public List<UserEntity> getAvailableOpponents(final UserEntity currentUser) {
     return usersRepository.findAll().stream()
         .filter(u -> !u.getId().equals(currentUser.getId()))

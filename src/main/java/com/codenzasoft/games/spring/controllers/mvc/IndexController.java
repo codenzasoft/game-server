@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -86,6 +87,22 @@ public class IndexController {
         return "redirect:/games/kh/" + game.getId();
       } catch (IllegalStateException e) {
         log.warn("Game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
+  /** Deletes (quits) the identified game on behalf of the authenticated user. */
+  @PostMapping(
+      "/games/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/delete")
+  public String deleteGame(@AuthenticationPrincipal UserDetails user, @PathVariable UUID gameId) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        gameService.deleteGame(gameId, entity.get());
+      } catch (IllegalStateException e) {
+        log.warn("Game deletion rejected for {}: {}", entity.get().getUsername(), e.getMessage());
       }
     }
     return "redirect:/";
