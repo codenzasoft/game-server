@@ -25,6 +25,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 public class ProfileController {
 
+  private static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
+
   @Autowired GamesUserDetailsService gamesUserDetailsService;
   @Autowired UsersRepository usersRepository;
   @Autowired PasswordEncoder passwordEncoder;
@@ -61,6 +63,36 @@ public class ProfileController {
 
     final UserEntity user = optionalUser.get();
 
+    // ----- Username validation -----
+    final String trimmedUserName = userName == null ? "" : userName.trim();
+    if (trimmedUserName.isEmpty()) {
+      redirectAttrs.addFlashAttribute("error", "Username cannot be empty.");
+      return "redirect:/profile";
+    }
+    if (!trimmedUserName.equals(user.getUsername())) {
+      final UserEntity takenBy = usersRepository.findByUserName(trimmedUserName);
+      if (takenBy != null && !takenBy.getId().equals(user.getId())) {
+        redirectAttrs.addFlashAttribute(
+            "error", "Username \"" + trimmedUserName + "\" is already taken.");
+        return "redirect:/profile";
+      }
+    }
+
+    // ----- Email validation -----
+    final String trimmedEmail = email == null ? "" : email.trim().toLowerCase();
+    if (!trimmedEmail.matches(EMAIL_PATTERN)) {
+      redirectAttrs.addFlashAttribute(
+          "error", "\"" + trimmedEmail + "\" is not a valid email address.");
+      return "redirect:/profile";
+    }
+    if (!trimmedEmail.equals(user.getEmail())) {
+      final UserEntity takenBy = usersRepository.findByEmail(trimmedEmail);
+      if (takenBy != null && !takenBy.getId().equals(user.getId())) {
+        redirectAttrs.addFlashAttribute("error", "An account with this email already exists.");
+        return "redirect:/profile";
+      }
+    }
+
     if (newPassword != null && !newPassword.isBlank()) {
       if (currentPassword == null
           || !passwordEncoder.matches(currentPassword, user.getPassword())) {
@@ -79,9 +111,9 @@ public class ProfileController {
       user.setPassword(passwordEncoder.encode(newPassword));
     }
 
-    final boolean usernameChanged = !user.getUsername().equals(userName);
-    user.setUserName(userName);
-    user.setEmail(email);
+    final boolean usernameChanged = !user.getUsername().equals(trimmedUserName);
+    user.setUserName(trimmedUserName);
+    user.setEmail(trimmedEmail);
     usersRepository.save(user);
 
     if (usernameChanged) {
