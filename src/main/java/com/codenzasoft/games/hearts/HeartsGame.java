@@ -32,14 +32,16 @@ public class HeartsGame {
     }
 
     public HeartsGame build() {
-      return new HeartsGame(GameState.with(id, players));
+      return new HeartsGame(GameState.with(id, players.stream().map(Player::name).toList()), players);
     }
   }
 
   private GameState gameState;
+  private List<Player> players;
 
-  private HeartsGame(final GameState gameState) {
+  private HeartsGame(final GameState gameState, final List<Player> players) {
     setGameState(gameState);
+    this.players = players;
   }
 
   private void setGameState(final GameState gameState) {
@@ -51,7 +53,7 @@ public class HeartsGame {
   }
 
   public List<Player> getPlayers() {
-    return getGameState().players();
+    return players;
   }
 
   /**

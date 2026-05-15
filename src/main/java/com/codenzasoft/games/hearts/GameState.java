@@ -11,11 +11,11 @@ import java.util.stream.Collectors;
  * The state of a hearts of hearts.
  *
  * @param id The hearts identifier.
- * @param players The {@link Player}s in clockwise order.
+ * @param players The players in clockwise order, identified by username.
  * @param rounds The state of played rounds.
- * @param isOver Whether the hearts is over or has been quit.
+ * @param isOver Whether the hearts game is over or has been quit.
  */
-public record GameState(UUID id, List<Player> players, List<RoundState> rounds, boolean isOver) {
+public record GameState(UUID id, List<String> players, List<RoundState> rounds, boolean isOver) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -31,7 +31,7 @@ public record GameState(UUID id, List<Player> players, List<RoundState> rounds, 
     }
   }
 
-  public static GameState with(final UUID id, final List<Player> players) {
+  public static GameState with(final UUID id, final List<String> players) {
     return new GameState(id, players, List.of(), false);
   }
 
@@ -39,7 +39,7 @@ public record GameState(UUID id, List<Player> players, List<RoundState> rounds, 
     return new GameState(id(), players(), rounds(), true);
   }
 
-  GameState startNewRound(final Player dealer, final Map<Player, List<Card>> deal) {
+  GameState startNewRound(final Player dealer, final Map<String, List<Card>> deal) {
     if (isOver()) {
       throw new IllegalStateException("hearts over - unable to start a new round");
     }
@@ -55,7 +55,7 @@ public record GameState(UUID id, List<Player> players, List<RoundState> rounds, 
       }
       nextPass = prevRound.pass().nextPass();
     }
-    final Map<Player, List<Card>> immutableDeal =
+    final Map<String, List<Card>> immutableDeal =
         deal.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
     final RoundState nextRound =

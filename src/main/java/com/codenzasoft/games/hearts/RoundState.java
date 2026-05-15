@@ -13,8 +13,8 @@ import java.util.*;
  *
  * <ol>
  *   <li>Create an initial {@link RoundState} with its number, pass direction and dealt cards via
- *       {@link #with(int, Pass, Player, Map)}.
- *   <li>Set selected pass cards for each player via {@link #setPass(Player, List)}, unless this is
+ *       {@link #with(int, Pass, String, Map)}.
+ *   <li>Set selected pass cards for each player via {@link #setPass(String, List)}, unless this is
  *       a {@link Pass#KEEPER} round.
  *   <li>Execute the pass via {@link #passCards(List)}.
  *   <li>Play tricks until the round is complete. For each trick, this entails:
@@ -27,31 +27,31 @@ import java.util.*;
  * @param number The round number, beginning at one.
  * @param pass The {@link Pass} direction.
  * @param dealer The designated dealer for the round.
- * @param deal The {@link Card}s dealt to each {@link Player} at the beginning of the round.
- * @param passes The pass {@link Card}s selected for each {@link Player}.
+ * @param deal The {@link Card}s dealt to each player at the beginning of the round.
+ * @param passes The pass {@link Card}s selected for each player.
  * @param passComplete Whether the card pass has been executed.
  * @param tricks The sequence of tricks played in this round.
- * @param hands The {@link Card}s remaining in each {@link Player}s hand.
+ * @param hands The {@link Card}s remaining in each player's hand.
  */
 public record RoundState(
     int number,
     Pass pass,
-    Player dealer,
-    Map<Player, List<Card>> deal,
-    Map<Player, List<Card>> passes,
+    String dealer,
+    Map<String, List<Card>> deal,
+    Map<String, List<Card>> passes,
     boolean passComplete,
     List<TrickState> tricks,
-    Map<Player, List<Card>> hands) {
+    Map<String, List<Card>> hands) {
 
   public static RoundState with(
-      final int number, final Pass pass, final Player dealer, final Map<Player, List<Card>> deal) {
-    final Map<Player, List<Card>> hands = new HashMap<>();
+      final int number, final Pass pass, final String dealer, final Map<String, List<Card>> deal) {
+    final Map<String, List<Card>> hands = new HashMap<>();
     deal.forEach((player, cards) -> hands.put(player, Collections.unmodifiableList(cards)));
-    final Map<Player, List<Card>> cards = Collections.unmodifiableMap(hands);
+    final Map<String, List<Card>> cards = Collections.unmodifiableMap(hands);
     return new RoundState(number, pass, dealer, cards, Map.of(), false, List.of(), cards);
   }
 
-  RoundState setPass(final Player player, final List<Card> cards) {
+  RoundState setPass(final String player, final List<Card> cards) {
     if (pass.equals(Pass.KEEPER)) {
       throw new IllegalStateException("cannot pass in keeper round");
     }
@@ -67,7 +67,7 @@ public record RoundState(
     if (!deal.get(player).containsAll(cards)) {
       throw new IllegalStateException("player does not have those cards");
     }
-    final Map<Player, List<Card>> nextPasses = new HashMap<>(passes);
+    final Map<String , List<Card>> nextPasses = new HashMap<>(passes);
     nextPasses.put(player, Collections.unmodifiableList(cards));
     return new RoundState(
         number, pass, dealer, deal, Collections.unmodifiableMap(nextPasses), false, tricks, hands);
@@ -81,14 +81,14 @@ public record RoundState(
     return passComplete;
   }
 
-  RoundState passCards(final List<Player> players) {
+  RoundState passCards(final List<String> players) {
     if (!pass.equals(Pass.KEEPER)) {
       if (!isPassReady()) {
         throw new IllegalStateException("all passes must be selected to execute the pass");
       }
-      final Map<Player, List<Card>> nextHands = new HashMap<>();
+      final Map<String, List<Card>> nextHands = new HashMap<>();
       hands.forEach((player, hand) -> nextHands.put(player, new ArrayList<>(hand)));
-      for (final Player p : players) {
+      for (final String p : players) {
         final List<Card> thePass = passes.get(p);
         final Player recipient = HeartsGame.getPlayerRelativeTo(p, pass, players);
         final List<Card> playerHand = nextHands.get(p);
