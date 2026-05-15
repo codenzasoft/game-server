@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.entities.WhitelistEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.WhitelistRepository;
+import com.codenzasoft.games.spring.validation.PasswordValidator;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +25,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 public class RegisterController {
 
-  private static final int MIN_PASSWORD_LENGTH = 8;
   private static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
 
   @Autowired UsersRepository usersRepository;
@@ -68,12 +68,9 @@ public class RegisterController {
     if (!password.equals(confirmPassword)) {
       return failed("Passwords do not match.", trimmedEmail, trimmedUserName, redirectAttrs);
     }
-    if (password.length() < MIN_PASSWORD_LENGTH) {
-      return failed(
-          "Password must be at least " + MIN_PASSWORD_LENGTH + " characters.",
-          trimmedEmail,
-          trimmedUserName,
-          redirectAttrs);
+    final PasswordValidator.Result passwordResult = PasswordValidator.validate(password);
+    if (!passwordResult.isValid()) {
+      return failed(passwordResult.getErrorMessage(), trimmedEmail, trimmedUserName, redirectAttrs);
     }
 
     // ----- Whitelist check -----

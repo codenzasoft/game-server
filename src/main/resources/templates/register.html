@@ -6,21 +6,25 @@
             <img src="/img/codenza-logo.png" width="300" class="mb-5"/>
             <h5 class="mb-3">Create your account</h5>
             <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
-            <form th:action="@{/register}" method="post" autocomplete="off">
+            <form th:action="@{/register}" method="post">
                 <div class="row mb-3">
                     <input type="email" name="email" placeholder="Email"
-                           th:value="${email}" required/>
+                           th:value="${email}" autocomplete="email" required/>
                 </div>
                 <div class="row mb-3">
                     <input type="text" name="userName" placeholder="Username"
-                           th:value="${userName}" required/>
+                           th:value="${userName}" autocomplete="username" required/>
                 </div>
                 <div class="row mb-3">
-                    <input type="password" name="password" placeholder="Password" required/>
+                    <input type="password" name="password" placeholder="Password"
+                           autocomplete="new-password"
+                           minlength="12" maxlength="64" required/>
                 </div>
                 <div class="row mb-3">
                     <input type="password" name="confirmPassword"
-                           placeholder="Confirm password" required/>
+                           placeholder="Confirm password"
+                           autocomplete="new-password"
+                           minlength="12" maxlength="64" required/>
                 </div>
                 <div class="row mb-3">
                     <input class="btn btn-primary" type="submit" value="Create account"/>
