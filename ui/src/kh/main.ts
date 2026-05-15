@@ -1,5 +1,6 @@
-import { Application, Text, TextStyle } from "pixi.js";
+import { Application } from "pixi.js";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
+import { SettingsMenu } from "./settings.ts";
 
 const wsUrl =
   import.meta.env.VITE_WS_URL ||
@@ -40,32 +41,6 @@ const getGameId = () => {
 
   console.log(`Using game ID: ${gameId}`);
 
-  // Add quit button (top-right corner, matching XO style)
-  const style = new TextStyle({
-    fontFamily: "Arial",
-    fontSize: 60,
-    fontWeight: "bold",
-    fill: "white",
-    stroke: {
-      color: "#4a1850",
-      width: 5,
-    },
-    dropShadow: {
-      color: "#000000",
-      blur: 4,
-      angle: Math.PI / 6,
-      distance: 6,
-    },
-  });
-
-  const quitButton = new Text({ text: "Quit", style });
-  quitButton.anchor.set(1, 0);
-  quitButton.x = app.screen.width;
-  quitButton.y = 0;
-  quitButton.eventMode = "static";
-  quitButton.cursor = "pointer";
-  app.stage.addChild(quitButton);
-
   // Connect to WebSocket via STOMP
   let subscription: StompSubscription;
 
@@ -100,9 +75,20 @@ const getGameId = () => {
 
   client.activate();
 
-  quitButton.on("pointerdown", () => {
-    client.publish({
-      destination: `/games/kh/${gameId}/quit`,
-    });
-  });
+  // Settings menu — contains "Save and Exit" and "Quit Game"
+  const settingsMenu = new SettingsMenu(
+    app,
+    () => {
+      // Quit Game: notify the server, which will confirm via WebSocket and
+      // trigger the redirect once the quit_at timestamp is persisted.
+      settingsMenu.close();
+      client.publish({ destination: `/games/kh/${gameId}/quit` });
+    },
+    () => {
+      // Save and Exit: game state is already persisted server-side, so just
+      // navigate home — the game remains active in the active games list.
+      window.location.href = homeUrl;
+    },
+  );
+  app.stage.addChild(settingsMenu);
 })();
