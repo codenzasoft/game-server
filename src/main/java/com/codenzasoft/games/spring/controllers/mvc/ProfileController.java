@@ -3,6 +3,7 @@ package com.codenzasoft.games.spring.controllers.mvc;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import com.codenzasoft.games.spring.validation.PasswordValidator;
 import com.codenzasoft.games.spring.views.ViewHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
@@ -68,6 +69,11 @@ public class ProfileController {
       }
       if (!newPassword.equals(confirmPassword)) {
         redirectAttrs.addFlashAttribute("error", "New passwords do not match.");
+        return "redirect:/profile";
+      }
+      final PasswordValidator.Result passwordResult = PasswordValidator.validate(newPassword);
+      if (!passwordResult.isValid()) {
+        redirectAttrs.addFlashAttribute("error", passwordResult.getErrorMessage());
         return "redirect:/profile";
       }
       user.setPassword(passwordEncoder.encode(newPassword));
