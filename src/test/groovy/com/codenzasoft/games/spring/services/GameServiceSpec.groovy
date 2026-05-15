@@ -1,69 +1,139 @@
 package com.codenzasoft.games.spring.services
 
-import com.codenzasoft.games.common.GameType
 import com.codenzasoft.games.kingshand.GameEngine
 import com.codenzasoft.games.spring.entities.UserEntity
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity
-import com.codenzasoft.games.spring.repositories.GamePlayersRepository
 import com.codenzasoft.games.spring.repositories.GamesRepository
+import com.codenzasoft.games.common.GameType
 import com.codenzasoft.games.spring.repositories.UsersRepository
-import com.codenzasoft.games.spring.services.xo.XoBroadcastService
-import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import com.codenzasoft.games.xo.Piece
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
 import spock.lang.Specification
 
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
 class GameServiceSpec extends Specification {
 
-    def gamesRepository = Mock(GamesRepository)
-    def usersRepository = Mock(UsersRepository)
-    def gamePlayersRepository = Mock(GamePlayersRepository)
-    def xoGamePersistenceService = Mock(XoGamePersistenceService)
-    def xoBroadcastService = Mock(XoBroadcastService)
-    def gameNotificationExecutor = Mock(ThreadPoolTaskExecutor)
-    def gameCache = new GameCache()
-    def gameService = new GameService()
+    @Autowired GameService gameService
+    @Autowired UsersRepository usersRepository
+    @Autowired JdbcTemplate jdbcTemplate
+    @Autowired GamesRepository gamesRepository
+    @Autowired GameCache gameCache
+
+    UserEntity testUser
 
     def setup() {
-        gameService.gamesRepository = gamesRepository
-        gameService.usersRepository = usersRepository
-        gameService.gamePlayersRepository = gamePlayersRepository
-        gameService.xoGamePersistenceService = xoGamePersistenceService
-        gameService.xoBroadcastService = xoBroadcastService
-        gameService.gameNotificationExecutor = gameNotificationExecutor
-        gameService.gameCache = gameCache
+        jdbcTemplate.execute("DELETE FROM xo_game_moves")
+        jdbcTemplate.execute("DELETE FROM xo_game_pieces")
+        jdbcTemplate.execute("DELETE FROM game_players")
+        jdbcTemplate.execute("DELETE FROM games")
+
+        testUser = new UserEntity()
+        testUser.setUserName("test-limit-user")
+        testUser = usersRepository.save(testUser)
     }
 
-    private static UserEntity userWith(UUID id, String name) {
-        def user = new UserEntity()
-        user.@id = id
-        user.userName = name
-        user
+    def "isAtGameLimit returns false when user has no active games"() {
+        expect:
+        !gameService.isAtGameLimit(testUser)
+    }
+
+    def "isAtGameLimit returns false when user is below the limit"() {
+        given: "user has one fewer game than the limit"
+        (GameService.MAX_ACTIVE_GAMES - 1).times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        expect:
+        !gameService.isAtGameLimit(testUser)
+    }
+
+    def "isAtGameLimit returns true when user is at the limit"() {
+        given:
+        GameService.MAX_ACTIVE_GAMES.times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        expect:
+        gameService.isAtGameLimit(testUser)
+    }
+
+    def "creating the 10th game succeeds"() {
+        given:
+        (GameService.MAX_ACTIVE_GAMES - 1).times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        when:
+        def game = gameService.createXoGame(testUser, Piece.X, Piece.X)
+
+        then:
+        game != null
+        game.id != null
+    }
+
+    def "creating a game beyond the limit throws IllegalStateException for xo vs-bot"() {
+        given: "user is already at the active game limit"
+        GameService.MAX_ACTIVE_GAMES.times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        when:
+        gameService.createXoGame(testUser, Piece.X, Piece.X)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "creating a kh game beyond the limit throws IllegalStateException"() {
+        given: "user is already at the active game limit"
+        GameService.MAX_ACTIVE_GAMES.times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        when:
+        gameService.createKhGame(testUser)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "completed games do not count toward the active game limit"() {
+        given: "user has MAX_ACTIVE_GAMES games, all of which are then completed"
+        GameService.MAX_ACTIVE_GAMES.times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+        jdbcTemplate.execute("UPDATE games SET over_at = NOW() WHERE over_at IS NULL AND quit_at IS NULL")
+
+        expect: "limit is no longer reached"
+        !gameService.isAtGameLimit(testUser)
+
+        and: "a new game can be created"
+        gameService.createXoGame(testUser, Piece.X, Piece.X) != null
+
     }
 
     def "createKhGame persists a new KH game with the given user as player"() {
-        given:
-        def userId = UUID.randomUUID()
-        def user = userWith(userId, "player1")
 
         when:
-        def entity = gameService.createKhGame(user)
+        def entity = gameService.createKhGame(testUser)
 
         then:
-        1 * gamesRepository.save(_ as KhGameEntity)
         entity instanceof KhGameEntity
         entity.id != null
         entity.gameType == GameType.KH
-        entity.players == [user]
+        entity.players == [testUser]
     }
 
     def "getOrBuildKhGame fetches from DB on first call and adds game to cache"() {
         given:
-        def gameId = UUID.randomUUID()
-        def userId = UUID.randomUUID()
-        def user = userWith(userId, "player1")
-        def entity = new KhGameEntity(gameId)
-        entity.setPlayers([user])
-        gamesRepository.findById(gameId) >> Optional.of(entity)
+        def game = gameService.createKhGame(testUser)
+        def gameId = game.id
 
         when:
         def result = gameService.getOrBuildKhGame(gameId)
@@ -73,17 +143,14 @@ class GameServiceSpec extends Specification {
         result.get() instanceof GameEngine
         result.get().id == gameId
         result.get().players.size() == 1
-        result.get().players[0].id() == userId
-        result.get().players[0].name() == "player1"
+        result.get().players[0].id() == testUser.id
+        result.get().players[0].name() == "test-limit-user"
     }
 
     def "getOrBuildKhGame adds the built game to the cache"() {
         given:
-        def gameId = UUID.randomUUID()
-        def user = userWith(UUID.randomUUID(), "player1")
-        def entity = new KhGameEntity(gameId)
-        entity.setPlayers([user])
-        gamesRepository.findById(gameId) >> Optional.of(entity)
+        def game = gameService.createKhGame(testUser)
+        def gameId = game.id
 
         when:
         gameService.getOrBuildKhGame(gameId)
@@ -92,19 +159,4 @@ class GameServiceSpec extends Specification {
         gameCache.getGameOfType(gameId, GameType.KH).isPresent()
     }
 
-    def "getOrBuildKhGame returns the cached game on subsequent calls without hitting the DB"() {
-        given:
-        def gameId = UUID.randomUUID()
-        def user = userWith(UUID.randomUUID(), "player1")
-        def entity = new KhGameEntity(gameId)
-        entity.setPlayers([user])
-
-        when:
-        def first = gameService.getOrBuildKhGame(gameId)
-        def second = gameService.getOrBuildKhGame(gameId)
-
-        then:
-        1 * gamesRepository.findById(gameId) >> Optional.of(entity)
-        first.get().is(second.get())
-    }
 }

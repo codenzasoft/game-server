@@ -10,12 +10,15 @@ import com.codenzasoft.games.xo.Piece;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -25,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
  */
 @Controller
 public class IndexController {
+  private static final Logger log = LoggerFactory.getLogger(IndexController.class);
+
   @Autowired GamesUserDetailsService gamesUserDetailsService;
   @Autowired ViewHelper viewHelper;
   @Autowired GameService gameService;
@@ -40,6 +45,7 @@ public class IndexController {
       model.addAttribute(PageConstants.PAGE_HELPER, viewHelper);
       model.addAttribute("opponents", gameService.getAvailableOpponents(currentUser));
       model.addAttribute("activeGames", gameService.getActiveGames(currentUser));
+      model.addAttribute("atGameLimit", gameService.isAtGameLimit(currentUser));
     }
     return "index";
   }
@@ -60,8 +66,12 @@ public class IndexController {
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
-      final XoGameEntity game = gameService.createXoGame(entity.get(), Piece.X, Piece.X);
-      return "redirect:/games/xo/" + game.getId();
+      try {
+        final XoGameEntity game = gameService.createXoGame(entity.get(), Piece.X, Piece.X);
+        return "redirect:/games/xo/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn("Game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
     }
     return "redirect:/";
   }
@@ -72,8 +82,28 @@ public class IndexController {
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
-      final KhGameEntity game = gameService.createKhGame(entity.get());
-      return "redirect:/games/kh/" + game.getId();
+      try {
+        final KhGameEntity game = gameService.createKhGame(entity.get());
+        return "redirect:/games/kh/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn("Game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
+  /** Deletes (quits) the identified game on behalf of the authenticated user. */
+  @PostMapping(
+      "/games/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/delete")
+  public String deleteGame(@AuthenticationPrincipal UserDetails user, @PathVariable UUID gameId) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        gameService.quitGame(gameId, entity.get());
+      } catch (IllegalStateException e) {
+        log.warn("Game deletion rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
     }
     return "redirect:/";
   }
@@ -86,10 +116,15 @@ public class IndexController {
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     final Optional<UserEntity> opponent = gameService.findUser(opponentId);
     if (creator.isPresent() && opponent.isPresent()) {
-      final XoGameEntity game =
-          gameService.createXoGame(
-              Map.of(Piece.X, creator.get(), Piece.O, opponent.get()), Piece.X);
-      return "redirect:/games/xo/" + game.getId();
+      try {
+        final XoGameEntity game =
+            gameService.createXoGame(
+                Map.of(Piece.X, creator.get(), Piece.O, opponent.get()), Piece.X);
+        return "redirect:/games/xo/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Challenge creation rejected for {}: {}", creator.get().getUsername(), e.getMessage());
+      }
     }
     return "redirect:/";
   }
