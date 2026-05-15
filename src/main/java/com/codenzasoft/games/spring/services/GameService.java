@@ -193,7 +193,7 @@ public class GameService {
    * @throws IllegalStateException if the user is not a player of the game.
    */
   @Transactional
-  public void deleteGame(final UUID gameId, final UserEntity user) {
+  public void quitGame(final UUID gameId, final UserEntity user) {
     final Optional<GameEntity> optional = gamesRepository.findById(gameId);
     if (optional.isEmpty()) {
       return;

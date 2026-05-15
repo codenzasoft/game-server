@@ -100,7 +100,7 @@ public class IndexController {
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
       try {
-        gameService.deleteGame(gameId, entity.get());
+        gameService.quitGame(gameId, entity.get());
       } catch (IllegalStateException e) {
         log.warn("Game deletion rejected for {}: {}", entity.get().getUsername(), e.getMessage());
       }
