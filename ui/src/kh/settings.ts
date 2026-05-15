@@ -5,12 +5,12 @@ const PANEL_PADDING = 20;
 const MARGIN = 12;
 
 /**
- * A PixiJS settings menu that renders as a "⚙ Settings" button anchored to
+ * A PixiJS options menu that renders as a "⚙ Options" button anchored to
  * the top-right corner. Clicking it toggles a dropdown panel containing
  * "Save and Exit" and "Quit Game" actions. Clicking outside the open panel
  * closes it via a transparent full-screen overlay.
  */
-export class SettingsMenu extends Container {
+export class OptionsMenu extends Container {
   private readonly panel: Container;
   private readonly overlay: Graphics;
   private readonly settingsButton: Text;
@@ -65,7 +65,7 @@ export class SettingsMenu extends Container {
       dropShadow: { color: "#000000", blur: 4, angle: Math.PI / 6, distance: 4 },
     });
 
-    const btn = new Text({ text: "⚙ Settings", style });
+    const btn = new Text({ text: "⚙ Options", style });
     btn.anchor.set(1, 0);
     btn.x = app.screen.width - MARGIN;
     btn.y = MARGIN;
@@ -130,7 +130,7 @@ export class SettingsMenu extends Container {
     });
 
     // --- Build text nodes (measure before drawing background) ---
-    const sectionLabel = new Text({ text: "SETTINGS", style: labelStyle });
+    const sectionLabel = new Text({ text: "OPTIONS", style: labelStyle });
     sectionLabel.x = P;
     sectionLabel.y = P;
 

@@ -1,6 +1,6 @@
 import { Application } from "pixi.js";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
-import { SettingsMenu } from "./settings.ts";
+import { OptionsMenu } from "./settings.ts";
 
 const wsUrl =
   import.meta.env.VITE_WS_URL ||
@@ -75,13 +75,13 @@ const getGameId = () => {
 
   client.activate();
 
-  // Settings menu — contains "Save and Exit" and "Quit Game"
-  const settingsMenu = new SettingsMenu(
+  // Options menu — contains "Save and Exit" and "Quit Game"
+  const optionsMenu = new OptionsMenu(
     app,
     () => {
       // Quit Game: notify the server, which will confirm via WebSocket and
       // trigger the redirect once the quit_at timestamp is persisted.
-      settingsMenu.close();
+      optionsMenu.close();
       client.publish({ destination: `/games/kh/${gameId}/quit` });
     },
     () => {
@@ -90,5 +90,5 @@ const getGameId = () => {
       window.location.href = homeUrl;
     },
   );
-  app.stage.addChild(settingsMenu);
+  app.stage.addChild(optionsMenu);
 })();
