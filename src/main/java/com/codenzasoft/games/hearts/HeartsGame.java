@@ -1,5 +1,7 @@
 package com.codenzasoft.games.hearts;
 
+import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Deck;
@@ -11,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class HeartsGame {
+public class HeartsGame implements Game<HeartsGame> {
 
   public static final Card QUEEN_OF_SPADES = new Card(Suit.SPADES, Rank.QUEEN);
   public static final Card TWO_OF_CLUBS = new Card(Suit.CLUBS, Rank.TWO);
@@ -32,15 +34,17 @@ public class HeartsGame {
 
     public HeartsGame build() {
       return new HeartsGame(
-          GameState.with(id, players.stream().map(Player::name).toList()), players);
+          id, GameState.with(players.stream().map(Player::name).toList()), players);
     }
   }
 
+  private final UUID id;
   private GameState gameState;
   private final List<Player> players;
 
-  private HeartsGame(final GameState gameState, final List<Player> players) {
+  private HeartsGame(final UUID id, final GameState gameState, final List<Player> players) {
     setGameState(gameState);
+    this.id = id;
     this.players = players;
   }
 
@@ -50,6 +54,21 @@ public class HeartsGame {
 
   public GameState getGameState() {
     return gameState;
+  }
+
+  @Override
+  public GameType getGameType() {
+    return GameType.HEARTS;
+  }
+
+  @Override
+  public HeartsGame getGame() {
+    return this;
+  }
+
+  @Override
+  public UUID getId() {
+    return id;
   }
 
   public List<Player> getPlayers() {

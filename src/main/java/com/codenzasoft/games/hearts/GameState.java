@@ -9,12 +9,11 @@ import java.util.stream.Collectors;
 /**
  * The state of a hearts of hearts.
  *
- * @param id The hearts identifier.
  * @param players The players in clockwise order, identified by username.
  * @param rounds The state of played rounds.
  * @param isOver Whether the hearts game is over or has been quit.
  */
-public record GameState(UUID id, List<String> players, List<RoundState> rounds, boolean isOver) {
+public record GameState(List<String> players, List<RoundState> rounds, boolean isOver) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -30,8 +29,8 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
     }
   }
 
-  public static GameState with(final UUID id, final List<String> players) {
-    return new GameState(id, players, List.of(), false);
+  public static GameState with(final List<String> players) {
+    return new GameState(players, List.of(), false);
   }
 
   public String getPlayerRelativeTo(final String player, final Pass pass) {
@@ -44,7 +43,7 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
   }
 
   public GameState setOver() {
-    return new GameState(id(), players(), rounds(), true);
+    return new GameState(players(), rounds(), true);
   }
 
   GameState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -70,7 +69,7 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
         RoundState.with(rounds().size() + 1, nextPass, dealer, immutableDeal);
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.add(nextRound);
-    return new GameState(id(), players(), nextRounds, isOver());
+    return new GameState(players(), nextRounds, isOver());
   }
 
   public Optional<RoundState> getCurrentRound() {
@@ -124,6 +123,6 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.remove(nextRounds.size() - 1);
     nextRounds.add(replacement);
-    return new GameState(id(), players(), nextRounds, isOver());
+    return new GameState(players(), nextRounds, isOver());
   }
 }
