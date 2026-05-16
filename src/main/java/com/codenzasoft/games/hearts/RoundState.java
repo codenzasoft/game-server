@@ -2,9 +2,8 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
-import org.springframework.data.util.Pair;
-
 import java.util.*;
+import org.springframework.data.util.Pair;
 
 /**
  * A {@link RoundState} describes the point-in-time state of a round.
@@ -16,7 +15,7 @@ import java.util.*;
  *       {@link #with(int, Pass, String, Map)}.
  *   <li>Set selected pass cards for each player via {@link #setPass(String, List)}, unless this is
  *       a {@link Pass#KEEPER} round.
- *   <li>Execute the pass via {@link #passCards(List)}.
+ *   <li>Execute the pass via {@link #passCards(GameState)}.
  *   <li>Play tricks until the round is complete. For each trick, this entails:
  *       <oL>
  *         <li>Starting a new trick.
@@ -67,7 +66,7 @@ public record RoundState(
     if (!deal.get(player).containsAll(cards)) {
       throw new IllegalStateException("player does not have those cards");
     }
-    final Map<String , List<Card>> nextPasses = new HashMap<>(passes);
+    final Map<String, List<Card>> nextPasses = new HashMap<>(passes);
     nextPasses.put(player, Collections.unmodifiableList(cards));
     return new RoundState(
         number, pass, dealer, deal, Collections.unmodifiableMap(nextPasses), false, tricks, hands);
@@ -81,16 +80,16 @@ public record RoundState(
     return passComplete;
   }
 
-  RoundState passCards(final List<String> players) {
+  RoundState passCards(final GameState gameState) {
     if (!pass.equals(Pass.KEEPER)) {
       if (!isPassReady()) {
         throw new IllegalStateException("all passes must be selected to execute the pass");
       }
       final Map<String, List<Card>> nextHands = new HashMap<>();
       hands.forEach((player, hand) -> nextHands.put(player, new ArrayList<>(hand)));
-      for (final String p : players) {
+      for (final String p : gameState.players()) {
         final List<Card> thePass = passes.get(p);
-        final Player recipient = HeartsGame.getPlayerRelativeTo(p, pass, players);
+        final String recipient = gameState.getPlayerRelativeTo(p, pass);
         final List<Card> playerHand = nextHands.get(p);
         final List<Card> recipientHand = nextHands.get(recipient);
         playerHand.removeAll(thePass);
@@ -105,7 +104,7 @@ public record RoundState(
     if (isComplete()) {
       throw new IllegalStateException("cannot begin a new trick - round is complete");
     }
-    final Optional<Player> leader;
+    final Optional<String> leader;
     if (tricks.isEmpty()) {
       leader = findLeader(hands);
     } else {
@@ -123,14 +122,14 @@ public record RoundState(
     return new RoundState(number, pass, dealer, deal, passes, passComplete, nextTricks, hands);
   }
 
-  private Optional<Player> findLeader(final Map<Player, List<Card>> playerHands) {
+  private Optional<String> findLeader(final Map<String, List<Card>> playerHands) {
     return playerHands.entrySet().stream()
         .filter(entry -> entry.getValue().contains(HeartsGame.TWO_OF_CLUBS))
         .findFirst()
         .map(Map.Entry::getKey);
   }
 
-  RoundState playCard(final GameState game, final Player player, final Card card) {
+  RoundState playCard(final GameState game, final String player, final Card card) {
     final List<TrickState> nextTricks;
     if (tricks.isEmpty()) {
       throw new IllegalStateException("cannot play a card without tricks");
@@ -139,7 +138,7 @@ public record RoundState(
     if (currTrick.isComplete()) {
       throw new IllegalStateException("cannot play a card in a completed trick");
     }
-    final Optional<Player> expectedPlayer = getNextPlayer(game);
+    final Optional<String> expectedPlayer = getNextPlayer(game);
     if (expectedPlayer.isEmpty()) {
       throw new IllegalStateException("no next player found");
     }
@@ -147,8 +146,8 @@ public record RoundState(
       throw new IllegalStateException("player is not the next player");
     }
 
-    final Map<Player, List<Card>> nextHands = new HashMap<>();
-    for (final Player p : hands.keySet()) {
+    final Map<String, List<Card>> nextHands = new HashMap<>();
+    for (final String p : hands.keySet()) {
       if (p.equals(player)) {
         final List<Card> nextCards = new ArrayList<>(hands.get(p));
         if (!nextCards.remove(card)) {
@@ -184,7 +183,7 @@ public record RoundState(
     return countCards(hands()) == 0;
   }
 
-  private int countCards(final Map<Player, List<Card>> hands) {
+  private int countCards(final Map<String, List<Card>> hands) {
     return hands.values().stream().mapToInt(List::size).sum();
   }
 
@@ -192,7 +191,7 @@ public record RoundState(
     return hands.get(player);
   }
 
-  Optional<Player> getNextPlayer(final GameState gameState) {
+  Optional<String> getNextPlayer(final GameState gameState) {
     return getCurrentTrick().flatMap(t -> t.getNextPlayer(gameState));
   }
 

@@ -1,7 +1,6 @@
 package com.codenzasoft.games.common.cards;
 
 import com.codenzasoft.games.common.Player;
-
 import java.util.*;
 
 public class Deck {

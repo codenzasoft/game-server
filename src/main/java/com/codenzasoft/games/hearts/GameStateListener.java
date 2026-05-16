@@ -2,7 +2,6 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
-
 import java.util.List;
 
 /**

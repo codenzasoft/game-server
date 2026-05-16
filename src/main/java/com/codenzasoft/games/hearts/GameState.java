@@ -2,7 +2,6 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
-
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -35,11 +34,20 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
     return new GameState(id, players, List.of(), false);
   }
 
+  public String getPlayerRelativeTo(final String player, final Pass pass) {
+    int index = Math.floorMod(players.indexOf(player) + pass.getOffset(), players.size());
+    return players.get(index);
+  }
+
+  public String getPlayerLeftOf(final String player) {
+    return getPlayerRelativeTo(player, Pass.LEFT);
+  }
+
   public GameState setOver() {
     return new GameState(id(), players(), rounds(), true);
   }
 
-  GameState startNewRound(final Player dealer, final Map<String, List<Card>> deal) {
+  GameState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
     if (isOver()) {
       throw new IllegalStateException("hearts over - unable to start a new round");
     }
@@ -76,7 +84,7 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
     return getCurrentRound().flatMap(RoundState::getCurrentTrick);
   }
 
-  GameState setPass(final Player player, final List<Card> cards) {
+  GameState setPass(final String player, final List<Card> cards) {
     return replaceLastRound(
         getCurrentRound()
             .map(r -> r.setPass(player, cards))
@@ -86,7 +94,7 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
   GameState passCards() {
     return replaceLastRound(
         getCurrentRound()
-            .map(r -> r.passCards(players()))
+            .map(r -> r.passCards(this))
             .orElseThrow(new IseSupplier("unable to pass cards - no current round")));
   }
 
@@ -97,7 +105,7 @@ public record GameState(UUID id, List<String> players, List<RoundState> rounds, 
             .orElseThrow(new IseSupplier("unable to start trick - no current round")));
   }
 
-  GameState playCard(final Player player, final Card card) {
+  GameState playCard(final String player, final Card card) {
     return replaceLastRound(
         getCurrentRound()
             .map(r -> r.playCard(this, player, card))
