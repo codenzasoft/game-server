@@ -1,5 +1,11 @@
 package com.codenzasoft.games.spring.messages;
 
-import java.util.UUID;
+import com.codenzasoft.games.kingshand.GameState;
 
-public record KhMessage(UUID gameId, boolean quit) {}
+/**
+ * A STOMP message for a specific player and King's Hand game.
+ *
+ * @param context A {@link KhContext} providing message context.
+ * @param state The associated {@link GameState}.
+ */
+public record KhMessage(KhContext context, GameState state) {}

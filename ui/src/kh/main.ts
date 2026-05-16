@@ -60,6 +60,8 @@ const getGameId = () => {
         }
       },
     );
+    // Request the current game state from the server
+    client.publish({ destination: `/games/kh/${gameId}/load` });
   };
 
   client.onWebSocketError = (error: unknown) => {
