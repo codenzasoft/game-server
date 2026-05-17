@@ -4,24 +4,33 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import java.util.List;
 
-/** A {@link HeartsListener} is notified of all changes in {@link GameState}. */
+/** A {@link HeartsListener} is notified of all changes in {@link HeartsState}. */
 public interface HeartsListener {
-  void gameStarted(final GameState game);
+  void gameStarted(final HeartsGame game, final HeartsState state);
 
-  void gameOver(final GameState game);
+  void gameOver(final HeartsGame game, final HeartsState state);
 
-  void gameQuit(final GameState game);
+  void gameQuit(final HeartsGame game, final HeartsState state);
 
-  void roundStarted(final GameState game, final RoundState round);
+  void roundStarted(final HeartsGame game, final HeartsState state, final RoundState round);
 
-  void roundEnded(final GameState game, final RoundState round);
+  void roundEnded(final HeartsGame game, final HeartsState state, final RoundState round);
 
-  void trickStarted(final GameState game, final RoundState round, final TrickState trick);
+  void trickStarted(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final TrickState trick);
 
-  void trickEnded(final GameState game, final RoundState round, final TrickState trick);
+  void trickEnded(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final TrickState trick);
 
   void cardPlayed(
-      final GameState game,
+      final HeartsGame game,
+      final HeartsState state,
       final RoundState round,
       final TrickState trick,
       Player player,
@@ -29,7 +38,11 @@ public interface HeartsListener {
       int cardNumber);
 
   void passSelected(
-      final GameState game, final RoundState round, final Player player, final List<Card> cards);
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final Player player,
+      final List<Card> cards);
 
-  void passComplete(final GameState game, final RoundState round);
+  void passComplete(final HeartsGame game, final HeartsState state, final RoundState round);
 }

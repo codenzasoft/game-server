@@ -15,7 +15,7 @@ import org.springframework.data.util.Pair;
  *       {@link #with(int, Pass, String, Map)}.
  *   <li>Set selected pass cards for each player via {@link #setPass(String, List)}, unless this is
  *       a {@link Pass#KEEPER} round.
- *   <li>Execute the pass via {@link #passCards(GameState)}.
+ *   <li>Execute the pass via {@link #passCards(HeartsState)}.
  *   <li>Play tricks until the round is complete. For each trick, this entails:
  *       <oL>
  *         <li>Starting a new trick.
@@ -80,7 +80,7 @@ public record RoundState(
     return passComplete;
   }
 
-  RoundState passCards(final GameState gameState) {
+  RoundState passCards(final HeartsState gameState) {
     if (!pass.equals(Pass.KEEPER)) {
       if (!isPassReady()) {
         throw new IllegalStateException("all passes must be selected to execute the pass");
@@ -129,7 +129,7 @@ public record RoundState(
         .map(Map.Entry::getKey);
   }
 
-  RoundState playCard(final GameState game, final String player, final Card card) {
+  RoundState playCard(final HeartsState game, final String player, final Card card) {
     final List<TrickState> nextTricks;
     if (tricks.isEmpty()) {
       throw new IllegalStateException("cannot play a card without tricks");
@@ -191,7 +191,7 @@ public record RoundState(
     return hands.get(player);
   }
 
-  Optional<String> getNextPlayer(final GameState gameState) {
+  Optional<String> getNextPlayer(final HeartsState gameState) {
     return getCurrentTrick().flatMap(t -> t.getNextPlayer(gameState));
   }
 

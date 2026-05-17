@@ -48,25 +48,38 @@ public class HeartsGame implements Game<HeartsGame> {
         withNotificationExecutor(Executors.newSingleThreadExecutor());
       }
       return new HeartsGame(
-          id, GameState.with(players.stream().map(Player::name).toList()), players);
+          id,
+          HeartsState.with(players.stream().map(Player::name).toList()),
+          players,
+          listeners,
+          executor);
     }
   }
 
   private final UUID id;
-  private GameState gameState;
+  private HeartsState gameState;
   private final List<Player> players;
+  private final List<HeartsListener> listeners;
+  private final Executor executor;
 
-  private HeartsGame(final UUID id, final GameState gameState, final List<Player> players) {
+  private HeartsGame(
+      final UUID id,
+      final HeartsState gameState,
+      final List<Player> players,
+      final List<HeartsListener> listeners,
+      final Executor executor) {
     setGameState(gameState);
     this.id = id;
     this.players = players;
+    this.listeners = listeners;
+    this.executor = executor;
   }
 
-  private void setGameState(final GameState gameState) {
+  private void setGameState(final HeartsState gameState) {
     this.gameState = gameState;
   }
 
-  public GameState getGameState() {
+  public HeartsState getGameState() {
     return gameState;
   }
 

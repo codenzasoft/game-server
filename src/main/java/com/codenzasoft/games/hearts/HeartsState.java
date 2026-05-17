@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
  * @param rounds The state of played rounds.
  * @param isOver Whether the hearts game is over or has been quit.
  */
-public record GameState(List<String> players, List<RoundState> rounds, boolean isOver) {
+public record HeartsState(List<String> players, List<RoundState> rounds, boolean isOver) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -29,8 +29,8 @@ public record GameState(List<String> players, List<RoundState> rounds, boolean i
     }
   }
 
-  public static GameState with(final List<String> players) {
-    return new GameState(players, List.of(), false);
+  public static HeartsState with(final List<String> players) {
+    return new HeartsState(players, List.of(), false);
   }
 
   public String getPlayerRelativeTo(final String player, final Pass pass) {
@@ -42,11 +42,11 @@ public record GameState(List<String> players, List<RoundState> rounds, boolean i
     return getPlayerRelativeTo(player, Pass.LEFT);
   }
 
-  public GameState setOver() {
-    return new GameState(players(), rounds(), true);
+  public HeartsState setOver() {
+    return new HeartsState(players(), rounds(), true);
   }
 
-  GameState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
+  HeartsState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
     if (isOver()) {
       throw new IllegalStateException("hearts over - unable to start a new round");
     }
@@ -69,7 +69,7 @@ public record GameState(List<String> players, List<RoundState> rounds, boolean i
         RoundState.with(rounds().size() + 1, nextPass, dealer, immutableDeal);
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.add(nextRound);
-    return new GameState(players(), nextRounds, isOver());
+    return new HeartsState(players(), nextRounds, isOver());
   }
 
   public Optional<RoundState> getCurrentRound() {
@@ -83,28 +83,28 @@ public record GameState(List<String> players, List<RoundState> rounds, boolean i
     return getCurrentRound().flatMap(RoundState::getCurrentTrick);
   }
 
-  GameState setPass(final String player, final List<Card> cards) {
+  HeartsState setPass(final String player, final List<Card> cards) {
     return replaceLastRound(
         getCurrentRound()
             .map(r -> r.setPass(player, cards))
             .orElseThrow(new IseSupplier("unable to set pass - no current round")));
   }
 
-  GameState passCards() {
+  HeartsState passCards() {
     return replaceLastRound(
         getCurrentRound()
             .map(r -> r.passCards(this))
             .orElseThrow(new IseSupplier("unable to pass cards - no current round")));
   }
 
-  GameState startNewTrick() {
+  HeartsState startNewTrick() {
     return replaceLastRound(
         getCurrentRound()
             .map(RoundState::startNewTrick)
             .orElseThrow(new IseSupplier("unable to start trick - no current round")));
   }
 
-  GameState playCard(final String player, final Card card) {
+  HeartsState playCard(final String player, final Card card) {
     return replaceLastRound(
         getCurrentRound()
             .map(r -> r.playCard(this, player, card))
@@ -119,10 +119,10 @@ public record GameState(List<String> players, List<RoundState> rounds, boolean i
     return new IllegalStateException(message);
   }
 
-  private GameState replaceLastRound(final RoundState replacement) {
+  private HeartsState replaceLastRound(final RoundState replacement) {
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.remove(nextRounds.size() - 1);
     nextRounds.add(replacement);
-    return new GameState(players(), nextRounds, isOver());
+    return new HeartsState(players(), nextRounds, isOver());
   }
 }

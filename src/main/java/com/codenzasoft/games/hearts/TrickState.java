@@ -46,7 +46,7 @@ public record TrickState(int number, String leader, List<Pair<String, Card>> car
                     .max(PAIR_COMPARATOR));
   }
 
-  Optional<String> getNextPlayer(final GameState gameState) {
+  Optional<String> getNextPlayer(final HeartsState gameState) {
     if (isComplete()) {
       return Optional.empty();
     }

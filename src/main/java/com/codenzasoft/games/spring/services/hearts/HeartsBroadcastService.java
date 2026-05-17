@@ -1,0 +1,138 @@
+package com.codenzasoft.games.spring.services.hearts;
+
+import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.common.cards.Card;
+import com.codenzasoft.games.hearts.*;
+import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.messages.HeartsContext;
+import com.codenzasoft.games.spring.messages.HeartsMessage;
+import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+/**
+ * Sends game state to players via websockets. The {@link HeartsBroadcastService} is added to each
+ * {@link com.codenzasoft.games.hearts.HeartsGame} as a {@link
+ * com.codenzasoft.games.hearts.HeartsListener} and sends messages to players for each state change.
+ */
+@Service
+public class HeartsBroadcastService implements HeartsListener {
+  private static final Logger log = LoggerFactory.getLogger(HeartsBroadcastService.class);
+
+  @Autowired private GamesUserDetailsService gamesUserDetailsService;
+  @Autowired private SimpMessagingTemplate messagingTemplate;
+
+  /**
+   * Sends the provided game state to all (non-bot) users playing the game. This results in a STOMP
+   * websocket message being sent to each player that has registered for game specific messages. A
+   * user specific context and state is created for each user.
+   *
+   * @param game The {@link HeartsGame} the state describes.
+   * @param state The {@link HeartsState} of the game.
+   * @param nextGameId The id of the next game to play if the current game is over and a new game
+   *     was requested, or <code>null</code> if none.
+   */
+  private void notifyUsers(final HeartsGame game, final HeartsState state, final UUID nextGameId) {
+    final List<UserEntity> users = getNonBots(game);
+    for (final UserEntity user : users) {
+      final HeartsContext context = buildContext(user, game, nextGameId);
+      // TODO: modify the state to hide other players' hands
+      final HeartsMessage message = new HeartsMessage(context, state);
+      messagingTemplate.convertAndSendToUser(
+          user.getUsername(), "/queue/games/" + context.gameId(), message);
+      log.debug("attempted to send message to user {}", user.getUsername());
+    }
+  }
+
+  public HeartsContext buildContext(
+      final UserEntity user, final HeartsGame game, final UUID nextGameId) {
+    final Player player = user.toPlayer();
+    return new HeartsContext(player.name(), game.getId(), nextGameId);
+  }
+
+  private List<UserEntity> getNonBots(final Game<?> game) {
+    return game.getPlayers().stream()
+        .map(player -> gamesUserDetailsService.getUserByUsernameOrEmail(player.name()))
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .filter(user -> !user.isBot())
+        .toList();
+  }
+
+  @Override
+  public void gameStarted(final HeartsGame game, final HeartsState state) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void gameOver(final HeartsGame game, final HeartsState state) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void gameQuit(final HeartsGame game, final HeartsState state) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void roundStarted(final HeartsGame game, final HeartsState state, final RoundState round) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void roundEnded(final HeartsGame game, final HeartsState state, final RoundState round) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void trickStarted(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final TrickState trick) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void trickEnded(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final TrickState trick) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void cardPlayed(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final TrickState trick,
+      final Player player,
+      final Card card,
+      final int cardNumber) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void passSelected(
+      final HeartsGame game,
+      final HeartsState state,
+      final RoundState round,
+      final Player player,
+      final List<Card> cards) {
+    notifyUsers(game, state, null);
+  }
+
+  @Override
+  public void passComplete(final HeartsGame game, final HeartsState state, final RoundState round) {
+    notifyUsers(game, state, null);
+  }
+}
