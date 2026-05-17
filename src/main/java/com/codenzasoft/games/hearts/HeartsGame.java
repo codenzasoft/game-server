@@ -7,6 +7,7 @@ import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Deck;
 import com.codenzasoft.games.common.cards.Rank;
 import com.codenzasoft.games.common.cards.Suit;
+import com.codenzasoft.games.hearts.notifications.*;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -56,6 +57,13 @@ public class HeartsGame implements Game<HeartsGame> {
     }
   }
 
+  private static final HeartsGameStartedNotification GAME_STARTED_NOTIFICATION =
+      new HeartsGameStartedNotification();
+  private static final HeartsGameOverNotification GAME_OVER_NOTIFICATION =
+      new HeartsGameOverNotification();
+  private static final HeartsGameQuitNotification GAME_QUIT_NOTIFICATION =
+      new HeartsGameQuitNotification();
+
   private final UUID id;
   private HeartsState gameState;
   private final List<Player> players;
@@ -68,11 +76,12 @@ public class HeartsGame implements Game<HeartsGame> {
       final List<Player> players,
       final List<HeartsListener> listeners,
       final Executor executor) {
-    setGameState(gameState);
     this.id = id;
     this.players = players;
     this.listeners = listeners;
     this.executor = executor;
+    setGameState(gameState);
+    notifyListeners(GAME_STARTED_NOTIFICATION);
   }
 
   private void setGameState(final HeartsState gameState) {
@@ -100,6 +109,14 @@ public class HeartsGame implements Game<HeartsGame> {
 
   public List<Player> getPlayers() {
     return players;
+  }
+
+  void notifyListeners(final HeartsNotification notification) {
+    final HeartsState state = getGameState();
+    final HeartsGame game = this;
+    for (final HeartsListener listener : listeners) {
+      executor.execute(() -> notification.execute(game, state, listener));
+    }
   }
 
   /**
@@ -133,6 +150,8 @@ public class HeartsGame implements Game<HeartsGame> {
                 Collectors.toMap(
                     e -> e.getKey().name(), e -> Collections.unmodifiableList(e.getValue())));
     startNewRound(dealer, setDeal);
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    notifyListeners(new HeartsRoundStartedNotification(round));
   }
 
   private synchronized void startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -141,17 +160,43 @@ public class HeartsGame implements Game<HeartsGame> {
 
   public synchronized void setPass(final Player player, final List<Card> cards) {
     setGameState(getGameState().setPass(player.name(), cards));
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    notifyListeners(new HeartsPassSelectedNotification(round, player, cards));
   }
 
   public synchronized void passCards() {
     setGameState(getGameState().passCards());
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    notifyListeners(new HeartsPassCompleteNotification(round));
   }
 
   public synchronized void startNewTrick() {
     setGameState(getGameState().startNewTrick());
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
+    notifyListeners(new HeartsTrickStartedNotification(round, trick));
   }
 
   public synchronized void playCard(final Player player, final Card card) {
     setGameState(getGameState().playCard(player.name(), card));
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
+    notifyListeners(
+        new HeartsCardPlayedNotification(round, trick, player, card, trick.cards().size()));
+    if (trick.isComplete()) {
+      notifyListeners(new HeartsTrickEndedNotification(round, trick));
+      if (round.isComplete()) {
+        notifyListeners(new HeartsRoundEndedNotification(round));
+      }
+    }
+  }
+
+  public synchronized void gameOver() {
+    setGameState(getGameState().setOver());
+    notifyListeners(GAME_OVER_NOTIFICATION);
+  }
+
+  public synchronized void quit() {
+    notifyListeners(GAME_QUIT_NOTIFICATION);
   }
 }
