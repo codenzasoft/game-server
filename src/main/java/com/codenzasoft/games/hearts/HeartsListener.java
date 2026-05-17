@@ -4,12 +4,8 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import java.util.List;
 
-/**
- * A {@link GameStateListener} is notified of all changes in {@link GameState}.
- *
- * <p>TODO: add quit vs. over state? TODO: separate UUID from state?
- */
-public interface GameStateListener {
+/** A {@link HeartsListener} is notified of all changes in {@link GameState}. */
+public interface HeartsListener {
   void gameStarted(final GameState game);
 
   void gameOver(final GameState game);

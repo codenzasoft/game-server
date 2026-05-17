@@ -24,6 +24,7 @@ public class ViewHelper {
     return switch (game.getGameType()) {
       case XO -> "/games/xo/" + game.getId().toString();
       case KH -> "/games/kh/" + game.getId().toString();
+      case HEARTS -> "/games/hearts/" + game.getId().toString();
     };
   }
 
@@ -37,6 +38,7 @@ public class ViewHelper {
     return switch (game.getGameType()) {
       case XO -> "Xs & Os";
       case KH -> "King's Hand";
+      case HEARTS -> "Hearts";
     };
   }
 }

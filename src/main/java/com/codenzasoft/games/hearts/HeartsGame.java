@@ -7,10 +7,9 @@ import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Deck;
 import com.codenzasoft.games.common.cards.Rank;
 import com.codenzasoft.games.common.cards.Suit;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 public class HeartsGame implements Game<HeartsGame> {
@@ -21,6 +20,8 @@ public class HeartsGame implements Game<HeartsGame> {
   public static class Builder {
     private List<Player> players;
     private UUID id;
+    private final List<HeartsListener> listeners = new ArrayList<>();
+    private Executor executor;
 
     public Builder withPlayers(final List<Player> players) {
       this.players = players;
@@ -32,7 +33,20 @@ public class HeartsGame implements Game<HeartsGame> {
       return this;
     }
 
+    public Builder addListener(final HeartsListener listener) {
+      listeners.add(listener);
+      return this;
+    }
+
+    public Builder withNotificationExecutor(final Executor executor) {
+      this.executor = executor;
+      return this;
+    }
+
     public HeartsGame build() {
+      if (executor == null) {
+        withNotificationExecutor(Executors.newSingleThreadExecutor());
+      }
       return new HeartsGame(
           id, GameState.with(players.stream().map(Player::name).toList()), players);
     }
