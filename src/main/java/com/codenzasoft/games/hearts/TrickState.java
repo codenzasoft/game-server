@@ -30,7 +30,7 @@ public record TrickState(int number, String leader, List<Pair<String, Card>> car
     return cards.size() == 4;
   }
 
-  Optional<Suit> getTrump() {
+  public Optional<Suit> getTrump() {
     if (cards.isEmpty()) {
       return Optional.empty();
     }
