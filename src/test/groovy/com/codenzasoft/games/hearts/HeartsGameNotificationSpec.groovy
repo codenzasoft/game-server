@@ -33,13 +33,13 @@ class HeartsGameNotificationSpec extends Specification {
         game.passCards()
     }
 
-    /** Plays one card for the current next player using the first card in their hand. */
+    /** Plays one card for the current next player, choosing from their valid cards. */
     def playNextCard(HeartsGame game) {
         def state = game.gameState
         def round = state.currentRound.get()
         def nextPlayerName = round.getNextPlayer(state).get()
         def player = [p1, p2, p3, p4].find { it.name() == nextPlayerName }
-        game.playCard(player, round.hands().get(nextPlayerName).first())
+        game.playCard(player, game.getValidCards(player).first())
     }
 
     /** Plays all four cards in the current trick. */

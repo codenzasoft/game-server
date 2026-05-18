@@ -197,7 +197,7 @@ public record RoundState(
   }
 
   public List<Card> getHand(final Player player) {
-    return hands.get(player);
+    return hands.get(player.name());
   }
 
   Optional<String> getNextPlayer(final HeartsState gameState) {

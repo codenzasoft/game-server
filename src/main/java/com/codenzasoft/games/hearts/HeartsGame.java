@@ -8,7 +8,9 @@ import com.codenzasoft.games.common.cards.Deck;
 import com.codenzasoft.games.common.cards.Rank;
 import com.codenzasoft.games.common.cards.Suit;
 import com.codenzasoft.games.hearts.notifications.*;
+import com.codenzasoft.games.hearts.rules.*;
 import java.util.*;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -56,6 +58,9 @@ public class HeartsGame implements Game<HeartsGame> {
           executor);
     }
   }
+
+  private static final List<Rule> RULES =
+      List.of(new LeadTwoOfClubsRule(), new FollowSuitRule(), new LeadTrickRule());
 
   private static final HeartsGameStartedNotification GAME_STARTED_NOTIFICATION =
       new HeartsGameStartedNotification();
@@ -109,6 +114,17 @@ public class HeartsGame implements Game<HeartsGame> {
 
   public List<Player> getPlayers() {
     return players;
+  }
+
+  public Set<Card> getValidCards(final Player player) {
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    for (final Rule rule : RULES) {
+      final Set<Card> valid = rule.getValidCards(player, round);
+      if (!valid.isEmpty()) {
+        return valid;
+      }
+    }
+    throw new IllegalStateException("no valid cards found for " + player.name());
   }
 
   void notifyListeners(final HeartsNotification notification) {
@@ -178,6 +194,10 @@ public class HeartsGame implements Game<HeartsGame> {
   }
 
   public synchronized void playCard(final Player player, final Card card) {
+    final Set<Card> validCards = getValidCards(player);
+    if (!validCards.contains(card)) {
+      throw new IllegalStateException("card " + card + " is not valid for " + player.name());
+    }
     setGameState(getGameState().playCard(player.name(), card));
     final RoundState round = getGameState().getCurrentRound().orElseThrow();
     final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
