@@ -68,6 +68,16 @@ public class HeartsGame implements Game<HeartsGame> {
       new HeartsGameOverNotification();
   private static final HeartsGameQuitNotification GAME_QUIT_NOTIFICATION =
       new HeartsGameQuitNotification();
+  private static final HeartsPassCompleteNotification PASS_COMPLETE_NOTIFICATION =
+      new HeartsPassCompleteNotification();
+  private static final HeartsRoundStartedNotification ROUND_STARTED_NOTIFICATION =
+      new HeartsRoundStartedNotification();
+  private static final HeartsRoundEndedNotification ROUND_ENDED_NOTIFICATION =
+      new HeartsRoundEndedNotification();
+  private static final HeartsTrickStartedNotification TRICK_STARTED_NOTIFICATION =
+      new HeartsTrickStartedNotification();
+  private static final HeartsTrickEndedNotification TRICK_ENDED_NOTIFICATION =
+      new HeartsTrickEndedNotification();
 
   private final UUID id;
   private HeartsState gameState;
@@ -166,8 +176,7 @@ public class HeartsGame implements Game<HeartsGame> {
                 Collectors.toMap(
                     e -> e.getKey().name(), e -> Collections.unmodifiableList(e.getValue())));
     startNewRound(dealer, setDeal);
-    final RoundState round = getGameState().getCurrentRound().orElseThrow();
-    notifyListeners(new HeartsRoundStartedNotification(round));
+    notifyListeners(ROUND_STARTED_NOTIFICATION);
   }
 
   private synchronized void startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -176,21 +185,17 @@ public class HeartsGame implements Game<HeartsGame> {
 
   public synchronized void setPass(final Player player, final List<Card> cards) {
     setGameState(getGameState().setPass(player.name(), cards));
-    final RoundState round = getGameState().getCurrentRound().orElseThrow();
-    notifyListeners(new HeartsPassSelectedNotification(round, player, cards));
+    notifyListeners(new HeartsPassSelectedNotification(player, cards));
   }
 
   public synchronized void passCards() {
     setGameState(getGameState().passCards());
-    final RoundState round = getGameState().getCurrentRound().orElseThrow();
-    notifyListeners(new HeartsPassCompleteNotification(round));
+    notifyListeners(PASS_COMPLETE_NOTIFICATION);
   }
 
   public synchronized void startNewTrick() {
     setGameState(getGameState().startNewTrick());
-    final RoundState round = getGameState().getCurrentRound().orElseThrow();
-    final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
-    notifyListeners(new HeartsTrickStartedNotification(round, trick));
+    notifyListeners(TRICK_STARTED_NOTIFICATION);
   }
 
   public synchronized void playCard(final Player player, final Card card) {
@@ -201,12 +206,11 @@ public class HeartsGame implements Game<HeartsGame> {
     setGameState(getGameState().playCard(player.name(), card));
     final RoundState round = getGameState().getCurrentRound().orElseThrow();
     final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
-    notifyListeners(
-        new HeartsCardPlayedNotification(round, trick, player, card, trick.cards().size()));
+    notifyListeners(new HeartsCardPlayedNotification(player, card, trick.cards().size()));
     if (trick.isComplete()) {
-      notifyListeners(new HeartsTrickEndedNotification(round, trick));
+      notifyListeners(TRICK_ENDED_NOTIFICATION);
       if (round.isComplete()) {
-        notifyListeners(new HeartsRoundEndedNotification(round));
+        notifyListeners(ROUND_ENDED_NOTIFICATION);
       }
     }
   }

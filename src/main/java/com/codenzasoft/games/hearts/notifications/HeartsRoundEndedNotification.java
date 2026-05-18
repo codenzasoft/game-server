@@ -3,15 +3,10 @@ package com.codenzasoft.games.hearts.notifications;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsListener;
 import com.codenzasoft.games.hearts.HeartsState;
-import com.codenzasoft.games.hearts.RoundState;
 
 public class HeartsRoundEndedNotification extends HeartsNotification {
 
-  private final RoundState round;
-
-  public HeartsRoundEndedNotification(final RoundState round) {
-    this.round = round;
-  }
+  public HeartsRoundEndedNotification() {}
 
   @Override
   void notifyListener(
