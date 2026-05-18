@@ -12,37 +12,23 @@ public interface HeartsListener {
 
   void gameQuit(final HeartsGame game, final HeartsState state);
 
-  void roundStarted(final HeartsGame game, final HeartsState state, final RoundState round);
+  void roundStarted(final HeartsGame game, final HeartsState state);
 
-  void roundEnded(final HeartsGame game, final HeartsState state, final RoundState round);
+  void roundEnded(final HeartsGame game, final HeartsState state);
 
-  void trickStarted(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final TrickState trick);
+  void trickStarted(final HeartsGame game, final HeartsState state);
 
-  void trickEnded(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final TrickState trick);
+  void trickEnded(final HeartsGame game, final HeartsState state);
 
   void cardPlayed(
       final HeartsGame game,
       final HeartsState state,
-      final RoundState round,
-      final TrickState trick,
       Player player,
       final Card card,
       int cardNumber);
 
   void passSelected(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final Player player,
-      final List<Card> cards);
+      final HeartsGame game, final HeartsState state, final Player player, final List<Card> cards);
 
-  void passComplete(final HeartsGame game, final HeartsState state, final RoundState round);
+  void passComplete(final HeartsGame game, final HeartsState state);
 }

@@ -50,15 +50,6 @@ public record RoundState(
     return new RoundState(number, pass, dealer, cards, Map.of(), false, List.of(), cards);
   }
 
-  /**
-   * Returns the current trick.
-   *
-   * @return The current {@link TrickState}.
-   */
-  public TrickState getTrick() {
-    return tricks.get(this.tricks.size() - 1);
-  }
-
   RoundState setPass(final String player, final List<Card> cards) {
     if (pass.equals(Pass.KEEPER)) {
       throw new IllegalStateException("cannot pass in keeper round");
@@ -209,6 +200,19 @@ public record RoundState(
       return Optional.empty();
     }
     return Optional.of(tricks.get(tricks.size() - 1));
+  }
+
+  /**
+   * Returns the most recent trick in this round.
+   *
+   * @return the most recent trick in this hand.
+   */
+  public TrickState getTrick() {
+    if (tricks.isEmpty()) {
+      throw new IllegalStateException("no tricks found");
+    } else {
+      return tricks.get(tricks.size() - 1);
+    }
   }
 
   public List<Card> getPlayedCards() {

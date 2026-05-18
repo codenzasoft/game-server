@@ -87,7 +87,7 @@ class HeartsGameNotificationSpec extends Specification {
         game.startNewRound()
 
         then:
-        1 * listener.roundStarted(game, _, { it.number() == 1 })
+        1 * listener.roundStarted(game, _)
     }
 
     def "setPass fires passSelected with the player and selected cards"() {
@@ -100,7 +100,7 @@ class HeartsGameNotificationSpec extends Specification {
         game.setPass(p1, cards)
 
         then:
-        1 * listener.passSelected(game, _, _, p1, cards)
+        1 * listener.passSelected(game, _, p1, cards)
     }
 
     def "passCards fires passComplete"() {
@@ -119,7 +119,7 @@ class HeartsGameNotificationSpec extends Specification {
         game.passCards()
 
         then:
-        1 * listener.passComplete(game, _, _)
+        1 * listener.passComplete(game, _)
     }
 
     def "startNewTrick fires trickStarted"() {
@@ -132,7 +132,7 @@ class HeartsGameNotificationSpec extends Specification {
         game.startNewTrick()
 
         then:
-        1 * listener.trickStarted(game, _, _, { it.number() == 1 })
+        1 * listener.trickStarted(game, _)
     }
 
     def "playCard fires cardPlayed with sequential card numbers within the trick"() {
@@ -146,10 +146,10 @@ class HeartsGameNotificationSpec extends Specification {
         4.times { playNextCard(game) }
 
         then:
-        1 * listener.cardPlayed(game, _, _, _, _, _, 1)
-        1 * listener.cardPlayed(game, _, _, _, _, _, 2)
-        1 * listener.cardPlayed(game, _, _, _, _, _, 3)
-        1 * listener.cardPlayed(game, _, _, _, _, _, 4)
+        1 * listener.cardPlayed(game, _, _, _, 1)
+        1 * listener.cardPlayed(game, _, _, _, 2)
+        1 * listener.cardPlayed(game, _, _, _, 3)
+        1 * listener.cardPlayed(game, _, _, _, 4)
     }
 
     def "fourth card in a trick fires trickEnded but not roundEnded"() {
@@ -164,8 +164,8 @@ class HeartsGameNotificationSpec extends Specification {
         playNextCard(game)
 
         then:
-        1 * listener.trickEnded(game, _, _, _)
-        0 * listener.roundEnded(_, _, _)
+        1 * listener.trickEnded(game, _)
+        0 * listener.roundEnded(_, _)
     }
 
     def "completing all tricks in a round fires roundEnded"() {
@@ -181,8 +181,8 @@ class HeartsGameNotificationSpec extends Specification {
         }
 
         then:
-        13 * listener.trickEnded(game, _, _, _)
-        1 * listener.roundEnded(game, _, _)
+        13 * listener.trickEnded(game, _)
+        1 * listener.roundEnded(game, _)
     }
 
     def "all listeners receive each notification"() {
@@ -194,7 +194,7 @@ class HeartsGameNotificationSpec extends Specification {
         game.startNewRound()
 
         then:
-        1 * listener1.roundStarted(game, _, _)
-        1 * listener2.roundStarted(game, _, _)
+        1 * listener1.roundStarted(game, _)
+        1 * listener2.roundStarted(game, _)
     }
 }

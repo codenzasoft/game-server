@@ -32,6 +32,6 @@ public class HeartsCardPlayedNotification extends HeartsNotification {
   @Override
   void notifyListener(
       final HeartsGame game, final HeartsState state, final HeartsListener listener) {
-    listener.cardPlayed(game, state, round, trick, player, card, cardNumber);
+    listener.cardPlayed(game, state, player, card, cardNumber);
   }
 }

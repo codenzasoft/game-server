@@ -79,6 +79,10 @@ public record HeartsState(List<String> players, List<RoundState> rounds, boolean
     return Optional.of(rounds.get(rounds.size() - 1));
   }
 
+  public RoundState getRound() {
+    return getCurrentRound().orElseThrow();
+  }
+
   public Optional<TrickState> getCurrentTrick() {
     return getCurrentRound().flatMap(RoundState::getCurrentTrick);
   }

@@ -82,30 +82,22 @@ public class HeartsBroadcastService implements HeartsListener {
   }
 
   @Override
-  public void roundStarted(final HeartsGame game, final HeartsState state, final RoundState round) {
+  public void roundStarted(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);
   }
 
   @Override
-  public void roundEnded(final HeartsGame game, final HeartsState state, final RoundState round) {
+  public void roundEnded(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);
   }
 
   @Override
-  public void trickStarted(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final TrickState trick) {
+  public void trickStarted(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);
   }
 
   @Override
-  public void trickEnded(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final TrickState trick) {
+  public void trickEnded(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);
   }
 
@@ -113,8 +105,6 @@ public class HeartsBroadcastService implements HeartsListener {
   public void cardPlayed(
       final HeartsGame game,
       final HeartsState state,
-      final RoundState round,
-      final TrickState trick,
       final Player player,
       final Card card,
       final int cardNumber) {
@@ -123,16 +113,12 @@ public class HeartsBroadcastService implements HeartsListener {
 
   @Override
   public void passSelected(
-      final HeartsGame game,
-      final HeartsState state,
-      final RoundState round,
-      final Player player,
-      final List<Card> cards) {
+      final HeartsGame game, final HeartsState state, final Player player, final List<Card> cards) {
     notifyUsers(game, state, null);
   }
 
   @Override
-  public void passComplete(final HeartsGame game, final HeartsState state, final RoundState round) {
+  public void passComplete(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);
   }
 }

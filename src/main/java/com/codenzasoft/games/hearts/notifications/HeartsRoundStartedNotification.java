@@ -16,6 +16,6 @@ public class HeartsRoundStartedNotification extends HeartsNotification {
   @Override
   void notifyListener(
       final HeartsGame game, final HeartsState state, final HeartsListener listener) {
-    listener.roundStarted(game, state, round);
+    listener.roundStarted(game, state);
   }
 }

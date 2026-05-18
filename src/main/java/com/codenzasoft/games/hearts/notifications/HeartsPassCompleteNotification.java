@@ -16,6 +16,6 @@ public class HeartsPassCompleteNotification extends HeartsNotification {
   @Override
   void notifyListener(
       final HeartsGame game, final HeartsState state, final HeartsListener listener) {
-    listener.passComplete(game, state, round);
+    listener.passComplete(game, state);
   }
 }
