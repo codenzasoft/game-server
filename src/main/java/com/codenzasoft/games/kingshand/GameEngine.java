@@ -138,6 +138,25 @@ public class GameEngine implements Game<GameEngine> {
   // ----- RANDOM_EVENT resolution -----
 
   /**
+   * Public entry point for rolling a random event during the {@link Phase#RANDOM_EVENT} phase. Safe
+   * to call multiple times — if an event has already been rolled for this phase it returns
+   * immediately without re-rolling.
+   *
+   * <p>This is needed because {@link #pickCard(Card)} and {@link #skipAdd()} set the phase to
+   * {@link Phase#RANDOM_EVENT} directly (bypassing {@link #advancePhase()}) so callers must trigger
+   * the roll explicitly after those calls.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#RANDOM_EVENT}
+   */
+  public synchronized void rollRandomEvent() {
+    requirePhase(Phase.RANDOM_EVENT, "rollRandomEvent");
+    if (state.getCurrentEvent() != null) {
+      return; // already rolled for this phase — do not re-roll
+    }
+    rollEvent();
+  }
+
+  /**
    * Randomly selects one eligible event for the current season and year and stores it on the state.
    * If no events are eligible the stored event is set to {@code null}.
    */

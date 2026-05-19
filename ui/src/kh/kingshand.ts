@@ -472,6 +472,31 @@ export class GameEventHandler {
     });
   }
 
+  // ── RANDOM_EVENT phase actions ────────────────────────────────────────────
+
+  /**
+   * Applies the chosen {@link EventOption} (zero-based index into
+   * {@code state.currentEvent.options}) and advances the phase to PLAY.
+   *
+   * @param index Zero-based index into the current event's options list.
+   */
+  public pickEventOption(index: number): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/event/pick`,
+      body: JSON.stringify({ index }),
+    });
+  }
+
+  /**
+   * Skips the RANDOM_EVENT phase when no event was rolled (i.e. {@code currentEvent} is
+   * absent).  Advances the phase to PLAY and draws the hand.
+   */
+  public skipEvent(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/event/skip`,
+    });
+  }
+
   // ── STOMP lifecycle ───────────────────────────────────────────────────────
 
   private onConnect(frame: Frame): void {

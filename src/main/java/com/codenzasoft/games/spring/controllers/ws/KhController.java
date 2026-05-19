@@ -1,6 +1,8 @@
 package com.codenzasoft.games.spring.controllers.ws;
 
 import com.codenzasoft.games.kingshand.Card;
+import com.codenzasoft.games.kingshand.Event;
+import com.codenzasoft.games.kingshand.EventOption;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.Phase;
 import com.codenzasoft.games.spring.entities.UserEntity;
@@ -40,8 +42,15 @@ public class KhController {
     final Optional<GameEngine> game = gameService.getOrBuildKhGame(UUID.fromString(gameId));
     game.ifPresent(
         g -> {
+          // Seed ADD choices for a fresh game that hasn't had any yet.
           if (g.getState().getCurPhase() == Phase.ADD && g.getState().getAddChoices().isEmpty()) {
             g.offerAddChoices();
+          }
+          // Roll an event if the game is in RANDOM_EVENT but no event has been drawn yet
+          // (can happen after a server restart mid-phase or a direct phase transition).
+          if (g.getState().getCurPhase() == Phase.RANDOM_EVENT
+              && g.getState().getCurrentEvent() == null) {
+            g.rollRandomEvent();
           }
           khBroadcastService.gameLoaded(g);
         });
@@ -86,6 +95,9 @@ public class KhController {
               }
               try {
                 game.pickCard(choices.get(index));
+                // pickCard sets curPhase=RANDOM_EVENT directly; roll the event now so the
+                // client receives a fully-populated state on the next broadcast.
+                game.rollRandomEvent();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
@@ -104,9 +116,67 @@ public class KhController {
             game -> {
               try {
                 game.skipAdd();
+                // skipAdd sets curPhase=RANDOM_EVENT directly; roll the event now so the
+                // client receives a fully-populated state on the next broadcast.
+                game.rollRandomEvent();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addSkip rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
+  /**
+   * Applies the chosen {@link EventOption} (by zero-based index) to the current game state, then
+   * draws the player's hand to start the {@link Phase#PLAY} phase.
+   */
+  @MessageMapping("/kh/{gameId}/event/pick")
+  public void eventPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final Event event = game.getState().getCurrentEvent();
+              if (event == null) {
+                log.warn("eventPick: no current event on game {}", gameId);
+                return;
+              }
+              final int index = ((Number) body.get("index")).intValue();
+              final List<EventOption> options = event.options();
+              if (index < 0 || index >= options.size()) {
+                log.warn("eventPick: invalid index {} (options size {})", index, options.size());
+                return;
+              }
+              try {
+                game.applyEventOption(options.get(index));
+                // applyEventOption advances phase to PLAY but does not draw the hand;
+                // startPlay() does that, mirroring what advancePhase() would do normally.
+                if (game.getState().getCurPhase() == Phase.PLAY && !game.getState().isGameOver()) {
+                  game.startPlay();
+                }
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
+  /**
+   * Skips the RANDOM_EVENT phase when no eligible event was rolled (i.e. {@code currentEvent} is
+   * {@code null}). Delegates to {@link GameEngine#advancePhase()}, which transitions to {@link
+   * Phase#PLAY} and draws the player's hand in one step.
+   */
+  @MessageMapping("/kh/{gameId}/event/skip")
+  public void eventSkip(@DestinationVariable String gameId) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              try {
+                game.advancePhase();
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("eventSkip rejected for game {}: {}", gameId, e.getMessage());
               }
             });
   }

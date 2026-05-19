@@ -2,6 +2,7 @@ import { Application } from "pixi.js";
 import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
 import { OptionsMenu } from "./settings.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
+import { RandomEventScene } from "./randomEventScene.ts";
 
 const homeUrl = `${window.location.origin}/`;
 const loginUrl =
@@ -42,7 +43,7 @@ const getGameId = (): string | undefined => {
   // Only one scene is live at a time.  onMessage replaces it whenever the
   // server sends a state update that changes the current phase.
 
-  let currentScene: AddPhaseScene | null = null;
+  let currentScene: AddPhaseScene | RandomEventScene | null = null;
 
   const mountTarget = document.getElementById("pixi-container")!;
 
@@ -70,13 +71,32 @@ const getGameId = (): string | undefined => {
         break;
       }
 
+      case Phase.RANDOM_EVENT: {
+        if (currentScene instanceof RandomEventScene) {
+          // Same phase, same scene type — just refresh content.
+          currentScene.update(state);
+        } else {
+          // Either a fresh mount or switching from ADD: tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new RandomEventScene(state, {
+            pickEventOption: (i) => handler.pickEventOption(i),
+            skipEvent:       () => handler.skipEvent(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
       default: {
-        // Phase changed away from ADD — tear down the scene.
+        // Phase changed to something without a scene yet — tear down whatever is live.
         if (currentScene) {
           currentScene.unmount();
           currentScene = null;
         }
-        // TODO: mount RANDOM_EVENT and PLAY scenes as they are built out.
+        // TODO: mount PLAY scene as it is built out.
         console.log(`Phase ${state.curPhase} scene not yet implemented.`);
         break;
       }
