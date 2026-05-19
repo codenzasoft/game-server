@@ -57,11 +57,15 @@ const getGameId = (): string | undefined => {
 
     switch (state.curPhase) {
       case Phase.ADD: {
-        if (currentScene) {
-          // Scene already mounted from a previous message (e.g. after a
-          // reroll the phase stays ADD): just refresh its content.
+        if (currentScene instanceof AddPhaseScene) {
+          // Same phase, same scene type (e.g. after a reroll) — just refresh content.
           currentScene.update(state);
         } else {
+          // Phase changed to ADD from RANDOM_EVENT or PLAY — tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
           currentScene = new AddPhaseScene(state, {
             reroll:   () => handler.reroll(),
             pickCard: (i) => handler.pickCard(i),

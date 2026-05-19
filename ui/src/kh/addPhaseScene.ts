@@ -198,9 +198,6 @@ export class AddPhaseScene {
   private buildCard(card: Card, index: number, state: GameState): string {
     const info = getCardDisplayInfo(card);
     const season = state.curSeason;
-    const affordable =
-      state.production >= card.productionRequirement &&
-      state.population >= card.populationRequirement;
 
     const tagsHTML = [
       `<span class="kh-tag kh-tag-season">${season}</span>`,
@@ -225,8 +222,7 @@ export class AddPhaseScene {
       .join("");
 
     return `
-      <div class="kh-card ${!affordable ? "kh-card-unaffordable" : ""}"
-           data-index="${index}">
+      <div class="kh-card" data-index="${index}">
         <div class="kh-card-header">
           <div class="kh-card-name">${info.name}</div>
           <div class="kh-card-tags">${tagsHTML}</div>
@@ -238,17 +234,15 @@ export class AddPhaseScene {
           ${effectsHTML}
           <div class="kh-card-costs">
             <div class="kh-cost-item">
-              <span class="kh-cost-label">⚒️ Cost</span>
+              <span class="kh-cost-label">⚒️ To Play</span>
               <span class="kh-cost-val kh-cost-prod">${card.productionRequirement}</span>
             </div>
             <div class="kh-cost-item">
               <span class="kh-cost-label">👥 Pop. Req</span>
               <span class="kh-cost-val kh-cost-pop">${card.populationRequirement}</span>
             </div>
-            ${!affordable ? `<span class="kh-unaffordable-flag">⚠ Cannot Afford</span>` : ""}
           </div>
-          <button class="kh-btn-select" data-index="${index}"
-            ${!affordable ? "disabled" : ""}>
+          <button class="kh-btn-select" data-index="${index}">
             Add to Deck
           </button>
         </div>
