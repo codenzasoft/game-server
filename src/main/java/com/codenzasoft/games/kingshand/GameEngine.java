@@ -392,6 +392,9 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
+    // Clear the previous season's event so rollRandomEvent() rolls a fresh one
+    // for this phase rather than seeing the old non-null value and short-circuiting.
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
   }
 
@@ -403,6 +406,8 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
+    // Clear the previous season's event so rollRandomEvent() rolls a fresh one.
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
   }
 
