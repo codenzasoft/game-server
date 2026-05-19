@@ -35,7 +35,7 @@ const UNKNOWN_CARD: CardDisplayInfo = {
  * where target is the ResourceTarget enum string (e.g. "FOOD") or "slot:{offset}"
  * for CardTarget effects.
  */
-function fingerprint(card: Card): string {
+export function fingerprint(card: Card): string {
   const effects = card.effects
     .map((e) => {
       const target =

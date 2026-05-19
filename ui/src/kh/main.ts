@@ -3,6 +3,7 @@ import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
 import { OptionsMenu } from "./settings.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
 import { RandomEventScene } from "./randomEventScene.ts";
+import { PlayPhaseScene } from "./playPhaseScene.ts";
 
 const homeUrl = `${window.location.origin}/`;
 const loginUrl =
@@ -43,7 +44,7 @@ const getGameId = (): string | undefined => {
   // Only one scene is live at a time.  onMessage replaces it whenever the
   // server sends a state update that changes the current phase.
 
-  let currentScene: AddPhaseScene | RandomEventScene | null = null;
+  let currentScene: AddPhaseScene | RandomEventScene | PlayPhaseScene | null = null;
 
   const mountTarget = document.getElementById("pixi-container")!;
 
@@ -90,13 +91,31 @@ const getGameId = (): string | undefined => {
         break;
       }
 
+      case Phase.PLAY: {
+        if (currentScene instanceof PlayPhaseScene) {
+          // Already in PLAY (e.g. after a placeCard or demolishCard refresh).
+          currentScene.update(state);
+        } else {
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new PlayPhaseScene(state, {
+            placeCard:    (i)    => handler.placeCard(i),
+            demolishCard: (slot) => handler.demolishCard(slot),
+            endAndRun:    ()     => handler.endAndRun(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
       default: {
-        // Phase changed to something without a scene yet — tear down whatever is live.
+        // Unknown phase — tear down whatever is live.
         if (currentScene) {
           currentScene.unmount();
           currentScene = null;
         }
-        // TODO: mount PLAY scene as it is built out.
         console.log(`Phase ${state.curPhase} scene not yet implemented.`);
         break;
       }

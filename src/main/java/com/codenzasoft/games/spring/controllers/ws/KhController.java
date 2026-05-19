@@ -181,6 +181,77 @@ public class KhController {
             });
   }
 
+  // ── PLAY phase actions ────────────────────────────────────────────────────
+
+  /**
+   * Places the card at hand {@code index} onto the current season's table. Deducts the production
+   * cost. If a matching card already sits on the table, amplifies it (upgrade) instead of adding a
+   * new slot.
+   */
+  @MessageMapping("/kh/{gameId}/play/card")
+  public void playCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final int index = ((Number) body.get("index")).intValue();
+              final List<Card> hand = game.getState().getHand();
+              if (index < 0 || index >= hand.size()) {
+                log.warn("playCard: invalid index {} (hand size {})", index, hand.size());
+                return;
+              }
+              try {
+                game.placeCard(hand.get(index));
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("playCard rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
+  /**
+   * Demolishes the card at {@code slot} on the current season's table, charging {@link
+   * GameEngine#DEMOLISH_COST_RATE} × the card's production requirement.
+   */
+  @MessageMapping("/kh/{gameId}/play/demolish")
+  public void demolishCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final int slot = ((Number) body.get("slot")).intValue();
+              try {
+                game.demolishCard(slot);
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("demolishCard rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
+  /**
+   * Ends the PLAY phase: resolves table cards left-to-right, consumes seasonal food, then advances
+   * to the next ADD phase (seeding card choices). {@link GameEngine#advancePhase()} is a no-op if
+   * the game has ended due to starvation, so the game-over state is broadcast cleanly.
+   */
+  @MessageMapping("/kh/{gameId}/play/end")
+  public void endAndRun(@DestinationVariable String gameId) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              try {
+                game.endAndRun();
+                // advancePhase moves PLAY → ADD (advancing the season and seeding card choices).
+                // It returns immediately without mutating state if the game is already over.
+                game.advancePhase();
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
   @MessageMapping("/kh/{gameId}/quit")
   public void quit(@DestinationVariable String gameId, Principal principal) {
     final Optional<UserEntity> userEntity = findUser(principal);

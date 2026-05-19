@@ -497,6 +497,45 @@ export class GameEventHandler {
     });
   }
 
+  // ── PLAY phase actions ────────────────────────────────────────────────────
+
+  /**
+   * Places the card at {@code index} within {@code state.hand} onto the current season's table.
+   * Deducts the production cost.  If a matching card is already on the table, amplifies it
+   * (upgrade) instead of filling a new slot.
+   *
+   * @param index Zero-based index into the current {@code state.hand} list.
+   */
+  public placeCard(index: number): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/card`,
+      body: JSON.stringify({ index }),
+    });
+  }
+
+  /**
+   * Demolishes the card at {@code slot} on the current season's table.  Charges 20% of the
+   * card's production requirement as the demolition cost.
+   *
+   * @param slot Zero-based index into the current season's table.
+   */
+  public demolishCard(slot: number): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/demolish`,
+      body: JSON.stringify({ slot }),
+    });
+  }
+
+  /**
+   * Ends the PLAY phase: resolves all table cards left-to-right, consumes seasonal food, then
+   * advances the season and begins the next ADD phase.
+   */
+  public endAndRun(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/end`,
+    });
+  }
+
   // ── STOMP lifecycle ───────────────────────────────────────────────────────
 
   private onConnect(frame: Frame): void {
