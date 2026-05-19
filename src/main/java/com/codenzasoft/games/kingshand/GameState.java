@@ -1,5 +1,7 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -63,6 +65,7 @@ public class GameState {
 
   // ----- Getters -----
 
+  @JsonProperty("board")
   public Map<Season, List<Card>> getBoard() {
     return board;
   }
@@ -129,46 +132,57 @@ public class GameState {
     hand.clear();
   }
 
+  @JsonProperty("discardPile")
   public Map<Season, List<Card>> getDiscardPile() {
     return discardPile;
   }
 
+  @JsonProperty("drawPile")
   public Map<Season, List<Card>> getDrawPile() {
     return drawPile;
   }
 
+  @JsonProperty("hand")
   public List<Card> getHand() {
     return hand;
   }
 
+  @JsonProperty("population")
   public double getPopulation() {
     return population;
   }
 
+  @JsonProperty("production")
   public double getProduction() {
     return production;
   }
 
+  @JsonProperty("food")
   public double getFood() {
     return food;
   }
 
+  @JsonProperty("curSeason")
   public Season getCurSeason() {
     return curSeason;
   }
 
+  @JsonProperty("curPhase")
   public Phase getCurPhase() {
     return curPhase;
   }
 
+  @JsonProperty("year")
   public int getYear() {
     return year;
   }
 
+  @JsonProperty("addChoices")
   public List<Card> getAddChoices() {
     return addChoices;
   }
 
+  @JsonProperty("rerollCount")
   public int getRerollCount() {
     return rerollCount;
   }
@@ -177,6 +191,8 @@ public class GameState {
    * The event rolled at the start of the current {@link Phase#RANDOM_EVENT} turn, or {@code null}
    * if no event has been rolled yet (or no eligible events existed).
    */
+  @JsonProperty("currentEvent")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public Event getCurrentEvent() {
     return currentEvent;
   }
@@ -219,6 +235,7 @@ public class GameState {
     this.currentEvent = currentEvent;
   }
 
+  @JsonProperty("gameOver")
   public boolean isGameOver() {
     return gameOver;
   }

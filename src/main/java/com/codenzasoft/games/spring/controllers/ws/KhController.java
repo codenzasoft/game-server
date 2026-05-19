@@ -1,10 +1,12 @@
 package com.codenzasoft.games.spring.controllers.ws;
 
+import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.spring.entities.UserEntity;
-import com.codenzasoft.games.spring.messages.KhMessage;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import java.security.Principal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -21,7 +23,14 @@ public class KhController {
 
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
+  @Autowired private KhBroadcastService khBroadcastService;
   @Autowired private SimpMessagingTemplate messagingTemplate;
+
+  @MessageMapping("/kh/{gameId}/load")
+  public void load(@DestinationVariable String gameId) {
+    final Optional<GameEngine> game = gameService.getOrBuildKhGame(UUID.fromString(gameId));
+    game.ifPresent(khBroadcastService::gameLoaded);
+  }
 
   @MessageMapping("/kh/{gameId}/quit")
   public void quit(@DestinationVariable String gameId, Principal principal) {
@@ -36,9 +45,8 @@ public class KhController {
       log.warn("Quit rejected for {}: {}", userEntity.get().getUsername(), e.getMessage());
       return;
     }
-    final KhMessage message = new KhMessage(id, true);
     messagingTemplate.convertAndSendToUser(
-        userEntity.get().getUsername(), "/queue/games/" + gameId, message);
+        userEntity.get().getUsername(), "/queue/games/" + gameId, Map.of("quit", true));
     log.debug("Quit game {} for user {}", gameId, userEntity.get().getUsername());
   }
 
