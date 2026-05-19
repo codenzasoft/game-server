@@ -24,6 +24,7 @@ public class HeartsGame implements Game<HeartsGame> {
     private List<Player> players;
     private UUID id;
     private final List<HeartsListener> listeners = new ArrayList<>();
+    private final Map<String, HeartsPlayerObserver> playerObservers = new HashMap<>();
     private Executor executor;
 
     public Builder withPlayers(final List<Player> players) {
@@ -46,6 +47,11 @@ public class HeartsGame implements Game<HeartsGame> {
       return this;
     }
 
+    public Builder addPlayerObserver(final Player player, final HeartsPlayerObserver observer) {
+      playerObservers.put(player.name(), observer);
+      return this;
+    }
+
     public HeartsGame build() {
       if (executor == null) {
         withNotificationExecutor(Executors.newSingleThreadExecutor());
@@ -55,7 +61,8 @@ public class HeartsGame implements Game<HeartsGame> {
           HeartsState.with(players.stream().map(Player::name).toList()),
           players,
           listeners,
-          executor);
+          executor,
+          playerObservers);
     }
   }
 
@@ -84,17 +91,20 @@ public class HeartsGame implements Game<HeartsGame> {
   private final List<Player> players;
   private final List<HeartsListener> listeners;
   private final Executor executor;
+  private final Map<String, HeartsPlayerObserver> playerObservers;
 
   private HeartsGame(
       final UUID id,
       final HeartsState gameState,
       final List<Player> players,
       final List<HeartsListener> listeners,
-      final Executor executor) {
+      final Executor executor,
+      final Map<String, HeartsPlayerObserver> playerObservers) {
     this.id = id;
     this.players = players;
     this.listeners = listeners;
     this.executor = executor;
+    this.playerObservers = Map.copyOf(playerObservers);
     setGameState(gameState);
     notifyListeners(GAME_STARTED_NOTIFICATION);
   }
@@ -137,6 +147,32 @@ public class HeartsGame implements Game<HeartsGame> {
     throw new IllegalStateException("no valid cards found for " + player.name());
   }
 
+  private Player findPlayer(final String name) {
+    return players.stream()
+        .filter(p -> p.name().equals(name))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("player not found: " + name));
+  }
+
+  private void notifyPlayerToPlay(final String playerName) {
+    final HeartsPlayerObserver observer = playerObservers.get(playerName);
+    if (observer == null) return;
+    final Player player = findPlayer(playerName);
+    final HeartsState state = getGameState();
+    final Set<Card> valid = getValidCards(player);
+    executor.execute(() -> observer.yourTurnToPlay(this, state, player, valid));
+  }
+
+  private void notifyPlayerToPass(final String playerName) {
+    final HeartsPlayerObserver observer = playerObservers.get(playerName);
+    if (observer == null) return;
+    final Player player = findPlayer(playerName);
+    final HeartsState state = getGameState();
+    final List<Card> hand =
+        state.getCurrentRound().map(r -> r.hands().get(playerName)).orElse(List.of());
+    executor.execute(() -> observer.yourTurnToPass(this, state, player, hand));
+  }
+
   void notifyListeners(final HeartsNotification notification) {
     final HeartsState state = getGameState();
     final HeartsGame game = this;
@@ -177,6 +213,10 @@ public class HeartsGame implements Game<HeartsGame> {
                     e -> e.getKey().name(), e -> Collections.unmodifiableList(e.getValue())));
     startNewRound(dealer, setDeal);
     notifyListeners(ROUND_STARTED_NOTIFICATION);
+    final RoundState round = getGameState().getCurrentRound().orElseThrow();
+    if (round.pass() != Pass.KEEPER) {
+      players.forEach(p -> notifyPlayerToPass(p.name()));
+    }
   }
 
   private synchronized void startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -196,6 +236,10 @@ public class HeartsGame implements Game<HeartsGame> {
   public synchronized void startNewTrick() {
     setGameState(getGameState().startNewTrick());
     notifyListeners(TRICK_STARTED_NOTIFICATION);
+    getGameState()
+        .getCurrentRound()
+        .flatMap(r -> r.getNextPlayer(getGameState()))
+        .ifPresent(this::notifyPlayerToPlay);
   }
 
   public synchronized void playCard(final Player player, final Card card) {
@@ -212,6 +256,8 @@ public class HeartsGame implements Game<HeartsGame> {
       if (round.isComplete()) {
         notifyListeners(ROUND_ENDED_NOTIFICATION);
       }
+    } else {
+      round.getNextPlayer(getGameState()).ifPresent(this::notifyPlayerToPlay);
     }
   }
 
