@@ -436,6 +436,42 @@ export class GameEventHandler {
     window.location.href = homeUrl;
   }
 
+  // ── ADD phase actions ─────────────────────────────────────────────────────
+
+  /**
+   * Requests a reroll of the current ADD-phase card offer.  The first reroll
+   * after the initial free offer costs {@link GameEngine.REROLL_COST_STEP}
+   * production; cost increases by the same step on each subsequent call.
+   */
+  public reroll(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/add/offer`,
+    });
+  }
+
+  /**
+   * Picks the card at {@code index} within {@code state.addChoices} and shuffles
+   * it into the season's draw pile.  Advances the phase to RANDOM_EVENT.
+   *
+   * @param index Zero-based index into the current {@code state.addChoices} list.
+   */
+  public pickCard(index: number): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/add/pick`,
+      body: JSON.stringify({ index }),
+    });
+  }
+
+  /**
+   * Skips the ADD phase without picking a card.  Advances the phase to
+   * RANDOM_EVENT.
+   */
+  public skipAdd(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/add/skip`,
+    });
+  }
+
   // ── STOMP lifecycle ───────────────────────────────────────────────────────
 
   private onConnect(frame: Frame): void {
