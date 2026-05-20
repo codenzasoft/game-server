@@ -138,6 +138,25 @@ public class GameEngine implements Game<GameEngine> {
   // ----- RANDOM_EVENT resolution -----
 
   /**
+   * Public entry point for rolling a random event during the {@link Phase#RANDOM_EVENT} phase. Safe
+   * to call multiple times — if an event has already been rolled for this phase it returns
+   * immediately without re-rolling.
+   *
+   * <p>This is needed because {@link #pickCard(Card)} and {@link #skipAdd()} set the phase to
+   * {@link Phase#RANDOM_EVENT} directly (bypassing {@link #advancePhase()}) so callers must trigger
+   * the roll explicitly after those calls.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#RANDOM_EVENT}
+   */
+  public synchronized void rollRandomEvent() {
+    requirePhase(Phase.RANDOM_EVENT, "rollRandomEvent");
+    if (state.getCurrentEvent() != null) {
+      return; // already rolled for this phase — do not re-roll
+    }
+    rollEvent();
+  }
+
+  /**
    * Randomly selects one eligible event for the current season and year and stores it on the state.
    * If no events are eligible the stored event is set to {@code null}.
    */
@@ -174,8 +193,8 @@ public class GameEngine implements Game<GameEngine> {
         Effect scaled = scaleForSeason(effect);
         switch (rt) {
           case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
-          case PRODUCTION -> state.setProduction(scaled.apply(state.getProduction()));
-          case FOOD -> state.setFood(scaled.apply(state.getFood()));
+          case PRODUCTION -> applyProduction(scaled.apply(state.getProduction()));
+          case FOOD -> applyFood(scaled.apply(state.getFood()));
         }
       }
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
@@ -235,8 +254,8 @@ public class GameEngine implements Game<GameEngine> {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-              case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
-              case FOOD -> state.setFood(effect.apply(state.getFood()));
+              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+              case FOOD -> applyFood(effect.apply(state.getFood()));
             }
           }
         }
@@ -280,8 +299,8 @@ public class GameEngine implements Game<GameEngine> {
         if (effect.target() instanceof ResourceTarget rt) {
           switch (rt) {
             case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-            case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
-            case FOOD -> state.setFood(effect.apply(state.getFood()));
+            case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+            case FOOD -> applyFood(effect.apply(state.getFood()));
           }
         }
       }
@@ -298,15 +317,37 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Applies a population change, clamping to zero and transitioning to {@link Phase#GAME_OVER} if
-   * the result is zero or below. All engine-level population mutations route through this method so
-   * game-over detection is never scattered.
+   * Applies a population change, clamping to zero and setting game-over if the result reaches zero.
+   * All engine-level population mutations route through this method so game-over detection is never
+   * scattered.
    */
   private void applyPopulation(double value) {
     double clamped = Math.max(0.0, value);
     state.setPopulation(clamped);
-    if (clamped == 0.0) {
+    // A fractional population (< 1) means nobody is actually alive.
+    if (clamped < 1.0) {
+      state.setPopulation(0.0);
       state.setGameOver(true);
+    }
+  }
+
+  /** Applies a production change, clamping to zero. Production can never go negative. */
+  private void applyProduction(double value) {
+    state.setProduction(Math.max(0.0, value));
+  }
+
+  /**
+   * Applies a food change, clamping to zero. If the result would be negative the shortfall is
+   * treated as a starvation deficit — food is set to 0 and population drops by {@code 0.5 ×
+   * deficit}, mirroring the logic in {@link #consumeFood()}.
+   */
+  private void applyFood(double value) {
+    if (value >= 0) {
+      state.setFood(value);
+    } else {
+      double deficit = -value;
+      state.setFood(0.0);
+      applyPopulation(state.getPopulation() - 0.5 * deficit);
     }
   }
 
@@ -355,7 +396,7 @@ public class GameEngine implements Game<GameEngine> {
                 + ", have "
                 + (int) state.getProduction());
       }
-      state.setProduction(state.getProduction() - cost);
+      applyProduction(state.getProduction() - cost);
     }
     state.setRerollCount(state.getRerollCount() + 1);
     List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
@@ -373,6 +414,9 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
+    // Clear the previous season's event so rollRandomEvent() rolls a fresh one
+    // for this phase rather than seeing the old non-null value and short-circuiting.
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
   }
 
@@ -384,6 +428,8 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
+    // Clear the previous season's event so rollRandomEvent() rolls a fresh one.
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
   }
 
@@ -540,7 +586,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // Pay the production cost and remove the card from the hand.
-    state.setProduction(state.getProduction() - card.productionRequirement());
+    applyProduction(state.getProduction() - card.productionRequirement());
     state.getHand().remove(card);
 
     // if duplicate exisits, replace with one whose every effect modifier is doubled.
@@ -580,7 +626,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // else pay and demolish card
-    state.setProduction(state.getProduction() - cost);
+    applyProduction(state.getProduction() - cost);
     state.removeFromTableAt(slot);
   }
 }

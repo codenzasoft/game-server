@@ -50,6 +50,7 @@ public class EventCatalog {
   public static EventCatalog defaultCatalog() {
     Map<Season, List<Event>> seasonal = new EnumMap<>(Season.class);
 
+    // ── Spring ────────────────────────────────────────────────────────────────
     seasonal.put(
         Season.SPRING,
         List.of(
@@ -65,8 +66,31 @@ public class EventCatalog {
                             ResourceTarget.FOOD.integer(15),
                             ResourceTarget.PRODUCTION.integer(-5))),
                     new EventOption(
-                        "Conserve seed stock", List.of(ResourceTarget.FOOD.integer(5)))))));
+                        "Conserve seed stock", List.of(ResourceTarget.FOOD.integer(5))))),
+            new Event(
+                "spring.migrants",
+                Season.SPRING,
+                1,
+                "Wandering families arrive at the border, seeking land and a fresh start.",
+                List.of(
+                    new EventOption(
+                        "Welcome them in",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(2),
+                            ResourceTarget.FOOD.integer(-10))),
+                    new EventOption("Redirect them onward", List.of()))),
+            new Event(
+                "spring.floods",
+                Season.SPRING,
+                2,
+                "Snowmelt swells the rivers. Low-lying fields sit under water.",
+                List.of(
+                    new EventOption(
+                        "Shore up the banks", List.of(ResourceTarget.PRODUCTION.integer(-10))),
+                    new EventOption(
+                        "Accept the flooding", List.of(ResourceTarget.FOOD.integer(-15)))))));
 
+    // ── Summer ────────────────────────────────────────────────────────────────
     seasonal.put(
         Season.SUMMER,
         List.of(
@@ -81,8 +105,33 @@ public class EventCatalog {
                         List.of(
                             ResourceTarget.PRODUCTION.integer(10),
                             ResourceTarget.FOOD.integer(-5))),
-                    new EventOption("Turn them away", List.of())))));
+                    new EventOption("Turn them away", List.of()))),
+            new Event(
+                "summer.drought",
+                Season.SUMMER,
+                1,
+                "A long dry spell parches the fields. The harvest is at risk.",
+                List.of(
+                    new EventOption(
+                        "Dig emergency wells",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-15),
+                            ResourceTarget.FOOD.integer(5))),
+                    new EventOption("Pray for rain", List.of(ResourceTarget.FOOD.integer(-20))))),
+            new Event(
+                "summer.festival",
+                Season.SUMMER,
+                2,
+                "The people clamour for a midsummer festival. Spirits are low.",
+                List.of(
+                    new EventOption(
+                        "Hold the feast",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-10),
+                            ResourceTarget.POPULATION.integer(1))),
+                    new EventOption("Decline — there is work to do", List.of())))));
 
+    // ── Fall ──────────────────────────────────────────────────────────────────
     seasonal.put(
         Season.FALL,
         List.of(
@@ -92,9 +141,33 @@ public class EventCatalog {
                 1,
                 "Fields ripen heavy this year.",
                 List.of(
+                    new EventOption("Bring it all in", List.of(ResourceTarget.FOOD.integer(20))))),
+            new Event(
+                "fall.early_frost",
+                Season.FALL,
+                1,
+                "A bitter frost arrives weeks ahead of schedule. Unharvested crops are at risk.",
+                List.of(
                     new EventOption(
-                        "Bring it all in", List.of(ResourceTarget.FOOD.integer(20)))))));
+                        "Rush the harvest",
+                        List.of(
+                            ResourceTarget.FOOD.integer(10),
+                            ResourceTarget.PRODUCTION.integer(-10))),
+                    new EventOption("Accept the loss", List.of(ResourceTarget.FOOD.integer(-15))))),
+            new Event(
+                "fall.trade_caravan",
+                Season.FALL,
+                2,
+                "A trade caravan passes through on its way south before winter closes the roads.",
+                List.of(
+                    new EventOption(
+                        "Stock up on provisions",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-15),
+                            ResourceTarget.FOOD.integer(25))),
+                    new EventOption("Wave them past", List.of())))));
 
+    // ── Winter ────────────────────────────────────────────────────────────────
     seasonal.put(
         Season.WINTER,
         List.of(
@@ -117,16 +190,23 @@ public class EventCatalog {
                     new EventOption(
                         "Slaughter livestock",
                         List.of(
-                            ResourceTarget.FOOD.integer(10),
-                            ResourceTarget.PRODUCTION.integer(-10))),
-                    new EventOption("Endure", List.of(ResourceTarget.FOOD.integer(-10))))),
+                            ResourceTarget.PRODUCTION.integer(-10),
+                            ResourceTarget.FOOD.integer(-5))),
+                    new EventOption(
+                        "Endure and ration", List.of(ResourceTarget.FOOD.integer(-15))))),
             new Event(
                 "winter.killing_frost",
                 Season.WINTER,
                 5,
                 "A killing frost takes the weakest.",
                 List.of(
-                    new EventOption("Mourn", List.of(ResourceTarget.POPULATION.integer(-2)))))));
+                    new EventOption(
+                        "Mourn the dead", List.of(ResourceTarget.POPULATION.integer(-2))),
+                    new EventOption(
+                        "Sacrifice the surplus to save lives",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-20),
+                            ResourceTarget.POPULATION.integer(-1)))))));
 
     return new EventCatalog(seasonal);
   }

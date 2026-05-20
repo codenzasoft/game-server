@@ -1,15 +1,15 @@
 import { Application } from "pixi.js";
-import { Client, Frame, StompSubscription } from "@stomp/stompjs";
+import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
 import { OptionsMenu } from "./settings.ts";
+import { AddPhaseScene } from "./addPhaseScene.ts";
+import { RandomEventScene } from "./randomEventScene.ts";
+import { PlayPhaseScene } from "./playPhaseScene.ts";
 
-const wsUrl =
-  import.meta.env.VITE_WS_URL ||
-  `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/games/connect`;
+const homeUrl = `${window.location.origin}/`;
 const loginUrl =
   import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
-const homeUrl = `${window.location.origin}/`;
 
-const getLastPathSegment = (url) => {
+const getLastPathSegment = (url: string): string | undefined => {
   const pathname = new URL(url).pathname;
   const parts = pathname.split("/");
   // The pop() method removes the last element and returns it.
@@ -17,80 +17,145 @@ const getLastPathSegment = (url) => {
   return parts.pop() || parts.pop();
 };
 
-const getGameId = () => {
+const getGameId = (): string | undefined => {
   return getLastPathSegment(window.location.href);
 };
 
 (async () => {
-  // Create a new application
+  // Create a new application.  The dark green background is visible between
+  // scene transitions; it doubles as the parchment world background.
   const app = new Application();
-
-  // Initialize the application
-  await app.init({ background: "red", resizeTo: window });
+  await app.init({ background: 0x2d5a3d, resizeTo: window });
 
   // Append the application canvas to the document body
   document.getElementById("pixi-container")!.appendChild(app.canvas);
 
   const gameId = getGameId();
-  if (gameId.length === 0) {
+  if (!gameId || gameId.length === 0) {
     console.error(`Game ID not provided`);
-    // redirect to login page to ensure user is authenticated
     window.location.href = loginUrl;
     return;
   }
 
   console.log(`Using game ID: ${gameId}`);
 
-  // Connect to WebSocket via STOMP
-  let subscription: StompSubscription;
+  // ── Active scene ──────────────────────────────────────────────────────────
+  //
+  // Only one scene is live at a time.  onMessage replaces it whenever the
+  // server sends a state update that changes the current phase.
 
-  const client = new Client({ brokerURL: wsUrl });
+  let currentScene: AddPhaseScene | RandomEventScene | PlayPhaseScene | null = null;
 
-  client.onConnect = (frame: Frame) => {
-    console.log("Connected: " + frame);
-    subscription = client.subscribe(
-      `/user/queue/games/${gameId}`,
-      (stompMessage) => {
-        const body = JSON.parse(stompMessage.body);
-        console.log("Received KH message:", body);
-        if (body.quit) {
-          subscription.unsubscribe();
-          app.destroy(true, true);
-          window.location.href = homeUrl;
+  const mountTarget = document.getElementById("pixi-container")!;
+
+  // onMessage is called for every GameMessage dequeued by GameEventHandler.
+  // It inspects curPhase and mounts the corresponding scene overlay.
+  const onMessage = (message: GameMessage) => {
+    console.log("Processing KH message:", message);
+
+    const { state } = message;
+
+    switch (state.curPhase) {
+      case Phase.ADD: {
+        if (currentScene instanceof AddPhaseScene) {
+          // Same phase, same scene type (e.g. after a reroll) — just refresh content.
+          currentScene.update(state);
+        } else {
+          // Phase changed to ADD from RANDOM_EVENT or PLAY — tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new AddPhaseScene(state, {
+            reroll:   () => handler.reroll(),
+            pickCard: (i) => handler.pickCard(i),
+            skipAdd:  () => handler.skipAdd(),
+          });
+          currentScene.mount(mountTarget);
         }
-      },
-    );
-    // Request the current game state from the server
-    client.publish({ destination: `/games/kh/${gameId}/load` });
+        break;
+      }
+
+      case Phase.RANDOM_EVENT: {
+        if (currentScene instanceof RandomEventScene) {
+          // Same phase, same scene type — just refresh content.
+          currentScene.update(state);
+        } else {
+          // Either a fresh mount or switching from ADD: tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new RandomEventScene(state, {
+            pickEventOption: (i) => handler.pickEventOption(i),
+            skipEvent:       () => handler.skipEvent(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
+      case Phase.PLAY: {
+        if (currentScene instanceof PlayPhaseScene) {
+          // Already in PLAY (e.g. after a placeCard or demolishCard refresh).
+          currentScene.update(state);
+        } else {
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new PlayPhaseScene(state, {
+            placeCard:    (i)    => handler.placeCard(i),
+            demolishCard: (slot) => handler.demolishCard(slot),
+            endAndRun:    ()     => handler.endAndRun(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
+      default: {
+        // Unknown phase — tear down whatever is live.
+        if (currentScene) {
+          currentScene.unmount();
+          currentScene = null;
+        }
+        console.log(`Phase ${state.curPhase} scene not yet implemented.`);
+        break;
+      }
+    }
   };
 
-  client.onWebSocketError = (error: unknown) => {
-    console.error("Error with websocket", error);
-    // redirect to login page to ensure user is authenticated
-    window.location.href = loginUrl;
+  // onQuit is called when the server confirms the quit.  Tear down PixiJS and
+  // return the player to the home screen.
+  const onQuit = () => {
+    if (currentScene) {
+      currentScene.unmount();
+      currentScene = null;
+    }
+    app.destroy(true, true);
+    window.location.href = homeUrl;
   };
 
-  client.onStompError = (frame: Frame) => {
-    console.error("Broker reported error: " + frame.headers["message"]);
-    console.error("Additional details: " + frame.body);
-  };
+  const handler = new GameEventHandler(onMessage, onQuit);
 
-  client.activate();
-
-  // Options menu — contains "Save and Exit" and "Quit Game"
+  // Options menu — contains "Save and Exit" and "Quit Game".
+  // Quit delegates to handler.quit() so the server is notified before we
+  // navigate away; saveAndExit() navigates immediately since state is already
+  // persisted server-side.
   const optionsMenu = new OptionsMenu(
     app,
     () => {
-      // Quit Game: notify the server, which will confirm via WebSocket and
-      // trigger the redirect once the quit_at timestamp is persisted.
       optionsMenu.close();
-      client.publish({ destination: `/games/kh/${gameId}/quit` });
+      handler.quit();
     },
     () => {
-      // Save and Exit: game state is already persisted server-side, so just
-      // navigate home — the game remains active in the active games list.
-      window.location.href = homeUrl;
+      handler.saveAndExit();
     },
   );
   app.stage.addChild(optionsMenu);
+
+  // Open the WebSocket connection last, after all local state is ready to
+  // receive messages.
+  handler.connect(gameId);
 })();
