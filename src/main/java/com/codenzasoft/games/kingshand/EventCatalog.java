@@ -190,16 +190,23 @@ public class EventCatalog {
                     new EventOption(
                         "Slaughter livestock",
                         List.of(
-                            ResourceTarget.FOOD.integer(10),
-                            ResourceTarget.PRODUCTION.integer(-10))),
-                    new EventOption("Endure", List.of(ResourceTarget.FOOD.integer(-10))))),
+                            ResourceTarget.PRODUCTION.integer(-10),
+                            ResourceTarget.FOOD.integer(-5))),
+                    new EventOption(
+                        "Endure and ration", List.of(ResourceTarget.FOOD.integer(-15))))),
             new Event(
                 "winter.killing_frost",
                 Season.WINTER,
                 5,
                 "A killing frost takes the weakest.",
                 List.of(
-                    new EventOption("Mourn", List.of(ResourceTarget.POPULATION.integer(-2)))))));
+                    new EventOption(
+                        "Mourn the dead", List.of(ResourceTarget.POPULATION.integer(-2))),
+                    new EventOption(
+                        "Sacrifice the surplus to save lives",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-20),
+                            ResourceTarget.POPULATION.integer(-1)))))));
 
     return new EventCatalog(seasonal);
   }

@@ -150,9 +150,16 @@ export class RandomEventScene {
   }
 
   private buildEventContent(event: KhEvent): string {
+    const isWinter = this.state.curSeason === Season.WINTER;
     const optionsHTML = event.options
       .map((opt, i) => this.buildOptionCard(opt, i))
       .join("");
+
+    const winterBanner = isWinter ? `
+      <div class="kh-re-winter-banner">
+        ❄ Winter Scaling — all effects are multiplied by Year ${this.state.year}
+      </div>
+    ` : "";
 
     return `
       <div class="kh-re-prompt">
@@ -160,6 +167,7 @@ export class RandomEventScene {
         <h2 class="kh-re-event-desc">"${event.description}"</h2>
         <p class="kh-re-event-sub">Choose how your settlement responds.</p>
       </div>
+      ${winterBanner}
       <div class="kh-re-options-grid kh-re-options-${event.options.length}">
         ${optionsHTML}
       </div>
@@ -167,18 +175,26 @@ export class RandomEventScene {
   }
 
   private buildOptionCard(option: EventOption, index: number): string {
+    const isWinter = this.state.curSeason === Season.WINTER;
+    const year     = this.state.year;
+
     const effectsHTML = option.effects.length > 0
       ? option.effects.map((e: Effect) => {
-          const targetStr = typeof e.target === "string" ? e.target : "CARD";
-          const isNegative = e.modifier < 0;
+          const targetStr     = typeof e.target === "string" ? e.target : "CARD";
+          // Apply winter year-scaling to the displayed modifier so what the player
+          // sees matches exactly what the server will apply via scaleForSeason().
+          const scaledModifier = isWinter ? e.modifier * year : e.modifier;
+          const isNegative     = scaledModifier < 0;
+          const scaleNote = "";
           return `
             <div class="kh-re-effect-row">
               <span class="kh-re-effect-target kh-re-et-${targetStr.toLowerCase()}">
                 ${targetEmoji(e.target)} ${targetStr}
               </span>
               <span class="kh-re-effect-mod ${isNegative ? "kh-re-mod-neg" : "kh-re-mod-pos"}">
-                ${formatModifier(e.modifier, e.valueType)}
+                ${formatModifier(scaledModifier, e.valueType)}
               </span>
+              ${scaleNote}
             </div>
           `;
         }).join("")
@@ -482,6 +498,31 @@ export class RandomEventScene {
         color: #f0e8c0;
         line-height: 1.3;
         letter-spacing: .3px;
+      }
+
+      /* Winter scaling banner */
+      .kh-re-winter-banner {
+        background: linear-gradient(90deg, #0e1e30 0%, #1a2e48 50%, #0e1e30 100%);
+        border: 1px solid #4a7ab0;
+        border-radius: 8px;
+        padding: 9px 20px;
+        margin-bottom: 22px;
+        font-family: 'Cinzel', serif;
+        font-size: .75rem;
+        font-weight: 600;
+        letter-spacing: 1.2px;
+        color: #90c8f0;
+        text-align: center;
+        box-shadow: 0 2px 12px rgba(74,122,176,.25);
+      }
+
+      /* Scale annotation next to each effect modifier */
+      .kh-re-scale-note {
+        font-family: 'Crimson Text', Georgia, serif;
+        font-size: .78rem;
+        font-style: italic;
+        color: #7090b0;
+        margin-left: 2px;
       }
 
       /* Option effects */
