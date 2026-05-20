@@ -33,12 +33,12 @@ const HOME_URL = `${window.location.origin}/`;
 
 const SEASON_META: Record<
   Season,
-  { label: string; icon: string; headerColor: string; accentColor: string }
+  { label: string; icon: string; headerColor: string; accentColor: string; bg: string }
 > = {
-  [Season.SPRING]: { label: "Spring", icon: "🌿", headerColor: "#274d30", accentColor: "#3d6b46" },
-  [Season.SUMMER]: { label: "Summer", icon: "☀️",  headerColor: "#5a3a0a", accentColor: "#8a5a10" },
-  [Season.FALL]:   { label: "Fall",   icon: "🍂", headerColor: "#5a2a10", accentColor: "#8a4020" },
-  [Season.WINTER]: { label: "Winter", icon: "❄️",  headerColor: "#1a2a40", accentColor: "#2a4060" },
+  [Season.SPRING]: { label: "Spring", icon: "🌿", headerColor: "#274d30", accentColor: "#3d6b46", bg: "/img/bg-spring.png" },
+  [Season.SUMMER]: { label: "Summer", icon: "☀️",  headerColor: "#5a3a0a", accentColor: "#8a5a10", bg: "/img/bg-summer.png" },
+  [Season.FALL]:   { label: "Fall",   icon: "🍂", headerColor: "#5a2a10", accentColor: "#8a4020", bg: "/img/bg-fall.png" },
+  [Season.WINTER]: { label: "Winter", icon: "❄️",  headerColor: "#1a2a40", accentColor: "#2a4060", bg: "/img/bg-winter.png" },
 };
 
 // ─── PlayPhaseScene ───────────────────────────────────────────────────────────
@@ -121,6 +121,10 @@ export class PlayPhaseScene {
       <div class="kh-play-toast" id="kh-play-toast"></div>
     `;
 
+    // Apply season background image over a dark scrim for readability
+    this.overlay.style.background =
+      `linear-gradient(rgba(8,4,2,.48) 0%, rgba(8,4,2,.48) 100%), url('${meta.bg}') center/cover no-repeat`;
+
     this.attachListeners(state, tableFingerprints);
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
@@ -157,6 +161,10 @@ export class PlayPhaseScene {
         </button>
       </div>
     `;
+
+    // Apply season background image on game-over screen too
+    this.overlay.style.background =
+      `linear-gradient(rgba(8,4,2,.6) 0%, rgba(8,4,2,.6) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.overlay.insertAdjacentHTML("beforeend", buildHandbookButton());
 

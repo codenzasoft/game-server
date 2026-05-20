@@ -27,31 +27,35 @@ const REROLL_COST_STEP = 10;
 
 const SEASON_META: Record<
   Season,
-  { label: string; icon: string; headerColor: string; accentColor: string }
+  { label: string; icon: string; headerColor: string; accentColor: string; bg: string }
 > = {
   [Season.SPRING]: {
     label: "Spring",
     icon: "🌿",
     headerColor: "#274d30",
     accentColor: "#3d6b46",
+    bg: "/img/bg-spring.png",
   },
   [Season.SUMMER]: {
     label: "Summer",
     icon: "☀️",
     headerColor: "#5a3a0a",
     accentColor: "#8a5a10",
+    bg: "/img/bg-summer.png",
   },
   [Season.FALL]: {
     label: "Fall",
     icon: "🍂",
     headerColor: "#5a2a10",
     accentColor: "#8a4020",
+    bg: "/img/bg-fall.png",
   },
   [Season.WINTER]: {
     label: "Winter",
     icon: "❄️",
     headerColor: "#1a2a40",
     accentColor: "#2a4060",
+    bg: "/img/bg-winter.png",
   },
 };
 
@@ -131,6 +135,10 @@ export class AddPhaseScene {
       ${buildHandbookButton()}
       <div class="kh-toast" id="kh-toast"></div>
     `;
+
+    // Apply season background image over a dark scrim for readability
+    this.overlay.style.background =
+      `linear-gradient(rgba(8,4,2,.48) 0%, rgba(8,4,2,.48) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.attachListeners(state);
     attachDeckListeners(this.overlay, state);
