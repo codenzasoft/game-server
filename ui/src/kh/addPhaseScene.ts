@@ -10,6 +10,8 @@ import {
   attachDeckListeners,
   buildHandbookButton,
   attachHandbookListeners,
+  buildOptionsButton,
+  attachOptionsListeners,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -129,12 +131,14 @@ export class AddPhaseScene {
       </main>
       ${buildDeckIndicator(state)}
       ${buildHandbookButton()}
+      ${buildOptionsButton()}
       <div class="kh-toast" id="kh-toast"></div>
     `;
 
     this.attachListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
   }
 
   private buildHeader(

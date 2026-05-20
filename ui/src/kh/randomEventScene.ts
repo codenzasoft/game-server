@@ -6,6 +6,8 @@ import {
   attachDeckListeners,
   buildHandbookButton,
   attachHandbookListeners,
+  buildOptionsButton,
+  attachOptionsListeners,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -83,12 +85,14 @@ export class RandomEventScene {
       </main>
       ${buildDeckIndicator(state)}
       ${buildHandbookButton()}
+      ${buildOptionsButton()}
       <div class="kh-re-toast" id="kh-re-toast"></div>
     `;
 
     this.attachListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
   }
 
   private buildHeader(
