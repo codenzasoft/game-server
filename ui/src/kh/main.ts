@@ -1,6 +1,5 @@
 import { Application } from "pixi.js";
 import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
-import { OptionsMenu } from "./settings.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
 import { RandomEventScene } from "./randomEventScene.ts";
 import { PlayPhaseScene } from "./playPhaseScene.ts";
@@ -139,21 +138,10 @@ const getGameId = (): string | undefined => {
 
   const handler = new GameEventHandler(onMessage, onQuit);
 
-  // Options menu — contains "Save and Exit" and "Quit Game".
-  // Quit delegates to handler.quit() so the server is notified before we
-  // navigate away; saveAndExit() navigates immediately since state is already
-  // persisted server-side.
-  const optionsMenu = new OptionsMenu(
-    app,
-    () => {
-      optionsMenu.close();
-      handler.quit();
-    },
-    () => {
-      handler.saveAndExit();
-    },
-  );
-  app.stage.addChild(optionsMenu);
+  // The quit and save-and-exit buttons live in the HTML overlay layer (sharedOverlays.ts)
+  // and communicate via custom DOM events so scenes stay decoupled from the handler.
+  document.addEventListener("kh-quit",      () => handler.quit());
+  document.addEventListener("kh-save-exit", () => handler.saveAndExit());
 
   // Open the WebSocket connection last, after all local state is ready to
   // receive messages.
