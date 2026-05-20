@@ -369,6 +369,13 @@ public class GameEngine implements Game<GameEngine> {
       state.setFood(0.0);
       applyPopulation(state.getPopulation() - 0.5 * deficit);
     }
+
+    // Surplus growth: if food remains after consumption, grow population proportionally.
+    // The surplus is used purely for the growth calculation — food is not further reduced.
+    if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
+      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.50);
+      applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
+    }
   }
 
   // ----- ADD phase: card offer, pick, skip -----
