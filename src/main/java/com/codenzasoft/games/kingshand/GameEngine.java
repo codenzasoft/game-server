@@ -32,7 +32,7 @@ import java.util.UUID;
 public class GameEngine implements Game<GameEngine> {
 
   public static final int MAX_TABLE_SIZE = 5;
-  public static final int MAX_HAND_SIZE = 5;
+  public static final int MAX_HAND_SIZE = 3;
   public static final int REROLL_COST_STEP = 10;
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
@@ -368,6 +368,13 @@ public class GameEngine implements Game<GameEngine> {
       double deficit = consumed - available;
       state.setFood(0.0);
       applyPopulation(state.getPopulation() - 0.5 * deficit);
+    }
+
+    // Surplus growth: if food remains after consumption, grow population proportionally.
+    // The surplus is used purely for the growth calculation — food is not further reduced.
+    if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
+      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.50);
+      applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
     }
   }
 

@@ -4,6 +4,13 @@ import {
   formatModifier,
   targetEmoji,
 } from "./cardCatalog.ts";
+import {
+  injectSharedStyles,
+  buildDeckIndicator,
+  attachDeckListeners,
+  buildHandbookButton,
+  attachHandbookListeners,
+} from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
 
@@ -65,6 +72,7 @@ export class AddPhaseScene {
     this.state = state;
     this.actions = actions;
     this.injectStylesOnce();
+    injectSharedStyles();
     this.overlay = document.createElement("div");
     this.overlay.id = "kh-add-phase-overlay";
     this.render();
@@ -119,10 +127,14 @@ export class AddPhaseScene {
           </button>
         </div>
       </main>
+      ${buildDeckIndicator(state)}
+      ${buildHandbookButton()}
       <div class="kh-toast" id="kh-toast"></div>
     `;
 
     this.attachListeners(state);
+    attachDeckListeners(this.overlay, state);
+    attachHandbookListeners(this.overlay);
   }
 
   private buildHeader(

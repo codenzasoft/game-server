@@ -1,10 +1,17 @@
-import { GameState, Card, Season } from "./kingshand.ts";
+import { GameState, Card, Season, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   formatModifier,
   targetEmoji,
   fingerprint,
 } from "./cardCatalog.ts";
+import {
+  injectSharedStyles,
+  buildDeckIndicator,
+  attachDeckListeners,
+  buildHandbookButton,
+  attachHandbookListeners,
+} from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
 
@@ -57,6 +64,7 @@ export class PlayPhaseScene {
     this.state = state;
     this.actions = actions;
     this.injectStylesOnce();
+    injectSharedStyles();
     this.overlay = document.createElement("div");
     this.overlay.id = "kh-play-phase-overlay";
     this.render();
@@ -106,10 +114,17 @@ export class PlayPhaseScene {
           </button>
         </div>
       </main>
+      ${this.buildPileIndicators(state)}
+      ${this.buildPileModal()}
+      ${buildDeckIndicator(state)}
+      ${buildHandbookButton()}
       <div class="kh-play-toast" id="kh-play-toast"></div>
     `;
 
     this.attachListeners(state, tableFingerprints);
+    this.attachPileListeners(state);
+    attachDeckListeners(this.overlay, state);
+    attachHandbookListeners(this.overlay);
   }
 
   private renderGameOver(): void {
@@ -143,12 +158,16 @@ export class PlayPhaseScene {
       </div>
     `;
 
+    this.overlay.insertAdjacentHTML("beforeend", buildHandbookButton());
+
     const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-go-btn");
     if (homeBtn) {
       homeBtn.addEventListener("click", () => {
         window.location.href = HOME_URL;
       });
     }
+
+    attachHandbookListeners(this.overlay);
   }
 
   // ─── Section builders ───────────────────────────────────────────────────
@@ -337,7 +356,7 @@ export class PlayPhaseScene {
           <div class="kh-play-table-count">${state.hand.length} card${state.hand.length !== 1 ? "s" : ""}</div>
         </div>
         <p class="kh-play-section-sub">
-          Play cards onto your table. Unplayed cards are discarded when you End and Run.
+          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you End and Run.
         </p>
         <div class="kh-play-hand-grid kh-play-hand-cols-${colCount}">
           ${cardsHTML}
@@ -430,6 +449,111 @@ export class PlayPhaseScene {
         </div>
       </div>
     `;
+  }
+
+  // ─── Pile indicators & modal ─────────────────────────────────────────────
+
+  private buildPileIndicators(state: GameState): string {
+    const drawCount    = state.drawPile.get(state.curSeason)?.length ?? 0;
+    const discardCount = state.discardPile.get(state.curSeason)?.length ?? 0;
+
+    return `
+      <!-- Draw pile — bottom left -->
+      <button class="kh-pile-icon kh-pile-draw" data-pile="draw" title="Draw Pile (this season)">
+        <span class="kh-pile-emoji">🗂</span>
+        <span class="kh-pile-label">Draw</span>
+        <span class="kh-pile-badge">${drawCount}</span>
+      </button>
+
+      <!-- Discard pile — bottom right -->
+      <button class="kh-pile-icon kh-pile-discard" data-pile="discard" title="Discard Pile (this season)">
+        <span class="kh-pile-emoji">🗂</span>
+        <span class="kh-pile-label">Discard</span>
+        <span class="kh-pile-badge">${discardCount}</span>
+      </button>
+    `;
+  }
+
+  private buildPileModal(): string {
+    return `
+      <div class="kh-pile-modal-backdrop" id="kh-pile-modal-backdrop" style="display:none;">
+        <div class="kh-pile-modal">
+          <div class="kh-pile-modal-header">
+            <span class="kh-pile-modal-title" id="kh-pile-modal-title"></span>
+            <button class="kh-pile-modal-close" id="kh-pile-modal-close">✕</button>
+          </div>
+          <div class="kh-pile-modal-tabs" id="kh-pile-modal-tabs"></div>
+          <div class="kh-pile-modal-body" id="kh-pile-modal-body"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  private openPileModal(
+    state: GameState,
+    pileType: "draw" | "discard",
+  ): void {
+    const backdrop = this.overlay.querySelector<HTMLDivElement>("#kh-pile-modal-backdrop");
+    const titleEl  = this.overlay.querySelector<HTMLSpanElement>("#kh-pile-modal-title");
+    const tabsEl   = this.overlay.querySelector<HTMLDivElement>("#kh-pile-modal-tabs");
+    const bodyEl   = this.overlay.querySelector<HTMLDivElement>("#kh-pile-modal-body");
+    if (!backdrop || !titleEl || !tabsEl || !bodyEl) return;
+
+    const pile  = pileType === "draw" ? state.drawPile : state.discardPile;
+    const cards = pile.get(state.curSeason) ?? [];
+    const meta  = SEASON_META[state.curSeason];
+    titleEl.textContent = pileType === "draw"
+      ? `Draw Pile — ${meta.label}`
+      : `Discard Pile — ${meta.label}`;
+    tabsEl.innerHTML = "";
+    bodyEl.innerHTML = cards.length === 0
+      ? `<div class="kh-pile-empty">No cards here.</div>`
+      : cards.map((c) => {
+          const info = getCardDisplayInfo(c);
+          const effectsHTML = c.effects.map((e) => {
+            const emoji = e.target === ResourceTarget.FOOD       ? "🌾"
+                        : e.target === ResourceTarget.PRODUCTION  ? "⚒️"
+                        : e.target === ResourceTarget.POPULATION  ? "👥" : "🃏";
+            return `<span class="kh-cc-effect">${emoji} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+          }).join("");
+          return `
+            <div class="kh-compact-card">
+              <div class="kh-cc-left">
+                <span class="kh-cc-icon">${info.icon}</span>
+                <div>
+                  <div class="kh-cc-name">${info.name}</div>
+                  <div class="kh-cc-desc">${info.description}</div>
+                </div>
+              </div>
+              <div class="kh-cc-right">
+                <span class="kh-cc-freq ${c.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${c.frequencyType}</span>
+                <div class="kh-cc-effects">${effectsHTML}</div>
+                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.populationRequirement}</div>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+    backdrop.style.display = "flex";
+  }
+
+  private attachPileListeners(state: GameState): void {
+    // Pile icon buttons (draw / discard only — deck is handled by sharedOverlays)
+    this.overlay.querySelectorAll<HTMLButtonElement>(".kh-pile-icon").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this.openPileModal(state, btn.dataset.pile as "draw" | "discard");
+      });
+    });
+
+    // Close modal
+    const closeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-pile-modal-close");
+    const backdrop = this.overlay.querySelector<HTMLDivElement>("#kh-pile-modal-backdrop");
+    if (closeBtn && backdrop) {
+      closeBtn.addEventListener("click", () => { backdrop.style.display = "none"; });
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) backdrop.style.display = "none";
+      });
+    }
   }
 
   // ─── Event listeners ────────────────────────────────────────────────────
@@ -743,10 +867,10 @@ export class PlayPhaseScene {
       /* ── Ornament ────────────────────────────────────────────────────── */
       .kh-play-ornament { text-align: center; color: #c49428; font-size: 1.4rem; letter-spacing: 10px; opacity: .45; margin: 8px 0 32px; user-select: none; }
 
-      /* ── Hand grid ───────────────────────────────────────────────────── */
+      /* ── Hand grid (max 3 cards) ─────────────────────────────────────── */
       .kh-play-hand-grid            { display: grid; gap: 22px; }
-      .kh-play-hand-cols-1          { grid-template-columns: 1fr; max-width: 340px; }
-      .kh-play-hand-cols-2          { grid-template-columns: repeat(2, 1fr); }
+      .kh-play-hand-cols-1          { grid-template-columns: 1fr; max-width: 380px; }
+      .kh-play-hand-cols-2          { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
       .kh-play-hand-cols-3          { grid-template-columns: repeat(3, 1fr); }
 
       /* Hand card — same parchment/green aesthetic as ADD phase */
@@ -965,6 +1089,119 @@ export class PlayPhaseScene {
         white-space: nowrap;
       }
       .kh-play-toast.kh-play-toast-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      /* ── Pile indicator buttons (draw / discard only — play phase) ───── */
+      .kh-pile-icon {
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 14px;
+        padding: 10px 14px 8px;
+        cursor: pointer;
+        z-index: 50;
+        box-shadow: 2px 4px 18px rgba(0,0,0,.5);
+        transition: all .18s ease;
+        min-width: 64px;
+      }
+      .kh-pile-icon:hover {
+        background: linear-gradient(160deg, #3e2810 0%, #2a180c 100%);
+        box-shadow: 3px 6px 24px rgba(0,0,0,.6);
+        transform: translateY(-2px);
+        border-color: #e0b040;
+      }
+      .kh-pile-draw    { bottom: 90px; left: 20px; }
+      .kh-pile-discard { bottom: 90px; right: 20px; }
+      .kh-pile-emoji { font-size: 1.5rem; line-height: 1; }
+      .kh-pile-label {
+        font-family: 'Cinzel', serif;
+        font-size: .55rem;
+        letter-spacing: 1px;
+        color: #c4a060;
+        text-transform: uppercase;
+      }
+      .kh-pile-badge {
+        background: #c49428;
+        color: #1a0e04;
+        font-family: 'Cinzel', serif;
+        font-size: .75rem;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 1px 7px;
+        min-width: 20px;
+        text-align: center;
+        margin-top: 2px;
+      }
+
+      /* ── Pile modal (draw / discard viewer) ──────────────────────────── */
+      .kh-pile-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.65);
+        z-index: 200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(2px);
+      }
+      .kh-pile-modal {
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 18px;
+        width: min(680px, 94vw);
+        max-height: 78vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 16px 60px rgba(0,0,0,.7);
+        overflow: hidden;
+      }
+      .kh-pile-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 22px;
+        border-bottom: 2px solid #c49428;
+        background: linear-gradient(90deg, #3a2010 0%, #2a1608 100%);
+        flex-shrink: 0;
+      }
+      .kh-pile-modal-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #f0cc50;
+        letter-spacing: 2px;
+      }
+      .kh-pile-modal-close {
+        background: none;
+        border: 1px solid #a09070;
+        color: #c4a060;
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: .9rem;
+        cursor: pointer;
+        font-family: 'Cinzel', serif;
+        transition: all .15s;
+      }
+      .kh-pile-modal-close:hover { background: rgba(255,255,255,.08); color: #f0cc50; border-color: #c49428; }
+      .kh-pile-modal-tabs { display: none; }
+      .kh-pile-modal-body {
+        overflow-y: auto;
+        padding: 14px 18px;
+        flex: 1;
+      }
+      .kh-pile-modal-body::-webkit-scrollbar { width: 5px; }
+      .kh-pile-modal-body::-webkit-scrollbar-track { background: #1a100a; }
+      .kh-pile-modal-body::-webkit-scrollbar-thumb { background: #c49428; border-radius: 4px; }
+      .kh-pile-empty {
+        text-align: center;
+        font-style: italic;
+        color: #7a6a52;
+        padding: 30px 0;
+        font-size: .95rem;
+      }
     `;
     document.head.appendChild(style);
   }

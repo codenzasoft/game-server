@@ -1,5 +1,12 @@
 import { GameState, Season, KhEvent, EventOption, Effect } from "./kingshand.ts";
 import { formatModifier, targetEmoji } from "./cardCatalog.ts";
+import {
+  injectSharedStyles,
+  buildDeckIndicator,
+  attachDeckListeners,
+  buildHandbookButton,
+  attachHandbookListeners,
+} from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
 
@@ -40,6 +47,7 @@ export class RandomEventScene {
     this.state = state;
     this.actions = actions;
     this.injectStylesOnce();
+    injectSharedStyles();
     this.overlay = document.createElement("div");
     this.overlay.id = "kh-random-event-overlay";
     this.render();
@@ -73,10 +81,14 @@ export class RandomEventScene {
           ? this.buildEventContent(state.currentEvent)
           : this.buildNoEventContent(meta)}
       </main>
+      ${buildDeckIndicator(state)}
+      ${buildHandbookButton()}
       <div class="kh-re-toast" id="kh-re-toast"></div>
     `;
 
     this.attachListeners(state);
+    attachDeckListeners(this.overlay, state);
+    attachHandbookListeners(this.overlay);
   }
 
   private buildHeader(

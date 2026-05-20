@@ -252,7 +252,7 @@ public class GameState {
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
     private double population = 5.0;
-    private double production = 100.0;
+    private double production = 200.0;
     private double food = 50.0;
     private Season curSeason = Season.SPRING;
     private Phase curPhase = Phase.ADD;
