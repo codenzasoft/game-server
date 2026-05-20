@@ -5,6 +5,7 @@ import {
   targetEmoji,
   fingerprint,
 } from "./cardCatalog.ts";
+import { HANDBOOK } from "./handbook.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
 
@@ -108,11 +109,14 @@ export class PlayPhaseScene {
       </main>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
+      ${this.buildHandbookButton()}
+      ${this.buildHandbookModal()}
       <div class="kh-play-toast" id="kh-play-toast"></div>
     `;
 
     this.attachListeners(state, tableFingerprints);
     this.attachPileListeners(state);
+    this.attachHandbookListeners();
   }
 
   private renderGameOver(): void {
@@ -146,12 +150,17 @@ export class PlayPhaseScene {
       </div>
     `;
 
+    this.overlay.insertAdjacentHTML("beforeend", this.buildHandbookButton());
+    this.overlay.insertAdjacentHTML("beforeend", this.buildHandbookModal());
+
     const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-go-btn");
     if (homeBtn) {
       homeBtn.addEventListener("click", () => {
         window.location.href = HOME_URL;
       });
     }
+
+    this.attachHandbookListeners();
   }
 
   // ─── Section builders ───────────────────────────────────────────────────
@@ -610,6 +619,75 @@ export class PlayPhaseScene {
     }
 
     backdrop.style.display = "flex";
+  }
+
+  // ─── Handbook ────────────────────────────────────────────────────────────
+
+  private buildHandbookButton(): string {
+    return `
+      <button class="kh-hb-btn" id="kh-hb-open" title="Player Handbook">
+        <span class="kh-hb-btn-icon">📜</span>
+        <span class="kh-hb-btn-label">Handbook</span>
+      </button>
+    `;
+  }
+
+  private buildHandbookModal(): string {
+    const chaptersHTML = HANDBOOK.map((ch, ci) => `
+      <div class="kh-hb-chapter ${ci === 0 ? "kh-hb-chapter-open" : ""}">
+        <button class="kh-hb-ch-toggle" data-chapter="${ci}">
+          <span class="kh-hb-ch-icon">${ch.icon}</span>
+          <span class="kh-hb-ch-title">${ch.title}</span>
+          <span class="kh-hb-ch-arrow">${ci === 0 ? "▲" : "▼"}</span>
+        </button>
+        <div class="kh-hb-ch-body" style="${ci === 0 ? "" : "display:none"}">
+          ${ch.sections.map((sec) => `
+            <div class="kh-hb-section">
+              <div class="kh-hb-sec-title">${sec.title}</div>
+              <div class="kh-hb-sec-body">${sec.body}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+
+    return `
+      <div class="kh-hb-backdrop" id="kh-hb-backdrop" style="display:none;">
+        <div class="kh-hb-modal">
+          <div class="kh-hb-modal-header">
+            <span class="kh-hb-modal-title">📜 &nbsp;Player Handbook</span>
+            <button class="kh-hb-modal-close" id="kh-hb-close">✕</button>
+          </div>
+          <div class="kh-hb-modal-body">
+            ${chaptersHTML}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private attachHandbookListeners(): void {
+    const openBtn  = this.overlay.querySelector<HTMLButtonElement>("#kh-hb-open");
+    const closeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-hb-close");
+    const backdrop = this.overlay.querySelector<HTMLDivElement>("#kh-hb-backdrop");
+
+    openBtn?.addEventListener("click",  () => { if (backdrop) backdrop.style.display = "flex"; });
+    closeBtn?.addEventListener("click", () => { if (backdrop) backdrop.style.display = "none"; });
+    backdrop?.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.style.display = "none"; });
+
+    // Accordion toggles
+    this.overlay.querySelectorAll<HTMLButtonElement>(".kh-hb-ch-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const chapter = btn.closest<HTMLDivElement>(".kh-hb-chapter");
+        if (!chapter) return;
+        const body  = chapter.querySelector<HTMLDivElement>(".kh-hb-ch-body");
+        const arrow = btn.querySelector<HTMLSpanElement>(".kh-hb-ch-arrow");
+        const isOpen = chapter.classList.contains("kh-hb-chapter-open");
+        chapter.classList.toggle("kh-hb-chapter-open", !isOpen);
+        if (body)  body.style.display  = isOpen ? "none" : "block";
+        if (arrow) arrow.textContent   = isOpen ? "▼" : "▲";
+      });
+    });
   }
 
   private attachPileListeners(state: GameState): void {
@@ -1344,6 +1422,161 @@ export class PlayPhaseScene {
       .kh-cc-effects   { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
       .kh-cc-effect    { font-family: 'Cinzel', serif; font-size: .65rem; color: #a0c080; background: rgba(100,180,80,.12); border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
       .kh-cc-costs     { font-family: 'Cinzel', serif; font-size: .6rem; color: #7a6a52; }
+
+      /* ── Handbook button (top-left fixed) ────────────────────────────── */
+      .kh-hb-btn {
+        position: fixed;
+        top: 190px;
+        left: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 14px;
+        padding: 10px 14px 8px;
+        cursor: pointer;
+        z-index: 50;
+        box-shadow: 2px 4px 18px rgba(0,0,0,.5);
+        transition: all .18s ease;
+        min-width: 64px;
+      }
+      .kh-hb-btn:hover {
+        background: linear-gradient(160deg, #3e2810 0%, #2a180c 100%);
+        box-shadow: 3px 6px 24px rgba(0,0,0,.6);
+        transform: translateY(-2px);
+        border-color: #e0b040;
+      }
+      .kh-hb-btn-icon  { font-size: 1.5rem; line-height: 1; }
+      .kh-hb-btn-label {
+        font-family: 'Cinzel', serif;
+        font-size: .55rem;
+        letter-spacing: 1px;
+        color: #c4a060;
+        text-transform: uppercase;
+      }
+
+      /* ── Handbook modal ──────────────────────────────────────────────── */
+      .kh-hb-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.65);
+        z-index: 200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(2px);
+      }
+      .kh-hb-modal {
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 18px;
+        width: min(700px, 94vw);
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 16px 60px rgba(0,0,0,.7);
+        overflow: hidden;
+      }
+      .kh-hb-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 22px;
+        border-bottom: 2px solid #c49428;
+        background: linear-gradient(90deg, #3a2010 0%, #2a1608 100%);
+        flex-shrink: 0;
+      }
+      .kh-hb-modal-title {
+        font-family: 'Cinzel', serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #f0cc50;
+        letter-spacing: 2px;
+      }
+      .kh-hb-modal-close {
+        background: none;
+        border: 1px solid #a09070;
+        color: #c4a060;
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: .9rem;
+        cursor: pointer;
+        font-family: 'Cinzel', serif;
+        transition: all .15s;
+      }
+      .kh-hb-modal-close:hover { background: rgba(255,255,255,.08); color: #f0cc50; border-color: #c49428; }
+
+      /* Modal scrollable body */
+      .kh-hb-modal-body {
+        overflow-y: auto;
+        padding: 10px 0;
+        flex: 1;
+      }
+      .kh-hb-modal-body::-webkit-scrollbar { width: 5px; }
+      .kh-hb-modal-body::-webkit-scrollbar-track { background: #1a100a; }
+      .kh-hb-modal-body::-webkit-scrollbar-thumb { background: #c49428; border-radius: 4px; }
+
+      /* Accordion chapters */
+      .kh-hb-chapter {
+        border-bottom: 1px solid rgba(196,148,40,.2);
+      }
+      .kh-hb-ch-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 22px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        transition: background .15s;
+      }
+      .kh-hb-ch-toggle:hover { background: rgba(255,255,255,.04); }
+      .kh-hb-chapter-open > .kh-hb-ch-toggle { background: rgba(196,148,40,.07); }
+      .kh-hb-ch-icon  { font-size: 1.2rem; flex-shrink: 0; }
+      .kh-hb-ch-title {
+        flex: 1;
+        font-family: 'Cinzel', serif;
+        font-size: .88rem;
+        font-weight: 700;
+        color: #f0e8c0;
+        letter-spacing: 1px;
+      }
+      .kh-hb-ch-arrow {
+        font-size: .7rem;
+        color: #c4a060;
+        flex-shrink: 0;
+      }
+
+      /* Chapter body */
+      .kh-hb-ch-body { padding: 0 22px 10px; }
+
+      /* Individual sections */
+      .kh-hb-section {
+        padding: 14px 0;
+        border-top: 1px dashed rgba(196,148,40,.2);
+      }
+      .kh-hb-section:first-child { border-top: none; }
+      .kh-hb-sec-title {
+        font-family: 'Cinzel', serif;
+        font-size: .75rem;
+        font-weight: 700;
+        color: #c49428;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+      }
+      .kh-hb-sec-body {
+        font-family: 'Crimson Text', Georgia, serif;
+        font-size: .97rem;
+        color: #c8b89a;
+        line-height: 1.65;
+      }
+      .kh-hb-sec-body b { color: #f0e8c0; }
+      .kh-hb-sec-body em { color: #d4c090; font-style: italic; }
     `;
     document.head.appendChild(style);
   }
