@@ -447,7 +447,7 @@ export class PlayPhaseScene {
   private buildPileIndicators(state: GameState): string {
     const drawCount    = state.drawPile.get(state.curSeason)?.length ?? 0;
     const discardCount = state.discardPile.get(state.curSeason)?.length ?? 0;
-    const deckCount    = this.totalCards(state.drawPile) + this.totalCards(state.discardPile);
+    const deckCount    = this.totalCards(state.drawPile) + this.totalCards(state.discardPile) + state.hand.length;
 
     return `
       <!-- Draw pile — bottom left -->
@@ -555,7 +555,8 @@ export class PlayPhaseScene {
         .map((s) => {
           const drawCards    = state.drawPile.get(s) ?? [];
           const discardCards = state.discardPile.get(s) ?? [];
-          const total        = drawCards.length + discardCards.length;
+          const handCards    = s === state.curSeason ? state.hand : [];
+          const total        = drawCards.length + discardCards.length + handCards.length;
           return `
             <button class="kh-pile-tab ${s === state.curSeason ? "kh-pile-tab-active" : ""}"
                     data-season="${s}">
@@ -569,7 +570,9 @@ export class PlayPhaseScene {
       const renderTab = (season: Season) => {
         const drawCards    = state.drawPile.get(season) ?? [];
         const discardCards = state.discardPile.get(season) ?? [];
-        const allCards     = [...drawCards, ...discardCards];
+        // Hand cards belong to the current season's draw pile — show them separately
+        const handCards    = season === state.curSeason ? state.hand : [];
+        const allCards     = [...drawCards, ...discardCards, ...handCards];
 
         // Update active state
         tabsEl.querySelectorAll<HTMLButtonElement>(".kh-pile-tab").forEach((btn) => {
@@ -580,6 +583,10 @@ export class PlayPhaseScene {
           bodyEl.innerHTML = `<div class="kh-pile-empty">No cards in your ${season.toLowerCase()} collection.</div>`;
         } else {
           bodyEl.innerHTML = `
+            ${handCards.length > 0 ? `
+              <div class="kh-pile-sub-heading">In Hand (${handCards.length})</div>
+              ${handCards.map((c) => this.buildCompactCard(c)).join("")}
+            ` : ""}
             ${drawCards.length > 0 ? `
               <div class="kh-pile-sub-heading">Draw (${drawCards.length})</div>
               ${drawCards.map((c) => this.buildCompactCard(c)).join("")}
