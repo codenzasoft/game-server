@@ -141,7 +141,7 @@ export class AddPhaseScene {
 
     // Apply season background image over a dark scrim for readability
     this.overlay.style.background =
-      `linear-gradient(rgba(8,4,2,.48) 0%, rgba(8,4,2,.48) 100%), url('${meta.bg}') center/cover no-repeat`;
+      `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.attachListeners(state);
     attachDeckListeners(this.overlay, state);
@@ -412,8 +412,8 @@ export class AddPhaseScene {
 
       /* Phase tracker */
       .kh-phase-track {
-        background: #e8d49c;
-        border-bottom: 2px solid #c4a060;
+        background: rgba(10,5,2,0.65);
+        border-bottom: 2px solid rgba(196,160,96,0.35);
         padding: 12px 48px;
         display: flex;
         justify-content: center;
@@ -428,26 +428,24 @@ export class AddPhaseScene {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1.5px;
-        color: #7a6a52;
+        color: rgba(200,176,140,0.55);
         border-radius: 4px;
-        opacity: .45;
       }
       .kh-phase-step.kh-phase-active {
-        opacity: 1;
-        color: #3d6b46;
-        background: rgba(61,107,70,.12);
-        border: 1px solid rgba(61,107,70,.35);
+        color: #90e090;
+        background: rgba(61,107,70,.3);
+        border: 1px solid rgba(144,224,144,.35);
         font-weight: 700;
       }
       .kh-phase-dot  { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-      .kh-phase-arrow { color: #c4a060; font-size: 1rem; opacity: .6; padding: 0 4px; }
+      .kh-phase-arrow { color: rgba(196,160,96,0.5); font-size: 1rem; padding: 0 4px; }
 
       /* Scene body */
       .kh-scene { max-width: 1080px; margin: 0 auto; padding: 44px 28px 60px; }
 
       .kh-prompt { text-align: center; margin-bottom: 36px; }
-      .kh-prompt h2 { font-family: 'Cinzel', serif; font-size: 1.55rem; color: #3a2010; margin: 0 0 6px; }
-      .kh-prompt p  { color: #7a6a52; font-size: 1.1rem; font-style: italic; }
+      .kh-prompt h2 { font-family: 'Cinzel', serif; font-size: 1.55rem; color: #f0e8c0; margin: 0 0 6px; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+      .kh-prompt p  { color: #c4b08c; font-size: 1.1rem; font-style: italic; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 
       /* Cards grid */
       .kh-cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-bottom: 36px; }
@@ -539,7 +537,7 @@ export class AddPhaseScene {
       .kh-btn-select:disabled { background: #a09070; border-color: #c0a060; color: #e8d8a0; cursor: not-allowed; opacity: .7; }
 
       /* Ornament */
-      .kh-ornament { text-align: center; color: #c49428; font-size: 1.4rem; letter-spacing: 10px; opacity: .45; margin: 6px 0 30px; user-select: none; }
+      .kh-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 6px 0 30px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
       /* Action bar */
       .kh-action-bar { display: flex; justify-content: center; align-items: center; gap: 18px; }
@@ -563,9 +561,9 @@ export class AddPhaseScene {
 
       .kh-btn-skip {
         padding: 12px 28px;
-        background: transparent;
-        color: #7a6a52;
-        border: 2px solid #c4a060;
+        background: rgba(10,5,2,0.45);
+        color: #c4b08c;
+        border: 2px solid rgba(196,160,96,0.55);
         border-radius: 9px;
         font-family: 'Cinzel', serif;
         font-size: .82rem;
@@ -573,7 +571,7 @@ export class AddPhaseScene {
         cursor: pointer;
         transition: all .15s;
       }
-      .kh-btn-skip:hover:not(:disabled) { border-color: #7a6a52; color: #3a2010; background: rgba(0,0,0,.04); }
+      .kh-btn-skip:hover:not(:disabled) { border-color: #c4b08c; color: #f0e8c0; background: rgba(10,5,2,0.6); }
       .kh-btn-skip:disabled { opacity: .5; cursor: not-allowed; }
 
       /* Toast */

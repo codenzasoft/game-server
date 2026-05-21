@@ -126,7 +126,7 @@ export class PlayPhaseScene {
 
     // Apply season background image over a dark scrim for readability
     this.overlay.style.background =
-      `linear-gradient(rgba(8,4,2,.48) 0%, rgba(8,4,2,.48) 100%), url('${meta.bg}') center/cover no-repeat`;
+      `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.attachListeners(state, tableFingerprints);
     this.attachPileListeners(state);
@@ -716,8 +716,8 @@ export class PlayPhaseScene {
 
       /* ── Phase tracker ───────────────────────────────────────────────── */
       .kh-play-phase-track {
-        background: #e8d49c;
-        border-bottom: 2px solid #c4a060;
+        background: rgba(10,5,2,0.65);
+        border-bottom: 2px solid rgba(196,160,96,0.35);
         padding: 12px 48px;
         display: flex;
         justify-content: center;
@@ -732,19 +732,17 @@ export class PlayPhaseScene {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1.5px;
-        color: #7a6a52;
+        color: rgba(200,176,140,0.55);
         border-radius: 4px;
-        opacity: .45;
       }
       .kh-play-phase-step.kh-play-phase-active {
-        opacity: 1;
-        color: #5a1a1a;
-        background: rgba(90,26,26,.10);
-        border: 1px solid rgba(90,26,26,.30);
+        color: #f09090;
+        background: rgba(139,40,40,.3);
+        border: 1px solid rgba(240,144,144,.35);
         font-weight: 700;
       }
       .kh-play-phase-dot   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-      .kh-play-phase-arrow { color: #c4a060; font-size: 1rem; opacity: .6; padding: 0 4px; }
+      .kh-play-phase-arrow { color: rgba(196,160,96,0.5); font-size: 1rem; padding: 0 4px; }
 
       /* ── Scene body ──────────────────────────────────────────────────── */
       .kh-play-scene { max-width: 1160px; margin: 0 auto; padding: 36px 28px 80px; }
@@ -762,27 +760,29 @@ export class PlayPhaseScene {
         font-size: 1.1rem;
         font-weight: 700;
         letter-spacing: 2px;
-        color: #3a2010;
+        color: #f0e8c0;
         display: flex;
         align-items: center;
         gap: 8px;
+        text-shadow: 0 2px 8px rgba(0,0,0,.7);
       }
       .kh-play-table-count {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1px;
-        color: #7a6a52;
-        background: rgba(0,0,0,.05);
+        color: #c4b08c;
+        background: rgba(0,0,0,.35);
         padding: 3px 12px;
         border-radius: 12px;
-        border: 1px solid #c4a060;
+        border: 1px solid rgba(196,160,96,0.45);
       }
       .kh-play-section-sub {
         font-style: italic;
-        color: #7a6a52;
+        color: #c4b08c;
         font-size: .93rem;
         margin: 0 0 18px;
         line-height: 1.4;
+        text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
 
       /* ── Table slots ─────────────────────────────────────────────────── */
@@ -879,7 +879,7 @@ export class PlayPhaseScene {
       .kh-play-empty-label { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1px; }
 
       /* ── Ornament ────────────────────────────────────────────────────── */
-      .kh-play-ornament { text-align: center; color: #c49428; font-size: 1.4rem; letter-spacing: 10px; opacity: .45; margin: 8px 0 32px; user-select: none; }
+      .kh-play-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 8px 0 32px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
       /* ── Hand grid (max 3 cards) ─────────────────────────────────────── */
       .kh-play-hand-grid            { display: grid; gap: 22px; }
@@ -1009,13 +1009,14 @@ export class PlayPhaseScene {
       .kh-play-action-bar {
         text-align: center;
         padding-top: 16px;
-        border-top: 2px dashed #c4a060;
+        border-top: 2px dashed rgba(196,160,96,0.45);
       }
       .kh-play-end-hint {
         font-style: italic;
-        color: #7a6a52;
+        color: #c4b08c;
         font-size: .95rem;
         margin-bottom: 18px;
+        text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
       .kh-play-btn-end {
         padding: 15px 52px;
