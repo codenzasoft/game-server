@@ -17,7 +17,7 @@ class GameStateSpec extends Specification {
         state.curSeason == Season.SPRING
         state.year == 1
         state.population == 5
-        state.production == 100
+        state.production == 200
         state.food == 50
         state.board.size() == 4
     }
