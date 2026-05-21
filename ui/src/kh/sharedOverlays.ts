@@ -377,7 +377,7 @@ export function injectSharedStyles(): void {
       z-index: 9999;
       white-space: nowrap;
       letter-spacing: .5px;
-      animation: kh-float-rise 1.1s ease-out forwards;
+      animation: kh-float-rise 2s ease-out forwards;
       text-shadow: 0 2px 8px rgba(0,0,0,.85);
     }
     .kh-float-pos { color: #6ae66a; }
@@ -419,7 +419,7 @@ export function spawnResourceIndicator(
   // so multiple effects from a single card cascade upward instead of stacking.
   const startY  = rect.top - 8 + staggerIndex * 18;
   const startX  = rect.left + rect.width / 2;
-  const delay   = staggerIndex * 110;
+  const delay   = staggerIndex * 180;
 
   el.style.cssText = `
     left: ${startX}px;
@@ -431,7 +431,7 @@ export function spawnResourceIndicator(
   el.addEventListener("animationstart", () => { el.style.opacity = ""; }, { once: true });
 
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1200 + delay);
+  setTimeout(() => el.remove(), 2100 + delay);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
