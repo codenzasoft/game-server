@@ -67,6 +67,116 @@ export function injectSharedStyles(): void {
     /* Positions */
     .kh-pos-deck     { top: 190px; right: 20px; }
     .kh-pos-handbook { top: 190px; left: 20px; }
+    .kh-pos-options  { top: 14px;  right: 20px; }
+
+    /* ── Options button ──────────────────────────────────────────────── */
+    .kh-options-btn {
+      position: fixed;
+      top: 14px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: linear-gradient(160deg, #1e1208 0%, #130c08 100%);
+      border: 2px solid #7a5a28;
+      border-radius: 10px;
+      padding: 7px 14px;
+      cursor: pointer;
+      z-index: 60;
+      box-shadow: 0 2px 12px rgba(0,0,0,.55);
+      transition: all .18s ease;
+      font-family: 'Cinzel', serif;
+      font-size: .72rem;
+      letter-spacing: 1px;
+      color: #b09060;
+      text-transform: uppercase;
+    }
+    .kh-options-btn:hover {
+      border-color: #c49428;
+      color: #f0cc50;
+      box-shadow: 0 4px 18px rgba(0,0,0,.65);
+      transform: translateY(-1px);
+    }
+    .kh-options-btn-icon { font-size: 1rem; line-height: 1; }
+
+    /* ── Options modal ───────────────────────────────────────────────── */
+    .kh-opt-modal {
+      background: linear-gradient(170deg, #1a1008 0%, #0e0904 100%);
+      border: 2px solid #c49428;
+      border-radius: 18px;
+      width: min(360px, 90vw);
+      box-shadow: 0 20px 70px rgba(0,0,0,.8);
+      overflow: hidden;
+    }
+    .kh-opt-modal-header {
+      background: linear-gradient(90deg, #2a1608 0%, #1a0e06 100%);
+      border-bottom: 2px solid #c49428;
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kh-opt-modal-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f0cc50;
+      letter-spacing: 2px;
+    }
+    .kh-opt-modal-body {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .kh-opt-action-btn {
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      border: 2px solid;
+      font-family: 'Cinzel', serif;
+      font-size: .9rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all .18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .kh-opt-save-btn {
+      background: linear-gradient(160deg, #1e2e1a 0%, #141e10 100%);
+      border-color: #5a8a40;
+      color: #90d070;
+    }
+    .kh-opt-save-btn:hover {
+      background: linear-gradient(160deg, #2a4022 0%, #1c2e16 100%);
+      border-color: #78b058;
+      color: #b0f090;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(80,160,40,.25);
+    }
+    .kh-opt-quit-btn {
+      background: linear-gradient(160deg, #2e1414 0%, #1e0c0c 100%);
+      border-color: #8a3030;
+      color: #d07070;
+    }
+    .kh-opt-quit-btn:hover {
+      background: linear-gradient(160deg, #401a1a 0%, #2a1010 100%);
+      border-color: #b04040;
+      color: #f09090;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(160,40,40,.25);
+    }
+    .kh-opt-quit-warn {
+      font-family: 'Crimson Text', Georgia, serif;
+      font-size: .82rem;
+      color: #7a5a5a;
+      text-align: center;
+      font-style: italic;
+      padding: 0 4px;
+    }
 
     /* ── Shared modal backdrop ───────────────────────────────────────── */
     .kh-shared-backdrop {
@@ -420,6 +530,62 @@ export function buildHandbookButton(): string {
       </div>
     </div>
   `;
+}
+
+// ── Options menu (Quit / Save and Exit) ───────────────────────────────────────
+//
+// Fires two custom DOM events so scenes stay decoupled from the handler:
+//   document.dispatchEvent(new Event('kh-quit'))
+//   document.dispatchEvent(new Event('kh-save-exit'))
+// main.ts listens for these and calls handler.quit() / handler.saveAndExit().
+
+export function buildOptionsButton(): string {
+  return `
+    <button class="kh-options-btn" id="kh-opt-open" title="Options">
+      <span class="kh-options-btn-icon">⚙</span>
+      Menu
+    </button>
+    <div class="kh-shared-backdrop" id="kh-opt-backdrop" style="display:none;">
+      <div class="kh-opt-modal">
+        <div class="kh-opt-modal-header">
+          <span class="kh-opt-modal-title">⚙ &nbsp;Options</span>
+          <button class="kh-shared-modal-close" id="kh-opt-close">✕</button>
+        </div>
+        <div class="kh-opt-modal-body">
+          <button class="kh-opt-action-btn kh-opt-save-btn" id="kh-opt-save-exit">
+            🏠 &nbsp;Save &amp; Exit
+          </button>
+          <button class="kh-opt-action-btn kh-opt-quit-btn" id="kh-opt-quit">
+            ☠ &nbsp;Quit Game
+          </button>
+          <p class="kh-opt-quit-warn">
+            Quitting permanently ends this run. Save &amp; Exit keeps your progress.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+export function attachOptionsListeners(overlay: HTMLElement): void {
+  const openBtn  = overlay.querySelector<HTMLButtonElement>("#kh-opt-open");
+  const closeBtn = overlay.querySelector<HTMLButtonElement>("#kh-opt-close");
+  const backdrop = overlay.querySelector<HTMLDivElement>("#kh-opt-backdrop");
+  const saveBtn  = overlay.querySelector<HTMLButtonElement>("#kh-opt-save-exit");
+  const quitBtn  = overlay.querySelector<HTMLButtonElement>("#kh-opt-quit");
+
+  openBtn?.addEventListener("click",  () => { if (backdrop) backdrop.style.display = "flex"; });
+  closeBtn?.addEventListener("click", () => { if (backdrop) backdrop.style.display = "none"; });
+  backdrop?.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.style.display = "none"; });
+
+  saveBtn?.addEventListener("click", () => {
+    document.dispatchEvent(new Event("kh-save-exit"));
+  });
+
+  quitBtn?.addEventListener("click", () => {
+    if (backdrop) backdrop.style.display = "none";
+    document.dispatchEvent(new Event("kh-quit"));
+  });
 }
 
 export function attachHandbookListeners(overlay: HTMLElement): void {

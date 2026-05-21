@@ -11,6 +11,8 @@ import {
   attachDeckListeners,
   buildHandbookButton,
   attachHandbookListeners,
+  buildOptionsButton,
+  attachOptionsListeners,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -118,6 +120,7 @@ export class PlayPhaseScene {
       ${this.buildPileModal()}
       ${buildDeckIndicator(state)}
       ${buildHandbookButton()}
+      ${buildOptionsButton()}
       <div class="kh-play-toast" id="kh-play-toast"></div>
     `;
 
@@ -129,6 +132,7 @@ export class PlayPhaseScene {
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
   }
 
   private renderGameOver(): void {
@@ -167,6 +171,7 @@ export class PlayPhaseScene {
       `linear-gradient(rgba(8,4,2,.6) 0%, rgba(8,4,2,.6) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.overlay.insertAdjacentHTML("beforeend", buildHandbookButton());
+    this.overlay.insertAdjacentHTML("beforeend", buildOptionsButton());
 
     const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-go-btn");
     if (homeBtn) {
@@ -176,6 +181,7 @@ export class PlayPhaseScene {
     }
 
     attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
   }
 
   // ─── Section builders ───────────────────────────────────────────────────
