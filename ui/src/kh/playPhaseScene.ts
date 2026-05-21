@@ -668,11 +668,12 @@ export class PlayPhaseScene {
       el?.classList.toggle("kh-resolving", on);
     };
 
-    // ── 1. Fire each RECURRING table card left-to-right ─────────────────
+    // ── 1. Fire each table card left-to-right ────────────────────────────
+    // RECURRING cards stay on the table; SINGLE cards fire once then go to
+    // the discard pile (handled server-side after the commit).
 
     for (let i = 0; i < table.length; i++) {
       const card = table[i];
-      if (card.frequencyType !== "RECURRING") continue;
 
       setHighlight(i, true);
 
@@ -691,7 +692,8 @@ export class PlayPhaseScene {
       updateBar(simPop, simProd, simFood, changed);
 
       const info = getCardDisplayInfo(card);
-      this.showToast(`${info.icon} ${info.name} fires…`);
+      const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
+      this.showToast(`${info.icon} ${info.name} ${label}`);
 
       await this.delay(750);
       setHighlight(i, false);
