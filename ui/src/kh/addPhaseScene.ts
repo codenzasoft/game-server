@@ -325,7 +325,7 @@ export class AddPhaseScene {
     el.textContent = msg;
     el.classList.add("kh-toast-visible");
     if (this._toastTimer) clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => el.classList.remove("kh-toast-visible"), 3000);
+    this._toastTimer = setTimeout(() => el.classList.remove("kh-toast-visible"), 5000);
   }
 
   // ─── Style injection (runs once per page load) ───────────────────────────
@@ -577,9 +577,9 @@ export class AddPhaseScene {
       /* Toast */
       .kh-toast {
         position: fixed;
-        bottom: 32px;
+        top: 170px;
         left: 50%;
-        transform: translateX(-50%) translateY(10px);
+        transform: translateX(-50%) translateY(-10px);
         background: #3a2010;
         color: #f0cc50;
         border: 2px solid #c49428;

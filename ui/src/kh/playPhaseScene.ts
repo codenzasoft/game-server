@@ -731,15 +731,12 @@ export class PlayPhaseScene {
       const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
       this.showToast(`${info.icon} ${info.name} ${label}`);
 
-      await this.delay(750);
+      await this.delay(1500);
       setHighlight(i, false);
-      await this.delay(120);
+      await this.delay(150);
     }
 
     // ── 2. Food consumption & population growth / starvation ─────────────
-
-    this.showToast("🍞 Calculating food & population…");
-    await this.delay(500);
 
     const rate     = season === Season.WINTER ? 2 : 1;
     const consumed = Math.floor(simPop) * rate;
@@ -786,7 +783,7 @@ export class PlayPhaseScene {
     if (this._toastTimer) clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(
       () => el.classList.remove("kh-play-toast-visible"),
-      3000,
+      5000,
     );
   }
 
@@ -1243,9 +1240,9 @@ export class PlayPhaseScene {
       /* ── Toast ───────────────────────────────────────────────────────── */
       .kh-play-toast {
         position: fixed;
-        bottom: 32px;
+        top: 170px;
         left: 50%;
-        transform: translateX(-50%) translateY(10px);
+        transform: translateX(-50%) translateY(-10px);
         background: #3a2010;
         color: #f0cc50;
         border: 2px solid #c49428;
