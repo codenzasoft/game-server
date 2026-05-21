@@ -1,4 +1,4 @@
-import { GameState, Season, KhEvent, EventOption, Effect } from "./kingshand.ts";
+import { GameState, Season, KhEvent, EventOption, Effect, ResourceTarget } from "./kingshand.ts";
 import { formatModifier, targetEmoji } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -8,6 +8,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  spawnResourceIndicator,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -21,12 +22,12 @@ export interface RandomEventActions {
 
 const SEASON_META: Record<
   Season,
-  { label: string; icon: string; headerColor: string; accentColor: string }
+  { label: string; icon: string; headerColor: string; accentColor: string; bg: string }
 > = {
-  [Season.SPRING]: { label: "Spring", icon: "🌿", headerColor: "#274d30", accentColor: "#3d6b46" },
-  [Season.SUMMER]: { label: "Summer", icon: "☀️",  headerColor: "#5a3a0a", accentColor: "#8a5a10" },
-  [Season.FALL]:   { label: "Fall",   icon: "🍂", headerColor: "#5a2a10", accentColor: "#8a4020" },
-  [Season.WINTER]: { label: "Winter", icon: "❄️",  headerColor: "#1a2a40", accentColor: "#2a4060" },
+  [Season.SPRING]: { label: "Spring", icon: "🌿", headerColor: "#274d30", accentColor: "#3d6b46", bg: "/img/bg-spring.png" },
+  [Season.SUMMER]: { label: "Summer", icon: "☀️",  headerColor: "#5a3a0a", accentColor: "#8a5a10", bg: "/img/bg-summer.png" },
+  [Season.FALL]:   { label: "Fall",   icon: "🍂", headerColor: "#5a2a10", accentColor: "#8a4020", bg: "/img/bg-fall.png" },
+  [Season.WINTER]: { label: "Winter", icon: "❄️",  headerColor: "#1a2a40", accentColor: "#2a4060", bg: "/img/bg-winter.png" },
 };
 
 // ─── RandomEventScene ─────────────────────────────────────────────────────────
@@ -88,6 +89,10 @@ export class RandomEventScene {
       ${buildOptionsButton()}
       <div class="kh-re-toast" id="kh-re-toast"></div>
     `;
+
+    // Apply season background image over a dark scrim for readability
+    this.overlay.style.background =
+      `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
     this.attachListeners(state);
     attachDeckListeners(this.overlay, state);
@@ -251,12 +256,32 @@ export class RandomEventScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
+    // Helper: spawn indicators for all effects of the chosen option.
+    const spawnOptionIndicators = (index: number): void => {
+      const option = state.currentEvent?.options[index];
+      if (!option) return;
+      let si = 0;
+      for (const eff of option.effects) {
+        if (typeof eff.target !== "string") continue; // skip CardTarget effects
+        const sel =
+          eff.target === ResourceTarget.POPULATION ? ".kh-re-pop  .kh-re-res-value" :
+          eff.target === ResourceTarget.PRODUCTION  ? ".kh-re-prod .kh-re-res-value" :
+                                                      ".kh-re-food .kh-re-res-value";
+        const icon =
+          eff.target === ResourceTarget.POPULATION ? "👥" :
+          eff.target === ResourceTarget.PRODUCTION  ? "⚒️" : "🌾";
+        const anchor = this.overlay.querySelector<HTMLElement>(sel);
+        if (anchor) spawnResourceIndicator(anchor, eff.modifier, icon, si++);
+      }
+    };
+
     // Option choose buttons
     this.overlay
       .querySelectorAll<HTMLButtonElement>(".kh-re-btn-choose")
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
+          spawnOptionIndicators(index);
           this.disableAllActions();
           const label = state.currentEvent?.options[index]?.description ?? "your choice";
           this.showToast(`"${label}" — advancing to Play…`);
@@ -272,6 +297,7 @@ export class RandomEventScene {
           // Avoid double-firing if the button inside was clicked
           if ((e.target as HTMLElement).closest(".kh-re-btn-choose")) return;
           const index = Number(card.dataset.index);
+          spawnOptionIndicators(index);
           this.disableAllActions();
           const label = state.currentEvent?.options[index]?.description ?? "your choice";
           this.showToast(`"${label}" — advancing to Play…`);
@@ -313,7 +339,7 @@ export class RandomEventScene {
     if (this._toastTimer) clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(
       () => el.classList.remove("kh-re-toast-visible"),
-      3000,
+      5000,
     );
   }
 
@@ -353,7 +379,7 @@ export class RandomEventScene {
         justify-content: space-between;
         box-shadow: 0 4px 20px rgba(0,0,0,.45);
       }
-      .kh-re-ornament      { font-size: 2rem; color: #f0cc50; opacity: .55; user-select: none; }
+      .kh-re-ornament      { font-size: 2rem; color: #f0cc50; opacity: .8; user-select: none; }
       .kh-re-header-center { text-align: center; flex: 1; }
       .kh-re-header-center h1 {
         font-family: 'Cinzel', serif;
@@ -400,8 +426,8 @@ export class RandomEventScene {
 
       /* Phase tracker */
       .kh-re-phase-track {
-        background: #e8d49c;
-        border-bottom: 2px solid #c4a060;
+        background: rgba(10,5,2,0.65);
+        border-bottom: 2px solid rgba(196,160,96,0.35);
         padding: 12px 48px;
         display: flex;
         justify-content: center;
@@ -416,19 +442,17 @@ export class RandomEventScene {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1.5px;
-        color: #7a6a52;
+        color: rgba(200,176,140,0.55);
         border-radius: 4px;
-        opacity: .45;
       }
       .kh-re-phase-step.kh-re-phase-active {
-        opacity: 1;
-        color: #3d6b46;
-        background: rgba(61,107,70,.12);
-        border: 1px solid rgba(61,107,70,.35);
+        color: #c49428;
+        background: rgba(196,148,40,.2);
+        border: 1px solid rgba(196,148,40,.4);
         font-weight: 700;
       }
       .kh-re-phase-dot   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-      .kh-re-phase-arrow { color: #c4a060; font-size: 1rem; opacity: .6; padding: 0 4px; }
+      .kh-re-phase-arrow { color: rgba(196,160,96,0.5); font-size: 1rem; padding: 0 4px; }
 
       /* Scene body */
       .kh-re-scene { max-width: 860px; margin: 0 auto; padding: 44px 28px 60px; }
@@ -447,14 +471,15 @@ export class RandomEventScene {
         font-family: 'Crimson Text', Georgia, serif;
         font-size: 1.7rem;
         font-style: italic;
-        color: #3a2010;
+        color: #f0e8c0;
         line-height: 1.4;
         margin: 0 0 10px;
         max-width: 680px;
         margin-left: auto;
         margin-right: auto;
+        text-shadow: 0 2px 10px rgba(0,0,0,.7);
       }
-      .kh-re-event-sub { color: #7a6a52; font-size: 1rem; font-style: italic; margin: 0; }
+      .kh-re-event-sub { color: #c4b08c; font-size: 1rem; font-style: italic; margin: 0; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 
       /* Options grid — 1 column for single option, 2 for two, side-by-side for 3 */
       .kh-re-options-grid {
@@ -591,8 +616,8 @@ export class RandomEventScene {
         margin: 0 auto;
       }
       .kh-re-no-event-icon { font-size: 4rem; margin-bottom: 20px; }
-      .kh-re-no-event h2   { font-family: 'Cinzel', serif; font-size: 1.6rem; color: #3a2010; margin: 0 0 10px; }
-      .kh-re-no-event p    { color: #7a6a52; font-style: italic; font-size: 1.05rem; margin: 0 0 32px; }
+      .kh-re-no-event h2   { font-family: 'Cinzel', serif; font-size: 1.6rem; color: #f0e8c0; margin: 0 0 10px; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+      .kh-re-no-event p    { color: #c4b08c; font-style: italic; font-size: 1.05rem; margin: 0 0 32px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
       .kh-re-btn-continue {
         padding: 13px 40px;
         background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
@@ -616,9 +641,9 @@ export class RandomEventScene {
       /* Toast */
       .kh-re-toast {
         position: fixed;
-        bottom: 32px;
+        top: 170px;
         left: 50%;
-        transform: translateX(-50%) translateY(10px);
+        transform: translateX(-50%) translateY(-10px);
         background: #3a2010;
         color: #f0cc50;
         border: 2px solid #c49428;

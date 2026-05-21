@@ -13,6 +13,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  spawnResourceIndicator,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -124,6 +125,10 @@ export class PlayPhaseScene {
       <div class="kh-play-toast" id="kh-play-toast"></div>
     `;
 
+    // Apply season background image over a dark scrim for readability
+    this.overlay.style.background =
+      `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
+
     this.attachListeners(state, tableFingerprints);
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
@@ -162,6 +167,7 @@ export class PlayPhaseScene {
       </div>
     `;
 
+    // Apply season background image on game-over screen too
     this.overlay.style.background =
       `linear-gradient(rgba(8,4,2,.6) 0%, rgba(8,4,2,.6) 100%), url('${meta.bg}') center/cover no-repeat`;
 
@@ -568,12 +574,20 @@ export class PlayPhaseScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState, tableFingerprints: Set<string>): void {
+    const table = state.getCurrentTable();
+
     // Demolish buttons on table cards
     this.overlay
       .querySelectorAll<HTMLButtonElement>(".kh-play-btn-demolish")
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const slot = Number(btn.dataset.slot);
+          const card = table[slot];
+          if (card) {
+            const cost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
+            const { prod } = this.resEls();
+            if (prod) spawnResourceIndicator(prod, -cost, "⚒️");
+          }
           this.disableAllActions();
           this.showToast("Demolishing…");
           this.actions.demolishCard(slot);
@@ -586,21 +600,24 @@ export class PlayPhaseScene {
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
-          const fp = fingerprint(state.hand[index]);
+          const card  = state.hand[index];
+          const fp    = fingerprint(card);
           const isUpgrade = tableFingerprints.has(fp);
+          if (card.productionRequirement > 0) {
+            const { prod } = this.resEls();
+            if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
+          }
           this.disableAllActions();
           this.showToast(isUpgrade ? "Upgrading table card…" : "Playing card…");
           this.actions.placeCard(index);
         });
       });
 
-    // End and Run
+    // End and Run — plays out card-by-card before dispatching to server.
     const endBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-btn-end");
     if (endBtn) {
       endBtn.addEventListener("click", () => {
-        this.disableAllActions();
-        this.showToast("Running the table — advancing the season…");
-        this.actions.endAndRun();
+        void this.animateEndAndRun();
       });
     }
   }
@@ -609,6 +626,149 @@ export class PlayPhaseScene {
     this.overlay
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((b) => (b.disabled = true));
+  }
+
+  // ─── Resource indicator helpers ──────────────────────────────────────────
+
+  /** Returns the three live resource-value elements (pop, prod, food). */
+  private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
+    return {
+      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop  .kh-play-res-value"),
+      prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
+      food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+    };
+  }
+
+  // ─── End-and-Run animation ───────────────────────────────────────────────
+
+  private readonly delay = (ms: number): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, ms));
+
+  /**
+   * Plays the End-and-Run resolution step-by-step so the player can see
+   * each RECURRING table card fire before the season advances.
+   *
+   * 1. Highlights each RECURRING card in order, updates the resource bar
+   *    with that card's effects, then pauses 750ms.
+   * 2. After all cards, shows the food-consumption / population step.
+   * 3. Dispatches the real {@link PlayPhaseActions.endAndRun} so the server
+   *    applies the authoritative result and pushes the next state.
+   */
+  private async animateEndAndRun(): Promise<void> {
+    this.disableAllActions();
+
+    const { state } = this;
+    const season = state.curSeason;
+    const table  = state.getCurrentTable();
+
+    // Local display values — server remains source of truth after commit.
+    let simPop  = state.population;
+    let simProd = state.production;
+    let simFood = state.food;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    const flashEl = (sel: string, val: number, doFlash: boolean): void => {
+      const el = this.overlay.querySelector<HTMLElement>(sel);
+      if (!el) return;
+      el.textContent = Math.floor(val).toString();
+      if (doFlash) {
+        el.classList.remove("kh-res-flash");
+        void el.offsetWidth; // force reflow to restart animation
+        el.classList.add("kh-res-flash");
+      }
+    };
+
+    const updateBar = (pop: number, prod: number, food: number,
+                       which: { pop: boolean; prod: boolean; food: boolean }): void => {
+      flashEl(".kh-play-pop  .kh-play-res-value", pop,  which.pop);
+      flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
+      flashEl(".kh-play-food .kh-play-res-value", food, which.food);
+    };
+
+    const setHighlight = (slot: number, on: boolean): void => {
+      const el = this.overlay.querySelector<HTMLElement>(
+        `.kh-play-table-card[data-slot="${slot}"]`,
+      );
+      el?.classList.toggle("kh-resolving", on);
+    };
+
+    // ── 1. Fire each table card left-to-right ────────────────────────────
+    // RECURRING cards stay on the table; SINGLE cards fire once then go to
+    // the discard pile (handled server-side after the commit).
+
+    for (let i = 0; i < table.length; i++) {
+      const card = table[i];
+
+      setHighlight(i, true);
+
+      const changed = { pop: false, prod: false, food: false };
+      const prevPop  = simPop;
+      const prevProd = simProd;
+      const prevFood = simFood;
+
+      for (const eff of card.effects) {
+        if (eff.target === ResourceTarget.FOOD)       { simFood += eff.modifier; changed.food = true; }
+        if (eff.target === ResourceTarget.PRODUCTION) { simProd += eff.modifier; changed.prod = true; }
+        if (eff.target === ResourceTarget.POPULATION) { simPop  += eff.modifier; changed.pop  = true; }
+      }
+
+      // Clamp — mirrors Java applyX helpers.
+      simProd = Math.max(0, simProd);
+      simPop  = Math.max(0, simPop);
+      simFood = Math.max(0, simFood);
+
+      updateBar(simPop, simProd, simFood, changed);
+
+      // Floating indicators for each changed resource.
+      const els = this.resEls();
+      let si = 0;
+      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  simPop  - prevPop,  "👥", si++);
+      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
+      if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
+
+      const info = getCardDisplayInfo(card);
+      const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
+      this.showToast(`${info.icon} ${info.name} ${label}`);
+
+      await this.delay(1500);
+      setHighlight(i, false);
+      await this.delay(150);
+    }
+
+    // ── 2. Food consumption & population growth / starvation ─────────────
+
+    const rate     = season === Season.WINTER ? 2 : 1;
+    const consumed = Math.floor(simPop) * rate;
+    const prevPop2 = simPop;
+    const prevFood2 = simFood;
+
+    if (simFood >= consumed) {
+      simFood -= consumed;
+      if (simFood > 0 && simPop > 0) {
+        const growthRate = Math.min(simFood / simPop, 0.50);
+        simPop = simPop + simPop * growthRate;
+      }
+      this.showToast("🌱 Your people are well-fed — population grows!");
+    } else {
+      const deficit = consumed - simFood;
+      simFood = 0;
+      simPop  = Math.max(0, simPop - 0.5 * deficit);
+      this.showToast("💀 Starvation — population falls!");
+    }
+
+    updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
+
+    // Indicators for food consumed and population change.
+    const els2 = this.resEls();
+    if (els2.food) spawnResourceIndicator(els2.food, simFood - prevFood2, "🌾", 0);
+    if (els2.pop)  spawnResourceIndicator(els2.pop,  simPop  - prevPop2,  "👥", 1);
+
+    await this.delay(1400);
+
+    // ── 3. Commit to server ───────────────────────────────────────────────
+
+    this.actions.endAndRun();
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────
@@ -623,7 +783,7 @@ export class PlayPhaseScene {
     if (this._toastTimer) clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(
       () => el.classList.remove("kh-play-toast-visible"),
-      3000,
+      5000,
     );
   }
 
@@ -711,8 +871,8 @@ export class PlayPhaseScene {
 
       /* ── Phase tracker ───────────────────────────────────────────────── */
       .kh-play-phase-track {
-        background: #e8d49c;
-        border-bottom: 2px solid #c4a060;
+        background: rgba(10,5,2,0.65);
+        border-bottom: 2px solid rgba(196,160,96,0.35);
         padding: 12px 48px;
         display: flex;
         justify-content: center;
@@ -727,19 +887,17 @@ export class PlayPhaseScene {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1.5px;
-        color: #7a6a52;
+        color: rgba(200,176,140,0.55);
         border-radius: 4px;
-        opacity: .45;
       }
       .kh-play-phase-step.kh-play-phase-active {
-        opacity: 1;
-        color: #5a1a1a;
-        background: rgba(90,26,26,.10);
-        border: 1px solid rgba(90,26,26,.30);
+        color: #f09090;
+        background: rgba(139,40,40,.3);
+        border: 1px solid rgba(240,144,144,.35);
         font-weight: 700;
       }
       .kh-play-phase-dot   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-      .kh-play-phase-arrow { color: #c4a060; font-size: 1rem; opacity: .6; padding: 0 4px; }
+      .kh-play-phase-arrow { color: rgba(196,160,96,0.5); font-size: 1rem; padding: 0 4px; }
 
       /* ── Scene body ──────────────────────────────────────────────────── */
       .kh-play-scene { max-width: 1160px; margin: 0 auto; padding: 36px 28px 80px; }
@@ -757,27 +915,29 @@ export class PlayPhaseScene {
         font-size: 1.1rem;
         font-weight: 700;
         letter-spacing: 2px;
-        color: #3a2010;
+        color: #f0e8c0;
         display: flex;
         align-items: center;
         gap: 8px;
+        text-shadow: 0 2px 8px rgba(0,0,0,.7);
       }
       .kh-play-table-count {
         font-family: 'Cinzel', serif;
         font-size: .72rem;
         letter-spacing: 1px;
-        color: #7a6a52;
-        background: rgba(0,0,0,.05);
+        color: #c4b08c;
+        background: rgba(0,0,0,.35);
         padding: 3px 12px;
         border-radius: 12px;
-        border: 1px solid #c4a060;
+        border: 1px solid rgba(196,160,96,0.45);
       }
       .kh-play-section-sub {
         font-style: italic;
-        color: #7a6a52;
+        color: #c4b08c;
         font-size: .93rem;
         margin: 0 0 18px;
         line-height: 1.4;
+        text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
 
       /* ── Table slots ─────────────────────────────────────────────────── */
@@ -874,7 +1034,7 @@ export class PlayPhaseScene {
       .kh-play-empty-label { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1px; }
 
       /* ── Ornament ────────────────────────────────────────────────────── */
-      .kh-play-ornament { text-align: center; color: #c49428; font-size: 1.4rem; letter-spacing: 10px; opacity: .45; margin: 8px 0 32px; user-select: none; }
+      .kh-play-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 8px 0 32px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
       /* ── Hand grid (max 3 cards) ─────────────────────────────────────── */
       .kh-play-hand-grid            { display: grid; gap: 22px; }
@@ -1004,13 +1164,14 @@ export class PlayPhaseScene {
       .kh-play-action-bar {
         text-align: center;
         padding-top: 16px;
-        border-top: 2px dashed #c4a060;
+        border-top: 2px dashed rgba(196,160,96,0.45);
       }
       .kh-play-end-hint {
         font-style: italic;
-        color: #7a6a52;
+        color: #c4b08c;
         font-size: .95rem;
         margin-bottom: 18px;
+        text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
       .kh-play-btn-end {
         padding: 15px 52px;
@@ -1079,9 +1240,9 @@ export class PlayPhaseScene {
       /* ── Toast ───────────────────────────────────────────────────────── */
       .kh-play-toast {
         position: fixed;
-        bottom: 32px;
+        top: 170px;
         left: 50%;
-        transform: translateX(-50%) translateY(10px);
+        transform: translateX(-50%) translateY(-10px);
         background: #3a2010;
         color: #f0cc50;
         border: 2px solid #c49428;
@@ -1098,6 +1259,31 @@ export class PlayPhaseScene {
         white-space: nowrap;
       }
       .kh-play-toast.kh-play-toast-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      /* ── End-and-Run animation ───────────────────────────────────────── */
+
+      /* Card glow while it is resolving */
+      .kh-play-table-card.kh-resolving {
+        transform: translateY(-6px) scale(1.05);
+        box-shadow:
+          0 0 0 3px #f0cc50,
+          0 0 32px rgba(240,204,80,0.55),
+          6px 16px 32px rgba(0,0,0,.35);
+        border-color: #f0cc50;
+        z-index: 5;
+        position: relative;
+      }
+
+      /* Resource value flash when it changes */
+      @keyframes kh-res-flash-anim {
+        0%   { transform: scale(1);    filter: brightness(1); }
+        30%  { transform: scale(1.28); filter: brightness(2.4); }
+        100% { transform: scale(1);    filter: brightness(1); }
+      }
+      .kh-play-res-value.kh-res-flash {
+        animation: kh-res-flash-anim 0.45s ease-out forwards;
+        display: inline-block;
+      }
 
       /* ── Pile indicator buttons (draw / discard only — play phase) ───── */
       .kh-pile-icon {
