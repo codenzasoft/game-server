@@ -361,8 +361,77 @@ export function injectSharedStyles(): void {
     }
     .kh-hb-sec-body b  { color: #f0e8c0; }
     .kh-hb-sec-body em { color: #d4c090; font-style: italic; }
+
+    /* ── Floating resource indicators ────────────────────────────────── */
+    @keyframes kh-float-rise {
+      0%   { opacity: 1;   transform: translateX(-50%) translateY(0); }
+      15%  { opacity: 1; }
+      100% { opacity: 0;   transform: translateX(-50%) translateY(-64px); }
+    }
+    .kh-float-indicator {
+      position: fixed;
+      font-family: 'Cinzel', serif;
+      font-size: .95rem;
+      font-weight: 700;
+      pointer-events: none;
+      z-index: 9999;
+      white-space: nowrap;
+      letter-spacing: .5px;
+      animation: kh-float-rise 1.1s ease-out forwards;
+      text-shadow: 0 2px 8px rgba(0,0,0,.85);
+    }
+    .kh-float-pos { color: #6ae66a; }
+    .kh-float-neg { color: #f07070; }
   `;
   document.head.appendChild(style);
+}
+
+// ── Floating resource indicator ───────────────────────────────────────────────
+
+/**
+ * Spawns a "+N 🌾" / "−N ⚒️" label that floats upward from near {@code anchor}
+ * and fades out, giving the player immediate visual feedback when a resource
+ * changes.
+ *
+ * @param anchor      The resource-value DOM element to anchor the indicator to.
+ * @param delta       The change amount (positive = green, negative = red).
+ * @param icon        Emoji shown after the number (e.g. "🌾", "⚒️", "👥").
+ * @param staggerIndex Pass 0, 1, 2 … when spawning multiple indicators at once
+ *                    so they cascade rather than pile on top of each other.
+ */
+export function spawnResourceIndicator(
+  anchor: HTMLElement,
+  delta: number,
+  icon: string,
+  staggerIndex = 0,
+): void {
+  if (delta === 0) return;
+
+  const rect    = anchor.getBoundingClientRect();
+  const sign    = delta > 0 ? "+" : "−";
+  const absVal  = Math.abs(Math.floor(delta));
+
+  const el = document.createElement("div");
+  el.className = `kh-float-indicator ${delta > 0 ? "kh-float-pos" : "kh-float-neg"}`;
+  el.textContent = `${sign}${absVal} ${icon}`;
+
+  // Stagger: each successive indicator starts slightly lower and fires later,
+  // so multiple effects from a single card cascade upward instead of stacking.
+  const startY  = rect.top - 8 + staggerIndex * 18;
+  const startX  = rect.left + rect.width / 2;
+  const delay   = staggerIndex * 110;
+
+  el.style.cssText = `
+    left: ${startX}px;
+    top: ${startY}px;
+    animation-delay: ${delay}ms;
+    opacity: 0;
+  `;
+  // Make visible only after the delay kicks in by using animationstart
+  el.addEventListener("animationstart", () => { el.style.opacity = ""; }, { once: true });
+
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1200 + delay);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

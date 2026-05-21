@@ -13,6 +13,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  spawnResourceIndicator,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -573,12 +574,20 @@ export class PlayPhaseScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState, tableFingerprints: Set<string>): void {
+    const table = state.getCurrentTable();
+
     // Demolish buttons on table cards
     this.overlay
       .querySelectorAll<HTMLButtonElement>(".kh-play-btn-demolish")
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const slot = Number(btn.dataset.slot);
+          const card = table[slot];
+          if (card) {
+            const cost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
+            const { prod } = this.resEls();
+            if (prod) spawnResourceIndicator(prod, -cost, "⚒️");
+          }
           this.disableAllActions();
           this.showToast("Demolishing…");
           this.actions.demolishCard(slot);
@@ -591,8 +600,13 @@ export class PlayPhaseScene {
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
-          const fp = fingerprint(state.hand[index]);
+          const card  = state.hand[index];
+          const fp    = fingerprint(card);
           const isUpgrade = tableFingerprints.has(fp);
+          if (card.productionRequirement > 0) {
+            const { prod } = this.resEls();
+            if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
+          }
           this.disableAllActions();
           this.showToast(isUpgrade ? "Upgrading table card…" : "Playing card…");
           this.actions.placeCard(index);
@@ -612,6 +626,17 @@ export class PlayPhaseScene {
     this.overlay
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((b) => (b.disabled = true));
+  }
+
+  // ─── Resource indicator helpers ──────────────────────────────────────────
+
+  /** Returns the three live resource-value elements (pop, prod, food). */
+  private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
+    return {
+      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop  .kh-play-res-value"),
+      prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
+      food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+    };
   }
 
   // ─── End-and-Run animation ───────────────────────────────────────────────
@@ -678,6 +703,10 @@ export class PlayPhaseScene {
       setHighlight(i, true);
 
       const changed = { pop: false, prod: false, food: false };
+      const prevPop  = simPop;
+      const prevProd = simProd;
+      const prevFood = simFood;
+
       for (const eff of card.effects) {
         if (eff.target === ResourceTarget.FOOD)       { simFood += eff.modifier; changed.food = true; }
         if (eff.target === ResourceTarget.PRODUCTION) { simProd += eff.modifier; changed.prod = true; }
@@ -690,6 +719,13 @@ export class PlayPhaseScene {
       simFood = Math.max(0, simFood);
 
       updateBar(simPop, simProd, simFood, changed);
+
+      // Floating indicators for each changed resource.
+      const els = this.resEls();
+      let si = 0;
+      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  simPop  - prevPop,  "👥", si++);
+      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
+      if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
 
       const info = getCardDisplayInfo(card);
       const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
@@ -707,6 +743,8 @@ export class PlayPhaseScene {
 
     const rate     = season === Season.WINTER ? 2 : 1;
     const consumed = Math.floor(simPop) * rate;
+    const prevPop2 = simPop;
+    const prevFood2 = simFood;
 
     if (simFood >= consumed) {
       simFood -= consumed;
@@ -723,6 +761,12 @@ export class PlayPhaseScene {
     }
 
     updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
+
+    // Indicators for food consumed and population change.
+    const els2 = this.resEls();
+    if (els2.food) spawnResourceIndicator(els2.food, simFood - prevFood2, "🌾", 0);
+    if (els2.pop)  spawnResourceIndicator(els2.pop,  simPop  - prevPop2,  "👥", 1);
+
     await this.delay(1400);
 
     // ── 3. Commit to server ───────────────────────────────────────────────

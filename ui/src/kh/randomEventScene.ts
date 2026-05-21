@@ -1,4 +1,4 @@
-import { GameState, Season, KhEvent, EventOption, Effect } from "./kingshand.ts";
+import { GameState, Season, KhEvent, EventOption, Effect, ResourceTarget } from "./kingshand.ts";
 import { formatModifier, targetEmoji } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -8,6 +8,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  spawnResourceIndicator,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -255,12 +256,32 @@ export class RandomEventScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
+    // Helper: spawn indicators for all effects of the chosen option.
+    const spawnOptionIndicators = (index: number): void => {
+      const option = state.currentEvent?.options[index];
+      if (!option) return;
+      let si = 0;
+      for (const eff of option.effects) {
+        if (typeof eff.target !== "string") continue; // skip CardTarget effects
+        const sel =
+          eff.target === ResourceTarget.POPULATION ? ".kh-re-pop  .kh-re-res-value" :
+          eff.target === ResourceTarget.PRODUCTION  ? ".kh-re-prod .kh-re-res-value" :
+                                                      ".kh-re-food .kh-re-res-value";
+        const icon =
+          eff.target === ResourceTarget.POPULATION ? "👥" :
+          eff.target === ResourceTarget.PRODUCTION  ? "⚒️" : "🌾";
+        const anchor = this.overlay.querySelector<HTMLElement>(sel);
+        if (anchor) spawnResourceIndicator(anchor, eff.modifier, icon, si++);
+      }
+    };
+
     // Option choose buttons
     this.overlay
       .querySelectorAll<HTMLButtonElement>(".kh-re-btn-choose")
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
+          spawnOptionIndicators(index);
           this.disableAllActions();
           const label = state.currentEvent?.options[index]?.description ?? "your choice";
           this.showToast(`"${label}" — advancing to Play…`);
@@ -276,6 +297,7 @@ export class RandomEventScene {
           // Avoid double-firing if the button inside was clicked
           if ((e.target as HTMLElement).closest(".kh-re-btn-choose")) return;
           const index = Number(card.dataset.index);
+          spawnOptionIndicators(index);
           this.disableAllActions();
           const label = state.currentEvent?.options[index]?.description ?? "your choice";
           this.showToast(`"${label}" — advancing to Play…`);
