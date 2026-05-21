@@ -160,7 +160,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.population == 15    // 5 + 10 from RECURRING card
-        state.production == 120   // 100 + 20 from RECURRING card
+        state.production == 220   // 200 + 20 from RECURRING card
         state.food       == 50    // unchanged — SINGLE card did not fire
     }
 
@@ -183,7 +183,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.population == 6     // 5 + 1
-        state.production == 105   // 100 + 5
+        state.production == 205   // 200 + 5
         state.food == 53          // 50 + 3
     }
 
@@ -840,7 +840,7 @@ class GameEngineSpec extends Specification {
         then:
         state.curPhase == Phase.PLAY
         state.food       == 50.0  // unchanged
-        state.production == 100.0 // unchanged
+        state.production == 200.0 // unchanged
         state.population == 5.0   // unchanged
     }
 
@@ -968,7 +968,7 @@ class GameEngineSpec extends Specification {
 
     def "startPlay draws up to MAX_HAND_SIZE cards from the current season's draw pile"() {
         setup:
-        def cards = (1..5).collect { new Card(0, 0, FrequencyType.RECURRING, []) }
+        def cards = (1..3).collect { new Card(0, 0, FrequencyType.RECURRING, []) }
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -985,7 +985,7 @@ class GameEngineSpec extends Specification {
         state.drawPile.get(Season.SPRING).isEmpty()
     }
 
-    def "startPlay respects MAX_HAND_SIZE — draws at most five even when more cards are available"() {
+    def "startPlay respects MAX_HAND_SIZE — draws at most three even when more cards are available"() {
         setup:
         def cards = (1..8).collect { new Card(0, 0, FrequencyType.RECURRING, []) }
         def state = GameState.builder()
@@ -1001,22 +1001,21 @@ class GameEngineSpec extends Specification {
         then:
         drawn.size() == GameEngine.MAX_HAND_SIZE
         state.hand.size() == GameEngine.MAX_HAND_SIZE
-        state.drawPile.get(Season.SUMMER).size() == 3
+        state.drawPile.get(Season.SUMMER).size() == 5  // 8 cards - 3 drawn = 5 remaining
     }
 
     def "startPlay reshuffles the discard pile into the draw pile when the draw pile runs dry"() {
         setup:
+        // 1 in draw pile + 2 in discard = 3 total = MAX_HAND_SIZE; all should be drawn
         def drawCard   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 1, ValueType.INTEGER)])
-        def discard1   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 2, ValueType.INTEGER)])
-        def discard2   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 3, ValueType.INTEGER)])
-        def discard3   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 4, ValueType.INTEGER)])
-        def discard4   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
+        def discard1   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 4, ValueType.INTEGER)])
+        def discard2   = new Card(0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
 
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.FALL)
                 .drawPile(Season.FALL, [drawCard])
-                .discardPile(Season.FALL, [discard1, discard2, discard3, discard4])
+                .discardPile(Season.FALL, [discard1, discard2])
                 .build()
         def engine = engine(state)
 
@@ -1024,8 +1023,8 @@ class GameEngineSpec extends Specification {
         def drawn = engine.startPlay()
 
         then:
-        drawn.size() == 5
-        state.hand.size() == 5
+        drawn.size() == 3
+        state.hand.size() == 3
         state.discardPile.get(Season.FALL).size() == 0
     }
 
@@ -1563,11 +1562,12 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun consumes floor(pop) × 1 food in a non-winter season"() {
         setup:
-        // pop=6.9 → floor=6; spring rate=1; consumed=6; food 40 → 34
+        // pop=6.0 → floor=6; spring rate=1; consumed=6; food 40 → 34
+        // surplus growth: rate = min(34/6.0, 0.50) = 0.50; new pop = 6.0 * 1.5 = 9.0
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(6.9)
+                .population(6.0)
                 .food(40.0)
                 .build()
         def engine = engine(state)
@@ -1576,13 +1576,14 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.food       == 34.0   // 40 - 6
-        state.population == 6.9    // unchanged — no deficit
+        state.food       == 34.0   // 40 - 6; surplus food is not further consumed
+        state.population == 9.0  // 6.0 * 1.5 after 50% surplus growth
     }
 
     def "endAndRun consumes floor(pop) × 2 food in winter"() {
         setup:
         // pop=4.0 → floor=4; winter rate=2; consumed=8; food 50 → 42
+        // surplus growth: rate = min(42/4.0, 0.50) = 0.50; new pop = 4.0 * 1.5 = 6.0
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.WINTER)
@@ -1595,8 +1596,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.food       == 42.0   // 50 - 8
-        state.population == 4.0    // unchanged — no deficit
+        state.food       == 42.0   // 50 - 8; surplus food is not further consumed
+        state.population == 6.0    // 4.0 * 1.5 after 50% surplus growth
     }
 
     def "endAndRun clamps food to zero and reduces population by half the deficit on starvation"() {
@@ -1709,7 +1710,8 @@ class GameEngineSpec extends Specification {
 
     def "sufficient food after endAndRun does not trigger GAME_OVER"() {
         setup:
-        // pop=5, spring: consumed=5, food=10 → food=5, pop unchanged, still PLAY
+        // pop=5, spring: consumed=5, food=10 → food=5
+        // surplus growth: rate = min(5/5.0, 0.50) = 0.50; new pop = 5.0 * 1.5 = 7.5
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
                 .population(5.0).food(10.0).build()
@@ -1720,6 +1722,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.curPhase   == Phase.PLAY
-        state.population == 5.0
+        state.gameOver   == false
+        state.population == 7.5    // 5.0 * 1.5 after 50% surplus growth
     }
 }
