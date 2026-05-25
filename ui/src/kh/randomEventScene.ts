@@ -170,10 +170,25 @@ export class RandomEventScene {
     `;
   }
 
+  // Returns true if the player can afford the production cost of this option.
+  private canAffordOption(option: EventOption): boolean {
+    const isWinter = this.state.curSeason === Season.WINTER;
+    const year     = this.state.year;
+    let prod = this.state.production;
+    for (const eff of option.effects) {
+      if (typeof eff.target !== "string" || eff.target !== ResourceTarget.PRODUCTION) continue;
+      const delta = isWinter ? eff.modifier * year : eff.modifier;
+      prod = eff.valueType === "PERCENTAGE"
+        ? prod + prod * (delta * 0.01)
+        : prod + delta;
+    }
+    return prod >= 0;
+  }
+
   private buildEventContent(event: KhEvent): string {
     const isWinter = this.state.curSeason === Season.WINTER;
     const optionsHTML = event.options
-      .map((opt, i) => this.buildOptionCard(opt, i))
+      .map((opt, i) => this.buildOptionCard(opt, i, this.canAffordOption(opt)))
       .join("");
 
     const winterBanner = isWinter ? `
@@ -195,18 +210,17 @@ export class RandomEventScene {
     `;
   }
 
-  private buildOptionCard(option: EventOption, index: number): string {
+  private buildOptionCard(option: EventOption, index: number, canAfford: boolean): string {
     const isWinter = this.state.curSeason === Season.WINTER;
     const year     = this.state.year;
 
     const effectsHTML = option.effects.length > 0
       ? option.effects.map((e: Effect) => {
-          const targetStr     = typeof e.target === "string" ? e.target : "CARD";
+          const targetStr      = typeof e.target === "string" ? e.target : "CARD";
           // Apply winter year-scaling to the displayed modifier so what the player
           // sees matches exactly what the server will apply via scaleForSeason().
           const scaledModifier = isWinter ? e.modifier * year : e.modifier;
           const isNegative     = scaledModifier < 0;
-          const scaleNote = "";
           return `
             <div class="kh-re-effect-row">
               <span class="kh-re-effect-target kh-re-et-${targetStr.toLowerCase()}">
@@ -215,14 +229,18 @@ export class RandomEventScene {
               <span class="kh-re-effect-mod ${isNegative ? "kh-re-mod-neg" : "kh-re-mod-pos"}">
                 ${formatModifier(scaledModifier, e.valueType)}
               </span>
-              ${scaleNote}
             </div>
           `;
         }).join("")
       : `<div class="kh-re-no-effect">No immediate effect</div>`;
 
+    const unaffordableBanner = !canAfford
+      ? `<div class="kh-re-unaffordable">⚒️ Not enough production</div>`
+      : "";
+
     return `
-      <div class="kh-re-option" data-index="${index}">
+      <div class="kh-re-option ${canAfford ? "" : "kh-re-option-disabled"}"
+           data-index="${index}" data-can-afford="${canAfford}">
         <div class="kh-re-option-header">
           <span class="kh-re-option-num">${index + 1}</span>
           <span class="kh-re-option-desc">${option.description}</span>
@@ -231,8 +249,9 @@ export class RandomEventScene {
           <div class="kh-re-effects-label">Outcome</div>
           ${effectsHTML}
         </div>
-        <button class="kh-re-btn-choose" data-index="${index}">
-          Choose
+        ${unaffordableBanner}
+        <button class="kh-re-btn-choose" data-index="${index}" ${canAfford ? "" : "disabled"}>
+          ${canAfford ? "Choose" : "Cannot afford"}
         </button>
       </div>
     `;
@@ -256,13 +275,18 @@ export class RandomEventScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
+    const isWinter = state.curSeason === Season.WINTER;
+    const year     = state.year;
+
     // Helper: spawn indicators for all effects of the chosen option.
+    // Winter scaling (modifier × year) is applied to match what the server will do.
     const spawnOptionIndicators = (index: number): void => {
       const option = state.currentEvent?.options[index];
       if (!option) return;
       let si = 0;
       for (const eff of option.effects) {
         if (typeof eff.target !== "string") continue; // skip CardTarget effects
+        const delta = isWinter ? eff.modifier * year : eff.modifier;
         const sel =
           eff.target === ResourceTarget.POPULATION ? ".kh-re-pop  .kh-re-res-value" :
           eff.target === ResourceTarget.PRODUCTION  ? ".kh-re-prod .kh-re-res-value" :
@@ -271,7 +295,44 @@ export class RandomEventScene {
           eff.target === ResourceTarget.POPULATION ? "👥" :
           eff.target === ResourceTarget.PRODUCTION  ? "⚒️" : "🌾";
         const anchor = this.overlay.querySelector<HTMLElement>(sel);
-        if (anchor) spawnResourceIndicator(anchor, eff.modifier, icon, si++);
+        if (anchor) spawnResourceIndicator(anchor, delta, icon, si++);
+      }
+    };
+
+    // Helper: simulate food after option effects to detect starvation.
+    const wouldStarve = (index: number): boolean => {
+      const option = state.currentEvent?.options[index];
+      if (!option) return false;
+      let food = state.food;
+      for (const eff of option.effects) {
+        if (typeof eff.target !== "string" || eff.target !== ResourceTarget.FOOD) continue;
+        const delta = isWinter ? eff.modifier * year : eff.modifier;
+        food = eff.valueType === "PERCENTAGE"
+          ? food + food * (delta * 0.01)
+          : food + delta;
+      }
+      return food <= 0;
+    };
+
+    // Unified choose handler — shared by button click and card click.
+    const handleChoose = (index: number): void => {
+      // Ignore clicks on options the player cannot afford.
+      const card = this.overlay.querySelector<HTMLElement>(
+        `.kh-re-option[data-index="${index}"]`,
+      );
+      if (!card || card.dataset.canAfford === "false") return;
+
+      spawnOptionIndicators(index);
+      this.disableAllActions();
+      const label = state.currentEvent?.options[index]?.description ?? "your choice";
+
+      if (wouldStarve(index)) {
+        // Show a famine warning and give the player time to read it before advancing.
+        this.showToast("🌾 Famine — the food stores are exhausted!");
+        setTimeout(() => this.actions.pickEventOption(index), 3500);
+      } else {
+        this.showToast(`"${label}" — advancing to Play…`);
+        this.actions.pickEventOption(index);
       }
     };
 
@@ -279,29 +340,17 @@ export class RandomEventScene {
     this.overlay
       .querySelectorAll<HTMLButtonElement>(".kh-re-btn-choose")
       .forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const index = Number(btn.dataset.index);
-          spawnOptionIndicators(index);
-          this.disableAllActions();
-          const label = state.currentEvent?.options[index]?.description ?? "your choice";
-          this.showToast(`"${label}" — advancing to Play…`);
-          this.actions.pickEventOption(index);
-        });
+        btn.addEventListener("click", () => handleChoose(Number(btn.dataset.index)));
       });
 
-    // Full option card is also clickable (not just the button)
+    // Full option card is also clickable (not just the button).
     this.overlay
       .querySelectorAll<HTMLDivElement>(".kh-re-option")
       .forEach((card) => {
         card.addEventListener("click", (e) => {
-          // Avoid double-firing if the button inside was clicked
+          // Avoid double-firing if the inner button was clicked.
           if ((e.target as HTMLElement).closest(".kh-re-btn-choose")) return;
-          const index = Number(card.dataset.index);
-          spawnOptionIndicators(index);
-          this.disableAllActions();
-          const label = state.currentEvent?.options[index]?.description ?? "your choice";
-          this.showToast(`"${label}" — advancing to Play…`);
-          this.actions.pickEventOption(index);
+          handleChoose(Number(card.dataset.index));
         });
       });
 
@@ -585,6 +634,21 @@ export class RandomEventScene {
       .kh-re-mod-pos       { color: #3d6b46; }
       .kh-re-mod-neg       { color: #8b2020; }
       .kh-re-no-effect     { font-style: italic; color: #a09070; font-size: .9rem; }
+
+      /* Unaffordable banner */
+      .kh-re-unaffordable {
+        margin: 0 20px 10px;
+        padding: 7px 14px;
+        background: rgba(60, 20, 20, 0.75);
+        border: 1px solid #8b4040;
+        border-radius: 6px;
+        font-family: 'Cinzel', serif;
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: .8px;
+        color: #f09090;
+        text-align: center;
+      }
 
       /* Choose button */
       .kh-re-btn-choose {

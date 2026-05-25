@@ -857,6 +857,59 @@ class GameEngineSpec extends Specification {
         e.message == "option cannot be null"
     }
 
+    def "applyEventOption throws when the player cannot afford the production cost"() {
+        setup:
+        // Production is 10; option costs -20 → would go to -10, which is unaffordable
+        def option = new EventOption("Expensive choice", [ResourceTarget.PRODUCTION.integer(-20)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .production(10.0).build()
+        def engine = engine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        thrown(IllegalStateException)
+        state.production == 10.0   // unchanged — no side-effects before the guard fires
+        state.curPhase == Phase.RANDOM_EVENT
+    }
+
+    def "applyEventOption affordability check accounts for winter year-scaling"() {
+        setup:
+        // Base cost -10, year 3 → scaled cost -30; production 20 → would go to -10, unaffordable
+        def option = new EventOption("Winter cost", [ResourceTarget.PRODUCTION.integer(-10)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(3)
+                .production(20.0).build()
+        def engine = engine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        thrown(IllegalStateException)
+        state.production == 20.0   // unchanged
+        state.curPhase == Phase.RANDOM_EVENT
+    }
+
+    def "applyEventOption succeeds when production exactly covers the cost"() {
+        setup:
+        // Production 15 exactly matches the cost of -15 → result is 0, which is the boundary
+        def option = new EventOption("Exact cost", [ResourceTarget.PRODUCTION.integer(-15)])
+        def state = GameState.builder()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .production(15.0).build()
+        def engine = engine(state, new EventCatalog([:]))
+
+        when:
+        engine.applyEventOption(option)
+
+        then:
+        state.production == 0.0
+        state.curPhase == Phase.PLAY
+    }
+
     // ----- RANDOM_EVENT: winter magnitude scaling (KH-6) -----
 
     def "winter event effects are scaled by the current year"() {

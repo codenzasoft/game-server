@@ -188,6 +188,24 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalArgumentException("option cannot be null");
     }
 
+    // Validate that the player can afford the production cost before applying anything.
+    // Simulate production effects (with winter scaling) to check the final value would
+    // not go below zero — mirroring the same guard in placeCard().
+    double simulatedProduction = state.getProduction();
+    for (Effect effect : option.effects()) {
+      if (effect.target() instanceof ResourceTarget rt && rt == ResourceTarget.PRODUCTION) {
+        simulatedProduction = scaleForSeason(effect).apply(simulatedProduction);
+      }
+    }
+    if (simulatedProduction < 0) {
+      throw new IllegalStateException(
+          "not enough production to choose this option: have "
+              + (int) state.getProduction()
+              + " but option requires "
+              + (int) -simulatedProduction
+              + " more");
+    }
+
     for (Effect effect : option.effects()) {
       if (effect.target() instanceof ResourceTarget rt) {
         Effect scaled = scaleForSeason(effect);
