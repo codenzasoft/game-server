@@ -79,6 +79,36 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "Dig into the hillside to extract ore every spring.",
     tags: ["INDUSTRY"],
   },
+  "3:20:RECURRING:FOOD:12:INTEGER": {
+    name: "Hunting Camp",
+    icon: "🏕️",
+    description: "A seasonal hunting camp that brings in fresh game each spring.",
+    tags: ["FOOD"],
+  },
+  "5:45:SINGLE:POPULATION:3:INTEGER": {
+    name: "Settlers",
+    icon: "🧳",
+    description: "A wave of settlers arrives to grow your community.",
+    tags: ["POPULATION"],
+  },
+  "2:25:RECURRING:PRODUCTION:8:INTEGER": {
+    name: "Lumber Yard",
+    icon: "🪓",
+    description: "A lumber yard that harvests timber to steadily boost production.",
+    tags: ["INDUSTRY"],
+  },
+  "1:20:RECURRING:FOOD:5:INTEGER|POPULATION:1:INTEGER": {
+    name: "Community Well",
+    icon: "⛲",
+    description: "A shared well that keeps the village healthy and slowly growing.",
+    tags: ["AGRICULTURE", "POPULATION"],
+  },
+  "3:35:RECURRING:FOOD:15:PERCENTAGE": {
+    name: "Irrigation",
+    icon: "💧",
+    description: "Channel water to the fields, dramatically improving crop yields.",
+    tags: ["AGRICULTURE"],
+  },
 
   // ── Summer ─────────────────────────────────────────────────────────────────
   "0:50:RECURRING:POPULATION:2:INTEGER|POPULATION:2:INTEGER": {
@@ -123,6 +153,60 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A school that slowly grows your population over time.",
     tags: ["POPULATION"],
   },
+  "2:15:SINGLE:FOOD:25:INTEGER": {
+    name: "Early Harvest",
+    icon: "🌽",
+    description: "Gather the first crops of summer before the heat peaks.",
+    tags: ["AGRICULTURE"],
+  },
+  "3:30:RECURRING:PRODUCTION:12:INTEGER": {
+    name: "Blacksmith",
+    icon: "🔨",
+    description: "A skilled blacksmith who crafts tools and steadily boosts production.",
+    tags: ["INDUSTRY"],
+  },
+  "2:45:RECURRING:FOOD:10:INTEGER|PRODUCTION:5:INTEGER": {
+    name: "Windmill",
+    icon: "🌬️",
+    description: "A windmill that grinds grain and keeps production turning.",
+    tags: ["AGRICULTURE", "INDUSTRY"],
+  },
+  "4:70:RECURRING:PRODUCTION:10:PERCENTAGE|FOOD:5:INTEGER": {
+    name: "Marketplace",
+    icon: "🏪",
+    description: "A bustling marketplace that drives commerce and brings in provisions.",
+    tags: ["COMMERCE"],
+  },
+  "6:55:RECURRING:PRODUCTION:15:PERCENTAGE": {
+    name: "Skilled Labor",
+    icon: "👷",
+    description: "Recruit skilled workers to significantly boost production output.",
+    tags: ["INDUSTRY"],
+  },
+  "3:60:RECURRING:PRODUCTION:10:INTEGER|FOOD:10:INTEGER": {
+    name: "Caravan",
+    icon: "🐪",
+    description: "A trade caravan that returns each summer with goods and provisions.",
+    tags: ["COMMERCE"],
+  },
+  "5:65:SINGLE:POPULATION:4:INTEGER|FOOD:20:INTEGER": {
+    name: "Town Fair",
+    icon: "🎠",
+    description: "A summer fair that draws in new settlers and fills the larder.",
+    tags: ["POPULATION", "FOOD"],
+  },
+  "4:50:RECURRING:PRODUCTION:15:INTEGER": {
+    name: "Brickworks",
+    icon: "🧱",
+    description: "A brickworks that manufactures building materials each summer.",
+    tags: ["INDUSTRY"],
+  },
+  "6:90:RECURRING:PRODUCTION:10:PERCENTAGE|FOOD:10:PERCENTAGE": {
+    name: "Merchant Guild",
+    icon: "💰",
+    description: "An established guild that expands both production and food stores.",
+    tags: ["COMMERCE"],
+  },
 
   // ── Fall ───────────────────────────────────────────────────────────────────
   "5:40:RECURRING:PRODUCTION:10:PERCENTAGE": {
@@ -149,6 +233,36 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A textile mill that dramatically increases production.",
     tags: ["INDUSTRY"],
   },
+  "2:35:RECURRING:FOOD:12:INTEGER": {
+    name: "Bakery",
+    icon: "🍞",
+    description: "A bakery that turns the harvest grain into steady food production.",
+    tags: ["FOOD"],
+  },
+  "4:0:SINGLE:PRODUCTION:40:INTEGER": {
+    name: "Tax Collection",
+    icon: "📜",
+    description: "Collect taxes from the populace for a one-time surge in production.",
+    tags: ["COMMERCE"],
+  },
+  "3:45:RECURRING:FOOD:15:PERCENTAGE": {
+    name: "Storehouse",
+    icon: "📦",
+    description: "A storehouse that stretches your food reserves each fall.",
+    tags: ["AGRICULTURE"],
+  },
+  "2:30:RECURRING:FOOD:15:INTEGER": {
+    name: "Barn",
+    icon: "🐄",
+    description: "A barn that shelters livestock and keeps food production steady.",
+    tags: ["AGRICULTURE"],
+  },
+  "5:80:RECURRING:PRODUCTION:25:INTEGER": {
+    name: "Mason Guild",
+    icon: "🏗️",
+    description: "A guild of master masons who drive substantial production each fall.",
+    tags: ["INDUSTRY"],
+  },
 
   // ── Winter ─────────────────────────────────────────────────────────────────
   "3:50:RECURRING:PRODUCTION:15:INTEGER": {
@@ -168,6 +282,24 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     icon: "🏪",
     description: "A granary that stretches your food supplies through winter.",
     tags: ["FOOD"],
+  },
+  "1:5:SINGLE:FOOD:25:INTEGER": {
+    name: "Emergency Rations",
+    icon: "🥫",
+    description: "Break open emergency stores to survive the harshest winter nights.",
+    tags: ["SURVIVAL", "FOOD"],
+  },
+  "1:20:SINGLE:PRODUCTION:20:INTEGER|FOOD:15:INTEGER": {
+    name: "Stockpile",
+    icon: "🗄️",
+    description: "Draw on stockpiled reserves for a one-time boost to goods and food.",
+    tags: ["SURVIVAL"],
+  },
+  "3:40:RECURRING:POPULATION:2:INTEGER": {
+    name: "Chapel",
+    icon: "⛪",
+    description: "A chapel that fosters community spirit and draws people to the settlement.",
+    tags: ["POPULATION"],
   },
 };
 
