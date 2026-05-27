@@ -527,6 +527,22 @@ export class GameEventHandler {
   }
 
   /**
+   * Swaps the card at {@code fromSlot} with the card at {@code toSlot} on the current
+   * season's table, allowing the player to reorder their table before resolving.
+   *
+   * Requires a matching server endpoint: POST /games/kh/{gameId}/play/reorder
+   *
+   * @param fromSlot Zero-based source slot index.
+   * @param toSlot   Zero-based destination slot index.
+   */
+  public reorderCard(fromSlot: number, toSlot: number): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/reorder`,
+      body: JSON.stringify({ fromSlot, toSlot }),
+    });
+  }
+
+  /**
    * Ends the PLAY phase: resolves all table cards left-to-right, consumes seasonal food, then
    * advances the season and begins the next ADD phase.
    */
