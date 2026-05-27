@@ -1181,11 +1181,11 @@ class GameEngineSpec extends Specification {
 
     def "placeCard throws when the player's population does not meet the requirement"() {
         setup:
-        // FARM requires population 2; give the player only 1
+        // FARM requires population 5; give the player only 4
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(1)
+                .population(4)
                 .production(100)
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1197,8 +1197,8 @@ class GameEngineSpec extends Specification {
         then:
         def e = thrown(IllegalStateException)
         e.message.contains("not enough population to place card")
-        e.message.contains("2")    // requirement
-        e.message.contains("1")    // have
+        e.message.contains("5")    // requirement
+        e.message.contains("4")    // have
     }
 
     def "placeCard throws when the current phase is not PLAY"() {
@@ -1222,7 +1222,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard moves the card from hand to the current season's table and deducts production"() {
         setup:
-        // FARM: populationRequirement=2, productionRequirement=30
+        // FARM: populationRequirement=5, productionRequirement=30
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1291,11 +1291,12 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADE_ROUTES has two recurring effects: PRODUCTION +5 and FOOD +5
+        // TRADE_ROUTES has two recurring effects: PRODUCTION +5% and FOOD +5%
+        // populationRequirement=80, productionRequirement=80
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
-                .population(10)
+                .population(80)
                 .production(200)
                 .table(Season.SUMMER, [CardCatalog.TRADE_ROUTES])
                 .hand([CardCatalog.TRADE_ROUTES])
@@ -1567,7 +1568,7 @@ class GameEngineSpec extends Specification {
 
     def "demolishCard removes the correct card when multiple cards are on the table"() {
         setup:
-        // Slot 1 is SEEDS (productionRequirement=10 → cost=2)
+        // Slot 1 is SEEDS (productionRequirement=15 → cost=3)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1585,7 +1586,7 @@ class GameEngineSpec extends Specification {
         table.contains(CardCatalog.FARM)
         !table.contains(CardCatalog.SEEDS)
         table.contains(CardCatalog.FERTILIZER)
-        state.production == 98.0    // 100 - 2
+        state.production == 97.0    // 100 - 3
     }
 
     def "demolishCard throws when the slot index is out of range"() {
