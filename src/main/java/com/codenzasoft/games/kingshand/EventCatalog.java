@@ -193,8 +193,11 @@ public class EventCatalog {
                         "Hold the feast",
                         List.of(
                             ResourceTarget.FOOD.integer(-10),
-                            ResourceTarget.POPULATION.integer(1))),
-                    new EventOption("Decline — there is work to do", List.of()))),
+                            ResourceTarget.PRODUCTION.integer(-10),
+                            ResourceTarget.POPULATION.integer(2))),
+                    new EventOption(
+                        "Decline — there is work to do",
+                        List.of(ResourceTarget.POPULATION.integer(-5))))),
             new Event(
                 "summer.wildfire",
                 Season.SUMMER,
