@@ -690,9 +690,16 @@ export class PlayPhaseScene {
       });
     });
 
-    // ── Drop on empty slot ──────────────────────────────────────────────────
+    // ── Drop on empty slot (hand cards only) ───────────────────────────────
+    // Empty slots only accept hand-card drops.  Table cards cannot be dropped
+    // here because an empty slot's visual index does not correspond to a valid
+    // server-side table index — the server list is compact (occupied cards only)
+    // and would reject the out-of-range slot, leaving the UI stuck with all
+    // buttons disabled.  Reordering between occupied slots is handled below.
     overlay.querySelectorAll<HTMLElement>(".kh-play-empty-slot[data-drop-target]").forEach((slot) => {
       slot.addEventListener("dragover", (e) => {
+        // Reject table-card drags so the cursor shows "no drop" and no highlight appears
+        if (dragType !== "hand") return;
         e.preventDefault();
         e.dataTransfer!.dropEffect = "move";
         slot.classList.add("kh-play-drag-over");
@@ -701,34 +708,29 @@ export class PlayPhaseScene {
       slot.addEventListener("drop", (e) => {
         e.preventDefault();
         slot.classList.remove("kh-play-drag-over");
-        const targetSlot = Number(slot.dataset.slot);
 
-        if (dragType === "hand" && dragIndex >= 0) {
-          const card   = state.hand[dragIndex];
-          const table  = state.getCurrentTable();
-          const fp     = fingerprint(card);
-          const isUpg  = tableFingerprints.has(fp);
-          const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
-          const canAfford =
-            state.production >= card.productionRequirement &&
-            state.population  >= card.populationRequirement;
+        if (dragType !== "hand" || dragIndex < 0) return;
 
-          if (!canAfford || !hasSlot) {
-            this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");
-            return;
-          }
-          if (card.productionRequirement > 0) {
-            const { prod } = this.resEls();
-            if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
-          }
-          this.disableAllActions();
-          this.showToast(isUpg ? "Upgrading table card…" : "Playing card…");
-          this.actions.placeCard(dragIndex);
+        const card   = state.hand[dragIndex];
+        const table  = state.getCurrentTable();
+        const fp     = fingerprint(card);
+        const isUpg  = tableFingerprints.has(fp);
+        const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
+        const canAfford =
+          state.production >= card.productionRequirement &&
+          state.population  >= card.populationRequirement;
 
-        } else if (dragType === "table" && dragSlot >= 0 && dragSlot !== targetSlot) {
-          this.disableAllActions();
-          this.actions.reorderCard(dragSlot, targetSlot);
+        if (!canAfford || !hasSlot) {
+          this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");
+          return;
         }
+        if (card.productionRequirement > 0) {
+          const { prod } = this.resEls();
+          if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
+        }
+        this.disableAllActions();
+        this.showToast(isUpg ? "Upgrading table card…" : "Playing card…");
+        this.actions.placeCard(dragIndex);
       });
     });
 
