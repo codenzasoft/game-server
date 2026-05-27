@@ -1331,6 +1331,219 @@ class GameEngineSpec extends Specification {
         state.board.get(Season.SPRING).size() == sizeBefore
     }
 
+    // ----- PLAY phase: reorderCard -----
+
+    def "reorderCard swaps the two specified cards"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.MINE])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, 2)
+
+        then:
+        def table = state.board.get(Season.SPRING)
+        table[0] == CardCatalog.MINE
+        table[1] == CardCatalog.SEEDS  // untouched
+        table[2] == CardCatalog.FARM
+    }
+
+    def "reorderCard with adjacent slots swaps them correctly"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SUMMER)
+                .table(Season.SUMMER, [CardCatalog.FARM, CardCatalog.MINE])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, 1)
+
+        then:
+        def table = state.board.get(Season.SUMMER)
+        table[0] == CardCatalog.MINE
+        table[1] == CardCatalog.FARM
+    }
+
+    def "reorderCard (toSlot < fromSlot) swaps in both directions"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.FALL)
+                .table(Season.FALL, [CardCatalog.SEEDS, CardCatalog.FERTILIZER, CardCatalog.FARM])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(2, 0)
+
+        then:
+        def table = state.board.get(Season.FALL)
+        table[0] == CardCatalog.FARM
+        table[1] == CardCatalog.FERTILIZER  // untouched
+        table[2] == CardCatalog.SEEDS
+    }
+
+    def "reorderCard preserves all cards — none are dropped"() {
+        setup:
+        def cards = [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.FERTILIZER, CardCatalog.MINE]
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, cards)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(1, 3)
+
+        then:
+        def table = state.board.get(Season.SPRING)
+        table.size() == 4
+        table.containsAll(cards)
+    }
+
+    def "reorderCard does not change table size"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.WINTER)
+                .table(Season.WINTER, [CardCatalog.FARM, CardCatalog.MINE, CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+        def sizeBefore = state.board.get(Season.WINTER).size()
+
+        when:
+        engine.reorderCard(0, 2)
+
+        then:
+        state.board.get(Season.WINTER).size() == sizeBefore
+    }
+
+    def "reorderCard throws when fromSlot equals toSlot"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(1, 1)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("fromSlot and toSlot must differ")
+    }
+
+    def "reorderCard throws when fromSlot is out of range"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(slot, 0)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("invalid fromSlot")
+
+        where:
+        slot << [-1, 2, 99]
+    }
+
+    def "reorderCard throws when toSlot is out of range"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, slot)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("invalid toSlot")
+
+        where:
+        slot << [-1, 2, 99]
+    }
+
+    def "reorderCard throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(phase)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, 1)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("reorderCard")
+
+        where:
+        phase << [Phase.ADD, Phase.RANDOM_EVENT]
+    }
+
+    def "reorderCard does not affect resources"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5.0)
+                .production(100.0)
+                .food(50.0)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.MINE])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, 1)
+
+        then:
+        state.population == 5.0
+        state.production == 100.0
+        state.food       == 50.0
+    }
+
+    def "reorderCard does not affect the hand, draw pile, or discard pile"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS])
+                .hand([CardCatalog.FERTILIZER])
+                .drawPile(Season.SPRING, [CardCatalog.MINE])
+                .discardPile(Season.SPRING, [CardCatalog.SEEDS])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.reorderCard(0, 1)
+
+        then:
+        state.hand == [CardCatalog.FERTILIZER]
+        state.drawPile.get(Season.SPRING)    == [CardCatalog.MINE]
+        state.discardPile.get(Season.SPRING) == [CardCatalog.SEEDS]
+    }
+
     // ----- PLAY phase: demolishCard -----
 
     def "demolishCard removes the card at the given slot and charges 20% of its production cost"() {

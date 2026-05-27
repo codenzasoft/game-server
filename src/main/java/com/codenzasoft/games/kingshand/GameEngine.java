@@ -624,6 +624,37 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
+   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table so the
+   * player can reorder their table before resolving. Because {@link #endAndRun()} fires cards
+   * left-to-right, slot order determines execution order — this method exposes that control to the
+   * player.
+   *
+   * @param fromSlot zero-based index of the card to move
+   * @param toSlot zero-based index of the destination slot
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the two
+   *     indices are equal, or if either index is out of range
+   */
+  public synchronized void reorderCard(int fromSlot, int toSlot) {
+    requirePhase(Phase.PLAY, "reorderCard");
+
+    if (fromSlot == toSlot) {
+      throw new IllegalStateException("fromSlot and toSlot must differ: " + fromSlot);
+    }
+
+    List<Card> table = state.getCurrentTable();
+    int size = table.size();
+
+    if (fromSlot < 0 || fromSlot >= size) {
+      throw new IllegalStateException("invalid fromSlot: " + fromSlot);
+    }
+    if (toSlot < 0 || toSlot >= size) {
+      throw new IllegalStateException("invalid toSlot: " + toSlot);
+    }
+
+    Collections.swap(table, fromSlot, toSlot);
+  }
+
+  /**
    * Demolishes the card at the given {@code slot} index on the current season's table, charging
    * {@value #DEMOLISH_COST_RATE} × the card's original {@link Card#productionRequirement()} as the
    * demolition cost and freeing the slot.

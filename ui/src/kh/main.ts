@@ -165,9 +165,10 @@ const getGameId = (): string | undefined => {
             currentScene = null;
           }
           currentScene = new PlayPhaseScene(state, {
-            placeCard:    (i)    => handler.placeCard(i),
-            demolishCard: (slot) => handler.demolishCard(slot),
-            endAndRun:    ()     => handler.endAndRun(),
+            placeCard:    (i)           => handler.placeCard(i),
+            demolishCard: (slot)        => handler.demolishCard(slot),
+            endAndRun:    ()            => handler.endAndRun(),
+            reorderCard:  (from, to)    => handler.reorderCard(from, to),
           });
           currentScene.mount(mountTarget);
         }

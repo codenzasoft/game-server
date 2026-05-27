@@ -22,6 +22,8 @@ export interface PlayPhaseActions {
   placeCard:    (index: number) => void;
   demolishCard: (slot: number)  => void;
   endAndRun:    ()              => void;
+  /** Swap the card at fromSlot with the card at toSlot on the current season's table. */
+  reorderCard:  (fromSlot: number, toSlot: number) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -262,7 +264,7 @@ export class PlayPhaseScene {
     const slots: string[] = [];
     for (let i = 0; i < MAX_TABLE_SIZE; i++) {
       const card = table[i];
-      slots.push(card ? this.buildTableCard(card, i, state) : this.buildEmptySlot());
+      slots.push(card ? this.buildTableCard(card, i, state) : this.buildEmptySlot(i));
     }
 
     return `
@@ -306,7 +308,7 @@ export class PlayPhaseScene {
       .join("");
 
     return `
-      <div class="kh-play-table-card" data-slot="${slot}">
+      <div class="kh-play-table-card" data-slot="${slot}" draggable="true">
         <div class="kh-play-tc-header">
           <div class="kh-play-tc-icon">${info.icon}</div>
           <div class="kh-play-tc-meta">
@@ -328,9 +330,9 @@ export class PlayPhaseScene {
     `;
   }
 
-  private buildEmptySlot(): string {
+  private buildEmptySlot(slot: number): string {
     return `
-      <div class="kh-play-empty-slot">
+      <div class="kh-play-empty-slot" data-slot="${slot}" data-drop-target="true">
         <span class="kh-play-empty-icon">+</span>
         <span class="kh-play-empty-label">Open Slot</span>
       </div>
@@ -436,7 +438,7 @@ export class PlayPhaseScene {
 
     return `
       <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""}"
-           data-index="${index}">
+           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}">
         <div class="kh-play-hc-header ${isUpgrade ? "kh-play-hc-header-upgrade" : ""}">
           <div class="kh-play-hc-name">${info.name}</div>
           <div class="kh-play-hc-tags">${tagsHTML}</div>
@@ -620,12 +622,138 @@ export class PlayPhaseScene {
         void this.animateEndAndRun();
       });
     }
+
+    this.attachDragListeners(state, tableFingerprints);
   }
 
   private disableAllActions(): void {
     this.overlay
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((b) => (b.disabled = true));
+  }
+
+  // ─── Drag-and-drop ───────────────────────────────────────────────────────────
+
+  /**
+   * Wires up HTML5 drag-and-drop so the player can:
+   *   • Drag a hand card onto an empty table slot  → calls placeCard(index)
+   *   • Drag a table card onto another slot         → calls reorderCard(fromSlot, toSlot)
+   *
+   * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
+   */
+  private attachDragListeners(state: GameState, tableFingerprints: Set<string>): void {
+    const overlay = this.overlay;
+
+    // Shared drag state held in closure — safe because all listeners below share
+    // the same re-render cycle and dragend always resets them.
+    let dragType:  "hand" | "table" | null = null;
+    let dragIndex: number = -1;
+    let dragSlot:  number = -1;
+
+    const clearDragState = (): void => {
+      dragType  = null;
+      dragIndex = -1;
+      dragSlot  = -1;
+      overlay.querySelectorAll(".kh-play-drag-over").forEach((el) =>
+        el.classList.remove("kh-play-drag-over"),
+      );
+    };
+
+    // ── Hand card drag ──────────────────────────────────────────────────────
+    overlay.querySelectorAll<HTMLElement>('.kh-play-hand-card[draggable="true"]').forEach((card) => {
+      card.addEventListener("dragstart", (e) => {
+        dragType  = "hand";
+        dragIndex = Number(card.dataset.index);
+        card.classList.add("kh-play-dragging");
+        e.dataTransfer!.effectAllowed = "move";
+        // setData required for Firefox drag-start
+        e.dataTransfer!.setData("text/plain", String(dragIndex));
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("kh-play-dragging");
+        clearDragState();
+      });
+    });
+
+    // ── Table card drag ─────────────────────────────────────────────────────
+    overlay.querySelectorAll<HTMLElement>(".kh-play-table-card").forEach((card) => {
+      card.addEventListener("dragstart", (e) => {
+        dragType = "table";
+        dragSlot = Number(card.dataset.slot);
+        card.classList.add("kh-play-dragging");
+        e.dataTransfer!.effectAllowed = "move";
+        e.dataTransfer!.setData("text/plain", String(dragSlot));
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("kh-play-dragging");
+        clearDragState();
+      });
+    });
+
+    // ── Drop on empty slot ──────────────────────────────────────────────────
+    overlay.querySelectorAll<HTMLElement>(".kh-play-empty-slot[data-drop-target]").forEach((slot) => {
+      slot.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = "move";
+        slot.classList.add("kh-play-drag-over");
+      });
+      slot.addEventListener("dragleave", () => slot.classList.remove("kh-play-drag-over"));
+      slot.addEventListener("drop", (e) => {
+        e.preventDefault();
+        slot.classList.remove("kh-play-drag-over");
+        const targetSlot = Number(slot.dataset.slot);
+
+        if (dragType === "hand" && dragIndex >= 0) {
+          const card   = state.hand[dragIndex];
+          const table  = state.getCurrentTable();
+          const fp     = fingerprint(card);
+          const isUpg  = tableFingerprints.has(fp);
+          const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
+          const canAfford =
+            state.production >= card.productionRequirement &&
+            state.population  >= card.populationRequirement;
+
+          if (!canAfford || !hasSlot) {
+            this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");
+            return;
+          }
+          if (card.productionRequirement > 0) {
+            const { prod } = this.resEls();
+            if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
+          }
+          this.disableAllActions();
+          this.showToast(isUpg ? "Upgrading table card…" : "Playing card…");
+          this.actions.placeCard(dragIndex);
+
+        } else if (dragType === "table" && dragSlot >= 0 && dragSlot !== targetSlot) {
+          this.disableAllActions();
+          this.actions.reorderCard(dragSlot, targetSlot);
+        }
+      });
+    });
+
+    // ── Drop on filled table card (table-to-table swap) ─────────────────────
+    overlay.querySelectorAll<HTMLElement>(".kh-play-table-card").forEach((card) => {
+      card.addEventListener("dragover", (e) => {
+        // Only allow table→table drags to land on a filled slot
+        if (dragType !== "table") return;
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = "move";
+        if (Number(card.dataset.slot) !== dragSlot) {
+          card.classList.add("kh-play-drag-over");
+        }
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("kh-play-drag-over"));
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        card.classList.remove("kh-play-drag-over");
+        const targetSlot = Number(card.dataset.slot);
+        if (dragType === "table" && dragSlot >= 0 && dragSlot !== targetSlot) {
+          this.disableAllActions();
+          this.actions.reorderCard(dragSlot, targetSlot);
+        }
+      });
+    });
   }
 
   // ─── Resource indicator helpers ──────────────────────────────────────────
@@ -1414,6 +1542,39 @@ export class PlayPhaseScene {
         color: #7a6a52;
         padding: 30px 0;
         font-size: .95rem;
+      }
+
+      /* ── Drag-and-drop ───────────────────────────────────────────────────── */
+
+      /* Grab cursor on draggable items */
+      .kh-play-hand-card[draggable="true"]:not(.kh-play-hc-unplayable) { cursor: grab; }
+      .kh-play-table-card[draggable="true"] { cursor: grab; }
+
+      /* Card being dragged fades in place */
+      .kh-play-hand-card.kh-play-dragging,
+      .kh-play-table-card.kh-play-dragging {
+        opacity: 0.35;
+        transform: scale(0.96);
+        cursor: grabbing;
+      }
+
+      /* Empty slot lights up as a valid drop target */
+      .kh-play-empty-slot.kh-play-drag-over {
+        border-color: #f0cc50;
+        background: rgba(240, 204, 80, 0.18);
+        opacity: 1;
+        box-shadow: 0 0 0 2px rgba(240,204,80,0.45), inset 0 0 20px rgba(240,204,80,0.1);
+        transition: all .12s ease;
+      }
+
+      /* Filled table card lights up when a table→table swap is possible */
+      .kh-play-table-card.kh-play-drag-over {
+        outline: 3px solid #f0cc50;
+        outline-offset: 3px;
+        box-shadow:
+          0 0 0 3px rgba(240,204,80,0.5),
+          0 0 28px rgba(240,204,80,0.35),
+          2px 4px 12px rgba(0,0,0,.18);
       }
     `;
     document.head.appendChild(style);

@@ -230,6 +230,32 @@ public class KhController {
   }
 
   /**
+   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table, letting
+   * the player reorder their table before resolving. Because {@link GameEngine#endAndRun()} fires
+   * cards left-to-right, slot order is strategically meaningful.
+   *
+   * <p>The request payload must contain integer fields {@code fromSlot} and {@code toSlot}. Invalid
+   * indices or a non-PLAY phase are silently rejected (warn-logged) so a stale client message
+   * cannot crash the session.
+   */
+  @MessageMapping("/kh/{gameId}/play/reorder")
+  public void reorderCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final int fromSlot = ((Number) body.get("fromSlot")).intValue();
+              final int toSlot = ((Number) body.get("toSlot")).intValue();
+              try {
+                game.reorderCard(fromSlot, toSlot);
+                khBroadcastService.gameLoaded(game);
+              } catch (IllegalStateException e) {
+                log.warn("reorderCard rejected for game {}: {}", gameId, e.getMessage());
+              }
+            });
+  }
+
+  /**
    * Ends the PLAY phase: resolves table cards left-to-right, consumes seasonal food, then advances
    * to the next ADD phase (seeding card choices). {@link GameEngine#advancePhase()} is a no-op if
    * the game has ended due to starvation, so the game-over state is broadcast cleanly.
