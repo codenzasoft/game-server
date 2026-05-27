@@ -65,6 +65,14 @@ export class PlayPhaseScene {
   private readonly actions: PlayPhaseActions;
   private state: GameState;
 
+  /**
+   * True only for the very first render of this scene instance — the initial
+   * card deal at the start of the PLAY phase.  Flipped to false after that
+   * render so that subsequent updates (play, demolish, etc.) don't re-trigger
+   * the animation.
+   */
+  private animateDraw = true;
+
   constructor(state: GameState, actions: PlayPhaseActions) {
     this.state = state;
     this.actions = actions;
@@ -136,6 +144,9 @@ export class PlayPhaseScene {
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
     attachOptionsListeners(this.overlay);
+
+    // Only the first render of this scene instance animates the card deal.
+    this.animateDraw = false;
   }
 
   private renderGameOver(): void {
@@ -436,9 +447,12 @@ export class PlayPhaseScene {
       })
       .join("");
 
+    const dealClass = this.animateDraw ? "kh-deal-in" : "";
+    const dealStyle = this.animateDraw ? `style="animation-delay:${index * 180}ms"` : "";
+
     return `
-      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""}"
-           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}">
+      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
+           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-header ${isUpgrade ? "kh-play-hc-header-upgrade" : ""}">
           <div class="kh-play-hc-name">${info.name}</div>
           <div class="kh-play-hc-tags">${tagsHTML}</div>
@@ -1577,6 +1591,30 @@ export class PlayPhaseScene {
           0 0 0 3px rgba(240,204,80,0.5),
           0 0 28px rgba(240,204,80,0.35),
           2px 4px 12px rgba(0,0,0,.18);
+      }
+
+      /* ── Card deal-in animation ───────────────────────────────────────────── */
+
+      @keyframes kh-card-deal {
+        0%   {
+          opacity: 0;
+          transform: translateY(56px) scale(0.88);
+          filter: brightness(0.6);
+        }
+        60%  {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          filter: brightness(1);
+        }
+      }
+
+      /* Applied only on the initial draw; removed on every subsequent render */
+      .kh-play-hand-card.kh-deal-in {
+        animation: kh-card-deal 1s cubic-bezier(0.22, 0.61, 0.36, 1) both;
       }
     `;
     document.head.appendChild(style);
