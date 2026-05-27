@@ -708,9 +708,27 @@ export class PlayPhaseScene {
       const prevFood = simFood;
 
       for (const eff of card.effects) {
-        if (eff.target === ResourceTarget.FOOD)       { simFood += eff.modifier; changed.food = true; }
-        if (eff.target === ResourceTarget.PRODUCTION) { simProd += eff.modifier; changed.prod = true; }
-        if (eff.target === ResourceTarget.POPULATION) { simPop  += eff.modifier; changed.pop  = true; }
+        if (typeof eff.target !== "string") continue; // skip CardTarget effects
+        const apply = (cur: number): number =>
+          eff.valueType === "PERCENTAGE"
+            ? cur + cur * (eff.modifier * 0.01)
+            : cur + eff.modifier;
+
+        if (eff.target === ResourceTarget.FOOD) {
+          const next = apply(simFood);
+          if (next !== simFood) changed.food = true;
+          simFood = next;
+        }
+        if (eff.target === ResourceTarget.PRODUCTION) {
+          const next = apply(simProd);
+          if (next !== simProd) changed.prod = true;
+          simProd = next;
+        }
+        if (eff.target === ResourceTarget.POPULATION) {
+          const next = apply(simPop);
+          if (next !== simPop) changed.pop = true;
+          simPop = next;
+        }
       }
 
       // Clamp — mirrors Java applyX helpers.

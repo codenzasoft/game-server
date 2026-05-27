@@ -47,12 +47,73 @@ const getGameId = (): string | undefined => {
 
   const mountTarget = document.getElementById("pixi-container")!;
 
+  // ── Game-over overlay ──────────────────────────────────────────────────────
+  // Shown whenever state.gameOver is true, regardless of curPhase.
+  // It sits on top of everything and lets the player return to the home screen.
+
+  const showGameOver = (): void => {
+    if (currentScene) {
+      currentScene.unmount();
+      currentScene = null;
+    }
+    if (document.getElementById("kh-game-over-overlay")) return; // already shown
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #kh-game-over-overlay {
+        position: fixed; inset: 0; z-index: 9000;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        background: rgba(8, 4, 2, 0.92);
+        font-family: 'Cinzel', serif;
+      }
+      .kh-go-skull   { font-size: 5rem; margin-bottom: 24px; }
+      .kh-go-title   { font-size: 2.6rem; font-weight: 700; color: #f0cc50;
+                       letter-spacing: 5px; text-shadow: 0 2px 18px rgba(0,0,0,.8);
+                       margin: 0 0 14px; }
+      .kh-go-sub     { font-size: 1.1rem; color: #c4b08c; font-style: italic;
+                       margin: 0 0 48px; letter-spacing: 1px; }
+      .kh-go-btn     { padding: 14px 48px; border-radius: 10px; border: 2px solid #c49428;
+                       background: linear-gradient(135deg, #3a2010 0%, #1e0e04 100%);
+                       color: #f0e8c0; font-family: 'Cinzel', serif; font-size: 1rem;
+                       font-weight: 700; letter-spacing: 2px; cursor: pointer;
+                       transition: all .15s; }
+      .kh-go-btn:hover { background: linear-gradient(135deg, #5a3020 0%, #2e1408 100%);
+                         box-shadow: 0 3px 18px rgba(196,148,40,.35); }
+    `;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement("div");
+    overlay.id = "kh-game-over-overlay";
+    overlay.innerHTML = `
+      <div class="kh-go-skull">💀</div>
+      <h1 class="kh-go-title">YOUR KINGDOM HAS FALLEN</h1>
+      <p class="kh-go-sub">Your people are gone. The land falls silent.</p>
+      <button class="kh-go-btn" id="kh-go-home">Return Home</button>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById("kh-go-home")!.addEventListener("click", () => {
+      overlay.remove();
+      app.destroy(true, true);
+      window.location.href = homeUrl;
+    });
+  };
+
   // onMessage is called for every GameMessage dequeued by GameEventHandler.
   // It inspects curPhase and mounts the corresponding scene overlay.
   const onMessage = (message: GameMessage) => {
     console.log("Processing KH message:", message);
 
     const { state } = message;
+
+    // Game over takes priority over phase routing — the server does not advance
+    // the phase when population hits zero, so we must check this first or the
+    // player can end up stuck on the current scene with no way forward.
+    if (state.gameOver) {
+      showGameOver();
+      return;
+    }
 
     switch (state.curPhase) {
       case Phase.ADD: {

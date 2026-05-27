@@ -300,9 +300,16 @@ export class RandomEventScene {
     };
 
     // Helper: simulate food after option effects to detect starvation.
+    // Returns false immediately if the option has no food effects at all — avoids
+    // a false positive when current food is already 0 and the option only touches
+    // production or population.
     const wouldStarve = (index: number): boolean => {
       const option = state.currentEvent?.options[index];
       if (!option) return false;
+      const hasFoodEffect = option.effects.some(
+        (eff) => typeof eff.target === "string" && eff.target === ResourceTarget.FOOD,
+      );
+      if (!hasFoodEffect) return false;
       let food = state.food;
       for (const eff of option.effects) {
         if (typeof eff.target !== "string" || eff.target !== ResourceTarget.FOOD) continue;
