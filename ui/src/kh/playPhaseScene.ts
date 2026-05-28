@@ -1,9 +1,8 @@
-import { GameState, Card, Season, ResourceTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   formatModifier,
   targetEmoji,
-  fingerprint,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -65,6 +64,14 @@ export class PlayPhaseScene {
   private readonly actions: PlayPhaseActions;
   private state: GameState;
 
+  /**
+   * True only for the very first render of this scene instance — the initial
+   * card deal at the start of the PLAY phase.  Flipped to false after that
+   * render so that subsequent updates (play, demolish, etc.) don't re-trigger
+   * the animation.
+   */
+  private animateDraw = true;
+
   constructor(state: GameState, actions: PlayPhaseActions) {
     this.state = state;
     this.actions = actions;
@@ -100,16 +107,16 @@ export class PlayPhaseScene {
 
     const meta = SEASON_META[state.curSeason];
     const table = state.getCurrentTable();
-    const tableFingerprints = new Set(table.map(fingerprint));
+    const tableNames = new Set(table.map((c) => c.name));
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
       ${this.buildPhaseTracker()}
       <main class="kh-play-scene">
-        ${this.buildTableSection(state, table, meta)}
+        ${this.buildTableSection(state, table, meta, state.tableStaffing)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
-        ${this.buildHandSection(state, table, tableFingerprints)}
+        ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
             Resolve all table cards from left to right, then advance the season.
@@ -131,11 +138,14 @@ export class PlayPhaseScene {
     this.overlay.style.background =
       `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
-    this.attachListeners(state, tableFingerprints);
+    this.attachListeners(state, tableNames);
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
     attachOptionsListeners(this.overlay);
+
+    // Only the first render of this scene instance animates the card deal.
+    this.animateDraw = false;
   }
 
   private renderGameOver(): void {
@@ -260,11 +270,12 @@ export class PlayPhaseScene {
     state: GameState,
     table: Card[],
     meta: (typeof SEASON_META)[Season],
+    staffing: CardStaffing[],
   ): string {
     const slots: string[] = [];
     for (let i = 0; i < MAX_TABLE_SIZE; i++) {
       const card = table[i];
-      slots.push(card ? this.buildTableCard(card, i, state) : this.buildEmptySlot(i));
+      slots.push(card ? this.buildTableCard(card, i, state, staffing[i]) : this.buildEmptySlot(i));
     }
 
     return `
@@ -287,10 +298,39 @@ export class PlayPhaseScene {
     `;
   }
 
-  private buildTableCard(card: Card, slot: number, state: GameState): string {
+  private buildTableCard(
+    card: Card,
+    slot: number,
+    state: GameState,
+    staffing: CardStaffing | undefined,
+  ): string {
     const info = getCardDisplayInfo(card);
     const demolishCost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
     const canDemolish = state.production >= demolishCost;
+
+    // Staffing badge — only shown when staffing data is present (PLAY phase).
+    const staffingHTML = staffing
+      ? (() => {
+          const tierClass =
+            staffing.tier === StaffingTier.FULL
+              ? "kh-play-staff-full"
+              : staffing.tier === StaffingTier.HALF
+                ? "kh-play-staff-half"
+                : "kh-play-staff-none";
+          const tierLabel =
+            staffing.tier === StaffingTier.FULL
+              ? "Full"
+              : staffing.tier === StaffingTier.HALF
+                ? "Half output"
+                : "Won't fire";
+          return `
+            <div class="kh-play-tc-staffing ${tierClass}">
+              <span class="kh-play-staff-badge">👥 ${staffing.workersAllocated} / ${staffing.workerCost}</span>
+              <span class="kh-play-staff-label">${tierLabel}</span>
+            </div>
+          `;
+        })()
+      : "";
 
     const effectsHTML = card.effects
       .map((e) => {
@@ -307,8 +347,18 @@ export class PlayPhaseScene {
       })
       .join("");
 
+    // Tier-based border colour applied inline so it overrides the default.
+    const tierBorder =
+      staffing?.tier === StaffingTier.FULL
+        ? "border-color: #4caf50;"
+        : staffing?.tier === StaffingTier.HALF
+          ? "border-color: #f9a825;"
+          : staffing?.tier === StaffingTier.NONE
+            ? "border-color: #e53935;"
+            : "";
+
     return `
-      <div class="kh-play-table-card" data-slot="${slot}" draggable="true">
+      <div class="kh-play-table-card" data-slot="${slot}" draggable="true" style="${tierBorder}">
         <div class="kh-play-tc-header">
           <div class="kh-play-tc-icon">${info.icon}</div>
           <div class="kh-play-tc-meta">
@@ -318,6 +368,7 @@ export class PlayPhaseScene {
             </div>
           </div>
         </div>
+        ${staffingHTML}
         <div class="kh-play-tc-effects">${effectsHTML}</div>
         <div class="kh-play-tc-footer">
           <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
@@ -342,7 +393,7 @@ export class PlayPhaseScene {
   private buildHandSection(
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     if (state.hand.length === 0) {
       return `
@@ -358,7 +409,7 @@ export class PlayPhaseScene {
     }
 
     const cardsHTML = state.hand
-      .map((card, i) => this.buildHandCard(card, i, state, table, tableFingerprints))
+      .map((card, i) => this.buildHandCard(card, i, state, table, tableNames))
       .join("");
 
     const colCount = Math.min(state.hand.length, 3);
@@ -387,31 +438,38 @@ export class PlayPhaseScene {
     index: number,
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     const info = getCardDisplayInfo(card);
-    const fp = fingerprint(card);
-    const isUpgrade = tableFingerprints.has(fp);
+    const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
     const canAffordProd = state.production >= card.productionRequirement;
-    const canAffordPop  = state.population  >= card.populationRequirement;
-    const canAfford = canAffordProd && canAffordPop;
     const hasSlot   = !tableFull || isUpgrade;    // upgrade always has "space"
-    const canPlay   = canAfford && hasSlot;
+    const canPlay   = canAffordProd && hasSlot;
+
+    // Warn if the card will be understaffed — but don't block placement.
+    const workers = Math.floor(state.population);
+    const halfThreshold = Math.ceil(card.staffRequirement / 2);
+    const staffWarn =
+      workers < halfThreshold
+        ? `👥 ${workers}/${card.staffRequirement} workers — won't fire`
+        : workers < card.staffRequirement
+          ? `👥 ${workers}/${card.staffRequirement} workers — half output`
+          : "";
 
     let btnText    = isUpgrade ? "✦ Upgrade" : "⚔ Play";
     let btnExtra   = "";
     let unavailable = "";
 
-    if (!canAfford) {
+    if (!canAffordProd) {
       btnExtra    = "disabled";
-      unavailable = !canAffordProd
-        ? `⚒️ Need ${card.productionRequirement} production`
-        : `👥 Need ${card.populationRequirement} population`;
+      unavailable = `⚒️ Need ${card.productionRequirement} production`;
     } else if (!hasSlot) {
       btnExtra    = "disabled";
       unavailable = "Table is full";
+    } else if (staffWarn) {
+      unavailable = staffWarn;
     }
 
     const tagsHTML = [
@@ -436,9 +494,12 @@ export class PlayPhaseScene {
       })
       .join("");
 
+    const dealClass = this.animateDraw ? "kh-deal-in" : "";
+    const dealStyle = this.animateDraw ? `style="animation-delay:${index * 180}ms"` : "";
+
     return `
-      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""}"
-           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}">
+      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
+           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-header ${isUpgrade ? "kh-play-hc-header-upgrade" : ""}">
           <div class="kh-play-hc-name">${info.name}</div>
           <div class="kh-play-hc-tags">${tagsHTML}</div>
@@ -455,7 +516,7 @@ export class PlayPhaseScene {
             </div>
             <div class="kh-play-hc-cost-item">
               <span class="kh-play-hc-cost-label">👥 Pop. Req</span>
-              <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.populationRequirement}</span>
+              <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.staffRequirement}</span>
             </div>
             ${unavailable ? `<span class="kh-play-hc-unavailable">${unavailable}</span>` : ""}
           </div>
@@ -545,7 +606,7 @@ export class PlayPhaseScene {
               <div class="kh-cc-right">
                 <span class="kh-cc-freq ${c.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${c.frequencyType}</span>
                 <div class="kh-cc-effects">${effectsHTML}</div>
-                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.populationRequirement}</div>
+                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.staffRequirement}</div>
               </div>
             </div>
           `;
@@ -575,7 +636,7 @@ export class PlayPhaseScene {
 
   // ─── Event listeners ────────────────────────────────────────────────────
 
-  private attachListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachListeners(state: GameState, tableNames: Set<string>): void {
     const table = state.getCurrentTable();
 
     // Demolish buttons on table cards
@@ -603,8 +664,7 @@ export class PlayPhaseScene {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
           const card  = state.hand[index];
-          const fp    = fingerprint(card);
-          const isUpgrade = tableFingerprints.has(fp);
+          const isUpgrade = tableNames.has(card.name);
           if (card.productionRequirement > 0) {
             const { prod } = this.resEls();
             if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
@@ -623,7 +683,7 @@ export class PlayPhaseScene {
       });
     }
 
-    this.attachDragListeners(state, tableFingerprints);
+    this.attachDragListeners(state, tableNames);
   }
 
   private disableAllActions(): void {
@@ -641,7 +701,7 @@ export class PlayPhaseScene {
    *
    * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
    */
-  private attachDragListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachDragListeners(state: GameState, tableNames: Set<string>): void {
     const overlay = this.overlay;
 
     // Shared drag state held in closure — safe because all listeners below share
@@ -713,12 +773,9 @@ export class PlayPhaseScene {
 
         const card   = state.hand[dragIndex];
         const table  = state.getCurrentTable();
-        const fp     = fingerprint(card);
-        const isUpg  = tableFingerprints.has(fp);
+        const isUpg  = tableNames.has(card.name);
         const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
-        const canAfford =
-          state.production >= card.productionRequirement &&
-          state.population  >= card.populationRequirement;
+        const canAfford = state.production >= card.productionRequirement;
 
         if (!canAfford || !hasSlot) {
           this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");
@@ -828,9 +885,22 @@ export class PlayPhaseScene {
     // the discard pile (handled server-side after the commit).
 
     for (let i = 0; i < table.length; i++) {
-      const card = table[i];
+      const card    = table[i];
+      const staffing = state.tableStaffing[i];
+      const tier    = staffing?.tier ?? StaffingTier.FULL;
 
       setHighlight(i, true);
+
+      const info = getCardDisplayInfo(card);
+
+      if (tier === StaffingTier.NONE) {
+        // Card is understaffed — does not fire.
+        this.showToast(`🚫 ${info.icon} ${info.name} — understaffed (won't fire)`);
+        await this.delay(1000);
+        setHighlight(i, false);
+        await this.delay(150);
+        continue;
+      }
 
       const changed = { pop: false, prod: false, food: false };
       const prevPop  = simPop;
@@ -839,10 +909,16 @@ export class PlayPhaseScene {
 
       for (const eff of card.effects) {
         if (typeof eff.target !== "string") continue; // skip CardTarget effects
+
+        // Mirror Java halveEffects: floor(modifier / 2) for HALF tier.
+        const rawMod = tier === StaffingTier.HALF
+          ? Math.floor(eff.modifier / 2)
+          : eff.modifier;
+
         const apply = (cur: number): number =>
           eff.valueType === "PERCENTAGE"
-            ? cur + cur * (eff.modifier * 0.01)
-            : cur + eff.modifier;
+            ? cur + cur * (rawMod * 0.01)
+            : cur + rawMod;
 
         if (eff.target === ResourceTarget.FOOD) {
           const next = apply(simFood);
@@ -875,9 +951,9 @@ export class PlayPhaseScene {
       if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
       if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
 
-      const info = getCardDisplayInfo(card);
-      const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
-      this.showToast(`${info.icon} ${info.name} ${label}`);
+      const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
+      const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
+      this.showToast(`${info.icon} ${info.name} ${freqLabel}${tierLabel}`);
 
       await this.delay(1500);
       setHighlight(i, false);
@@ -1577,6 +1653,30 @@ export class PlayPhaseScene {
           0 0 0 3px rgba(240,204,80,0.5),
           0 0 28px rgba(240,204,80,0.35),
           2px 4px 12px rgba(0,0,0,.18);
+      }
+
+      /* ── Card deal-in animation ───────────────────────────────────────────── */
+
+      @keyframes kh-card-deal {
+        0%   {
+          opacity: 0;
+          transform: translateY(56px) scale(0.88);
+          filter: brightness(0.6);
+        }
+        60%  {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          filter: brightness(1);
+        }
+      }
+
+      /* Applied only on the initial draw; removed on every subsequent render */
+      .kh-play-hand-card.kh-deal-in {
+        animation: kh-card-deal 1s cubic-bezier(0.22, 0.61, 0.36, 1) both;
       }
     `;
     document.head.appendChild(style);

@@ -96,7 +96,7 @@ class EffectSpec extends Specification {
 
     def "amplify returns a new card with every effect's modifier scaled by the factor"() {
         setup:
-        def card = new Card(2, 30, FrequencyType.RECURRING, [
+        def card = new Card("TEST", 2, 30, FrequencyType.RECURRING, [
                 new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER),
                 new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER)
         ])
@@ -109,21 +109,21 @@ class EffectSpec extends Specification {
         amplified.effects()[1].modifier() == 10.0
     }
 
-    def "amplify preserves the card's population and production requirements"() {
+    def "amplify preserves the card's staff and production requirements"() {
         setup:
-        def card = new Card(3, 60, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def card = new Card("TEST", 3, 60, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
 
         when:
         def amplified = card.amplify(2)
 
         then:
-        amplified.populationRequirement() == 3.0
+        amplified.staffRequirement() == 3.0
         amplified.productionRequirement() == 60.0
     }
 
     def "amplify preserves the card's frequencyType"() {
         setup:
-        def card = new Card(0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def card = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
 
         when:
         def amplified = card.amplify(2)
@@ -134,7 +134,7 @@ class EffectSpec extends Specification {
 
     def "amplify does not mutate the original card"() {
         setup:
-        def card = new Card(2, 30, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def card = new Card("TEST", 2, 30, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
 
         when:
         card.amplify(2)

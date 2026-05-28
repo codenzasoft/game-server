@@ -3,7 +3,7 @@ package com.codenzasoft.games.kingshand;
 import java.util.List;
 
 /**
- * A playable card. Carries its play requirements ({@code populationRequirement}, {@code
+ * A playable card. Carries its play requirements ({@code staffRequirement}, {@code
  * productionRequirement}), a {@link FrequencyType} that applies to all of its effects (one-shot vs
  * every season), and an arbitrary list of {@link Effect}s.
  *
@@ -14,7 +14,8 @@ import java.util.List;
  * fact.
  */
 public record Card(
-    double populationRequirement,
+    String name,
+    double staffRequirement,
     double productionRequirement,
     FrequencyType frequencyType,
     List<Effect> effects) {
@@ -31,6 +32,6 @@ public record Card(
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    return new Card(populationRequirement, productionRequirement, frequencyType, amplified);
+    return new Card(name, staffRequirement, productionRequirement, frequencyType, amplified);
   }
 }

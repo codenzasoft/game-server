@@ -49,88 +49,149 @@ public class CardCatalog {
 
   // Spring
   public static final Card FARM =
-      new Card(2.0, 30.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(10)));
+      new Card(
+          "FARM", 4.0, 30.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(10)));
   public static final Card SEEDS =
-      new Card(1.0, 10.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(8)));
+      new Card("SEEDS", 2.0, 15.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(10)));
   public static final Card FERTILIZER =
-      new Card(1.0, 15.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.percentage(10.0)));
+      new Card(
+          "FERTILIZER",
+          2.0,
+          30.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.percentage(10.0)));
   public static final Card MINE =
-      new Card(5.0, 60.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(15)));
+      new Card(
+          "MINE",
+          5.0,
+          60.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(15)));
   public static final Card HUNTING_CAMP =
-      new Card(3.0, 20.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(12)));
+      new Card(
+          "HUNTING_CAMP",
+          8.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(12), ResourceTarget.PRODUCTION.integer(8)));
   public static final Card SETTLERS =
-      new Card(5.0, 45.0, FrequencyType.SINGLE, List.of(ResourceTarget.POPULATION.integer(3)));
+      new Card(
+          "SETTLERS",
+          3.0,
+          50.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.POPULATION.integer(25)));
   public static final Card LUMBER_YARD =
-      new Card(2.0, 25.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(8)));
+      new Card(
+          "LUMBER_YARD",
+          10.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(20), ResourceTarget.PRODUCTION.percentage(5)));
   public static final Card COMMUNITY_WELL =
       new Card(
-          1.0,
-          20.0,
+          "COMMUNITY_WELL",
+          12.0,
+          50.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(5), ResourceTarget.POPULATION.integer(1)));
+          List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.POPULATION.percentage(10)));
   public static final Card IRRIGATION =
-      new Card(3.0, 35.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.percentage(15.0)));
+      new Card(
+          "IRRIGATION",
+          15.0,
+          120.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.percentage(15.0), ResourceTarget.FOOD.integer(15)));
 
   // Summer
   public static final Card FARMSTEAD =
       new Card(
-          0.0,
+          "FARMSTEAD",
+          6.0,
           50.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.POPULATION.integer(2), ResourceTarget.POPULATION.integer(2)));
-  public static final Card HUNTING =
-      new Card(15.0, 20.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(30)));
-  public static final Card SETTLEMENT =
-      new Card(20.0, 100.0, FrequencyType.RECURRING, List.of(ResourceTarget.POPULATION.integer(3)));
+          List.of(ResourceTarget.FOOD.integer(8), ResourceTarget.PRODUCTION.integer(8)));
+  public static final Card THE_HUNT =
+      new Card(
+          "THE_HUNT", 4.0, 20.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(30)));
   public static final Card LOGGING =
-      new Card(3.0, 25.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(10)));
+      new Card(
+          "LOGGING",
+          6.0,
+          20.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.PRODUCTION.integer(40)));
   public static final Card TRADE_ROUTES =
       new Card(
-          4.0,
+          "TRADE_ROUTES",
+          14.0,
           80.0,
           FrequencyType.RECURRING,
           List.of(ResourceTarget.PRODUCTION.percentage(5.0), ResourceTarget.FOOD.percentage(5.0)));
   public static final Card FISHING_VILLAGE =
-      new Card(3.0, 40.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(15)));
+      new Card(
+          "FISHING_VILLAGE",
+          6.0,
+          60,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(15)));
   public static final Card SCHOOL_HOUSE =
-      new Card(2.0, 50.0, FrequencyType.RECURRING, List.of(ResourceTarget.POPULATION.integer(1)));
+      new Card(
+          "SCHOOL_HOUSE",
+          14.0,
+          75.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.percentage(8), ResourceTarget.FOOD.percentage(5)));
   public static final Card EARLY_HARVEST =
-      new Card(2.0, 15.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(25)));
-  public static final Card BLACKSMITH =
-      new Card(3.0, 30.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(12)));
+      new Card(
+          "EARLY_HARVEST",
+          3.0,
+          30.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.FOOD.integer(35)));
   public static final Card WINDMILL =
       new Card(
-          2.0,
-          45.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(5)));
-  public static final Card MARKETPLACE =
-      new Card(
-          4.0,
+          "WINDMILL",
+          5.0,
           70.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(10.0), ResourceTarget.FOOD.integer(5)));
-  public static final Card SKILLED_LABOR =
+          List.of(
+              ResourceTarget.FOOD.integer(10),
+              ResourceTarget.FOOD.percentage(5),
+              ResourceTarget.PRODUCTION.integer(5)));
+  public static final Card MARKETPLACE =
       new Card(
-          6.0, 55.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.percentage(15.0)));
+          "MARKETPLACE",
+          12.0,
+          70.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.percentage(10.0), ResourceTarget.FOOD.integer(10)));
   public static final Card CARAVAN =
       new Card(
-          3.0,
-          60.0,
+          "CARAVAN",
+          12.0,
+          70.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(10), ResourceTarget.FOOD.integer(10)));
+          List.of(ResourceTarget.PRODUCTION.integer(10), ResourceTarget.FOOD.percentage(10)));
   public static final Card TOWN_FAIR =
       new Card(
+          "TOWN_FAIR",
           5.0,
-          65.0,
+          40.0,
           FrequencyType.SINGLE,
-          List.of(ResourceTarget.POPULATION.integer(4), ResourceTarget.FOOD.integer(20)));
-  public static final Card BRICKWORKS =
-      new Card(4.0, 50.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(15)));
+          List.of(ResourceTarget.POPULATION.integer(10), ResourceTarget.FOOD.integer(20)));
+  public static final Card STONE_QUARRY =
+      new Card(
+          "STONE_QUARRY",
+          6.0,
+          60.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(15), ResourceTarget.PRODUCTION.percentage(5)));
   public static final Card MERCHANT_GUILD =
       new Card(
-          6.0,
-          90.0,
+          "MERCHANT_GUILD",
+          20.0,
+          120.0,
           FrequencyType.RECURRING,
           List.of(
               ResourceTarget.PRODUCTION.percentage(10.0), ResourceTarget.FOOD.percentage(10.0)));
@@ -138,52 +199,154 @@ public class CardCatalog {
   // Fall
   public static final Card WORKSHOP =
       new Card(
-          5.0, 40.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.percentage(10.0)));
+          "WORKSHOP",
+          4.0,
+          40.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(10)));
   public static final Card MANOR =
       new Card(
-          8.0,
-          120.0,
+          "MANOR",
+          12.0,
+          75.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.POPULATION.integer(2), ResourceTarget.PRODUCTION.integer(20)));
+          List.of(ResourceTarget.POPULATION.integer(5), ResourceTarget.PRODUCTION.integer(20)));
   public static final Card HARVEST =
-      new Card(2.0, 10.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(40)));
+      new Card(
+          "HARVEST", 2.0, 20.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(40)));
   public static final Card TEXTILES =
       new Card(
-          4.0, 60.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.percentage(20.0)));
+          "TEXTILES",
+          8.0,
+          60.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.percentage(5.0), ResourceTarget.PRODUCTION.integer(10)));
   public static final Card BAKERY =
-      new Card(2.0, 35.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(12)));
+      new Card(
+          "BAKERY",
+          8.0,
+          60.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(12), ResourceTarget.FOOD.percentage(5)));
   public static final Card TAX_COLLECTION =
-      new Card(4.0, 0.0, FrequencyType.SINGLE, List.of(ResourceTarget.PRODUCTION.integer(40)));
+      new Card(
+          "TAX_COLLECTION",
+          5.0,
+          0.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.PRODUCTION.integer(40), ResourceTarget.POPULATION.integer(-10)));
   public static final Card STOREHOUSE =
-      new Card(3.0, 45.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.percentage(15.0)));
+      new Card(
+          "STOREHOUSE",
+          6.0,
+          45.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.percentage(8.0)));
   public static final Card BARN =
-      new Card(2.0, 30.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(15)));
+      new Card(
+          "BARN", 10.0, 40.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(20)));
   public static final Card MASON_GUILD =
-      new Card(5.0, 80.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(25)));
+      new Card(
+          "MASON_GUILD",
+          16.0,
+          100.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(25), ResourceTarget.PRODUCTION.percentage(10)));
+  public static final Card STONE_TOOLS =
+      new Card(
+          "STONE_TOOLS",
+          4.0,
+          40.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.percentage(5)));
+  public static final Card METALWORKING =
+      new Card(
+          "METALWORKING",
+          8.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.percentage(10)));
+  public static final Card BLACKSMITH =
+      new Card(
+          "BLACKSMITH",
+          20.0,
+          160.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.percentage(20)));
 
   // Winter
   public static final Card FORGE =
-      new Card(3.0, 50.0, FrequencyType.RECURRING, List.of(ResourceTarget.PRODUCTION.integer(15)));
+      new Card(
+          "FORGE",
+          6.0,
+          50.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(15)));
   public static final Card WOODPILES =
-      new Card(1.0, 10.0, FrequencyType.SINGLE, List.of(ResourceTarget.PRODUCTION.integer(25)));
+      new Card(
+          "WOODPILES",
+          3.0,
+          10.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.PRODUCTION.integer(25)));
   public static final Card GRANARY =
       new Card(
-          2.0,
-          40.0,
+          "GRANARY",
+          10.0,
+          100.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.percentage(10.0), ResourceTarget.FOOD.integer(20)));
+          List.of(ResourceTarget.FOOD.percentage(10.0), ResourceTarget.FOOD.integer(15)));
   public static final Card EMERGENCY_RATIONS =
-      new Card(1.0, 5.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(25)));
+      new Card(
+          "EMERGENCY_RATIONS",
+          2.0,
+          25.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.FOOD.integer(25)));
   public static final Card STOCKPILE =
       new Card(
-          1.0,
-          20.0,
+          "STOCKPILE",
+          5.0,
+          65.0,
           FrequencyType.SINGLE,
-          List.of(ResourceTarget.PRODUCTION.integer(20), ResourceTarget.FOOD.integer(15)));
+          List.of(ResourceTarget.PRODUCTION.integer(15), ResourceTarget.FOOD.percentage(5)));
   public static final Card CHAPEL =
-      new Card(3.0, 40.0, FrequencyType.RECURRING, List.of(ResourceTarget.POPULATION.integer(2)));
+      new Card(
+          "CHAPEL",
+          6.0,
+          40.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(40), ResourceTarget.POPULATION.percentage(20)));
+  public static final Card PRAY =
+      new Card(
+          "PRAY",
+          1.0,
+          1.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.FOOD.integer(5), ResourceTarget.PRODUCTION.integer(5)));
+  public static final Card DESPERATE_TIMES =
+      new Card(
+          "DESPERATE_TIMES",
+          4.0,
+          10.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(40), ResourceTarget.POPULATION.integer(-10)));
 
   // ----- Default catalog factory -----
+
+  /**
+   * Returns the starting deck for a new game, grouped by season. Each season receives three cards
+   * that give the player a viable foundation across all resource types.
+   */
+  public static Map<Season, List<Card>> defaultStartingDeck() {
+    Map<Season, List<Card>> deck = new EnumMap<>(Season.class);
+    deck.put(Season.SPRING, List.of(MINE, SEEDS, FERTILIZER));
+    deck.put(Season.SUMMER, List.of(THE_HUNT, EARLY_HARVEST, STONE_QUARRY));
+    deck.put(Season.FALL, List.of(WORKSHOP, HARVEST, BAKERY));
+    deck.put(Season.WINTER, List.of(EMERGENCY_RATIONS, FORGE, PRAY));
+    return Collections.unmodifiableMap(deck);
+  }
 
   /** Builds the canonical King's Hand card catalog with all cards assigned to their season. */
   public static CardCatalog defaultCatalog() {
@@ -206,20 +369,17 @@ public class CardCatalog {
         Season.SUMMER,
         List.of(
             FARMSTEAD,
-            HUNTING,
-            SETTLEMENT,
+            THE_HUNT,
             LOGGING,
             TRADE_ROUTES,
             FISHING_VILLAGE,
             SCHOOL_HOUSE,
             EARLY_HARVEST,
-            BLACKSMITH,
             WINDMILL,
             MARKETPLACE,
-            SKILLED_LABOR,
             CARAVAN,
             TOWN_FAIR,
-            BRICKWORKS,
+            STONE_QUARRY,
             MERCHANT_GUILD));
 
     seasonal.put(
@@ -233,10 +393,22 @@ public class CardCatalog {
             TAX_COLLECTION,
             STOREHOUSE,
             BARN,
-            MASON_GUILD));
+            MASON_GUILD,
+            STONE_TOOLS,
+            METALWORKING,
+            BLACKSMITH));
 
     seasonal.put(
-        Season.WINTER, List.of(FORGE, WOODPILES, GRANARY, EMERGENCY_RATIONS, STOCKPILE, CHAPEL));
+        Season.WINTER,
+        List.of(
+            FORGE,
+            WOODPILES,
+            GRANARY,
+            EMERGENCY_RATIONS,
+            STOCKPILE,
+            CHAPEL,
+            PRAY,
+            DESPERATE_TIMES));
 
     return new CardCatalog(seasonal);
   }
