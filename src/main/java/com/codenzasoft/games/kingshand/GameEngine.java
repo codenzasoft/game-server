@@ -485,6 +485,15 @@ public class GameEngine implements Game<GameEngine> {
 
   // ----- Pile mutations -----
 
+  /**
+   * Seeds the per-season starting deck into the draw piles for a brand-new game. Must be called
+   * once after construction before the first ADD phase. Uses {@link
+   * CardCatalog#defaultStartingDeck()} so the composition is kept in one place.
+   */
+  public synchronized void seedStartingDeck() {
+    CardCatalog.defaultStartingDeck().forEach(this::addToDeck);
+  }
+
   // when we add a card to one of our draws, add it to the drawpile and shuffle the drawpile.
   public synchronized void addToDeck(Season season, Card card) {
     addToDeck(season, List.of(card));

@@ -67,6 +67,7 @@ interface EffectData {
 }
 
 interface CardData {
+  name: string;
   populationRequirement: number;
   productionRequirement: number;
   frequencyType: FrequencyType;
@@ -149,12 +150,14 @@ export class Effect {
 // Card: a playable card with play requirements, a frequency type, and a list
 // of effects that fire when the card is resolved.
 export class Card {
+  name: string;
   populationRequirement: number;
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
 
   constructor(data: CardData) {
+    this.name = data.name;
     this.populationRequirement = data.populationRequirement;
     this.productionRequirement = data.productionRequirement;
     this.frequencyType = data.frequencyType;
@@ -291,6 +294,7 @@ const EffectSchema = z
 
 const CardSchema = z
   .object({
+    name: z.string(),
     populationRequirement: z.number(),
     productionRequirement: z.number(),
     frequencyType: z.enum(FrequencyType),

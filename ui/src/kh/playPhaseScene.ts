@@ -3,7 +3,6 @@ import {
   getCardDisplayInfo,
   formatModifier,
   targetEmoji,
-  fingerprint,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -65,6 +64,14 @@ export class PlayPhaseScene {
   private readonly actions: PlayPhaseActions;
   private state: GameState;
 
+  /**
+   * True only for the very first render of this scene instance — the initial
+   * card deal at the start of the PLAY phase.  Flipped to false after that
+   * render so that subsequent updates (play, demolish, etc.) don't re-trigger
+   * the animation.
+   */
+  private animateDraw = true;
+
   constructor(state: GameState, actions: PlayPhaseActions) {
     this.state = state;
     this.actions = actions;
@@ -100,7 +107,7 @@ export class PlayPhaseScene {
 
     const meta = SEASON_META[state.curSeason];
     const table = state.getCurrentTable();
-    const tableFingerprints = new Set(table.map(fingerprint));
+    const tableNames = new Set(table.map((c) => c.name));
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -109,7 +116,7 @@ export class PlayPhaseScene {
       <main class="kh-play-scene">
         ${this.buildTableSection(state, table, meta)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
-        ${this.buildHandSection(state, table, tableFingerprints)}
+        ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
             Resolve all table cards from left to right, then advance the season.
@@ -131,11 +138,14 @@ export class PlayPhaseScene {
     this.overlay.style.background =
       `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
-    this.attachListeners(state, tableFingerprints);
+    this.attachListeners(state, tableNames);
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
     attachOptionsListeners(this.overlay);
+
+    // Only the first render of this scene instance animates the card deal.
+    this.animateDraw = false;
   }
 
   private renderGameOver(): void {
@@ -342,7 +352,7 @@ export class PlayPhaseScene {
   private buildHandSection(
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     if (state.hand.length === 0) {
       return `
@@ -358,7 +368,7 @@ export class PlayPhaseScene {
     }
 
     const cardsHTML = state.hand
-      .map((card, i) => this.buildHandCard(card, i, state, table, tableFingerprints))
+      .map((card, i) => this.buildHandCard(card, i, state, table, tableNames))
       .join("");
 
     const colCount = Math.min(state.hand.length, 3);
@@ -387,11 +397,10 @@ export class PlayPhaseScene {
     index: number,
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     const info = getCardDisplayInfo(card);
-    const fp = fingerprint(card);
-    const isUpgrade = tableFingerprints.has(fp);
+    const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
     const canAffordProd = state.production >= card.productionRequirement;
@@ -436,9 +445,12 @@ export class PlayPhaseScene {
       })
       .join("");
 
+    const dealClass = this.animateDraw ? "kh-deal-in" : "";
+    const dealStyle = this.animateDraw ? `style="animation-delay:${index * 180}ms"` : "";
+
     return `
-      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""}"
-           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}">
+      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
+           data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-header ${isUpgrade ? "kh-play-hc-header-upgrade" : ""}">
           <div class="kh-play-hc-name">${info.name}</div>
           <div class="kh-play-hc-tags">${tagsHTML}</div>
@@ -575,7 +587,7 @@ export class PlayPhaseScene {
 
   // ─── Event listeners ────────────────────────────────────────────────────
 
-  private attachListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachListeners(state: GameState, tableNames: Set<string>): void {
     const table = state.getCurrentTable();
 
     // Demolish buttons on table cards
@@ -603,8 +615,7 @@ export class PlayPhaseScene {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
           const card  = state.hand[index];
-          const fp    = fingerprint(card);
-          const isUpgrade = tableFingerprints.has(fp);
+          const isUpgrade = tableNames.has(card.name);
           if (card.productionRequirement > 0) {
             const { prod } = this.resEls();
             if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
@@ -623,7 +634,7 @@ export class PlayPhaseScene {
       });
     }
 
-    this.attachDragListeners(state, tableFingerprints);
+    this.attachDragListeners(state, tableNames);
   }
 
   private disableAllActions(): void {
@@ -641,7 +652,7 @@ export class PlayPhaseScene {
    *
    * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
    */
-  private attachDragListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachDragListeners(state: GameState, tableNames: Set<string>): void {
     const overlay = this.overlay;
 
     // Shared drag state held in closure — safe because all listeners below share
@@ -713,8 +724,7 @@ export class PlayPhaseScene {
 
         const card   = state.hand[dragIndex];
         const table  = state.getCurrentTable();
-        const fp     = fingerprint(card);
-        const isUpg  = tableFingerprints.has(fp);
+        const isUpg  = tableNames.has(card.name);
         const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
         const canAfford =
           state.production >= card.productionRequirement &&
@@ -1577,6 +1587,30 @@ export class PlayPhaseScene {
           0 0 0 3px rgba(240,204,80,0.5),
           0 0 28px rgba(240,204,80,0.35),
           2px 4px 12px rgba(0,0,0,.18);
+      }
+
+      /* ── Card deal-in animation ───────────────────────────────────────────── */
+
+      @keyframes kh-card-deal {
+        0%   {
+          opacity: 0;
+          transform: translateY(56px) scale(0.88);
+          filter: brightness(0.6);
+        }
+        60%  {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          filter: brightness(1);
+        }
+      }
+
+      /* Applied only on the initial draw; removed on every subsequent render */
+      .kh-play-hand-card.kh-deal-in {
+        animation: kh-card-deal 1s cubic-bezier(0.22, 0.61, 0.36, 1) both;
       }
     `;
     document.head.appendChild(style);
