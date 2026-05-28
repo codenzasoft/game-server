@@ -263,7 +263,7 @@ export class AddPhaseScene {
             </div>
             <div class="kh-cost-item">
               <span class="kh-cost-label">👥 Pop. Req</span>
-              <span class="kh-cost-val kh-cost-pop">${card.populationRequirement}</span>
+              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement}</span>
             </div>
           </div>
           <button class="kh-btn-select" data-index="${index}">

@@ -159,9 +159,9 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 15    // 5 + 10 from RECURRING card
+        state.population == 30    // 20 + 10 from RECURRING card
         state.production == 220   // 200 + 20 from RECURRING card
-        state.food       == 50    // unchanged — SINGLE card did not fire
+        state.food       == 150   // unchanged — SINGLE card did not fire
     }
 
     def "card with recurring effects on all three resources fires every one of them"() {
@@ -182,9 +182,9 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 6     // 5 + 1
+        state.population == 21    // 20 + 1
         state.production == 205   // 200 + 5
-        state.food == 53          // 50 + 3
+        state.food == 153         // 150 + 3
     }
 
     def "single-frequency effects do not fire on the season trigger"() {
@@ -201,7 +201,7 @@ class GameEngineSpec extends Specification {
         engine.advanceSeason()
 
         then:
-        state.food == 50    // unchanged because the effect is SINGLE
+        state.food == 150   // unchanged because the effect is SINGLE
     }
 
     // ----- table mutations -----
@@ -839,9 +839,9 @@ class GameEngineSpec extends Specification {
 
         then:
         state.curPhase == Phase.PLAY
-        state.food       == 50.0  // unchanged
+        state.food       == 150.0 // unchanged
         state.production == 200.0 // unchanged
-        state.population == 5.0   // unchanged
+        state.population == 20.0  // unchanged
     }
 
     def "applyEventOption throws when option is null"() {
@@ -1179,13 +1179,13 @@ class GameEngineSpec extends Specification {
         e.message.contains("10")   // have
     }
 
-    def "placeCard throws when the player's population does not meet the requirement"() {
+    def "placeCard succeeds regardless of population — staffing is evaluated at End and Run, not at placement"() {
         setup:
-        // FARM requires population 5; give the player only 4
+        // FARM has staffRequirement=4 but cards can be placed regardless of population
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(4)
+                .population(1)
                 .production(100)
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1195,10 +1195,8 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        def e = thrown(IllegalStateException)
-        e.message.contains("not enough population to place card")
-        e.message.contains("5")    // requirement
-        e.message.contains("4")    // have
+        notThrown(IllegalStateException)
+        state.getCurrentTable().contains(CardCatalog.FARM)
     }
 
     def "placeCard throws when the current phase is not PLAY"() {
@@ -1222,7 +1220,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard moves the card from hand to the current season's table and deducts production"() {
         setup:
-        // FARM: populationRequirement=5, productionRequirement=30
+        // FARM: staffRequirement=4, productionRequirement=30
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1292,7 +1290,7 @@ class GameEngineSpec extends Specification {
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
         // TRADE_ROUTES has two recurring effects: PRODUCTION +5% and FOOD +5%
-        // populationRequirement=80, productionRequirement=80
+        // staffRequirement=14, productionRequirement=80
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
@@ -1695,6 +1693,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
+                .population(5.0)
                 .food(50.0)
                 .table(Season.SUMMER, [card])
                 .build()
@@ -1716,6 +1715,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
+                .population(5.0)
                 .food(50.0)
                 .table(Season.SUMMER, [singleCard])
                 .build()
@@ -1757,6 +1757,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.FALL)
+                .population(5.0)
                 .food(50.0).production(100.0)
                 .table(Season.FALL, [singleCard, recurringCard])
                 .build()
@@ -1784,6 +1785,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
+                .population(5.0)
                 .food(50.0)
                 .table(Season.SPRING, [cardA, cardB])
                 .build()

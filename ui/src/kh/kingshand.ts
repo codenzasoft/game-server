@@ -48,6 +48,14 @@ export enum ResourceTarget {
   FOOD = "FOOD",
 }
 
+// StaffingTier: the result of distributing floor(population) workers left-to-right
+// across the table.  Determines how a card resolves at End and Run.
+export enum StaffingTier {
+  NONE = "NONE",   // < ceil(staffRequirement / 2) workers — card does not fire
+  HALF = "HALF",   // ≥ ceil(staffRequirement / 2) but < staffRequirement — fires at half value
+  FULL = "FULL",   // staffRequirement workers met — fires at full value
+}
+
 // ─── Data interfaces ──────────────────────────────────────────────────────────
 //
 // Each *Data interface describes the shape that a constructor expects.  Declaring
@@ -68,10 +76,16 @@ interface EffectData {
 
 interface CardData {
   name: string;
-  populationRequirement: number;
+  staffRequirement: number;
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
+}
+
+interface CardStaffingData {
+  workersAllocated: number;
+  workerCost: number;
+  tier: StaffingTier;
 }
 
 interface EventOptionData {
@@ -107,6 +121,7 @@ interface GameStateData {
   rerollCount: number;
   currentEvent: KhEvent | undefined;
   gameOver: boolean;
+  tableStaffing: CardStaffing[];
 }
 
 interface GameMessageData {
@@ -147,21 +162,35 @@ export class Effect {
   }
 }
 
-// Card: a playable card with play requirements, a frequency type, and a list
-// of effects that fire when the card is resolved.
+// Card: a playable card with a staff requirement, a production cost, a frequency
+// type, and a list of effects that fire when the card is resolved.
 export class Card {
   name: string;
-  populationRequirement: number;
+  staffRequirement: number;
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
 
   constructor(data: CardData) {
     this.name = data.name;
-    this.populationRequirement = data.populationRequirement;
+    this.staffRequirement = data.staffRequirement;
     this.productionRequirement = data.productionRequirement;
     this.frequencyType = data.frequencyType;
     this.effects = data.effects;
+  }
+}
+
+// CardStaffing: the staffing snapshot for one table slot during the Play phase.
+// Computed by the server and returned in GameState.tableStaffing.
+export class CardStaffing {
+  workersAllocated: number;
+  workerCost: number;
+  tier: StaffingTier;
+
+  constructor(data: CardStaffingData) {
+    this.workersAllocated = data.workersAllocated;
+    this.workerCost = data.workerCost;
+    this.tier = data.tier;
   }
 }
 
@@ -224,6 +253,7 @@ export class GameState {
   rerollCount: number;
   currentEvent: KhEvent | undefined;
   gameOver: boolean;
+  tableStaffing: CardStaffing[];
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -240,6 +270,7 @@ export class GameState {
     this.rerollCount = data.rerollCount;
     this.currentEvent = data.currentEvent;
     this.gameOver = data.gameOver;
+    this.tableStaffing = data.tableStaffing;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -295,12 +326,20 @@ const EffectSchema = z
 const CardSchema = z
   .object({
     name: z.string(),
-    populationRequirement: z.number(),
+    staffRequirement: z.number(),
     productionRequirement: z.number(),
     frequencyType: z.enum(FrequencyType),
     effects: z.array(EffectSchema),
   })
   .transform((data) => new Card(data as CardData));
+
+const CardStaffingSchema = z
+  .object({
+    workersAllocated: z.number().int(),
+    workerCost: z.number().int(),
+    tier: z.enum(StaffingTier),
+  })
+  .transform((data) => new CardStaffing(data as CardStaffingData));
 
 const EventOptionSchema = z
   .object({
@@ -353,6 +392,8 @@ export const GameStateSchema = z
     // entirely thanks to @JsonInclude(NON_NULL), so .optional() is correct.
     currentEvent: KhEventSchema.optional(),
     gameOver: z.boolean(),
+    // tableStaffing is only populated during the PLAY phase; empty array otherwise.
+    tableStaffing: z.array(CardStaffingSchema).default([]),
   })
   .transform((data) => new GameState(data as GameStateData));
 

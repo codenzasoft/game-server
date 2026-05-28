@@ -1,4 +1,4 @@
-import { GameState, Card, Season, ResourceTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   formatModifier,
@@ -114,7 +114,7 @@ export class PlayPhaseScene {
       ${this.buildResourcesBar(state)}
       ${this.buildPhaseTracker()}
       <main class="kh-play-scene">
-        ${this.buildTableSection(state, table, meta)}
+        ${this.buildTableSection(state, table, meta, state.tableStaffing)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
         ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
@@ -270,11 +270,12 @@ export class PlayPhaseScene {
     state: GameState,
     table: Card[],
     meta: (typeof SEASON_META)[Season],
+    staffing: CardStaffing[],
   ): string {
     const slots: string[] = [];
     for (let i = 0; i < MAX_TABLE_SIZE; i++) {
       const card = table[i];
-      slots.push(card ? this.buildTableCard(card, i, state) : this.buildEmptySlot(i));
+      slots.push(card ? this.buildTableCard(card, i, state, staffing[i]) : this.buildEmptySlot(i));
     }
 
     return `
@@ -297,10 +298,39 @@ export class PlayPhaseScene {
     `;
   }
 
-  private buildTableCard(card: Card, slot: number, state: GameState): string {
+  private buildTableCard(
+    card: Card,
+    slot: number,
+    state: GameState,
+    staffing: CardStaffing | undefined,
+  ): string {
     const info = getCardDisplayInfo(card);
     const demolishCost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
     const canDemolish = state.production >= demolishCost;
+
+    // Staffing badge — only shown when staffing data is present (PLAY phase).
+    const staffingHTML = staffing
+      ? (() => {
+          const tierClass =
+            staffing.tier === StaffingTier.FULL
+              ? "kh-play-staff-full"
+              : staffing.tier === StaffingTier.HALF
+                ? "kh-play-staff-half"
+                : "kh-play-staff-none";
+          const tierLabel =
+            staffing.tier === StaffingTier.FULL
+              ? "Full"
+              : staffing.tier === StaffingTier.HALF
+                ? "Half output"
+                : "Won't fire";
+          return `
+            <div class="kh-play-tc-staffing ${tierClass}">
+              <span class="kh-play-staff-badge">👥 ${staffing.workersAllocated} / ${staffing.workerCost}</span>
+              <span class="kh-play-staff-label">${tierLabel}</span>
+            </div>
+          `;
+        })()
+      : "";
 
     const effectsHTML = card.effects
       .map((e) => {
@@ -317,8 +347,18 @@ export class PlayPhaseScene {
       })
       .join("");
 
+    // Tier-based border colour applied inline so it overrides the default.
+    const tierBorder =
+      staffing?.tier === StaffingTier.FULL
+        ? "border-color: #4caf50;"
+        : staffing?.tier === StaffingTier.HALF
+          ? "border-color: #f9a825;"
+          : staffing?.tier === StaffingTier.NONE
+            ? "border-color: #e53935;"
+            : "";
+
     return `
-      <div class="kh-play-table-card" data-slot="${slot}" draggable="true">
+      <div class="kh-play-table-card" data-slot="${slot}" draggable="true" style="${tierBorder}">
         <div class="kh-play-tc-header">
           <div class="kh-play-tc-icon">${info.icon}</div>
           <div class="kh-play-tc-meta">
@@ -328,6 +368,7 @@ export class PlayPhaseScene {
             </div>
           </div>
         </div>
+        ${staffingHTML}
         <div class="kh-play-tc-effects">${effectsHTML}</div>
         <div class="kh-play-tc-footer">
           <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
@@ -404,23 +445,31 @@ export class PlayPhaseScene {
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
     const canAffordProd = state.production >= card.productionRequirement;
-    const canAffordPop  = state.population  >= card.populationRequirement;
-    const canAfford = canAffordProd && canAffordPop;
     const hasSlot   = !tableFull || isUpgrade;    // upgrade always has "space"
-    const canPlay   = canAfford && hasSlot;
+    const canPlay   = canAffordProd && hasSlot;
+
+    // Warn if the card will be understaffed — but don't block placement.
+    const workers = Math.floor(state.population);
+    const halfThreshold = Math.ceil(card.staffRequirement / 2);
+    const staffWarn =
+      workers < halfThreshold
+        ? `👥 ${workers}/${card.staffRequirement} workers — won't fire`
+        : workers < card.staffRequirement
+          ? `👥 ${workers}/${card.staffRequirement} workers — half output`
+          : "";
 
     let btnText    = isUpgrade ? "✦ Upgrade" : "⚔ Play";
     let btnExtra   = "";
     let unavailable = "";
 
-    if (!canAfford) {
+    if (!canAffordProd) {
       btnExtra    = "disabled";
-      unavailable = !canAffordProd
-        ? `⚒️ Need ${card.productionRequirement} production`
-        : `👥 Need ${card.populationRequirement} population`;
+      unavailable = `⚒️ Need ${card.productionRequirement} production`;
     } else if (!hasSlot) {
       btnExtra    = "disabled";
       unavailable = "Table is full";
+    } else if (staffWarn) {
+      unavailable = staffWarn;
     }
 
     const tagsHTML = [
@@ -467,7 +516,7 @@ export class PlayPhaseScene {
             </div>
             <div class="kh-play-hc-cost-item">
               <span class="kh-play-hc-cost-label">👥 Pop. Req</span>
-              <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.populationRequirement}</span>
+              <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.staffRequirement}</span>
             </div>
             ${unavailable ? `<span class="kh-play-hc-unavailable">${unavailable}</span>` : ""}
           </div>
@@ -557,7 +606,7 @@ export class PlayPhaseScene {
               <div class="kh-cc-right">
                 <span class="kh-cc-freq ${c.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${c.frequencyType}</span>
                 <div class="kh-cc-effects">${effectsHTML}</div>
-                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.populationRequirement}</div>
+                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.staffRequirement}</div>
               </div>
             </div>
           `;
@@ -726,9 +775,7 @@ export class PlayPhaseScene {
         const table  = state.getCurrentTable();
         const isUpg  = tableNames.has(card.name);
         const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
-        const canAfford =
-          state.production >= card.productionRequirement &&
-          state.population  >= card.populationRequirement;
+        const canAfford = state.production >= card.productionRequirement;
 
         if (!canAfford || !hasSlot) {
           this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");

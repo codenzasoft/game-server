@@ -466,7 +466,7 @@ function buildCompactCard(card: Card): string {
       <div class="kh-cc-right">
         <span class="kh-cc-freq ${card.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${card.frequencyType}</span>
         <div class="kh-cc-effects">${effectsHTML}</div>
-        <div class="kh-cc-costs">⚒️ ${card.productionRequirement} &nbsp; 👥 ${card.populationRequirement}</div>
+        <div class="kh-cc-costs">⚒️ ${card.productionRequirement} &nbsp; 👥 ${card.staffRequirement}</div>
       </div>
     </div>
   `;

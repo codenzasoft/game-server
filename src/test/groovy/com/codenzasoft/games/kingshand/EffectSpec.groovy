@@ -109,7 +109,7 @@ class EffectSpec extends Specification {
         amplified.effects()[1].modifier() == 10.0
     }
 
-    def "amplify preserves the card's population and production requirements"() {
+    def "amplify preserves the card's staff and production requirements"() {
         setup:
         def card = new Card("TEST", 3, 60, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
 
@@ -117,7 +117,7 @@ class EffectSpec extends Specification {
         def amplified = card.amplify(2)
 
         then:
-        amplified.populationRequirement() == 3.0
+        amplified.staffRequirement() == 3.0
         amplified.productionRequirement() == 60.0
     }
 
