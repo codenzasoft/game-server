@@ -885,9 +885,22 @@ export class PlayPhaseScene {
     // the discard pile (handled server-side after the commit).
 
     for (let i = 0; i < table.length; i++) {
-      const card = table[i];
+      const card    = table[i];
+      const staffing = state.tableStaffing[i];
+      const tier    = staffing?.tier ?? StaffingTier.FULL;
 
       setHighlight(i, true);
+
+      const info = getCardDisplayInfo(card);
+
+      if (tier === StaffingTier.NONE) {
+        // Card is understaffed — does not fire.
+        this.showToast(`🚫 ${info.icon} ${info.name} — understaffed (won't fire)`);
+        await this.delay(1000);
+        setHighlight(i, false);
+        await this.delay(150);
+        continue;
+      }
 
       const changed = { pop: false, prod: false, food: false };
       const prevPop  = simPop;
@@ -896,10 +909,16 @@ export class PlayPhaseScene {
 
       for (const eff of card.effects) {
         if (typeof eff.target !== "string") continue; // skip CardTarget effects
+
+        // Mirror Java halveEffects: floor(modifier / 2) for HALF tier.
+        const rawMod = tier === StaffingTier.HALF
+          ? Math.floor(eff.modifier / 2)
+          : eff.modifier;
+
         const apply = (cur: number): number =>
           eff.valueType === "PERCENTAGE"
-            ? cur + cur * (eff.modifier * 0.01)
-            : cur + eff.modifier;
+            ? cur + cur * (rawMod * 0.01)
+            : cur + rawMod;
 
         if (eff.target === ResourceTarget.FOOD) {
           const next = apply(simFood);
@@ -932,9 +951,9 @@ export class PlayPhaseScene {
       if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
       if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
 
-      const info = getCardDisplayInfo(card);
-      const label = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
-      this.showToast(`${info.icon} ${info.name} ${label}`);
+      const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
+      const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
+      this.showToast(`${info.icon} ${info.name} ${freqLabel}${tierLabel}`);
 
       await this.delay(1500);
       setHighlight(i, false);
