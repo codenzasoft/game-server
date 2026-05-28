@@ -3,7 +3,6 @@ import {
   getCardDisplayInfo,
   formatModifier,
   targetEmoji,
-  fingerprint,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -108,7 +107,7 @@ export class PlayPhaseScene {
 
     const meta = SEASON_META[state.curSeason];
     const table = state.getCurrentTable();
-    const tableFingerprints = new Set(table.map(fingerprint));
+    const tableNames = new Set(table.map((c) => c.name));
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -117,7 +116,7 @@ export class PlayPhaseScene {
       <main class="kh-play-scene">
         ${this.buildTableSection(state, table, meta)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
-        ${this.buildHandSection(state, table, tableFingerprints)}
+        ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
             Resolve all table cards from left to right, then advance the season.
@@ -139,7 +138,7 @@ export class PlayPhaseScene {
     this.overlay.style.background =
       `linear-gradient(rgba(8,4,2,.62) 0%, rgba(8,4,2,.62) 100%), url('${meta.bg}') center/cover no-repeat`;
 
-    this.attachListeners(state, tableFingerprints);
+    this.attachListeners(state, tableNames);
     this.attachPileListeners(state);
     attachDeckListeners(this.overlay, state);
     attachHandbookListeners(this.overlay);
@@ -353,7 +352,7 @@ export class PlayPhaseScene {
   private buildHandSection(
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     if (state.hand.length === 0) {
       return `
@@ -369,7 +368,7 @@ export class PlayPhaseScene {
     }
 
     const cardsHTML = state.hand
-      .map((card, i) => this.buildHandCard(card, i, state, table, tableFingerprints))
+      .map((card, i) => this.buildHandCard(card, i, state, table, tableNames))
       .join("");
 
     const colCount = Math.min(state.hand.length, 3);
@@ -398,11 +397,10 @@ export class PlayPhaseScene {
     index: number,
     state: GameState,
     table: Card[],
-    tableFingerprints: Set<string>,
+    tableNames: Set<string>,
   ): string {
     const info = getCardDisplayInfo(card);
-    const fp = fingerprint(card);
-    const isUpgrade = tableFingerprints.has(fp);
+    const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
     const canAffordProd = state.production >= card.productionRequirement;
@@ -589,7 +587,7 @@ export class PlayPhaseScene {
 
   // ─── Event listeners ────────────────────────────────────────────────────
 
-  private attachListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachListeners(state: GameState, tableNames: Set<string>): void {
     const table = state.getCurrentTable();
 
     // Demolish buttons on table cards
@@ -617,8 +615,7 @@ export class PlayPhaseScene {
         btn.addEventListener("click", () => {
           const index = Number(btn.dataset.index);
           const card  = state.hand[index];
-          const fp    = fingerprint(card);
-          const isUpgrade = tableFingerprints.has(fp);
+          const isUpgrade = tableNames.has(card.name);
           if (card.productionRequirement > 0) {
             const { prod } = this.resEls();
             if (prod) spawnResourceIndicator(prod, -card.productionRequirement, "⚒️");
@@ -637,7 +634,7 @@ export class PlayPhaseScene {
       });
     }
 
-    this.attachDragListeners(state, tableFingerprints);
+    this.attachDragListeners(state, tableNames);
   }
 
   private disableAllActions(): void {
@@ -655,7 +652,7 @@ export class PlayPhaseScene {
    *
    * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
    */
-  private attachDragListeners(state: GameState, tableFingerprints: Set<string>): void {
+  private attachDragListeners(state: GameState, tableNames: Set<string>): void {
     const overlay = this.overlay;
 
     // Shared drag state held in closure — safe because all listeners below share
@@ -727,8 +724,7 @@ export class PlayPhaseScene {
 
         const card   = state.hand[dragIndex];
         const table  = state.getCurrentTable();
-        const fp     = fingerprint(card);
-        const isUpg  = tableFingerprints.has(fp);
+        const isUpg  = tableNames.has(card.name);
         const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
         const canAfford =
           state.production >= card.productionRequirement &&

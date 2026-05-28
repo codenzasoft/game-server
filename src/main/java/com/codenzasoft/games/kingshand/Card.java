@@ -14,6 +14,7 @@ import java.util.List;
  * fact.
  */
 public record Card(
+    String name,
     double populationRequirement,
     double productionRequirement,
     FrequencyType frequencyType,
@@ -31,6 +32,6 @@ public record Card(
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    return new Card(populationRequirement, productionRequirement, frequencyType, amplified);
+    return new Card(name, populationRequirement, productionRequirement, frequencyType, amplified);
   }
 }
