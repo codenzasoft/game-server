@@ -353,9 +353,9 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   // DESPERATE_TIMES  pop=10,  prod=10,  RECURRING,  FOOD+40, POPULATION-10
   "10:10:RECURRING:FOOD:40:INTEGER|POPULATION:-10:INTEGER": {
-    name: "Desperate Times",
+    name: "Desperate Times...",
     icon: "⚠️",
-    description: "Extreme measures fill the larder — but the cost to your people is steep.",
+    description: "You shall be fed— but the cost to your people is steep.",
     tags: ["SURVIVAL"],
   },
 };
