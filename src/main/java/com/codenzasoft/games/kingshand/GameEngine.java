@@ -207,6 +207,24 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
+   * Applies the {@link EventOption} whose {@link EventOption#description()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the option.
+   *
+   * @throws IllegalStateException if no current event exists or no option matches the given name
+   */
+  public synchronized void applyEventOptionByName(String name) {
+    Event event = state.getCurrentEvent();
+    if (event == null) {
+      throw new IllegalStateException("no current event to pick an option from");
+    }
+    EventOption option = event.options().stream()
+        .filter(o -> o.description().equals(name))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
+    applyEventOption(option);
+  }
+
+  /**
    * Returns a scaled copy of {@code effect} whose modifier is multiplied by the season-and-year
    * multiplier from {@link #computeScaleMultiplier(Season, int)}. If the multiplier is exactly
    * {@code 1.0} the original effect is returned unchanged to avoid unnecessary allocation.
@@ -531,6 +549,20 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
+   * Picks the offered ADD-phase card whose {@link Card#name()} matches {@code name} (case-sensitive).
+   * Delegates to {@link #pickCard(Card)} after locating the card.
+   *
+   * @throws IllegalStateException if no offered card matches the given name
+   */
+  public synchronized void pickCardByName(String name) {
+    Card card = state.getAddChoices().stream()
+        .filter(c -> c.name().equals(name))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("no offered card with name: " + name));
+    pickCard(card);
+  }
+
+  /**
    * Skips the ADD phase without adding a card, advancing the phase to {@link Phase#RANDOM_EVENT}.
    *
    * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
@@ -713,6 +745,37 @@ public class GameEngine implements Game<GameEngine> {
 
     // Recompute staffing so the client sees the updated allocation immediately.
     computeAndSetStaffing();
+  }
+
+  /**
+   * Places the hand card whose {@link Card#name()} matches {@code name} (case-sensitive).
+   * Delegates to {@link #placeCard(Card)} after locating the card.
+   *
+   * @throws IllegalStateException if no hand card matches the given name
+   */
+  public synchronized void placeCardByName(String name) {
+    Card card = state.getHand().stream()
+        .filter(c -> c.name().equals(name))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("no hand card with name: " + name));
+    placeCard(card);
+  }
+
+  /**
+   * Demolishes the table card whose {@link Card#name()} matches {@code name} (case-sensitive).
+   * Delegates to {@link #demolishCard(int)} after locating the slot.
+   *
+   * @throws IllegalStateException if no table card matches the given name
+   */
+  public synchronized void demolishCardByName(String name) {
+    List<Card> table = state.getCurrentTable();
+    for (int i = 0; i < table.size(); i++) {
+      if (table.get(i).name().equals(name)) {
+        demolishCard(i);
+        return;
+      }
+    }
+    throw new IllegalStateException("no table card with name: " + name);
   }
 
   /**

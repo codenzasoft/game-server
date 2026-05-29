@@ -18,8 +18,8 @@ import {
 // ─── Public interface ─────────────────────────────────────────────────────────
 
 export interface PlayPhaseActions {
-  placeCard:    (index: number) => void;
-  demolishCard: (slot: number)  => void;
+  placeCard:    (name: string) => void;
+  demolishCard: (name: string) => void;
   endAndRun:    ()              => void;
   /** Swap the card at fromSlot with the card at toSlot on the current season's table. */
   reorderCard:  (fromSlot: number, toSlot: number) => void;
@@ -653,7 +653,7 @@ export class PlayPhaseScene {
           }
           this.disableAllActions();
           this.showToast("Demolishing…");
-          this.actions.demolishCard(slot);
+          this.actions.demolishCard(card?.name ?? "");
         });
       });
 
@@ -671,7 +671,7 @@ export class PlayPhaseScene {
           }
           this.disableAllActions();
           this.showToast(isUpgrade ? "Upgrading table card…" : "Playing card…");
-          this.actions.placeCard(index);
+          this.actions.placeCard(card.name);
         });
       });
 
@@ -787,7 +787,7 @@ export class PlayPhaseScene {
         }
         this.disableAllActions();
         this.showToast(isUpg ? "Upgrading table card…" : "Playing card…");
-        this.actions.placeCard(dragIndex);
+        this.actions.placeCard(state.hand[dragIndex]?.name ?? "");
       });
     });
 

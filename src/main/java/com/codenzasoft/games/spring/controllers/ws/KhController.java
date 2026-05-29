@@ -1,15 +1,11 @@
 package com.codenzasoft.games.spring.controllers.ws;
 
-import com.codenzasoft.games.kingshand.Card;
-import com.codenzasoft.games.kingshand.Event;
-import com.codenzasoft.games.kingshand.EventOption;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import java.security.Principal;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,9 +58,8 @@ public class KhController {
   }
 
   /**
-   * Picks one of the offered ADD-phase cards by zero-based index into {@code state.addChoices}.
-   * Shuffles the chosen card into the season's draw pile and advances to {@link
-   * Phase#RANDOM_EVENT}.
+   * Picks one of the offered ADD-phase cards by stable card name. Shuffles the chosen card into the
+   * season's draw pile and advances to the RANDOM_EVENT phase.
    */
   @MessageMapping("/kh/{gameId}/add/pick")
   public void addPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -72,14 +67,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int index = ((Number) body.get("index")).intValue();
-              final List<Card> choices = game.getState().getAddChoices();
-              if (index < 0 || index >= choices.size()) {
-                log.warn("addPick: invalid index {} (choices size {})", index, choices.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.pickCard(choices.get(index));
+                game.pickCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
@@ -106,8 +96,8 @@ public class KhController {
   }
 
   /**
-   * Applies the chosen {@link EventOption} (by zero-based index) to the current game state, then
-   * draws the player's hand to start the {@link Phase#PLAY} phase.
+   * Applies the chosen event option by its stable option name, then draws the player's hand to
+   * start the PLAY phase.
    */
   @MessageMapping("/kh/{gameId}/event/pick")
   public void eventPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -115,19 +105,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final Event event = game.getState().getCurrentEvent();
-              if (event == null) {
-                log.warn("eventPick: no current event on game {}", gameId);
-                return;
-              }
-              final int index = ((Number) body.get("index")).intValue();
-              final List<EventOption> options = event.options();
-              if (index < 0 || index >= options.size()) {
-                log.warn("eventPick: invalid index {} (options size {})", index, options.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.applyEventOption(options.get(index));
+                game.applyEventOptionByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
@@ -158,9 +138,9 @@ public class KhController {
   // ── PLAY phase actions ────────────────────────────────────────────────────
 
   /**
-   * Places the card at hand {@code index} onto the current season's table. Deducts the production
-   * cost. If a matching card already sits on the table, amplifies it (upgrade) instead of adding a
-   * new slot.
+   * Places the hand card identified by its stable card name onto the current season's table.
+   * Deducts the production cost. If a matching card already sits on the table, amplifies it
+   * (upgrade) instead of adding a new slot.
    */
   @MessageMapping("/kh/{gameId}/play/card")
   public void playCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -168,14 +148,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int index = ((Number) body.get("index")).intValue();
-              final List<Card> hand = game.getState().getHand();
-              if (index < 0 || index >= hand.size()) {
-                log.warn("playCard: invalid index {} (hand size {})", index, hand.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.placeCard(hand.get(index));
+                game.placeCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("playCard rejected for game {}: {}", gameId, e.getMessage());
@@ -184,7 +159,7 @@ public class KhController {
   }
 
   /**
-   * Demolishes the card at {@code slot} on the current season's table, charging {@link
+   * Demolishes the table card identified by its stable card name, charging {@link
    * GameEngine#DEMOLISH_COST_RATE} × the card's production requirement.
    */
   @MessageMapping("/kh/{gameId}/play/demolish")
@@ -193,9 +168,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int slot = ((Number) body.get("slot")).intValue();
+              final String name = (String) body.get("name");
               try {
-                game.demolishCard(slot);
+                game.demolishCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("demolishCard rejected for game {}: {}", gameId, e.getMessage());

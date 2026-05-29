@@ -14,7 +14,7 @@ import {
 // ─── Public interface ─────────────────────────────────────────────────────────
 
 export interface RandomEventActions {
-  pickEventOption: (index: number) => void;
+  pickEventOption: (name: string) => void;
   skipEvent: () => void;
 }
 
@@ -333,13 +333,14 @@ export class RandomEventScene {
       this.disableAllActions();
       const label = state.currentEvent?.options[index]?.description ?? "your choice";
 
+      const optionName = state.currentEvent?.options[index]?.description ?? "";
       if (wouldStarve(index)) {
         // Show a famine warning and give the player time to read it before advancing.
         this.showToast("🌾 Famine — the food stores are exhausted!");
-        setTimeout(() => this.actions.pickEventOption(index), 3500);
+        setTimeout(() => this.actions.pickEventOption(optionName), 3500);
       } else {
         this.showToast(`"${label}" — advancing to Play…`);
-        this.actions.pickEventOption(index);
+        this.actions.pickEventOption(optionName);
       }
     };
 
