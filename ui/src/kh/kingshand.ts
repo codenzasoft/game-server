@@ -495,15 +495,15 @@ export class GameEventHandler {
   }
 
   /**
-   * Picks the card at {@code index} within {@code state.addChoices} and shuffles
-   * it into the season's draw pile.  Advances the phase to RANDOM_EVENT.
+   * Picks the offered ADD-phase card by its stable card name and shuffles it into the season's
+   * draw pile.  Advances the phase to RANDOM_EVENT.
    *
-   * @param index Zero-based index into the current {@code state.addChoices} list.
+   * @param name The stable {@code Card.name} of the chosen card.
    */
-  public pickCard(index: number): void {
+  public pickCard(name: string): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/add/pick`,
-      body: JSON.stringify({ index }),
+      body: JSON.stringify({ name }),
     });
   }
 
@@ -520,15 +520,14 @@ export class GameEventHandler {
   // ── RANDOM_EVENT phase actions ────────────────────────────────────────────
 
   /**
-   * Applies the chosen {@link EventOption} (zero-based index into
-   * {@code state.currentEvent.options}) and advances the phase to PLAY.
+   * Applies the chosen event option by its stable option name and advances the phase to PLAY.
    *
-   * @param index Zero-based index into the current event's options list.
+   * @param name The {@code EventOption.description} of the chosen option.
    */
-  public pickEventOption(index: number): void {
+  public pickEventOption(name: string): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/event/pick`,
-      body: JSON.stringify({ index }),
+      body: JSON.stringify({ name }),
     });
   }
 
@@ -545,45 +544,42 @@ export class GameEventHandler {
   // ── PLAY phase actions ────────────────────────────────────────────────────
 
   /**
-   * Places the card at {@code index} within {@code state.hand} onto the current season's table.
+   * Places the hand card identified by its stable card name onto the current season's table.
    * Deducts the production cost.  If a matching card is already on the table, amplifies it
    * (upgrade) instead of filling a new slot.
    *
-   * @param index Zero-based index into the current {@code state.hand} list.
+   * @param name The stable {@code Card.name} of the card to place.
    */
-  public placeCard(index: number): void {
+  public placeCard(name: string): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/card`,
-      body: JSON.stringify({ index }),
+      body: JSON.stringify({ name }),
     });
   }
 
   /**
-   * Demolishes the card at {@code slot} on the current season's table.  Charges 20% of the
-   * card's production requirement as the demolition cost.
+   * Demolishes the table card identified by its stable card name.  Charges 20% of the card's
+   * production requirement as the demolition cost.
    *
-   * @param slot Zero-based index into the current season's table.
+   * @param name The stable {@code Card.name} of the card to demolish.
    */
-  public demolishCard(slot: number): void {
+  public demolishCard(name: string): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/demolish`,
-      body: JSON.stringify({ slot }),
+      body: JSON.stringify({ name }),
     });
   }
 
   /**
-   * Swaps the card at {@code fromSlot} with the card at {@code toSlot} on the current
-   * season's table, allowing the player to reorder their table before resolving.
+   * Reorders the current season's table by sending the complete desired card name order.
+   * The server replaces the current table order to match the provided list exactly.
    *
-   * Requires a matching server endpoint: POST /games/kh/{gameId}/play/reorder
-   *
-   * @param fromSlot Zero-based source slot index.
-   * @param toSlot   Zero-based destination slot index.
+   * @param names Ordered array of card names representing the desired table order.
    */
-  public reorderCard(fromSlot: number, toSlot: number): void {
+  public reorderTable(names: string[]): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/reorder`,
-      body: JSON.stringify({ fromSlot, toSlot }),
+      body: JSON.stringify({ names }),
     });
   }
 

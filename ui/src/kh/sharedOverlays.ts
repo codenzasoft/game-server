@@ -23,16 +23,16 @@ export function injectSharedStyles(): void {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 5px;
       background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
       border: 2px solid #c49428;
-      border-radius: 14px;
-      padding: 10px 14px 8px;
+      border-radius: 16px;
+      padding: 14px 20px 12px;
       cursor: pointer;
       z-index: 50;
       box-shadow: 2px 4px 18px rgba(0,0,0,.5);
       transition: all .18s ease;
-      min-width: 64px;
+      min-width: 84px;
       text-align: center;
     }
     .kh-shared-icon-btn:hover {
@@ -41,10 +41,10 @@ export function injectSharedStyles(): void {
       transform: translateY(-2px);
       border-color: #e0b040;
     }
-    .kh-shared-icon-btn .kh-sib-emoji  { font-size: 1.5rem; line-height: 1; display: block; }
+    .kh-shared-icon-btn .kh-sib-emoji  { font-size: 1.9rem; line-height: 1; display: block; }
     .kh-shared-icon-btn .kh-sib-label  {
       font-family: 'Cinzel', serif;
-      font-size: .55rem;
+      font-size: .65rem;
       letter-spacing: 1px;
       color: #c4a060;
       text-transform: uppercase;
@@ -54,11 +54,11 @@ export function injectSharedStyles(): void {
       background: #c49428;
       color: #1a0e04;
       font-family: 'Cinzel', serif;
-      font-size: .75rem;
+      font-size: .8rem;
       font-weight: 700;
       border-radius: 10px;
-      padding: 1px 7px;
-      min-width: 20px;
+      padding: 2px 9px;
+      min-width: 24px;
       text-align: center;
       margin-top: 2px;
       display: block;
@@ -193,8 +193,8 @@ export function injectSharedStyles(): void {
       background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
       border: 2px solid #c49428;
       border-radius: 18px;
-      width: min(700px, 94vw);
-      max-height: 82vh;
+      width: min(1100px, 96vw);
+      max-height: 92vh;
       display: flex;
       flex-direction: column;
       box-shadow: 0 16px 60px rgba(0,0,0,.7);
@@ -305,15 +305,15 @@ export function injectSharedStyles(): void {
     .kh-compact-card:hover { background: rgba(255,255,255,.07); }
     .kh-cc-left  { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
     .kh-cc-icon  { font-size: 1.5rem; line-height: 1; flex-shrink: 0; filter: drop-shadow(0 1px 4px rgba(0,0,0,.5)); }
-    .kh-cc-name  { font-family: 'Cinzel', serif; font-size: .82rem; font-weight: 700; color: #f0e8c0; margin-bottom: 3px; }
-    .kh-cc-desc  { font-style: italic; font-size: .8rem; color: #8a7a60; line-height: 1.35; }
-    .kh-cc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
-    .kh-cc-freq  { font-family: 'Cinzel', serif; font-size: .55rem; font-weight: 700; letter-spacing: .8px; padding: 2px 7px; border-radius: 8px; }
+    .kh-cc-name  { font-family: 'Cinzel', serif; font-size: .95rem; font-weight: 700; color: #f0e8c0; margin-bottom: 4px; }
+    .kh-cc-desc  { font-style: italic; font-size: .9rem; color: #8a7a60; line-height: 1.4; }
+    .kh-cc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+    .kh-cc-freq  { font-family: 'Cinzel', serif; font-size: .65rem; font-weight: 700; letter-spacing: .8px; padding: 3px 9px; border-radius: 8px; }
     .kh-cc-recurring { background: rgba(100,180,100,.22); color: #90d090; }
     .kh-cc-single    { background: rgba(200,120,80,.25);  color: #e0b090; }
     .kh-cc-effects   { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
-    .kh-cc-effect    { font-family: 'Cinzel', serif; font-size: .65rem; color: #a0c080; background: rgba(100,180,80,.12); border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
-    .kh-cc-costs     { font-family: 'Cinzel', serif; font-size: .6rem; color: #7a6a52; }
+    .kh-cc-effect    { font-family: 'Cinzel', serif; font-size: .75rem; color: #a0c080; background: rgba(100,180,80,.12); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+    .kh-cc-costs     { font-family: 'Cinzel', serif; font-size: .7rem; color: #7a6a52; }
 
     /* ── Handbook modal specifics ─────────────────────────────────────── */
     .kh-hb-chapter { border-bottom: 1px solid rgba(196,148,40,.2); }
@@ -335,29 +335,29 @@ export function injectSharedStyles(): void {
     .kh-hb-ch-title {
       flex: 1;
       font-family: 'Cinzel', serif;
-      font-size: .88rem;
+      font-size: 1rem;
       font-weight: 700;
       color: #f0e8c0;
       letter-spacing: 1px;
     }
-    .kh-hb-ch-arrow { font-size: .7rem; color: #c4a060; flex-shrink: 0; }
-    .kh-hb-ch-body  { padding: 0 22px 10px; }
-    .kh-hb-section  { padding: 14px 0; border-top: 1px dashed rgba(196,148,40,.2); }
+    .kh-hb-ch-arrow { font-size: .8rem; color: #c4a060; flex-shrink: 0; }
+    .kh-hb-ch-body  { padding: 0 28px 14px; }
+    .kh-hb-section  { padding: 18px 0; border-top: 1px dashed rgba(196,148,40,.2); }
     .kh-hb-section:first-child { border-top: none; }
     .kh-hb-sec-title {
       font-family: 'Cinzel', serif;
-      font-size: .75rem;
+      font-size: .85rem;
       font-weight: 700;
       color: #c49428;
       letter-spacing: 1px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       text-transform: uppercase;
     }
     .kh-hb-sec-body {
       font-family: 'Crimson Text', Georgia, serif;
-      font-size: .97rem;
+      font-size: 1.1rem;
       color: #c8b89a;
-      line-height: 1.65;
+      line-height: 1.75;
     }
     .kh-hb-sec-body b  { color: #f0e8c0; }
     .kh-hb-sec-body em { color: #d4c090; font-style: italic; }
@@ -483,7 +483,7 @@ export function buildDeckIndicator(state: GameState): string {
       <span class="kh-sib-badge">${count}</span>
     </button>
     <div class="kh-shared-backdrop" id="kh-deck-backdrop" style="display:none;">
-      <div class="kh-shared-modal" style="max-height:82vh;">
+      <div class="kh-shared-modal">
         <div class="kh-shared-modal-header">
           <span class="kh-shared-modal-title">📖 &nbsp;Your Deck</span>
           <button class="kh-shared-modal-close" id="kh-deck-close">✕</button>
@@ -511,10 +511,11 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
   if (!backdrop || !tabsEl || !bodyEl) return;
 
   const renderTab = (season: Season) => {
+    const tableCards   = state.board.get(season) ?? [];
     const drawCards    = state.drawPile.get(season) ?? [];
     const discardCards = state.discardPile.get(season) ?? [];
     const handCards    = season === state.curSeason ? state.hand : [];
-    const allCards     = [...handCards, ...drawCards, ...discardCards];
+    const allCards     = [...tableCards, ...handCards, ...drawCards, ...discardCards];
 
     tabsEl.querySelectorAll<HTMLButtonElement>(".kh-deck-tab").forEach((btn) => {
       btn.classList.toggle("kh-deck-tab-active", btn.dataset.season === season);
@@ -524,6 +525,10 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
       bodyEl.innerHTML = `<div class="kh-deck-empty">No cards in your ${season.toLowerCase()} collection.</div>`;
     } else {
       bodyEl.innerHTML = `
+        ${tableCards.length > 0 ? `
+          <div class="kh-deck-sub-heading">Table (${tableCards.length})</div>
+          ${tableCards.map(buildCompactCard).join("")}
+        ` : ""}
         ${handCards.length > 0 ? `
           <div class="kh-deck-sub-heading">In Hand (${handCards.length})</div>
           ${handCards.map(buildCompactCard).join("")}
@@ -542,7 +547,8 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
 
   // Build tabs
   tabsEl.innerHTML = ALL_SEASONS.map((s) => {
-    const count = (state.drawPile.get(s)?.length ?? 0)
+    const count = (state.board.get(s)?.length ?? 0)
+                + (state.drawPile.get(s)?.length ?? 0)
                 + (state.discardPile.get(s)?.length ?? 0)
                 + (s === state.curSeason ? state.hand.length : 0);
     return `

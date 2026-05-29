@@ -128,7 +128,7 @@ const getGameId = (): string | undefined => {
           }
           currentScene = new AddPhaseScene(state, {
             reroll:   () => handler.reroll(),
-            pickCard: (i) => handler.pickCard(i),
+            pickCard: (name) => handler.pickCard(name),
             skipAdd:  () => handler.skipAdd(),
           });
           currentScene.mount(mountTarget);
@@ -147,7 +147,7 @@ const getGameId = (): string | undefined => {
             currentScene = null;
           }
           currentScene = new RandomEventScene(state, {
-            pickEventOption: (i) => handler.pickEventOption(i),
+            pickEventOption: (name) => handler.pickEventOption(name),
             skipEvent:       () => handler.skipEvent(),
           });
           currentScene.mount(mountTarget);
@@ -165,10 +165,10 @@ const getGameId = (): string | undefined => {
             currentScene = null;
           }
           currentScene = new PlayPhaseScene(state, {
-            placeCard:    (i)           => handler.placeCard(i),
-            demolishCard: (slot)        => handler.demolishCard(slot),
+            placeCard:    (name)        => handler.placeCard(name),
+            demolishCard: (name)        => handler.demolishCard(name),
             endAndRun:    ()            => handler.endAndRun(),
-            reorderCard:  (from, to)    => handler.reorderCard(from, to),
+            reorderTable: (names)       => handler.reorderTable(names),
           });
           currentScene.mount(mountTarget);
         }

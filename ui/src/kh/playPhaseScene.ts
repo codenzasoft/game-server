@@ -18,11 +18,11 @@ import {
 // ─── Public interface ─────────────────────────────────────────────────────────
 
 export interface PlayPhaseActions {
-  placeCard:    (index: number) => void;
-  demolishCard: (slot: number)  => void;
+  placeCard:    (name: string) => void;
+  demolishCard: (name: string) => void;
   endAndRun:    ()              => void;
   /** Swap the card at fromSlot with the card at toSlot on the current season's table. */
-  reorderCard:  (fromSlot: number, toSlot: number) => void;
+  reorderTable: (names: string[]) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ export class PlayPhaseScene {
             Resolve all table cards from left to right, then advance the season.
           </div>
           <button class="kh-play-btn-end" id="kh-play-btn-end">
-            ⚔ &nbsp;End and Run →
+            ⚔ &nbsp;Play
           </button>
         </div>
       </main>
@@ -458,7 +458,7 @@ export class PlayPhaseScene {
           ? `👥 ${workers}/${card.staffRequirement} workers — half output`
           : "";
 
-    let btnText    = isUpgrade ? "✦ Upgrade" : "⚔ Play";
+    let btnText    = isUpgrade ? "✦ Upgrade" : "🏗 Build";
     let btnExtra   = "";
     let unavailable = "";
 
@@ -653,7 +653,7 @@ export class PlayPhaseScene {
           }
           this.disableAllActions();
           this.showToast("Demolishing…");
-          this.actions.demolishCard(slot);
+          this.actions.demolishCard(card?.name ?? "");
         });
       });
 
@@ -671,7 +671,7 @@ export class PlayPhaseScene {
           }
           this.disableAllActions();
           this.showToast(isUpgrade ? "Upgrading table card…" : "Playing card…");
-          this.actions.placeCard(index);
+          this.actions.placeCard(card.name);
         });
       });
 
@@ -696,8 +696,8 @@ export class PlayPhaseScene {
 
   /**
    * Wires up HTML5 drag-and-drop so the player can:
-   *   • Drag a hand card onto an empty table slot  → calls placeCard(index)
-   *   • Drag a table card onto another slot         → calls reorderCard(fromSlot, toSlot)
+   *   • Drag a hand card onto an empty table slot  → calls placeCard(name)
+   *   • Drag a table card onto another slot         → calls reorderTable(names)
    *
    * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
    */
@@ -787,7 +787,7 @@ export class PlayPhaseScene {
         }
         this.disableAllActions();
         this.showToast(isUpg ? "Upgrading table card…" : "Playing card…");
-        this.actions.placeCard(dragIndex);
+        this.actions.placeCard(state.hand[dragIndex]?.name ?? "");
       });
     });
 
@@ -808,8 +808,13 @@ export class PlayPhaseScene {
         card.classList.remove("kh-play-drag-over");
         const targetSlot = Number(card.dataset.slot);
         if (dragType === "table" && dragSlot >= 0 && dragSlot !== targetSlot) {
+          // Build the full reordered name list by swapping the two slots locally,
+          // then send the complete order to the server in one call.
+          const table = state.getCurrentTable();
+          const reordered = table.map((c) => c.name);
+          [reordered[dragSlot], reordered[targetSlot]] = [reordered[targetSlot], reordered[dragSlot]];
           this.disableAllActions();
-          this.actions.reorderCard(dragSlot, targetSlot);
+          this.actions.reorderTable(reordered);
         }
       });
     });
@@ -970,7 +975,7 @@ export class PlayPhaseScene {
     if (simFood >= consumed) {
       simFood -= consumed;
       if (simFood > 0 && simPop > 0) {
-        const growthRate = Math.min(simFood / simPop, 0.50);
+        const growthRate = Math.min(simFood / simPop, 0.20);
         simPop = simPop + simPop * growthRate;
       }
       this.showToast("🌱 Your people are well-fed — population grows!");

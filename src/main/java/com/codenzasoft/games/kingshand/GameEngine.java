@@ -91,6 +91,21 @@ public class GameEngine implements Game<GameEngine> {
     this.rng = rng;
   }
 
+  /**
+   * Initializes a brand-new game: seeds the starting deck and offers the first ADD choices. Must be
+   * called once after construction for a fresh game. Has no effect if the game is already over.
+   *
+   * <p>Called by {@code GameService} after building the engine. The initialization logic lives here
+   * so the engine owns all knowledge of how a game starts.
+   */
+  public synchronized void initialize() {
+    if (state.isGameOver()) return;
+    seedStartingDeck();
+    if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
+      offerAddChoices();
+    }
+  }
+
   @Override
   public GameType getGameType() {
     return GameType.KH;
@@ -136,25 +151,6 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   // ----- RANDOM_EVENT resolution -----
-
-  /**
-   * Public entry point for rolling a random event during the {@link Phase#RANDOM_EVENT} phase. Safe
-   * to call multiple times — if an event has already been rolled for this phase it returns
-   * immediately without re-rolling.
-   *
-   * <p>This is needed because {@link #pickCard(Card)} and {@link #skipAdd()} set the phase to
-   * {@link Phase#RANDOM_EVENT} directly (bypassing {@link #advancePhase()}) so callers must trigger
-   * the roll explicitly after those calls.
-   *
-   * @throws IllegalStateException if the current phase is not {@link Phase#RANDOM_EVENT}
-   */
-  public synchronized void rollRandomEvent() {
-    requirePhase(Phase.RANDOM_EVENT, "rollRandomEvent");
-    if (state.getCurrentEvent() != null) {
-      return; // already rolled for this phase — do not re-roll
-    }
-    rollEvent();
-  }
 
   /**
    * Randomly selects one eligible event for the current season and year and stores it on the state.
@@ -221,18 +217,74 @@ public class GameEngine implements Game<GameEngine> {
     // Only advance to PLAY if the game is still running (population may have hit zero above).
     if (!state.isGameOver()) {
       state.setCurPhase(Phase.PLAY);
+      startPlay();
     }
   }
 
   /**
-   * Returns the effect unchanged for non-winter seasons; for {@link Season#WINTER} returns a new
-   * {@link Effect} whose modifier is scaled by the current year (KH-6 winter scaling rule).
+   * Applies the {@link EventOption} whose {@link EventOption#description()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the
+   * option.
+   *
+   * @throws IllegalStateException if no current event exists or no option matches the given name
+   */
+  public synchronized void applyEventOptionByName(String name) {
+    Event event = state.getCurrentEvent();
+    if (event == null) {
+      throw new IllegalStateException("no current event to pick an option from");
+    }
+    EventOption option =
+        event.options().stream()
+            .filter(o -> o.description().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
+    applyEventOption(option);
+  }
+
+  /**
+   * Returns a scaled copy of {@code effect} whose modifier is multiplied by the season-and-year
+   * multiplier from {@link #computeScaleMultiplier(Season, int)}. If the multiplier is exactly
+   * {@code 1.0} the original effect is returned unchanged to avoid unnecessary allocation.
+   *
+   * <p>Replaces the old KH-6 linear winter-only rule ({@code modifier × year}).
    */
   private Effect scaleForSeason(Effect effect) {
-    if (state.getCurSeason() != Season.WINTER) {
-      return effect;
+    double multiplier = computeScaleMultiplier(state.getCurSeason(), state.getYear());
+    if (multiplier == 1.0) return effect;
+    return new Effect(effect.target(), effect.modifier() * multiplier, effect.valueType());
+  }
+
+  /**
+   * Computes the event-effect scaling multiplier for the given season and year.
+   *
+   * <p><b>Winter</b> uses a piecewise accelerating curve so early winters are survivable but late
+   * winters become genuinely threatening:
+   *
+   * <ul>
+   *   <li>Years 1–5: linear ramp {@code 1.0 + (year − 1) × 0.15} → 1.00 / 1.15 / 1.30 / 1.45 / 1.60
+   *   <li>Years 6+: exponential {@code 1.6 × 1.25^(year − 5)}, capped at {@code 20.0} (~year 16)
+   * </ul>
+   *
+   * <p><b>Spring, Summer, Fall</b> use a slow linear crawl so non-winter events gradually tighten
+   * but never dominate: {@code 1.0 + (year − 1) × 0.05} → ~2.0× at year 21.
+   *
+   * @param season the season in which the event fires
+   * @param year the current game year (1-indexed)
+   * @return the multiplier to apply to each effect modifier
+   */
+  double computeScaleMultiplier(Season season, int year) {
+    if (season == Season.WINTER) {
+      if (year <= 4) {
+        // Linear ramp: 1.0 → 2.0 over years 1–4 (doubles by year 4).
+        return 1.0 + (year - 1) * (1.0 / 3.0);
+      } else {
+        // Exponential from 2.0 at year 5, capped at 20× (~year 13).
+        double raw = 2.0 * Math.pow(1.30, year - 4);
+        return Math.min(raw, 20.0);
+      }
+    } else {
+      return 1.0 + (year - 1) * 0.05;
     }
-    return new Effect(effect.target(), effect.modifier() * state.getYear(), effect.valueType());
   }
 
   public synchronized void advanceSeason() {
@@ -345,6 +397,9 @@ public class GameEngine implements Game<GameEngine> {
 
     // 4. Seasonal food consumption and starvation.
     consumeFood();
+
+    // 5. Advance to the next phase (ADD for next season, or stay put if game is over).
+    advancePhase();
   }
 
   /**
@@ -454,9 +509,10 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // Surplus growth: if food remains after consumption, grow population proportionally.
-    // The surplus is used purely for the growth calculation — food is not further reduced.
+    // Growth rate is capped at 20% per season so the population snowball stays manageable.
+    // The surplus food is not consumed — it carries over to the next season.
     if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
-      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.50);
+      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.20);
       applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
     }
   }
@@ -504,10 +560,24 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
-    // Clear the previous season's event so rollRandomEvent() rolls a fresh one
-    // for this phase rather than seeing the old non-null value and short-circuiting.
     state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
+  }
+
+  /**
+   * Picks the offered ADD-phase card whose {@link Card#name()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #pickCard(Card)} after locating the card.
+   *
+   * @throws IllegalStateException if no offered card matches the given name
+   */
+  public synchronized void pickCardByName(String name) {
+    Card card =
+        state.getAddChoices().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no offered card with name: " + name));
+    pickCard(card);
   }
 
   /**
@@ -518,9 +588,9 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
-    // Clear the previous season's event so rollRandomEvent() rolls a fresh one.
     state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
   }
 
   // ----- ADD helpers -----
@@ -696,34 +766,80 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table so the
-   * player can reorder their table before resolving. Because {@link #endAndRun()} fires cards
-   * left-to-right, slot order determines execution order — this method exposes that control to the
-   * player.
+   * Places the hand card whose {@link Card#name()} matches {@code name} (case-sensitive). Delegates
+   * to {@link #placeCard(Card)} after locating the card.
    *
-   * @param fromSlot zero-based index of the card to move
-   * @param toSlot zero-based index of the destination slot
-   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the two
-   *     indices are equal, or if either index is out of range
+   * @throws IllegalStateException if no hand card matches the given name
    */
-  public synchronized void reorderCard(int fromSlot, int toSlot) {
-    requirePhase(Phase.PLAY, "reorderCard");
+  public synchronized void placeCardByName(String name) {
+    Card card =
+        state.getHand().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no hand card with name: " + name));
+    placeCard(card);
+  }
 
-    if (fromSlot == toSlot) {
-      throw new IllegalStateException("fromSlot and toSlot must differ: " + fromSlot);
+  /**
+   * Demolishes the table card whose {@link Card#name()} matches {@code name} (case-sensitive).
+   * Delegates to {@link #demolishCard(int)} after locating the slot.
+   *
+   * @throws IllegalStateException if no table card matches the given name
+   */
+  public synchronized void demolishCardByName(String name) {
+    List<Card> table = state.getCurrentTable();
+    for (int i = 0; i < table.size(); i++) {
+      if (table.get(i).name().equals(name)) {
+        demolishCard(i);
+        return;
+      }
     }
+    throw new IllegalStateException("no table card with name: " + name);
+  }
+
+  /**
+   * Reorders the current season's table to match the provided list of card names. Every card
+   * currently on the table must appear in {@code cardNames} exactly once; the table is then sorted
+   * to match the given order.
+   *
+   * <p>This replaces the old swap-based {@code reorderCard(fromSlot, toSlot)} API. The client sends
+   * the complete desired order after each drag, so a single call always reflects the player's
+   * intent regardless of how many intermediate drags occurred.
+   *
+   * @param cardNames the desired order of card names; must match the current table contents exactly
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the size
+   *     doesn't match, or if any name doesn't correspond to a table card
+   */
+  public synchronized void reorderTable(List<String> cardNames) {
+    requirePhase(Phase.PLAY, "reorderTable");
 
     List<Card> table = state.getCurrentTable();
-    int size = table.size();
 
-    if (fromSlot < 0 || fromSlot >= size) {
-      throw new IllegalStateException("invalid fromSlot: " + fromSlot);
-    }
-    if (toSlot < 0 || toSlot >= size) {
-      throw new IllegalStateException("invalid toSlot: " + toSlot);
+    if (cardNames.size() != table.size()) {
+      throw new IllegalStateException(
+          "reorderTable: expected " + table.size() + " names but got " + cardNames.size());
     }
 
-    Collections.swap(table, fromSlot, toSlot);
+    // Build a lookup from name → card, then reconstruct the table in the requested order.
+    // Use a mutable copy so we can remove as we match, catching any duplicate-name edge cases.
+    List<Card> remaining = new ArrayList<>(table);
+    List<Card> reordered = new ArrayList<>(table.size());
+
+    for (String name : cardNames) {
+      Card match =
+          remaining.stream()
+              .filter(c -> c.name().equals(name))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException("reorderTable: no table card with name: " + name));
+      reordered.add(match);
+      remaining.remove(match);
+    }
+
+    // Replace table contents in-place so the existing list reference stays valid.
+    table.clear();
+    table.addAll(reordered);
 
     // Recompute staffing so the client sees the updated priority chain immediately.
     computeAndSetStaffing();

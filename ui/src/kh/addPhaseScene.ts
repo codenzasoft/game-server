@@ -18,7 +18,7 @@ import {
 
 export interface AddPhaseActions {
   reroll: () => void;
-  pickCard: (index: number) => void;
+  pickCard: (name: string) => void;
   skipAdd: () => void;
 }
 
@@ -281,7 +281,8 @@ export class AddPhaseScene {
     this.overlay.querySelectorAll<HTMLButtonElement>(".kh-btn-select").forEach((btn) => {
       btn.addEventListener("click", () => {
         const index = Number(btn.dataset.index);
-        this.actions.pickCard(index);
+        const cardName = state.addChoices[index]?.name ?? "";
+        this.actions.pickCard(cardName);
         // Optimistic UI: disable all interaction while server responds
         this.disableAllActions();
         this.showToast(`Adding card to your ${SEASON_META[state.curSeason].label} deck…`);

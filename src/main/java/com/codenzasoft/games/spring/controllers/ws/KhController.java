@@ -1,10 +1,6 @@
 package com.codenzasoft.games.spring.controllers.ws;
 
-import com.codenzasoft.games.kingshand.Card;
-import com.codenzasoft.games.kingshand.Event;
-import com.codenzasoft.games.kingshand.EventOption;
 import com.codenzasoft.games.kingshand.GameEngine;
-import com.codenzasoft.games.kingshand.Phase;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -20,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -30,7 +25,6 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
-  @Autowired private SimpMessagingTemplate messagingTemplate;
 
   /**
    * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
@@ -39,21 +33,7 @@ public class KhController {
    */
   @MessageMapping("/kh/{gameId}/load")
   public void load(@DestinationVariable String gameId) {
-    final Optional<GameEngine> game = gameService.getOrBuildKhGame(UUID.fromString(gameId));
-    game.ifPresent(
-        g -> {
-          // Seed ADD choices for a fresh game that hasn't had any yet.
-          if (g.getState().getCurPhase() == Phase.ADD && g.getState().getAddChoices().isEmpty()) {
-            g.offerAddChoices();
-          }
-          // Roll an event if the game is in RANDOM_EVENT but no event has been drawn yet
-          // (can happen after a server restart mid-phase or a direct phase transition).
-          if (g.getState().getCurPhase() == Phase.RANDOM_EVENT
-              && g.getState().getCurrentEvent() == null) {
-            g.rollRandomEvent();
-          }
-          khBroadcastService.gameLoaded(g);
-        });
+    gameService.getOrBuildKhGame(UUID.fromString(gameId)).ifPresent(khBroadcastService::gameLoaded);
   }
 
   /**
@@ -77,9 +57,8 @@ public class KhController {
   }
 
   /**
-   * Picks one of the offered ADD-phase cards by zero-based index into {@code state.addChoices}.
-   * Shuffles the chosen card into the season's draw pile and advances to {@link
-   * Phase#RANDOM_EVENT}.
+   * Picks one of the offered ADD-phase cards by stable card name. Shuffles the chosen card into the
+   * season's draw pile and advances to the RANDOM_EVENT phase.
    */
   @MessageMapping("/kh/{gameId}/add/pick")
   public void addPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -87,17 +66,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int index = ((Number) body.get("index")).intValue();
-              final List<Card> choices = game.getState().getAddChoices();
-              if (index < 0 || index >= choices.size()) {
-                log.warn("addPick: invalid index {} (choices size {})", index, choices.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.pickCard(choices.get(index));
-                // pickCard sets curPhase=RANDOM_EVENT directly; roll the event now so the
-                // client receives a fully-populated state on the next broadcast.
-                game.rollRandomEvent();
+                game.pickCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
@@ -116,9 +87,6 @@ public class KhController {
             game -> {
               try {
                 game.skipAdd();
-                // skipAdd sets curPhase=RANDOM_EVENT directly; roll the event now so the
-                // client receives a fully-populated state on the next broadcast.
-                game.rollRandomEvent();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addSkip rejected for game {}: {}", gameId, e.getMessage());
@@ -127,8 +95,8 @@ public class KhController {
   }
 
   /**
-   * Applies the chosen {@link EventOption} (by zero-based index) to the current game state, then
-   * draws the player's hand to start the {@link Phase#PLAY} phase.
+   * Applies the chosen event option by its stable option name, then draws the player's hand to
+   * start the PLAY phase.
    */
   @MessageMapping("/kh/{gameId}/event/pick")
   public void eventPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -136,24 +104,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final Event event = game.getState().getCurrentEvent();
-              if (event == null) {
-                log.warn("eventPick: no current event on game {}", gameId);
-                return;
-              }
-              final int index = ((Number) body.get("index")).intValue();
-              final List<EventOption> options = event.options();
-              if (index < 0 || index >= options.size()) {
-                log.warn("eventPick: invalid index {} (options size {})", index, options.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.applyEventOption(options.get(index));
-                // applyEventOption advances phase to PLAY but does not draw the hand;
-                // startPlay() does that, mirroring what advancePhase() would do normally.
-                if (game.getState().getCurPhase() == Phase.PLAY && !game.getState().isGameOver()) {
-                  game.startPlay();
-                }
+                game.applyEventOptionByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
@@ -184,9 +137,9 @@ public class KhController {
   // ── PLAY phase actions ────────────────────────────────────────────────────
 
   /**
-   * Places the card at hand {@code index} onto the current season's table. Deducts the production
-   * cost. If a matching card already sits on the table, amplifies it (upgrade) instead of adding a
-   * new slot.
+   * Places the hand card identified by its stable card name onto the current season's table.
+   * Deducts the production cost. If a matching card already sits on the table, amplifies it
+   * (upgrade) instead of adding a new slot.
    */
   @MessageMapping("/kh/{gameId}/play/card")
   public void playCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -194,14 +147,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int index = ((Number) body.get("index")).intValue();
-              final List<Card> hand = game.getState().getHand();
-              if (index < 0 || index >= hand.size()) {
-                log.warn("playCard: invalid index {} (hand size {})", index, hand.size());
-                return;
-              }
+              final String name = (String) body.get("name");
               try {
-                game.placeCard(hand.get(index));
+                game.placeCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("playCard rejected for game {}: {}", gameId, e.getMessage());
@@ -210,7 +158,7 @@ public class KhController {
   }
 
   /**
-   * Demolishes the card at {@code slot} on the current season's table, charging {@link
+   * Demolishes the table card identified by its stable card name, charging {@link
    * GameEngine#DEMOLISH_COST_RATE} × the card's production requirement.
    */
   @MessageMapping("/kh/{gameId}/play/demolish")
@@ -219,9 +167,9 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int slot = ((Number) body.get("slot")).intValue();
+              final String name = (String) body.get("name");
               try {
-                game.demolishCard(slot);
+                game.demolishCardByName(name);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("demolishCard rejected for game {}: {}", gameId, e.getMessage());
@@ -230,27 +178,23 @@ public class KhController {
   }
 
   /**
-   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table, letting
-   * the player reorder their table before resolving. Because {@link GameEngine#endAndRun()} fires
-   * cards left-to-right, slot order is strategically meaningful.
-   *
-   * <p>The request payload must contain integer fields {@code fromSlot} and {@code toSlot}. Invalid
-   * indices or a non-PLAY phase are silently rejected (warn-logged) so a stale client message
-   * cannot crash the session.
+   * Reorders the current season's table to match the provided complete list of card names. The
+   * client sends the full desired order after every drag rather than individual swap operations, so
+   * the server always applies the player's complete intent in one call.
    */
   @MessageMapping("/kh/{gameId}/play/reorder")
-  public void reorderCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+  public void reorderTable(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
     gameService
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int fromSlot = ((Number) body.get("fromSlot")).intValue();
-              final int toSlot = ((Number) body.get("toSlot")).intValue();
+              @SuppressWarnings("unchecked")
+              final List<String> names = (List<String>) body.get("names");
               try {
-                game.reorderCard(fromSlot, toSlot);
+                game.reorderTable(names);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
-                log.warn("reorderCard rejected for game {}: {}", gameId, e.getMessage());
+                log.warn("reorderTable rejected for game {}: {}", gameId, e.getMessage());
               }
             });
   }
@@ -268,9 +212,6 @@ public class KhController {
             game -> {
               try {
                 game.endAndRun();
-                // advancePhase moves PLAY → ADD (advancing the season and seeding card choices).
-                // It returns immediately without mutating state if the game is already over.
-                game.advancePhase();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());
@@ -291,9 +232,7 @@ public class KhController {
       log.warn("Quit rejected for {}: {}", userEntity.get().getUsername(), e.getMessage());
       return;
     }
-    messagingTemplate.convertAndSendToUser(
-        userEntity.get().getUsername(), "/queue/games/" + gameId, Map.of("quit", true));
-    log.debug("Quit game {} for user {}", gameId, userEntity.get().getUsername());
+    khBroadcastService.gameQuit(id, userEntity.get().getUsername());
   }
 
   private Optional<UserEntity> findUser(final Principal principal) {
