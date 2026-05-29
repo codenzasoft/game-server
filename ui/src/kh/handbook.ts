@@ -19,6 +19,48 @@ export interface HandbookChapter {
 }
 
 export const HANDBOOK: HandbookChapter[] = [
+  // ── Quick Start ────────────────────────────────────────────────────────────
+  {
+    icon: "🚀",
+    title: "Quick Start",
+    sections: [
+      {
+        title: "Your goal",
+        body: `Keep your population alive for as long as possible.  Your kingdom falls
+               the moment population hits zero — everything else is in service of
+               preventing that.`,
+      },
+      {
+        title: "Your first few turns",
+        body: `You start with a small starter deck spread across the seasons, 20 population,
+               200 production, and 150 food.
+               <br><br>
+               <b>Step 1 — Add phase:</b> You're offered three cards to add to your deck.
+               Pick one that generates food or production — <em>Farm</em> and <em>Seeds</em>
+               are safe early picks.  You can reroll the offer for a production cost or skip
+               if nothing looks useful.
+               <br><br>
+               <b>Step 2 — Random Event:</b> An event fires and you pick an option.  Read
+               both choices — one is usually clearly better for your current resources.
+               <br><br>
+               <b>Step 3 — Play phase:</b> You draw up to 3 cards. Drag a card onto an
+               open table slot (or click Play) to place it.  Check the staffing badge on
+               each table card — green means it will fire at full power.  When you're
+               ready, hit <em>End and Run</em> to resolve the table and feed your people.
+               <br><br>
+               Repeat across Spring → Summer → Fall → Winter, then a new year begins with
+               harder events.`,
+      },
+      {
+        title: "The one rule to survive early",
+        body: `Always enter End and Run with enough food to feed your population.
+               <b>Standard seasons cost 1 food per population; Winter costs 2.</b>
+               If you can't feed everyone, population drops — and a smaller population
+               means fewer workers to staff your cards next season.`,
+      },
+    ],
+  },
+
   // ── Phase Cycle ────────────────────────────────────────────────────────────
   {
     icon: "🔄",
@@ -58,9 +100,14 @@ export const HANDBOOK: HandbookChapter[] = [
         body: `Population is your most important resource — if it drops below 1, your
                kingdom falls and the game ends.
                <br><br>
-               Population grows naturally over time through the food surplus mechanic
-               and certain cards and events.  It can be reduced by starvation and
-               negative events.`,
+               Population doubles as your <b>worker pool</b>.  When you End and Run,
+               <em>floor(population)</em> workers are distributed left-to-right across
+               your table cards, filling each card's staff requirement.  Cards that
+               can't be staffed fire at reduced power or not at all — see the
+               <b>Workers &amp; Staffing</b> chapter for details.
+               <br><br>
+               Population grows naturally through the food surplus mechanic and shrinks
+               through starvation and negative events.`,
       },
       {
         title: "Production ⚒️",
@@ -145,13 +192,15 @@ export const HANDBOOK: HandbookChapter[] = [
       },
       {
         title: "Playing a card",
-        body: `To play a card from your hand, you must meet <em>both</em> requirements:
+        body: `To play a card from your hand you must meet one hard requirement:
                <br><br>
                &nbsp;&nbsp;• <b>Production cost</b> — your current production must be at
-               least the card's listed cost.  Production is deducted on play.
-               <br>
-               &nbsp;&nbsp;• <b>Population requirement</b> — your population must be at
-               least the listed value.  Population is <em>not</em> deducted.
+               least the card's listed cost.  Production is deducted immediately on play.
+               <br><br>
+               Cards also show a <b>Staff Req</b> value.  This is <em>not</em> a gate —
+               you can play any card regardless of population — but a card you can't
+               staff will fire at half power or not at all when you End and Run.
+               The hand card will warn you if your current population falls short.
                <br><br>
                Unplayed hand cards are discarded to your discard pile when you End and Run.`,
       },
@@ -170,9 +219,66 @@ export const HANDBOOK: HandbookChapter[] = [
                from left to right.  Recurring cards remain on the table after firing;
                single-use cards are removed.
                <br><br>
+               Each table card shows a <b>staffing badge</b> (👥 3/8) and a color-coded
+               border indicating how well it will be staffed with your current population:
+               <br><br>
+               &nbsp;&nbsp;• <span style="color:#4caf50"><b>Green</b></span> — fully staffed, fires at full power.
+               <br>
+               &nbsp;&nbsp;• <span style="color:#f9a825"><b>Yellow</b></span> — half staffed, fires with all modifiers halved.
+               <br>
+               &nbsp;&nbsp;• <span style="color:#e53935"><b>Red</b></span> — understaffed, will not fire.
+               <br><br>
+               Workers fill cards left to right, so <b>card order matters</b>.  Drag table
+               cards to reorder them and watch the badges update in real time — put your
+               most important cards on the left to guarantee they are staffed first.
+               <br><br>
                You can demolish any table card at any time during the Play phase.
                Demolishing costs <b>20% of the card's production requirement</b>
                (rounded up) and permanently removes it from your deck.`,
+      },
+    ],
+  },
+
+  // ── Workers & Staffing ─────────────────────────────────────────────────────
+  {
+    icon: "👷",
+    title: "Workers & Staffing",
+    sections: [
+      {
+        title: "How workers are allocated",
+        body: `When you End and Run, your total worker count is locked in as
+               <b>floor(population)</b> — fractional population doesn't contribute.
+               Workers are then distributed <b>left to right</b> across your table,
+               filling each card's staff requirement greedily until workers run out.
+               <br><br>
+               Example: 14 workers, three cards requiring 6 / 6 / 8.
+               Card 1 gets 6 (fully staffed), card 2 gets 6 (fully staffed),
+               card 3 gets 2 out of 8 (understaffed — won't fire).`,
+      },
+      {
+        title: "Staffing tiers",
+        body: `Each card resolves at one of three tiers based on how many workers it received:
+               <br><br>
+               &nbsp;&nbsp;• <b>Full</b> (workers ≥ staff req) — fires at full effect value.
+               <br>
+               &nbsp;&nbsp;• <b>Half</b> (workers ≥ ceil(staff req ÷ 2)) — fires with every
+               effect modifier floored to half.  A +10 food card becomes +5.
+               <br>
+               &nbsp;&nbsp;• <b>None</b> (workers &lt; half threshold) — does not fire at all.
+               Single-use cards are still consumed even at None tier.
+               <br><br>
+               The End and Run animation shows each card's tier as it resolves, so you
+               always know exactly what fired and at what power.`,
+      },
+      {
+        title: "Staffing strategy",
+        body: `Because workers fill left to right, <b>slot order is your staffing priority queue</b>.
+               Drag your highest-value recurring cards to the left so they are always
+               fully staffed, even when population dips.
+               <br><br>
+               Growing your population through food surplus is the primary way to staff
+               more cards.  A well-fed kingdom naturally unlocks more table capacity
+               without spending card slots on population effects.`,
       },
     ],
   },
@@ -187,6 +293,11 @@ export const HANDBOOK: HandbookChapter[] = [
         body: `Your deck is the full collection of cards you have built across all
                seasons.  Cards are organised by season — a Farm you drafted in Spring
                lives in your Spring deck and can only be drawn during Spring.
+               <br><br>
+               Every new game starts with a small <b>starter deck</b> already seeded
+               into your piles — a handful of basic cards spread across the seasons to
+               give you a baseline from day one.  These are intentionally weak; the
+               Add phase is where you build your real engine.
                <br><br>
                The <b>Deck</b> button (top-right) shows every card you own, grouped by
                season and sorted into draw, hand, and discard sub-piles.`,
@@ -274,6 +385,14 @@ export const HANDBOOK: HandbookChapter[] = [
         body: `Upgrading a table card doubles its effect for just one hand card.
                Before filling a new table slot, check whether you already have a
                matching card in hand — the upgrade is often better value than a new slot.`,
+      },
+      {
+        title: "Put your best cards on the left",
+        body: `Workers fill your table from left to right.  If population drops after
+               a bad winter or a starvation event, the rightmost cards are the first to
+               lose staffing.  Keep your most critical recurring cards in the leftmost
+               slots so they are always staffed first, and push high-cost situational
+               cards to the right where they can absorb the shortfall.`,
       },
     ],
   },
