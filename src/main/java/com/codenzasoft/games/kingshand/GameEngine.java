@@ -257,10 +257,12 @@ public class GameEngine implements Game<GameEngine> {
    */
   double computeScaleMultiplier(Season season, int year) {
     if (season == Season.WINTER) {
-      if (year <= 5) {
-        return 1.0 + (year - 1) * 0.15;
+      if (year <= 4) {
+        // Linear ramp: 1.0 → 2.0 over years 1–4 (doubles by year 4).
+        return 1.0 + (year - 1) * (1.0 / 3.0);
       } else {
-        double raw = 1.6 * Math.pow(1.25, year - 5);
+        // Exponential from 2.0 at year 5, capped at 20× (~year 13).
+        double raw = 2.0 * Math.pow(1.30, year - 4);
         return Math.min(raw, 20.0);
       }
     } else {

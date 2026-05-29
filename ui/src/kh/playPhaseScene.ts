@@ -970,7 +970,7 @@ export class PlayPhaseScene {
     if (simFood >= consumed) {
       simFood -= consumed;
       if (simFood > 0 && simPop > 0) {
-        const growthRate = Math.min(simFood / simPop, 0.50);
+        const growthRate = Math.min(simFood / simPop, 0.20);
         simPop = simPop + simPop * growthRate;
       }
       this.showToast("🌱 Your people are well-fed — population grows!");
