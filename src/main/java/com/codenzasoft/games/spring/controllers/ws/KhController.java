@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -26,7 +25,6 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
-  @Autowired private SimpMessagingTemplate messagingTemplate;
 
   /**
    * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
@@ -234,9 +232,7 @@ public class KhController {
       log.warn("Quit rejected for {}: {}", userEntity.get().getUsername(), e.getMessage());
       return;
     }
-    messagingTemplate.convertAndSendToUser(
-        userEntity.get().getUsername(), "/queue/games/" + gameId, Map.of("quit", true));
-    log.debug("Quit game {} for user {}", gameId, userEntity.get().getUsername());
+    khBroadcastService.gameQuit(id, userEntity.get().getUsername());
   }
 
   private Optional<UserEntity> findUser(final Principal principal) {
