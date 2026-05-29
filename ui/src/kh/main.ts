@@ -168,7 +168,7 @@ const getGameId = (): string | undefined => {
             placeCard:    (name)        => handler.placeCard(name),
             demolishCard: (name)        => handler.demolishCard(name),
             endAndRun:    ()            => handler.endAndRun(),
-            reorderCard:  (from, to)    => handler.reorderCard(from, to),
+            reorderTable: (names)       => handler.reorderTable(names),
           });
           currentScene.mount(mountTarget);
         }

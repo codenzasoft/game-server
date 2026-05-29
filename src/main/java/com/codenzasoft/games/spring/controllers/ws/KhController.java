@@ -6,6 +6,7 @@ import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import java.security.Principal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -179,27 +180,23 @@ public class KhController {
   }
 
   /**
-   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table, letting
-   * the player reorder their table before resolving. Because {@link GameEngine#endAndRun()} fires
-   * cards left-to-right, slot order is strategically meaningful.
-   *
-   * <p>The request payload must contain integer fields {@code fromSlot} and {@code toSlot}. Invalid
-   * indices or a non-PLAY phase are silently rejected (warn-logged) so a stale client message
-   * cannot crash the session.
+   * Reorders the current season's table to match the provided complete list of card names. The
+   * client sends the full desired order after every drag rather than individual swap operations, so
+   * the server always applies the player's complete intent in one call.
    */
   @MessageMapping("/kh/{gameId}/play/reorder")
-  public void reorderCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+  public void reorderTable(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
     gameService
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final int fromSlot = ((Number) body.get("fromSlot")).intValue();
-              final int toSlot = ((Number) body.get("toSlot")).intValue();
+              @SuppressWarnings("unchecked")
+              final List<String> names = (List<String>) body.get("names");
               try {
-                game.reorderCard(fromSlot, toSlot);
+                game.reorderTable(names);
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
-                log.warn("reorderCard rejected for game {}: {}", gameId, e.getMessage());
+                log.warn("reorderTable rejected for game {}: {}", gameId, e.getMessage());
               }
             });
   }

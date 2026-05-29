@@ -571,18 +571,15 @@ export class GameEventHandler {
   }
 
   /**
-   * Swaps the card at {@code fromSlot} with the card at {@code toSlot} on the current
-   * season's table, allowing the player to reorder their table before resolving.
+   * Reorders the current season's table by sending the complete desired card name order.
+   * The server replaces the current table order to match the provided list exactly.
    *
-   * Requires a matching server endpoint: POST /games/kh/{gameId}/play/reorder
-   *
-   * @param fromSlot Zero-based source slot index.
-   * @param toSlot   Zero-based destination slot index.
+   * @param names Ordered array of card names representing the desired table order.
    */
-  public reorderCard(fromSlot: number, toSlot: number): void {
+  public reorderTable(names: string[]): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/reorder`,
-      body: JSON.stringify({ fromSlot, toSlot }),
+      body: JSON.stringify({ names }),
     });
   }
 

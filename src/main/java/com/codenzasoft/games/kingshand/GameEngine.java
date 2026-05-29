@@ -208,7 +208,8 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Applies the {@link EventOption} whose {@link EventOption#description()} matches {@code name}
-   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the option.
+   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the
+   * option.
    *
    * @throws IllegalStateException if no current event exists or no option matches the given name
    */
@@ -217,10 +218,11 @@ public class GameEngine implements Game<GameEngine> {
     if (event == null) {
       throw new IllegalStateException("no current event to pick an option from");
     }
-    EventOption option = event.options().stream()
-        .filter(o -> o.description().equals(name))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
+    EventOption option =
+        event.options().stream()
+            .filter(o -> o.description().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
     applyEventOption(option);
   }
 
@@ -549,16 +551,17 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Picks the offered ADD-phase card whose {@link Card#name()} matches {@code name} (case-sensitive).
-   * Delegates to {@link #pickCard(Card)} after locating the card.
+   * Picks the offered ADD-phase card whose {@link Card#name()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #pickCard(Card)} after locating the card.
    *
    * @throws IllegalStateException if no offered card matches the given name
    */
   public synchronized void pickCardByName(String name) {
-    Card card = state.getAddChoices().stream()
-        .filter(c -> c.name().equals(name))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("no offered card with name: " + name));
+    Card card =
+        state.getAddChoices().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no offered card with name: " + name));
     pickCard(card);
   }
 
@@ -748,16 +751,17 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Places the hand card whose {@link Card#name()} matches {@code name} (case-sensitive).
-   * Delegates to {@link #placeCard(Card)} after locating the card.
+   * Places the hand card whose {@link Card#name()} matches {@code name} (case-sensitive). Delegates
+   * to {@link #placeCard(Card)} after locating the card.
    *
    * @throws IllegalStateException if no hand card matches the given name
    */
   public synchronized void placeCardByName(String name) {
-    Card card = state.getHand().stream()
-        .filter(c -> c.name().equals(name))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("no hand card with name: " + name));
+    Card card =
+        state.getHand().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no hand card with name: " + name));
     placeCard(card);
   }
 
@@ -779,34 +783,48 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Swaps the cards at {@code fromSlot} and {@code toSlot} on the current season's table so the
-   * player can reorder their table before resolving. Because {@link #endAndRun()} fires cards
-   * left-to-right, slot order determines execution order — this method exposes that control to the
-   * player.
+   * Reorders the current season's table to match the provided list of card names. Every card
+   * currently on the table must appear in {@code cardNames} exactly once; the table is then sorted
+   * to match the given order.
    *
-   * @param fromSlot zero-based index of the card to move
-   * @param toSlot zero-based index of the destination slot
-   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the two
-   *     indices are equal, or if either index is out of range
+   * <p>This replaces the old swap-based {@code reorderCard(fromSlot, toSlot)} API. The client sends
+   * the complete desired order after each drag, so a single call always reflects the player's
+   * intent regardless of how many intermediate drags occurred.
+   *
+   * @param cardNames the desired order of card names; must match the current table contents exactly
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the size
+   *     doesn't match, or if any name doesn't correspond to a table card
    */
-  public synchronized void reorderCard(int fromSlot, int toSlot) {
-    requirePhase(Phase.PLAY, "reorderCard");
-
-    if (fromSlot == toSlot) {
-      throw new IllegalStateException("fromSlot and toSlot must differ: " + fromSlot);
-    }
+  public synchronized void reorderTable(List<String> cardNames) {
+    requirePhase(Phase.PLAY, "reorderTable");
 
     List<Card> table = state.getCurrentTable();
-    int size = table.size();
 
-    if (fromSlot < 0 || fromSlot >= size) {
-      throw new IllegalStateException("invalid fromSlot: " + fromSlot);
-    }
-    if (toSlot < 0 || toSlot >= size) {
-      throw new IllegalStateException("invalid toSlot: " + toSlot);
+    if (cardNames.size() != table.size()) {
+      throw new IllegalStateException(
+          "reorderTable: expected " + table.size() + " names but got " + cardNames.size());
     }
 
-    Collections.swap(table, fromSlot, toSlot);
+    // Build a lookup from name → card, then reconstruct the table in the requested order.
+    // Use a mutable copy so we can remove as we match, catching any duplicate-name edge cases.
+    List<Card> remaining = new ArrayList<>(table);
+    List<Card> reordered = new ArrayList<>(table.size());
+
+    for (String name : cardNames) {
+      Card match =
+          remaining.stream()
+              .filter(c -> c.name().equals(name))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException("reorderTable: no table card with name: " + name));
+      reordered.add(match);
+      remaining.remove(match);
+    }
+
+    // Replace table contents in-place so the existing list reference stays valid.
+    table.clear();
+    table.addAll(reordered);
 
     // Recompute staffing so the client sees the updated priority chain immediately.
     computeAndSetStaffing();

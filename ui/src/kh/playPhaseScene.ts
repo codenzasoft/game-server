@@ -22,7 +22,7 @@ export interface PlayPhaseActions {
   demolishCard: (name: string) => void;
   endAndRun:    ()              => void;
   /** Swap the card at fromSlot with the card at toSlot on the current season's table. */
-  reorderCard:  (fromSlot: number, toSlot: number) => void;
+  reorderTable: (names: string[]) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -696,8 +696,8 @@ export class PlayPhaseScene {
 
   /**
    * Wires up HTML5 drag-and-drop so the player can:
-   *   • Drag a hand card onto an empty table slot  → calls placeCard(index)
-   *   • Drag a table card onto another slot         → calls reorderCard(fromSlot, toSlot)
+   *   • Drag a hand card onto an empty table slot  → calls placeCard(name)
+   *   • Drag a table card onto another slot         → calls reorderTable(names)
    *
    * The existing "Play" and "Demolish" buttons remain fully functional as a fallback.
    */
@@ -808,8 +808,13 @@ export class PlayPhaseScene {
         card.classList.remove("kh-play-drag-over");
         const targetSlot = Number(card.dataset.slot);
         if (dragType === "table" && dragSlot >= 0 && dragSlot !== targetSlot) {
+          // Build the full reordered name list by swapping the two slots locally,
+          // then send the complete order to the server in one call.
+          const table = state.getCurrentTable();
+          const reordered = table.map((c) => c.name);
+          [reordered[dragSlot], reordered[targetSlot]] = [reordered[targetSlot], reordered[dragSlot]];
           this.disableAllActions();
-          this.actions.reorderCard(dragSlot, targetSlot);
+          this.actions.reorderTable(reordered);
         }
       });
     });

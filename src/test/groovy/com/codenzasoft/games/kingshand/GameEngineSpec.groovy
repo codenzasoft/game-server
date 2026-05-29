@@ -1333,7 +1333,7 @@ class GameEngineSpec extends Specification {
 
     // ----- PLAY phase: reorderCard -----
 
-    def "reorderCard swaps the two specified cards"() {
+    def "reorderTable reorders table to match the provided name list"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1343,7 +1343,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, 2)
+        engine.reorderTable(["MINE", "SEEDS", "FARM"])
 
         then:
         def table = state.board.get(Season.SPRING)
@@ -1352,7 +1352,7 @@ class GameEngineSpec extends Specification {
         table[2] == CardCatalog.FARM
     }
 
-    def "reorderCard with adjacent slots swaps them correctly"() {
+    def "reorderTable with two cards swaps them correctly"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1362,7 +1362,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, 1)
+        engine.reorderTable(["MINE", "FARM"])
 
         then:
         def table = state.board.get(Season.SUMMER)
@@ -1370,7 +1370,7 @@ class GameEngineSpec extends Specification {
         table[1] == CardCatalog.FARM
     }
 
-    def "reorderCard (toSlot < fromSlot) swaps in both directions"() {
+    def "reorderTable can move last card to first position"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1380,7 +1380,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(2, 0)
+        engine.reorderTable(["FARM", "FERTILIZER", "SEEDS"])
 
         then:
         def table = state.board.get(Season.FALL)
@@ -1389,7 +1389,7 @@ class GameEngineSpec extends Specification {
         table[2] == CardCatalog.SEEDS
     }
 
-    def "reorderCard preserves all cards — none are dropped"() {
+    def "reorderTable preserves all cards — none are dropped"() {
         setup:
         def cards = [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.FERTILIZER, CardCatalog.MINE]
         def state = GameState.builder()
@@ -1400,7 +1400,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(1, 3)
+        engine.reorderTable(["MINE", "FARM", "FERTILIZER", "SEEDS"])
 
         then:
         def table = state.board.get(Season.SPRING)
@@ -1408,7 +1408,7 @@ class GameEngineSpec extends Specification {
         table.containsAll(cards)
     }
 
-    def "reorderCard does not change table size"() {
+    def "reorderTable does not change table size"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1419,13 +1419,13 @@ class GameEngineSpec extends Specification {
         def sizeBefore = state.board.get(Season.WINTER).size()
 
         when:
-        engine.reorderCard(0, 2)
+        engine.reorderTable(["MINE", "FARM", "SEEDS"])
 
         then:
         state.board.get(Season.WINTER).size() == sizeBefore
     }
 
-    def "reorderCard throws when fromSlot equals toSlot"() {
+    def "reorderTable throws when list size does not match table size"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1435,14 +1435,14 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(1, 1)
+        engine.reorderTable(["FARM"])   // too short
 
         then:
         def e = thrown(IllegalStateException)
-        e.message.contains("fromSlot and toSlot must differ")
+        e.message.contains("expected 2 names but got 1")
     }
 
-    def "reorderCard throws when fromSlot is out of range"() {
+    def "reorderTable throws when a name does not match any table card"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1452,17 +1452,14 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(slot, 0)
+        engine.reorderTable(["FARM", "MINE"])   // MINE not on table
 
         then:
         def e = thrown(IllegalStateException)
-        e.message.contains("invalid fromSlot")
-
-        where:
-        slot << [-1, 2, 99]
+        e.message.contains("no table card with name: MINE")
     }
 
-    def "reorderCard throws when toSlot is out of range"() {
+    def "reorderTable throws when a name appears twice (duplicate)"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1472,17 +1469,14 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, slot)
+        engine.reorderTable(["FARM", "FARM"])   // SEEDS missing, FARM duplicated
 
         then:
         def e = thrown(IllegalStateException)
-        e.message.contains("invalid toSlot")
-
-        where:
-        slot << [-1, 2, 99]
+        e.message.contains("no table card with name: FARM")
     }
 
-    def "reorderCard throws when the current phase is not PLAY"() {
+    def "reorderTable throws when the current phase is not PLAY"() {
         setup:
         def state = GameState.builder()
                 .curPhase(phase)
@@ -1492,17 +1486,17 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, 1)
+        engine.reorderTable(["SEEDS", "FARM"])
 
         then:
         def e = thrown(IllegalStateException)
-        e.message.contains("reorderCard")
+        e.message.contains("reorderTable")
 
         where:
         phase << [Phase.ADD, Phase.RANDOM_EVENT]
     }
 
-    def "reorderCard does not affect resources"() {
+    def "reorderTable does not affect resources"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1515,7 +1509,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, 1)
+        engine.reorderTable(["MINE", "FARM"])
 
         then:
         state.population == 5.0
@@ -1523,7 +1517,7 @@ class GameEngineSpec extends Specification {
         state.food       == 50.0
     }
 
-    def "reorderCard does not affect the hand, draw pile, or discard pile"() {
+    def "reorderTable does not affect the hand, draw pile, or discard pile"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1536,7 +1530,7 @@ class GameEngineSpec extends Specification {
         def engine = engine(state)
 
         when:
-        engine.reorderCard(0, 1)
+        engine.reorderTable(["SEEDS", "FARM"])
 
         then:
         state.hand == [CardCatalog.FERTILIZER]
