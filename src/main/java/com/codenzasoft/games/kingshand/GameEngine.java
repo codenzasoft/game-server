@@ -138,25 +138,6 @@ public class GameEngine implements Game<GameEngine> {
   // ----- RANDOM_EVENT resolution -----
 
   /**
-   * Public entry point for rolling a random event during the {@link Phase#RANDOM_EVENT} phase. Safe
-   * to call multiple times — if an event has already been rolled for this phase it returns
-   * immediately without re-rolling.
-   *
-   * <p>This is needed because {@link #pickCard(Card)} and {@link #skipAdd()} set the phase to
-   * {@link Phase#RANDOM_EVENT} directly (bypassing {@link #advancePhase()}) so callers must trigger
-   * the roll explicitly after those calls.
-   *
-   * @throws IllegalStateException if the current phase is not {@link Phase#RANDOM_EVENT}
-   */
-  public synchronized void rollRandomEvent() {
-    requirePhase(Phase.RANDOM_EVENT, "rollRandomEvent");
-    if (state.getCurrentEvent() != null) {
-      return; // already rolled for this phase — do not re-roll
-    }
-    rollEvent();
-  }
-
-  /**
    * Randomly selects one eligible event for the current season and year and stores it on the state.
    * If no events are eligible the stored event is set to {@code null}.
    */
@@ -221,6 +202,7 @@ public class GameEngine implements Game<GameEngine> {
     // Only advance to PLAY if the game is still running (population may have hit zero above).
     if (!state.isGameOver()) {
       state.setCurPhase(Phase.PLAY);
+      startPlay();
     }
   }
 
@@ -380,6 +362,9 @@ public class GameEngine implements Game<GameEngine> {
 
     // 4. Seasonal food consumption and starvation.
     consumeFood();
+
+    // 5. Advance to the next phase (ADD for next season, or stay put if game is over).
+    advancePhase();
   }
 
   /**
@@ -540,10 +525,9 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
-    // Clear the previous season's event so rollRandomEvent() rolls a fresh one
-    // for this phase rather than seeing the old non-null value and short-circuiting.
     state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
   }
 
   /**
@@ -554,9 +538,9 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
-    // Clear the previous season's event so rollRandomEvent() rolls a fresh one.
     state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
   }
 
   // ----- ADD helpers -----

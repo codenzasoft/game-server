@@ -4,7 +4,6 @@ import com.codenzasoft.games.kingshand.Card;
 import com.codenzasoft.games.kingshand.Event;
 import com.codenzasoft.games.kingshand.EventOption;
 import com.codenzasoft.games.kingshand.GameEngine;
-import com.codenzasoft.games.kingshand.Phase;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -39,21 +38,7 @@ public class KhController {
    */
   @MessageMapping("/kh/{gameId}/load")
   public void load(@DestinationVariable String gameId) {
-    final Optional<GameEngine> game = gameService.getOrBuildKhGame(UUID.fromString(gameId));
-    game.ifPresent(
-        g -> {
-          // Seed ADD choices for a fresh game that hasn't had any yet.
-          if (g.getState().getCurPhase() == Phase.ADD && g.getState().getAddChoices().isEmpty()) {
-            g.offerAddChoices();
-          }
-          // Roll an event if the game is in RANDOM_EVENT but no event has been drawn yet
-          // (can happen after a server restart mid-phase or a direct phase transition).
-          if (g.getState().getCurPhase() == Phase.RANDOM_EVENT
-              && g.getState().getCurrentEvent() == null) {
-            g.rollRandomEvent();
-          }
-          khBroadcastService.gameLoaded(g);
-        });
+    gameService.getOrBuildKhGame(UUID.fromString(gameId)).ifPresent(khBroadcastService::gameLoaded);
   }
 
   /**
@@ -95,9 +80,6 @@ public class KhController {
               }
               try {
                 game.pickCard(choices.get(index));
-                // pickCard sets curPhase=RANDOM_EVENT directly; roll the event now so the
-                // client receives a fully-populated state on the next broadcast.
-                game.rollRandomEvent();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
@@ -116,9 +98,6 @@ public class KhController {
             game -> {
               try {
                 game.skipAdd();
-                // skipAdd sets curPhase=RANDOM_EVENT directly; roll the event now so the
-                // client receives a fully-populated state on the next broadcast.
-                game.rollRandomEvent();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("addSkip rejected for game {}: {}", gameId, e.getMessage());
@@ -149,11 +128,6 @@ public class KhController {
               }
               try {
                 game.applyEventOption(options.get(index));
-                // applyEventOption advances phase to PLAY but does not draw the hand;
-                // startPlay() does that, mirroring what advancePhase() would do normally.
-                if (game.getState().getCurPhase() == Phase.PLAY && !game.getState().isGameOver()) {
-                  game.startPlay();
-                }
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
@@ -268,9 +242,6 @@ public class KhController {
             game -> {
               try {
                 game.endAndRun();
-                // advancePhase moves PLAY → ADD (advancing the season and seeding card choices).
-                // It returns immediately without mutating state if the game is already over.
-                game.advancePhase();
                 khBroadcastService.gameLoaded(game);
               } catch (IllegalStateException e) {
                 log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());

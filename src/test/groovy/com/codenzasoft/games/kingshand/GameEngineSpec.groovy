@@ -796,6 +796,7 @@ class GameEngineSpec extends Specification {
 
     def "applyEventOption applies a production penalty to state"() {
         setup:
+        // Summer year 2: scale = 1.0 + (2-1)*0.05 = 1.05; -10 * 1.05 = -10.5; 100 - 10.5 = 89.5
         def option = new EventOption("Pay cost", [ResourceTarget.PRODUCTION.integer(-10)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(2).production(100.0).build()
@@ -805,7 +806,7 @@ class GameEngineSpec extends Specification {
         engine.applyEventOption(option)
 
         then:
-        state.production == 90.0
+        state.production == 89.5
         state.curPhase == Phase.PLAY
     }
 
@@ -877,11 +878,11 @@ class GameEngineSpec extends Specification {
 
     def "applyEventOption affordability check accounts for winter year-scaling"() {
         setup:
-        // Base cost -10, year 3 → scaled cost -30; production 20 → would go to -10, unaffordable
+        // Base cost -10, year 4 → scale = 2.0 → scaled cost -20; production 15 → would go to -5, unaffordable
         def option = new EventOption("Winter cost", [ResourceTarget.PRODUCTION.integer(-10)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(3)
-                .production(20.0).build()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4)
+                .production(15.0).build()
         def engine = engine(state, new EventCatalog([:]))
 
         when:
@@ -889,7 +890,7 @@ class GameEngineSpec extends Specification {
 
         then:
         thrown(IllegalStateException)
-        state.production == 20.0   // unchanged
+        state.production == 15.0   // unchanged
         state.curPhase == Phase.RANDOM_EVENT
     }
 
@@ -914,17 +915,17 @@ class GameEngineSpec extends Specification {
 
     def "winter event effects are scaled by the current year"() {
         setup:
-        // Base modifier is -10; at year 3 the applied delta should be -30
+        // Base modifier is -10; at year 4 scale = 2.0 → applied delta = -20; 50 - 20 = 30
         def option = new EventOption("Endure", [ResourceTarget.FOOD.integer(-10)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(3).food(50.0).build()
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
         def engine = engine(state, new EventCatalog([:]))
 
         when:
         engine.applyEventOption(option)
 
         then:
-        state.food == 50.0 + (-10 * 3)   // 20.0
+        state.food == 30.0   // 50 + (-10 * 2.0)
         state.curPhase == Phase.PLAY
     }
 
@@ -933,9 +934,9 @@ class GameEngineSpec extends Specification {
         def option = new EventOption(
                 "Slaughter livestock",
                 [ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(-10)])
-        // year 2: food +20, production -20
+        // year 4: scale = 2.0 → food +20, production -20
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(2)
+                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4)
                 .food(50.0).production(100.0).build()
         def engine = engine(state, new EventCatalog([:]))
 
@@ -943,8 +944,8 @@ class GameEngineSpec extends Specification {
         engine.applyEventOption(option)
 
         then:
-        state.food       == 50.0  + (10  * 2)   // 70.0
-        state.production == 100.0 + (-10 * 2)   // 80.0
+        state.food       == 70.0   // 50  + (10  * 2.0)
+        state.production == 80.0   // 100 + (-10 * 2.0)
     }
 
     def "winter scaling at year 1 leaves the magnitude unchanged"() {
@@ -961,8 +962,9 @@ class GameEngineSpec extends Specification {
         state.production == 100.0 + (-5 * 1)   // 95.0
     }
 
-    def "non-winter event effects are NOT year-scaled"() {
+    def "non-winter event effects use gentle 5%/year scaling"() {
         setup:
+        // Summer year 5: scale = 1.0 + (5-1)*0.05 = 1.20; +10 * 1.20 = +12; 100 + 12 = 112
         def option = new EventOption("Trade", [ResourceTarget.PRODUCTION.integer(10)])
         def state = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(5).production(100.0).build()
@@ -972,29 +974,28 @@ class GameEngineSpec extends Specification {
         engine.applyEventOption(option)
 
         then:
-        // year is 5 but scaling must NOT apply outside winter; delta is flat +10
-        state.production == 110.0
+        state.production == 112.0
     }
 
-    def "year-scaling applies independently per season: fall and spring unscaled, winter scaled"() {
+    def "year-scaling applies piecewise: non-winter gentle linear, winter accelerated"() {
         setup:
         def option = new EventOption("opt", [ResourceTarget.FOOD.integer(10)])
 
-        when: "fall (year 4) — no scaling"
+        when: "fall year 4 — gentle linear: scale = 1.0 + 3*0.05 = 1.15; food = 50 + 10*1.15 = 61.5"
         def fallState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.FALL).year(4).food(50.0).build()
         engine(fallState, new EventCatalog([:])).applyEventOption(option)
 
         then:
-        fallState.food == 60.0
+        fallState.food == 61.5
 
-        when: "winter (year 4) — scaled by 4"
+        when: "winter year 4 — linear ramp: scale = 2.0; food = 50 + 10*2.0 = 70.0"
         def winterState = GameState.builder()
                 .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
         engine(winterState, new EventCatalog([:])).applyEventOption(option)
 
         then:
-        winterState.food == 50.0 + (10 * 4)   // 90.0
+        winterState.food == 70.0
     }
 
     // ----- construction guard -----
@@ -1832,7 +1833,7 @@ class GameEngineSpec extends Specification {
     def "endAndRun consumes floor(pop) × 1 food in a non-winter season"() {
         setup:
         // pop=6.0 → floor=6; spring rate=1; consumed=6; food 40 → 34
-        // surplus growth: rate = min(34/6.0, 0.50) = 0.50; new pop = 6.0 * 1.5 = 9.0
+        // surplus growth: rate = min(34/6.0, 0.20) = 0.20; new pop = 6.0 * 1.2 = 7.2
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1846,13 +1847,13 @@ class GameEngineSpec extends Specification {
 
         then:
         state.food       == 34.0   // 40 - 6; surplus food is not further consumed
-        state.population == 9.0  // 6.0 * 1.5 after 50% surplus growth
+        state.population == 7.2    // 6.0 * 1.2 after 20% surplus growth cap
     }
 
     def "endAndRun consumes floor(pop) × 2 food in winter"() {
         setup:
         // pop=4.0 → floor=4; winter rate=2; consumed=8; food 50 → 42
-        // surplus growth: rate = min(42/4.0, 0.50) = 0.50; new pop = 4.0 * 1.5 = 6.0
+        // surplus growth: rate = min(42/4.0, 0.20) = 0.20; new pop = 4.0 * 1.2 = 4.8
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.WINTER)
@@ -1866,7 +1867,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.food       == 42.0   // 50 - 8; surplus food is not further consumed
-        state.population == 6.0    // 4.0 * 1.5 after 50% surplus growth
+        state.population == 4.8    // 4.0 * 1.2 after 20% surplus growth cap
     }
 
     def "endAndRun clamps food to zero and reduces population by half the deficit on starvation"() {
@@ -1980,7 +1981,8 @@ class GameEngineSpec extends Specification {
     def "sufficient food after endAndRun does not trigger GAME_OVER"() {
         setup:
         // pop=5, spring: consumed=5, food=10 → food=5
-        // surplus growth: rate = min(5/5.0, 0.50) = 0.50; new pop = 5.0 * 1.5 = 7.5
+        // surplus growth: rate = min(5/5.0, 0.20) = 0.20; new pop = 5.0 * 1.2 = 6.0
+        // endAndRun now calls advancePhase() internally → phase advances to ADD
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
                 .population(5.0).food(10.0).build()
@@ -1990,8 +1992,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.curPhase   == Phase.PLAY
+        state.curPhase   == Phase.ADD   // endAndRun advances phase internally
         state.gameOver   == false
-        state.population == 7.5    // 5.0 * 1.5 after 50% surplus growth
+        state.population == 6.0    // 5.0 * 1.2 after 20% surplus growth cap
     }
 }
