@@ -153,7 +153,60 @@ public class EventCatalog {
                             ResourceTarget.PRODUCTION.integer(-8), ResourceTarget.FOOD.integer(5))),
                     new EventOption(
                         "Reinforce the pens", List.of(ResourceTarget.PRODUCTION.integer(-5))),
-                    new EventOption("Do nothing", List.of(ResourceTarget.FOOD.integer(-10)))))));
+                    new EventOption("Do nothing", List.of(ResourceTarget.FOOD.integer(-10))))),
+            new Event(
+                "spring.land_seizure",
+                Season.SPRING,
+                6,
+                "Noble lords claim the most fertile fields by decree, stripping your best farmland.",
+                List.of(
+                    new EventOption(
+                        "Contest the claim",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-25),
+                            ResourceTarget.FOOD.integer(10))),
+                    new EventOption(
+                        "Capitulate to the lords", List.of(ResourceTarget.FOOD.integer(-30))))),
+            new Event(
+                "spring.peasant_uprising",
+                Season.SPRING,
+                8,
+                "Years of hardship boil over. Peasants seize grain stores and refuse to plant.",
+                List.of(
+                    new EventOption(
+                        "Pay their demands",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-35),
+                            ResourceTarget.FOOD.integer(-10))),
+                    new EventOption(
+                        "Suppress the uprising",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(-5),
+                            ResourceTarget.PRODUCTION.integer(-15))),
+                    new EventOption(
+                        "Negotiate a compromise",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.POPULATION.integer(-2))))),
+            new Event(
+                "spring.sickness_from_the_east",
+                Season.SPRING,
+                7,
+                "Traders bring word — and symptoms — of a spreading illness from distant lands.",
+                List.of(
+                    new EventOption(
+                        "Seal the borders",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.FOOD.integer(-15))),
+                    new EventOption(
+                        "Accept refugees fleeing the sickness",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(4),
+                            ResourceTarget.FOOD.integer(-30),
+                            ResourceTarget.PRODUCTION.integer(-10))),
+                    new EventOption(
+                        "Ignore the warnings", List.of(ResourceTarget.POPULATION.integer(-6)))))));
 
     // ── Summer ────────────────────────────────────────────────────────────────
     seasonal.put(
@@ -267,7 +320,51 @@ public class EventCatalog {
                             ResourceTarget.FOOD.integer(5))),
                     new EventOption(
                         "Pay them off", List.of(ResourceTarget.PRODUCTION.integer(-15))),
-                    new EventOption("Ignore them", List.of(ResourceTarget.FOOD.integer(-20)))))));
+                    new EventOption("Ignore them", List.of(ResourceTarget.FOOD.integer(-20))))),
+            new Event(
+                "summer.great_drought",
+                Season.SUMMER,
+                6,
+                "The worst dry spell in memory. Rivers run low. Fields crack and wither.",
+                List.of(
+                    new EventOption(
+                        "Dig emergency wells",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-30),
+                            ResourceTarget.FOOD.integer(-10))),
+                    new EventOption(
+                        "Abandon the outer fields", List.of(ResourceTarget.FOOD.integer(-45))))),
+            new Event(
+                "summer.mercenary_tribute",
+                Season.SUMMER,
+                7,
+                "A mercenary company marches through your lands demanding payment for passage.",
+                List.of(
+                    new EventOption("Pay in food", List.of(ResourceTarget.FOOD.integer(-40))),
+                    new EventOption("Pay in coin", List.of(ResourceTarget.PRODUCTION.integer(-35))),
+                    new EventOption(
+                        "Resist their demands",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.POPULATION.integer(-4))))),
+            new Event(
+                "summer.mass_epidemic",
+                Season.SUMMER,
+                9,
+                "A virulent fever tears through the settlement with terrifying speed.",
+                List.of(
+                    new EventOption(
+                        "Full quarantine — spare no resource",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-40),
+                            ResourceTarget.POPULATION.integer(-3))),
+                    new EventOption(
+                        "Treat what you can",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.POPULATION.integer(-6))),
+                    new EventOption(
+                        "Pray it passes", List.of(ResourceTarget.POPULATION.integer(-10)))))));
 
     // ── Fall ──────────────────────────────────────────────────────────────────
     seasonal.put(
@@ -365,7 +462,66 @@ public class EventCatalog {
                         List.of(
                             ResourceTarget.PRODUCTION.integer(-5),
                             ResourceTarget.FOOD.integer(20))),
-                    new EventOption("Stay focused on harvest work", List.of())))));
+                    new EventOption("Stay focused on harvest work", List.of()))),
+            new Event(
+                "fall.tax_revolt",
+                Season.FALL,
+                6,
+                "Workers refuse the seasonal levy. Storehouses stand locked. Foremen have fled.",
+                List.of(
+                    new EventOption(
+                        "Enforce with a militia",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-30),
+                            ResourceTarget.POPULATION.integer(-3))),
+                    new EventOption(
+                        "Negotiate a settlement",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.FOOD.integer(-15))),
+                    new EventOption(
+                        "Concede the levy entirely",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-10),
+                            ResourceTarget.POPULATION.integer(-5))))),
+            new Event(
+                "fall.winter_foreboding",
+                Season.FALL,
+                7,
+                "Omens are dire. Every elder says this will be the harshest winter yet.",
+                List.of(
+                    new EventOption(
+                        "Emergency stockpiling — all hands to stores",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-40),
+                            ResourceTarget.FOOD.integer(25))),
+                    new EventOption(
+                        "Prepare as usual",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-15),
+                            ResourceTarget.FOOD.integer(-20))))),
+            new Event(
+                "fall.the_reckoning",
+                Season.FALL,
+                10,
+                "Creditors, rivals, and enemies converge. Every debt comes due at once.",
+                List.of(
+                    new EventOption(
+                        "Pay in full — strip the treasury",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-50),
+                            ResourceTarget.FOOD.integer(-20))),
+                    new EventOption(
+                        "Pay in blood — conscript labour",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(-6),
+                            ResourceTarget.FOOD.integer(-15))),
+                    new EventOption(
+                        "Default and face the consequences",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-25),
+                            ResourceTarget.POPULATION.integer(-4),
+                            ResourceTarget.FOOD.integer(-20)))))));
 
     // ── Winter ────────────────────────────────────────────────────────────────
     seasonal.put(
@@ -466,7 +622,76 @@ public class EventCatalog {
                             ResourceTarget.PRODUCTION.integer(-8),
                             ResourceTarget.POPULATION.integer(-1))),
                     new EventOption(
-                        "Let them go", List.of(ResourceTarget.POPULATION.integer(-3)))))));
+                        "Let them go", List.of(ResourceTarget.POPULATION.integer(-3))))),
+            new Event(
+                "winter.great_freeze",
+                Season.WINTER,
+                6,
+                "The coldest winter anyone can remember. Pipes burst. Livestock freeze in pens.",
+                List.of(
+                    new EventOption(
+                        "Burn everything that will burn",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-25),
+                            ResourceTarget.FOOD.integer(-10))),
+                    new EventOption(
+                        "Huddle and endure",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(-6),
+                            ResourceTarget.FOOD.integer(-15))))),
+            new Event(
+                "winter.mass_desertion",
+                Season.WINTER,
+                7,
+                "Entire families vanish overnight, preferring the road to another winter here.",
+                List.of(
+                    new EventOption(
+                        "Pay them handsomely to stay",
+                        List.of(
+                            ResourceTarget.PRODUCTION.integer(-35),
+                            ResourceTarget.POPULATION.integer(-2))),
+                    new EventOption(
+                        "Let them go — fewer mouths to feed",
+                        List.of(ResourceTarget.POPULATION.integer(-8))))),
+            new Event(
+                "winter.the_long_winter",
+                Season.WINTER,
+                9,
+                "Spring does not come. The cold simply refuses to lift.",
+                List.of(
+                    new EventOption(
+                        "Slaughter livestock for food",
+                        List.of(
+                            ResourceTarget.FOOD.integer(15),
+                            ResourceTarget.PRODUCTION.integer(-40),
+                            ResourceTarget.POPULATION.integer(-2))),
+                    new EventOption(
+                        "Ration with iron discipline",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-30),
+                            ResourceTarget.POPULATION.integer(-5))),
+                    new EventOption(
+                        "Send desperate foraging parties",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-15),
+                            ResourceTarget.PRODUCTION.integer(-20),
+                            ResourceTarget.POPULATION.integer(-4))))),
+            new Event(
+                "winter.white_death",
+                Season.WINTER,
+                12,
+                "An unprecedented cold kills the old, the young, and the unlucky without mercy.",
+                List.of(
+                    new EventOption(
+                        "Sacrifice everything to save them",
+                        List.of(
+                            ResourceTarget.FOOD.integer(-50),
+                            ResourceTarget.PRODUCTION.integer(-30))),
+                    new EventOption(
+                        "Triage — save who you can",
+                        List.of(
+                            ResourceTarget.POPULATION.integer(-8),
+                            ResourceTarget.FOOD.integer(-20)))))));
 
     return new EventCatalog(seasonal);
   }

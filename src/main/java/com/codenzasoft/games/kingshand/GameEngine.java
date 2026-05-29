@@ -225,14 +225,47 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Returns the effect unchanged for non-winter seasons; for {@link Season#WINTER} returns a new
-   * {@link Effect} whose modifier is scaled by the current year (KH-6 winter scaling rule).
+   * Returns a scaled copy of {@code effect} whose modifier is multiplied by the season-and-year
+   * multiplier from {@link #computeScaleMultiplier(Season, int)}. If the multiplier is exactly
+   * {@code 1.0} the original effect is returned unchanged to avoid unnecessary allocation.
+   *
+   * <p>Replaces the old KH-6 linear winter-only rule ({@code modifier × year}).
    */
   private Effect scaleForSeason(Effect effect) {
-    if (state.getCurSeason() != Season.WINTER) {
-      return effect;
+    double multiplier = computeScaleMultiplier(state.getCurSeason(), state.getYear());
+    if (multiplier == 1.0) return effect;
+    return new Effect(effect.target(), effect.modifier() * multiplier, effect.valueType());
+  }
+
+  /**
+   * Computes the event-effect scaling multiplier for the given season and year.
+   *
+   * <p><b>Winter</b> uses a piecewise accelerating curve so early winters are survivable but late
+   * winters become genuinely threatening:
+   *
+   * <ul>
+   *   <li>Years 1–5: linear ramp {@code 1.0 + (year − 1) × 0.15} → 1.00 / 1.15 / 1.30 / 1.45 / 1.60
+   *   <li>Years 6+: exponential {@code 1.6 × 1.25^(year − 5)}, capped at {@code 20.0} (~year 16)
+   * </ul>
+   *
+   * <p><b>Spring, Summer, Fall</b> use a slow linear crawl so non-winter events gradually tighten
+   * but never dominate: {@code 1.0 + (year − 1) × 0.05} → ~2.0× at year 21.
+   *
+   * @param season the season in which the event fires
+   * @param year the current game year (1-indexed)
+   * @return the multiplier to apply to each effect modifier
+   */
+  double computeScaleMultiplier(Season season, int year) {
+    if (season == Season.WINTER) {
+      if (year <= 5) {
+        return 1.0 + (year - 1) * 0.15;
+      } else {
+        double raw = 1.6 * Math.pow(1.25, year - 5);
+        return Math.min(raw, 20.0);
+      }
+    } else {
+      return 1.0 + (year - 1) * 0.05;
     }
-    return new Effect(effect.target(), effect.modifier() * state.getYear(), effect.valueType());
   }
 
   public synchronized void advanceSeason() {
@@ -454,9 +487,10 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // Surplus growth: if food remains after consumption, grow population proportionally.
-    // The surplus is used purely for the growth calculation — food is not further reduced.
+    // Growth rate is capped at 20% per season so the population snowball stays manageable.
+    // The surplus food is not consumed — it carries over to the next season.
     if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
-      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.50);
+      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.20);
       applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
     }
   }
