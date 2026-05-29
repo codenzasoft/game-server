@@ -23,16 +23,16 @@ export function injectSharedStyles(): void {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 5px;
       background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
       border: 2px solid #c49428;
-      border-radius: 14px;
-      padding: 10px 14px 8px;
+      border-radius: 16px;
+      padding: 14px 20px 12px;
       cursor: pointer;
       z-index: 50;
       box-shadow: 2px 4px 18px rgba(0,0,0,.5);
       transition: all .18s ease;
-      min-width: 64px;
+      min-width: 84px;
       text-align: center;
     }
     .kh-shared-icon-btn:hover {
@@ -41,10 +41,10 @@ export function injectSharedStyles(): void {
       transform: translateY(-2px);
       border-color: #e0b040;
     }
-    .kh-shared-icon-btn .kh-sib-emoji  { font-size: 1.5rem; line-height: 1; display: block; }
+    .kh-shared-icon-btn .kh-sib-emoji  { font-size: 1.9rem; line-height: 1; display: block; }
     .kh-shared-icon-btn .kh-sib-label  {
       font-family: 'Cinzel', serif;
-      font-size: .55rem;
+      font-size: .65rem;
       letter-spacing: 1px;
       color: #c4a060;
       text-transform: uppercase;
@@ -54,11 +54,11 @@ export function injectSharedStyles(): void {
       background: #c49428;
       color: #1a0e04;
       font-family: 'Cinzel', serif;
-      font-size: .75rem;
+      font-size: .8rem;
       font-weight: 700;
       border-radius: 10px;
-      padding: 1px 7px;
-      min-width: 20px;
+      padding: 2px 9px;
+      min-width: 24px;
       text-align: center;
       margin-top: 2px;
       display: block;
@@ -511,10 +511,11 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
   if (!backdrop || !tabsEl || !bodyEl) return;
 
   const renderTab = (season: Season) => {
+    const tableCards   = state.board.get(season) ?? [];
     const drawCards    = state.drawPile.get(season) ?? [];
     const discardCards = state.discardPile.get(season) ?? [];
     const handCards    = season === state.curSeason ? state.hand : [];
-    const allCards     = [...handCards, ...drawCards, ...discardCards];
+    const allCards     = [...tableCards, ...handCards, ...drawCards, ...discardCards];
 
     tabsEl.querySelectorAll<HTMLButtonElement>(".kh-deck-tab").forEach((btn) => {
       btn.classList.toggle("kh-deck-tab-active", btn.dataset.season === season);
@@ -524,6 +525,10 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
       bodyEl.innerHTML = `<div class="kh-deck-empty">No cards in your ${season.toLowerCase()} collection.</div>`;
     } else {
       bodyEl.innerHTML = `
+        ${tableCards.length > 0 ? `
+          <div class="kh-deck-sub-heading">Table (${tableCards.length})</div>
+          ${tableCards.map(buildCompactCard).join("")}
+        ` : ""}
         ${handCards.length > 0 ? `
           <div class="kh-deck-sub-heading">In Hand (${handCards.length})</div>
           ${handCards.map(buildCompactCard).join("")}
@@ -542,7 +547,8 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
 
   // Build tabs
   tabsEl.innerHTML = ALL_SEASONS.map((s) => {
-    const count = (state.drawPile.get(s)?.length ?? 0)
+    const count = (state.board.get(s)?.length ?? 0)
+                + (state.drawPile.get(s)?.length ?? 0)
                 + (state.discardPile.get(s)?.length ?? 0)
                 + (s === state.curSeason ? state.hand.length : 0);
     return `

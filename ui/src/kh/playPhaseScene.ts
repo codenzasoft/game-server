@@ -122,7 +122,7 @@ export class PlayPhaseScene {
             Resolve all table cards from left to right, then advance the season.
           </div>
           <button class="kh-play-btn-end" id="kh-play-btn-end">
-            ⚔ &nbsp;End and Run →
+            ⚔ &nbsp;Play
           </button>
         </div>
       </main>
@@ -458,7 +458,7 @@ export class PlayPhaseScene {
           ? `👥 ${workers}/${card.staffRequirement} workers — half output`
           : "";
 
-    let btnText    = isUpgrade ? "✦ Upgrade" : "⚔ Play";
+    let btnText    = isUpgrade ? "✦ Upgrade" : "🏗 Build";
     let btnExtra   = "";
     let unavailable = "";
 
