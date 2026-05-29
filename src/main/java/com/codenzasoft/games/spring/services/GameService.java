@@ -270,9 +270,10 @@ public class GameService {
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
     final GameState state = GameState.builder().gameOver(isOver).build();
-    // GameEngine self-initializes: seeds the starting deck and offers the first ADD choices
-    // when the game is new. Completed/quit games are left untouched.
-    return new GameEngine(entity.getId(), player, state);
+    final GameEngine engine = new GameEngine(entity.getId(), player, state);
+    // Delegate initialization to the engine — it owns the knowledge of how a game starts.
+    engine.initialize();
+    return engine;
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
