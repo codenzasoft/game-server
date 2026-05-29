@@ -52,7 +52,11 @@ public class GameEngine implements Game<GameEngine> {
     this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, rng);
   }
 
-  /** Constructor for restoring a persisted game with its id and player. */
+  /**
+   * Constructor for building a game from a persisted entity. Automatically seeds the starting
+   * deck and offers the first ADD choices when the game is new (all draw piles empty, not over).
+   * Persisted games with existing deck state are left untouched.
+   */
   public GameEngine(UUID id, Player player, GameState state) {
     this(
         id,
@@ -61,6 +65,7 @@ public class GameEngine implements Game<GameEngine> {
         CardCatalog.defaultCatalog(),
         EventCatalog.defaultCatalog(),
         new Random());
+    initializeIfNew();
   }
 
   /** Full constructor with all dependencies injected. */
@@ -89,6 +94,21 @@ public class GameEngine implements Game<GameEngine> {
     this.cardCatalog = cardCatalog;
     this.eventCatalog = eventCatalog;
     this.rng = rng;
+  }
+
+  /**
+   * Seeds the starting deck and offers the first ADD choices when this is a brand-new game.
+   * A game is considered new when all draw piles are empty and the game is not over. Persisted
+   * games restored from the database already have deck state and are left untouched.
+   */
+  private void initializeIfNew() {
+    if (state.isGameOver()) return;
+    boolean allEmpty = state.getDrawPile().values().stream().allMatch(List::isEmpty);
+    if (!allEmpty) return;
+    seedStartingDeck();
+    if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
+      offerAddChoices();
+    }
   }
 
   @Override

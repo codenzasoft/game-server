@@ -270,13 +270,9 @@ public class GameService {
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
     final GameState state = GameState.builder().gameOver(isOver).build();
-    final GameEngine engine = new GameEngine(entity.getId(), player, state);
-    // Seed the starting deck for every live game so the player has cards from turn one.
-    // (Completed/quit games are already over — no deck needed.)
-    if (!isOver) {
-      engine.seedStartingDeck();
-    }
-    return engine;
+    // GameEngine self-initializes: seeds the starting deck and offers the first ADD choices
+    // when the game is new. Completed/quit games are left untouched.
+    return new GameEngine(entity.getId(), player, state);
   }
 
   public Optional<UserEntity> findUser(final UUID id) {
