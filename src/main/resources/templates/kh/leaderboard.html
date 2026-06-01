@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <style>
+        .leaderboard-header {
+            background-image: linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.82)),
+                              url('/img/kingshand-bg.png');
+            background-size: cover;
+            background-position: center top;
+        }
+        .rank-badge {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .rank-1 { background: #FFD700; color: #333; }
+        .rank-2 { background: #C0C0C0; color: #333; }
+        .rank-3 { background: #CD7F32; color: #fff; }
+        .rank-4, .rank-5 { background: #e9ecef; color: #555; }
+    </style>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <div class="container mt-4" style="max-width: 720px;">
+
+            <!-- Page header -->
+            <div class="rounded p-4 mb-4 leaderboard-header">
+                <h3 class="mb-0 fw-bold">King's Hand Leaderboard</h3>
+                <p class="text-muted mb-0 mt-1">Top 5 all-time games</p>
+            </div>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-0" id="leaderboardTabs">
+                <li class="nav-item">
+                    <a class="nav-link"
+                       th:classappend="${activeTab == 'duration' ? 'active' : ''}"
+                       th:href="@{/kh/leaderboard(tab='duration')}">
+                        Longest Survival
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                       th:classappend="${activeTab == 'population' ? 'active' : ''}"
+                       th:href="@{/kh/leaderboard(tab='population')}">
+                        Peak Population
+                    </a>
+                </li>
+            </ul>
+
+            <div class="border border-top-0 rounded-bottom p-3 mb-4 bg-white">
+
+                <!-- Longest Survival tab -->
+                <div th:if="${activeTab == 'duration'}">
+                    <table class="table table-borderless align-middle mb-0"
+                           th:if="${not #lists.isEmpty(topByDuration)}">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:3rem">#</th>
+                                <th>Player</th>
+                                <th>Survived Until</th>
+                                <th class="text-end">Peak Pop.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="entry, iter : ${topByDuration}">
+                                <td>
+                                    <span class="rank-badge"
+                                          th:classappend="'rank-' + ${iter.index + 1}"
+                                          th:text="${iter.index + 1}"></span>
+                                </td>
+                                <td th:text="${entry.user.username}"></td>
+                                <td>
+                                    Year <span th:text="${entry.yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span>
+                                </td>
+                                <td class="text-end"
+                                    th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="text-muted text-center py-4 mb-0"
+                       th:if="${#lists.isEmpty(topByDuration)}">
+                        No completed games yet. Be the first on the board!
+                    </p>
+                </div>
+
+                <!-- Peak Population tab -->
+                <div th:if="${activeTab == 'population'}">
+                    <table class="table table-borderless align-middle mb-0"
+                           th:if="${not #lists.isEmpty(topByPopulation)}">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:3rem">#</th>
+                                <th>Player</th>
+                                <th class="text-end">Peak Pop.</th>
+                                <th>Survived Until</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="entry, iter : ${topByPopulation}">
+                                <td>
+                                    <span class="rank-badge"
+                                          th:classappend="'rank-' + ${iter.index + 1}"
+                                          th:text="${iter.index + 1}"></span>
+                                </td>
+                                <td th:text="${entry.user.username}"></td>
+                                <td class="text-end fw-semibold"
+                                    th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
+                                <td>
+                                    Year <span th:text="${entry.yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="text-muted text-center py-4 mb-0"
+                       th:if="${#lists.isEmpty(topByPopulation)}">
+                        No completed games yet. Be the first on the board!
+                    </p>
+                </div>
+            </div>
+
+            <a th:href="@{/}" class="btn btn-outline-secondary btn-sm">← Back to Games</a>
+        </div>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+    </body>
+</html>

@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhGamePersistenceService;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
+  @Autowired private KhGamePersistenceService khGamePersistenceService;
 
   /**
    * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
@@ -213,6 +215,9 @@ public class KhController {
               try {
                 game.endAndRun();
                 khBroadcastService.gameLoaded(game);
+                if (game.getState().isGameOver()) {
+                  khGamePersistenceService.saveResult(game);
+                }
               } catch (IllegalStateException e) {
                 log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());
               }

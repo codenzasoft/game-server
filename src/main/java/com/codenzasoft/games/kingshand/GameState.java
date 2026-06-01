@@ -23,6 +23,7 @@ public class GameState {
   private List<Card> hand;
   // resources
   private double population;
+  private double peakPopulation;
   private double production;
   private double food;
   // where are we
@@ -45,6 +46,7 @@ public class GameState {
     this.discardPile = b.discardPile;
     this.hand = b.hand;
     this.population = b.population;
+    this.peakPopulation = b.peakPopulation;
     this.production = b.production;
     this.food = b.food;
     this.curSeason = b.curSeason;
@@ -156,6 +158,11 @@ public class GameState {
     return population;
   }
 
+  @JsonProperty("peakPopulation")
+  public double getPeakPopulation() {
+    return peakPopulation;
+  }
+
   @JsonProperty("production")
   public double getProduction() {
     return production;
@@ -205,6 +212,9 @@ public class GameState {
 
   public void setPopulation(double population) {
     this.population = population;
+    if (population > this.peakPopulation) {
+      this.peakPopulation = population;
+    }
   }
 
   public void setProduction(double production) {
@@ -273,6 +283,7 @@ public class GameState {
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
     private double population = 20.0;
+    private double peakPopulation = 20.0;
     private double production = 200.0;
     private double food = 150.0;
     private Season curSeason = Season.SPRING;
@@ -316,6 +327,11 @@ public class GameState {
 
     public Builder population(double population) {
       this.population = population;
+      return this;
+    }
+
+    public Builder peakPopulation(double peakPopulation) {
+      this.peakPopulation = peakPopulation;
       return this;
     }
 
