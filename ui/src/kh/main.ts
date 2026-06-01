@@ -1,15 +1,14 @@
 import { Application } from "pixi.js";
-import { Client, Frame, StompSubscription } from "@stomp/stompjs";
-import { OptionsMenu } from "./settings.ts";
+import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
+import { AddPhaseScene } from "./addPhaseScene.ts";
+import { RandomEventScene } from "./randomEventScene.ts";
+import { PlayPhaseScene } from "./playPhaseScene.ts";
 
-const wsUrl =
-  import.meta.env.VITE_WS_URL ||
-  `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/games/connect`;
+const homeUrl = `${window.location.origin}/`;
 const loginUrl =
   import.meta.env.VITE_LOGIN_URL || `${window.location.origin}/login`;
-const homeUrl = `${window.location.origin}/`;
 
-const getLastPathSegment = (url) => {
+const getLastPathSegment = (url: string): string | undefined => {
   const pathname = new URL(url).pathname;
   const parts = pathname.split("/");
   // The pop() method removes the last element and returns it.
@@ -17,80 +16,196 @@ const getLastPathSegment = (url) => {
   return parts.pop() || parts.pop();
 };
 
-const getGameId = () => {
+const getGameId = (): string | undefined => {
   return getLastPathSegment(window.location.href);
 };
 
 (async () => {
-  // Create a new application
+  // Create a new application.  The dark green background is visible between
+  // scene transitions; it doubles as the parchment world background.
   const app = new Application();
-
-  // Initialize the application
-  await app.init({ background: "red", resizeTo: window });
+  await app.init({ background: 0x2d5a3d, resizeTo: window });
 
   // Append the application canvas to the document body
   document.getElementById("pixi-container")!.appendChild(app.canvas);
 
   const gameId = getGameId();
-  if (gameId.length === 0) {
+  if (!gameId || gameId.length === 0) {
     console.error(`Game ID not provided`);
-    // redirect to login page to ensure user is authenticated
     window.location.href = loginUrl;
     return;
   }
 
   console.log(`Using game ID: ${gameId}`);
 
-  // Connect to WebSocket via STOMP
-  let subscription: StompSubscription;
+  // ── Active scene ──────────────────────────────────────────────────────────
+  //
+  // Only one scene is live at a time.  onMessage replaces it whenever the
+  // server sends a state update that changes the current phase.
 
-  const client = new Client({ brokerURL: wsUrl });
+  let currentScene: AddPhaseScene | RandomEventScene | PlayPhaseScene | null = null;
 
-  client.onConnect = (frame: Frame) => {
-    console.log("Connected: " + frame);
-    subscription = client.subscribe(
-      `/user/queue/games/${gameId}`,
-      (stompMessage) => {
-        const body = JSON.parse(stompMessage.body);
-        console.log("Received KH message:", body);
-        if (body.quit) {
-          subscription.unsubscribe();
-          app.destroy(true, true);
-          window.location.href = homeUrl;
-        }
-      },
-    );
-    // Request the current game state from the server
-    client.publish({ destination: `/games/kh/${gameId}/load` });
-  };
+  const mountTarget = document.getElementById("pixi-container")!;
 
-  client.onWebSocketError = (error: unknown) => {
-    console.error("Error with websocket", error);
-    // redirect to login page to ensure user is authenticated
-    window.location.href = loginUrl;
-  };
+  // ── Game-over overlay ──────────────────────────────────────────────────────
+  // Shown whenever state.gameOver is true, regardless of curPhase.
+  // It sits on top of everything and lets the player return to the home screen.
 
-  client.onStompError = (frame: Frame) => {
-    console.error("Broker reported error: " + frame.headers["message"]);
-    console.error("Additional details: " + frame.body);
-  };
+  const showGameOver = (): void => {
+    if (currentScene) {
+      currentScene.unmount();
+      currentScene = null;
+    }
+    if (document.getElementById("kh-game-over-overlay")) return; // already shown
 
-  client.activate();
+    const style = document.createElement("style");
+    style.textContent = `
+      #kh-game-over-overlay {
+        position: fixed; inset: 0; z-index: 9000;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        background: rgba(8, 4, 2, 0.92);
+        font-family: 'Cinzel', serif;
+      }
+      .kh-go-skull   { font-size: 5rem; margin-bottom: 24px; }
+      .kh-go-title   { font-size: 2.6rem; font-weight: 700; color: #f0cc50;
+                       letter-spacing: 5px; text-shadow: 0 2px 18px rgba(0,0,0,.8);
+                       margin: 0 0 14px; }
+      .kh-go-sub     { font-size: 1.1rem; color: #c4b08c; font-style: italic;
+                       margin: 0 0 48px; letter-spacing: 1px; }
+      .kh-go-btn     { padding: 14px 48px; border-radius: 10px; border: 2px solid #c49428;
+                       background: linear-gradient(135deg, #3a2010 0%, #1e0e04 100%);
+                       color: #f0e8c0; font-family: 'Cinzel', serif; font-size: 1rem;
+                       font-weight: 700; letter-spacing: 2px; cursor: pointer;
+                       transition: all .15s; }
+      .kh-go-btn:hover { background: linear-gradient(135deg, #5a3020 0%, #2e1408 100%);
+                         box-shadow: 0 3px 18px rgba(196,148,40,.35); }
+    `;
+    document.head.appendChild(style);
 
-  // Options menu — contains "Save and Exit" and "Quit Game"
-  const optionsMenu = new OptionsMenu(
-    app,
-    () => {
-      // Quit Game: notify the server, which will confirm via WebSocket and
-      // trigger the redirect once the quit_at timestamp is persisted.
-      optionsMenu.close();
-      client.publish({ destination: `/games/kh/${gameId}/quit` });
-    },
-    () => {
-      // Save and Exit: game state is already persisted server-side, so just
-      // navigate home — the game remains active in the active games list.
+    const overlay = document.createElement("div");
+    overlay.id = "kh-game-over-overlay";
+    overlay.innerHTML = `
+      <div class="kh-go-skull">💀</div>
+      <h1 class="kh-go-title">YOUR KINGDOM HAS FALLEN</h1>
+      <p class="kh-go-sub">Your people are gone. The land falls silent.</p>
+      <button class="kh-go-btn" id="kh-go-home">Return Home</button>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById("kh-go-home")!.addEventListener("click", () => {
+      overlay.remove();
+      app.destroy(true, true);
       window.location.href = homeUrl;
-    },
-  );
-  app.stage.addChild(optionsMenu);
+    });
+  };
+
+  // onMessage is called for every GameMessage dequeued by GameEventHandler.
+  // It inspects curPhase and mounts the corresponding scene overlay.
+  const onMessage = (message: GameMessage) => {
+    console.log("Processing KH message:", message);
+
+    const { state } = message;
+
+    // Game over takes priority over phase routing — the server does not advance
+    // the phase when population hits zero, so we must check this first or the
+    // player can end up stuck on the current scene with no way forward.
+    if (state.gameOver) {
+      showGameOver();
+      return;
+    }
+
+    switch (state.curPhase) {
+      case Phase.ADD: {
+        if (currentScene instanceof AddPhaseScene) {
+          // Same phase, same scene type (e.g. after a reroll) — just refresh content.
+          currentScene.update(state);
+        } else {
+          // Phase changed to ADD from RANDOM_EVENT or PLAY — tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new AddPhaseScene(state, {
+            reroll:   () => handler.reroll(),
+            pickCard: (name) => handler.pickCard(name),
+            skipAdd:  () => handler.skipAdd(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
+      case Phase.RANDOM_EVENT: {
+        if (currentScene instanceof RandomEventScene) {
+          // Same phase, same scene type — just refresh content.
+          currentScene.update(state);
+        } else {
+          // Either a fresh mount or switching from ADD: tear down the old scene first.
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new RandomEventScene(state, {
+            pickEventOption: (name) => handler.pickEventOption(name),
+            skipEvent:       () => handler.skipEvent(),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
+      case Phase.PLAY: {
+        if (currentScene instanceof PlayPhaseScene) {
+          // Already in PLAY (e.g. after a placeCard or demolishCard refresh).
+          currentScene.update(state);
+        } else {
+          if (currentScene) {
+            currentScene.unmount();
+            currentScene = null;
+          }
+          currentScene = new PlayPhaseScene(state, {
+            placeCard:    (name)        => handler.placeCard(name),
+            demolishCard: (name)        => handler.demolishCard(name),
+            endAndRun:    ()            => handler.endAndRun(),
+            reorderTable: (names)       => handler.reorderTable(names),
+          });
+          currentScene.mount(mountTarget);
+        }
+        break;
+      }
+
+      default: {
+        // Unknown phase — tear down whatever is live.
+        if (currentScene) {
+          currentScene.unmount();
+          currentScene = null;
+        }
+        console.log(`Phase ${state.curPhase} scene not yet implemented.`);
+        break;
+      }
+    }
+  };
+
+  // onQuit is called when the server confirms the quit.  Tear down PixiJS and
+  // return the player to the home screen.
+  const onQuit = () => {
+    if (currentScene) {
+      currentScene.unmount();
+      currentScene = null;
+    }
+    app.destroy(true, true);
+    window.location.href = homeUrl;
+  };
+
+  const handler = new GameEventHandler(onMessage, onQuit);
+
+  // The quit and save-and-exit buttons live in the HTML overlay layer (sharedOverlays.ts)
+  // and communicate via custom DOM events so scenes stay decoupled from the handler.
+  document.addEventListener("kh-quit",      () => handler.quit());
+  document.addEventListener("kh-save-exit", () => handler.saveAndExit());
+
+  // Open the WebSocket connection last, after all local state is ready to
+  // receive messages.
+  handler.connect(gameId);
 })();

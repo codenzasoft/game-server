@@ -32,7 +32,7 @@ import java.util.UUID;
 public class GameEngine implements Game<GameEngine> {
 
   public static final int MAX_TABLE_SIZE = 5;
-  public static final int MAX_HAND_SIZE = 5;
+  public static final int MAX_HAND_SIZE = 3;
   public static final int REROLL_COST_STEP = 10;
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
@@ -89,6 +89,21 @@ public class GameEngine implements Game<GameEngine> {
     this.cardCatalog = cardCatalog;
     this.eventCatalog = eventCatalog;
     this.rng = rng;
+  }
+
+  /**
+   * Initializes a brand-new game: seeds the starting deck and offers the first ADD choices. Must be
+   * called once after construction for a fresh game. Has no effect if the game is already over.
+   *
+   * <p>Called by {@code GameService} after building the engine. The initialization logic lives here
+   * so the engine owns all knowledge of how a game starts.
+   */
+  public synchronized void initialize() {
+    if (state.isGameOver()) return;
+    seedStartingDeck();
+    if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
+      offerAddChoices();
+    }
   }
 
   @Override
@@ -169,13 +184,31 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalArgumentException("option cannot be null");
     }
 
+    // Validate that the player can afford the production cost before applying anything.
+    // Simulate production effects (with winter scaling) to check the final value would
+    // not go below zero — mirroring the same guard in placeCard().
+    double simulatedProduction = state.getProduction();
+    for (Effect effect : option.effects()) {
+      if (effect.target() instanceof ResourceTarget rt && rt == ResourceTarget.PRODUCTION) {
+        simulatedProduction = scaleForSeason(effect).apply(simulatedProduction);
+      }
+    }
+    if (simulatedProduction < 0) {
+      throw new IllegalStateException(
+          "not enough production to choose this option: have "
+              + (int) state.getProduction()
+              + " but option requires "
+              + (int) -simulatedProduction
+              + " more");
+    }
+
     for (Effect effect : option.effects()) {
       if (effect.target() instanceof ResourceTarget rt) {
         Effect scaled = scaleForSeason(effect);
         switch (rt) {
           case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
-          case PRODUCTION -> state.setProduction(scaled.apply(state.getProduction()));
-          case FOOD -> state.setFood(scaled.apply(state.getFood()));
+          case PRODUCTION -> applyProduction(scaled.apply(state.getProduction()));
+          case FOOD -> applyFood(scaled.apply(state.getFood()));
         }
       }
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
@@ -184,18 +217,74 @@ public class GameEngine implements Game<GameEngine> {
     // Only advance to PLAY if the game is still running (population may have hit zero above).
     if (!state.isGameOver()) {
       state.setCurPhase(Phase.PLAY);
+      startPlay();
     }
   }
 
   /**
-   * Returns the effect unchanged for non-winter seasons; for {@link Season#WINTER} returns a new
-   * {@link Effect} whose modifier is scaled by the current year (KH-6 winter scaling rule).
+   * Applies the {@link EventOption} whose {@link EventOption#description()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the
+   * option.
+   *
+   * @throws IllegalStateException if no current event exists or no option matches the given name
+   */
+  public synchronized void applyEventOptionByName(String name) {
+    Event event = state.getCurrentEvent();
+    if (event == null) {
+      throw new IllegalStateException("no current event to pick an option from");
+    }
+    EventOption option =
+        event.options().stream()
+            .filter(o -> o.description().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
+    applyEventOption(option);
+  }
+
+  /**
+   * Returns a scaled copy of {@code effect} whose modifier is multiplied by the season-and-year
+   * multiplier from {@link #computeScaleMultiplier(Season, int)}. If the multiplier is exactly
+   * {@code 1.0} the original effect is returned unchanged to avoid unnecessary allocation.
+   *
+   * <p>Replaces the old KH-6 linear winter-only rule ({@code modifier × year}).
    */
   private Effect scaleForSeason(Effect effect) {
-    if (state.getCurSeason() != Season.WINTER) {
-      return effect;
+    double multiplier = computeScaleMultiplier(state.getCurSeason(), state.getYear());
+    if (multiplier == 1.0) return effect;
+    return new Effect(effect.target(), effect.modifier() * multiplier, effect.valueType());
+  }
+
+  /**
+   * Computes the event-effect scaling multiplier for the given season and year.
+   *
+   * <p><b>Winter</b> uses a piecewise accelerating curve so early winters are survivable but late
+   * winters become genuinely threatening:
+   *
+   * <ul>
+   *   <li>Years 1–5: linear ramp {@code 1.0 + (year − 1) × 0.15} → 1.00 / 1.15 / 1.30 / 1.45 / 1.60
+   *   <li>Years 6+: exponential {@code 1.6 × 1.25^(year − 5)}, capped at {@code 20.0} (~year 16)
+   * </ul>
+   *
+   * <p><b>Spring, Summer, Fall</b> use a slow linear crawl so non-winter events gradually tighten
+   * but never dominate: {@code 1.0 + (year − 1) × 0.05} → ~2.0× at year 21.
+   *
+   * @param season the season in which the event fires
+   * @param year the current game year (1-indexed)
+   * @return the multiplier to apply to each effect modifier
+   */
+  double computeScaleMultiplier(Season season, int year) {
+    if (season == Season.WINTER) {
+      if (year <= 4) {
+        // Linear ramp: 1.0 → 2.0 over years 1–4 (doubles by year 4).
+        return 1.0 + (year - 1) * (1.0 / 3.0);
+      } else {
+        // Exponential from 2.0 at year 5, capped at 20× (~year 13).
+        double raw = 2.0 * Math.pow(1.30, year - 4);
+        return Math.min(raw, 20.0);
+      }
+    } else {
+      return 1.0 + (year - 1) * 0.05;
     }
-    return new Effect(effect.target(), effect.modifier() * state.getYear(), effect.valueType());
   }
 
   public synchronized void advanceSeason() {
@@ -235,8 +324,8 @@ public class GameEngine implements Game<GameEngine> {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-              case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
-              case FOOD -> state.setFood(effect.apply(state.getFood()));
+              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+              case FOOD -> applyFood(effect.apply(state.getFood()));
             }
           }
         }
@@ -248,17 +337,21 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Ends the player's turn: discards every card remaining in the hand to the current season's
-   * discard pile, then resolves the current season's table left-to-right.
+   * discard pile, then resolves the current season's table left-to-right using the worker staffing
+   * system.
    *
-   * <p>Resolution iterates the table in slot order (index 0 first). For each card all effects fire
-   * in declaration order, so cards to the right see the resource state already mutated by cards to
-   * their left. After a card's effects fire:
+   * <p>Workers ({@code floor(population)}) are distributed left-to-right. Each card's {@link
+   * Card#staffRequirement()} determines its {@link StaffingTier}:
    *
    * <ul>
-   *   <li>{@link FrequencyType#SINGLE} cards are moved to the current season's discard pile
-   *       (one-shot exhaustion).
-   *   <li>{@link FrequencyType#RECURRING} cards stay in their table slot.
+   *   <li>{@link StaffingTier#FULL} — fires at full value.
+   *   <li>{@link StaffingTier#HALF} — fires with every effect modifier floored to half.
+   *   <li>{@link StaffingTier#NONE} — does not fire.
    * </ul>
+   *
+   * <p>{@link FrequencyType#SINGLE} cards are always discarded after this phase, even if they did
+   * not fire due to insufficient staffing. {@link FrequencyType#RECURRING} cards remain on the
+   * table regardless of their tier.
    *
    * <p>Note: {@link CardTarget} effects are not yet evaluated and are silently skipped.
    *
@@ -270,43 +363,129 @@ public class GameEngine implements Game<GameEngine> {
     // 1. Discard everything remaining in hand.
     state.discardHand();
 
-    // 2. Snapshot the table order before resolution so that removals during the walk don't
+    // 2. Compute staffing based on current population (locked in at End and Run time).
+    List<CardStaffing> staffing = computeTableStaffing();
+
+    // 3. Snapshot the table order before resolution so that removals during the walk don't
     //    disturb the iteration sequence.
     List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
-    for (Card card : snapshot) {
-      // Fire every ResourceTarget effect on this card.
-      for (Effect effect : card.effects()) {
-        if (effect.target() instanceof ResourceTarget rt) {
-          switch (rt) {
-            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-            case PRODUCTION -> state.setProduction(effect.apply(state.getProduction()));
-            case FOOD -> state.setFood(effect.apply(state.getFood()));
+    for (int i = 0; i < snapshot.size(); i++) {
+      Card card = snapshot.get(i);
+      StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
+
+      if (tier != StaffingTier.NONE) {
+        List<Effect> effects =
+            tier == StaffingTier.HALF ? halveEffects(card.effects()) : card.effects();
+        for (Effect effect : effects) {
+          if (effect.target() instanceof ResourceTarget rt) {
+            switch (rt) {
+              case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
+              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+              case FOOD -> applyFood(effect.apply(state.getFood()));
+            }
           }
         }
       }
 
-      // SINGLE cards are exhausted: remove from table and send to discard.
+      // SINGLE cards are always exhausted after resolution regardless of staffing tier.
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
       }
       // RECURRING cards remain in their slot — no action needed.
     }
 
-    // 3. Seasonal food consumption and starvation.
+    // 4. Seasonal food consumption and starvation.
     consumeFood();
+
+    // 5. Advance to the next phase (ADD for next season, or stay put if game is over).
+    advancePhase();
   }
 
   /**
-   * Applies a population change, clamping to zero and transitioning to {@link Phase#GAME_OVER} if
-   * the result is zero or below. All engine-level population mutations route through this method so
-   * game-over detection is never scattered.
+   * Distributes {@code floor(population)} workers left-to-right across the current season's table,
+   * filling each card's {@link Card#staffRequirement()} greedily in slot order, and returns the
+   * resulting {@link CardStaffing} list (one entry per table slot).
+   *
+   * <p>The half threshold for {@link StaffingTier#HALF} is {@code ceil(staffRequirement / 2)}.
+   */
+  List<CardStaffing> computeTableStaffing() {
+    List<Card> table = state.getCurrentTable();
+    int remaining = (int) Math.floor(state.getPopulation());
+    List<CardStaffing> result = new ArrayList<>(table.size());
+
+    for (Card card : table) {
+      int cost = (int) card.staffRequirement();
+      int allocated = Math.min(remaining, cost);
+      remaining -= allocated;
+
+      int halfThreshold = (int) Math.ceil(cost / 2.0);
+      StaffingTier tier;
+      if (allocated >= cost) {
+        tier = StaffingTier.FULL;
+      } else if (allocated >= halfThreshold) {
+        tier = StaffingTier.HALF;
+      } else {
+        tier = StaffingTier.NONE;
+      }
+
+      result.add(new CardStaffing(allocated, cost, tier));
+    }
+
+    return result;
+  }
+
+  /**
+   * Computes staffing for the current table and stores it on the state so the client can render the
+   * live staffing indicator. Call after any mutation that changes table order or contents during
+   * the PLAY phase.
+   */
+  private void computeAndSetStaffing() {
+    state.setTableStaffing(computeTableStaffing());
+  }
+
+  /**
+   * Returns a new effect list with every modifier floored to half, used when a card resolves at
+   * {@link StaffingTier#HALF}. Both INTEGER and PERCENTAGE modifiers are halved.
+   */
+  private List<Effect> halveEffects(List<Effect> effects) {
+    return effects.stream()
+        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
+        .toList();
+  }
+
+  /**
+   * Applies a population change, clamping to zero and setting game-over if the result reaches zero.
+   * All engine-level population mutations route through this method so game-over detection is never
+   * scattered.
    */
   private void applyPopulation(double value) {
     double clamped = Math.max(0.0, value);
     state.setPopulation(clamped);
-    if (clamped == 0.0) {
+    // A fractional population (< 1) means nobody is actually alive.
+    if (clamped < 1.0) {
+      state.setPopulation(0.0);
       state.setGameOver(true);
+    }
+  }
+
+  /** Applies a production change, clamping to zero. Production can never go negative. */
+  private void applyProduction(double value) {
+    state.setProduction(Math.max(0.0, value));
+  }
+
+  /**
+   * Applies a food change, clamping to zero. If the result would be negative the shortfall is
+   * treated as a starvation deficit — food is set to 0 and population drops by {@code 0.5 ×
+   * deficit}, mirroring the logic in {@link #consumeFood()}.
+   */
+  private void applyFood(double value) {
+    if (value >= 0) {
+      state.setFood(value);
+    } else {
+      double deficit = -value;
+      state.setFood(0.0);
+      applyPopulation(state.getPopulation() - 0.5 * deficit);
     }
   }
 
@@ -327,6 +506,14 @@ public class GameEngine implements Game<GameEngine> {
       double deficit = consumed - available;
       state.setFood(0.0);
       applyPopulation(state.getPopulation() - 0.5 * deficit);
+    }
+
+    // Surplus growth: if food remains after consumption, grow population proportionally.
+    // Growth rate is capped at 20% per season so the population snowball stays manageable.
+    // The surplus food is not consumed — it carries over to the next season.
+    if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
+      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.20);
+      applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
     }
   }
 
@@ -355,7 +542,7 @@ public class GameEngine implements Game<GameEngine> {
                 + ", have "
                 + (int) state.getProduction());
       }
-      state.setProduction(state.getProduction() - cost);
+      applyProduction(state.getProduction() - cost);
     }
     state.setRerollCount(state.getRerollCount() + 1);
     List<Card> choices = pickRandom(cardCatalog.forSeason(state.getCurSeason()), ADD_OFFER_SIZE);
@@ -373,7 +560,24 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
+  }
+
+  /**
+   * Picks the offered ADD-phase card whose {@link Card#name()} matches {@code name}
+   * (case-sensitive). Delegates to {@link #pickCard(Card)} after locating the card.
+   *
+   * @throws IllegalStateException if no offered card matches the given name
+   */
+  public synchronized void pickCardByName(String name) {
+    Card card =
+        state.getAddChoices().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no offered card with name: " + name));
+    pickCard(card);
   }
 
   /**
@@ -384,7 +588,9 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
+    state.setCurrentEvent(null);
     state.setCurPhase(Phase.RANDOM_EVENT);
+    rollEvent();
   }
 
   // ----- ADD helpers -----
@@ -413,6 +619,15 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   // ----- Pile mutations -----
+
+  /**
+   * Seeds the per-season starting deck into the draw piles for a brand-new game. Must be called
+   * once after construction before the first ADD phase. Uses {@link
+   * CardCatalog#defaultStartingDeck()} so the composition is kept in one place.
+   */
+  public synchronized void seedStartingDeck() {
+    CardCatalog.defaultStartingDeck().forEach(this::addToDeck);
+  }
 
   // when we add a card to one of our draws, add it to the drawpile and shuffle the drawpile.
   public synchronized void addToDeck(Season season, Card card) {
@@ -480,7 +695,10 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized List<Card> startPlay() {
     requirePhase(Phase.PLAY, "startPlay");
-    return draw(state.getCurSeason(), MAX_HAND_SIZE);
+    List<Card> drawn = draw(state.getCurSeason(), MAX_HAND_SIZE);
+    // Compute initial staffing snapshot when the Play phase begins.
+    computeAndSetStaffing();
+    return drawn;
   }
 
   /**
@@ -491,12 +709,12 @@ public class GameEngine implements Game<GameEngine> {
    *   <li>The table has an open slot (<{@value #MAX_TABLE_SIZE} cards) <em>or</em> the card
    *       duplicates one already on the table (upgrade path).
    *   <li>Current production ≥ {@link Card#productionRequirement()}.
-   *   <li>Current population ≥ {@link Card#populationRequirement()}.
    * </ol>
    *
-   * <p>On success the production cost is deducted and the card is removed from the hand. If a
-   * matching card already sits on the table, every effect's modifier on that table card is doubled
-   * (upgrade) rather than adding a new slot.
+   * <p>Cards can be played regardless of population — staffing is evaluated at resolution time by
+   * {@link #endAndRun()}, not at placement. On success the production cost is deducted and the card
+   * is removed from the hand. If a matching card already sits on the table, every effect's modifier
+   * on that table card is doubled (upgrade) rather than adding a new slot.
    *
    * @param card the card to place; must not be {@code null}
    * @throws IllegalArgumentException if {@code card} is {@code null}
@@ -530,26 +748,101 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) state.getProduction());
     }
-    // if you do not meet the population requirement, reject
-    if (state.getPopulation() < card.populationRequirement()) {
-      throw new IllegalStateException(
-          "not enough population to place card: need "
-              + (int) card.populationRequirement()
-              + ", have "
-              + (int) state.getPopulation());
-    }
 
     // Pay the production cost and remove the card from the hand.
-    state.setProduction(state.getProduction() - card.productionRequirement());
+    applyProduction(state.getProduction() - card.productionRequirement());
     state.getHand().remove(card);
 
-    // if duplicate exisits, replace with one whose every effect modifier is doubled.
+    // if duplicate exists, replace with one whose every effect modifier is doubled.
     // else just add it to the table as a new card.
     if (state.tableContains(card)) {
       state.replaceTableCard(card, card.amplify(2));
     } else {
       state.addToTable(card);
     }
+
+    // Recompute staffing so the client sees the updated allocation immediately.
+    computeAndSetStaffing();
+  }
+
+  /**
+   * Places the hand card whose {@link Card#name()} matches {@code name} (case-sensitive). Delegates
+   * to {@link #placeCard(Card)} after locating the card.
+   *
+   * @throws IllegalStateException if no hand card matches the given name
+   */
+  public synchronized void placeCardByName(String name) {
+    Card card =
+        state.getHand().stream()
+            .filter(c -> c.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("no hand card with name: " + name));
+    placeCard(card);
+  }
+
+  /**
+   * Demolishes the table card whose {@link Card#name()} matches {@code name} (case-sensitive).
+   * Delegates to {@link #demolishCard(int)} after locating the slot.
+   *
+   * @throws IllegalStateException if no table card matches the given name
+   */
+  public synchronized void demolishCardByName(String name) {
+    List<Card> table = state.getCurrentTable();
+    for (int i = 0; i < table.size(); i++) {
+      if (table.get(i).name().equals(name)) {
+        demolishCard(i);
+        return;
+      }
+    }
+    throw new IllegalStateException("no table card with name: " + name);
+  }
+
+  /**
+   * Reorders the current season's table to match the provided list of card names. Every card
+   * currently on the table must appear in {@code cardNames} exactly once; the table is then sorted
+   * to match the given order.
+   *
+   * <p>This replaces the old swap-based {@code reorderCard(fromSlot, toSlot)} API. The client sends
+   * the complete desired order after each drag, so a single call always reflects the player's
+   * intent regardless of how many intermediate drags occurred.
+   *
+   * @param cardNames the desired order of card names; must match the current table contents exactly
+   * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}, if the size
+   *     doesn't match, or if any name doesn't correspond to a table card
+   */
+  public synchronized void reorderTable(List<String> cardNames) {
+    requirePhase(Phase.PLAY, "reorderTable");
+
+    List<Card> table = state.getCurrentTable();
+
+    if (cardNames.size() != table.size()) {
+      throw new IllegalStateException(
+          "reorderTable: expected " + table.size() + " names but got " + cardNames.size());
+    }
+
+    // Build a lookup from name → card, then reconstruct the table in the requested order.
+    // Use a mutable copy so we can remove as we match, catching any duplicate-name edge cases.
+    List<Card> remaining = new ArrayList<>(table);
+    List<Card> reordered = new ArrayList<>(table.size());
+
+    for (String name : cardNames) {
+      Card match =
+          remaining.stream()
+              .filter(c -> c.name().equals(name))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException("reorderTable: no table card with name: " + name));
+      reordered.add(match);
+      remaining.remove(match);
+    }
+
+    // Replace table contents in-place so the existing list reference stays valid.
+    table.clear();
+    table.addAll(reordered);
+
+    // Recompute staffing so the client sees the updated priority chain immediately.
+    computeAndSetStaffing();
   }
 
   /**
@@ -580,7 +873,10 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // else pay and demolish card
-    state.setProduction(state.getProduction() - cost);
+    applyProduction(state.getProduction() - cost);
     state.removeFromTableAt(slot);
+
+    // Recompute staffing so freed workers are redistributed immediately.
+    computeAndSetStaffing();
   }
 }

@@ -3,6 +3,7 @@ package com.codenzasoft.games.kingshand;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,8 @@ public class GameState {
   private Event currentEvent;
   // true once the player's population has reached zero; no further actions are possible
   private boolean gameOver;
+  // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
+  private List<CardStaffing> tableStaffing;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -51,6 +54,7 @@ public class GameState {
     this.rerollCount = b.rerollCount;
     this.currentEvent = b.currentEvent;
     this.gameOver = b.gameOver;
+    this.tableStaffing = b.tableStaffing;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -244,6 +248,23 @@ public class GameState {
     this.gameOver = gameOver;
   }
 
+  /**
+   * Staffing snapshot for the current season's table, computed by {@link GameEngine} during the
+   * {@link Phase#PLAY} phase. Index {@code i} corresponds to the card at slot {@code i} on the
+   * table. Empty list outside of the PLAY phase.
+   */
+  @JsonProperty("tableStaffing")
+  public List<CardStaffing> getTableStaffing() {
+    return tableStaffing == null ? List.of() : tableStaffing;
+  }
+
+  public void setTableStaffing(List<CardStaffing> tableStaffing) {
+    this.tableStaffing =
+        tableStaffing == null
+            ? List.of()
+            : Collections.unmodifiableList(new ArrayList<>(tableStaffing));
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -251,9 +272,9 @@ public class GameState {
     private Map<Season, List<Card>> discardPile = new HashMap<>();
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
-    private double population = 5.0;
-    private double production = 100.0;
-    private double food = 50.0;
+    private double population = 20.0;
+    private double production = 200.0;
+    private double food = 150.0;
     private Season curSeason = Season.SPRING;
     private Phase curPhase = Phase.ADD;
     private int year = 1;
@@ -261,6 +282,7 @@ public class GameState {
     private int rerollCount = 0;
     private Event currentEvent = null;
     private boolean gameOver = false;
+    private List<CardStaffing> tableStaffing = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -339,6 +361,11 @@ public class GameState {
 
     public Builder gameOver(boolean gameOver) {
       this.gameOver = gameOver;
+      return this;
+    }
+
+    public Builder tableStaffing(List<CardStaffing> tableStaffing) {
+      this.tableStaffing = tableStaffing == null ? List.of() : new ArrayList<>(tableStaffing);
       return this;
     }
 

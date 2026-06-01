@@ -5,7 +5,9 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,5 +50,18 @@ public class KhBroadcastService {
     messagingTemplate.convertAndSendToUser(
         user.getUsername(), "/queue/games/" + game.getId(), message);
     log.debug("Sent game state to user '{}'", user.getUsername());
+  }
+
+  /**
+   * Notifies the player that their game has been quit. Sends a simple quit acknowledgement to the
+   * player's user-specific queue at {@code /user/queue/games/{gameId}}.
+   *
+   * @param gameId The UUID of the game that was quit.
+   * @param username The username of the player to notify.
+   */
+  public void gameQuit(final UUID gameId, final String username) {
+    messagingTemplate.convertAndSendToUser(
+        username, "/queue/games/" + gameId, Map.of("quit", true));
+    log.debug("Sent quit acknowledgement to user '{}'", username);
   }
 }
