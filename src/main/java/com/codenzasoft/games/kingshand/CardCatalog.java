@@ -253,13 +253,6 @@ public class CardCatalog {
           100.0,
           FrequencyType.RECURRING,
           List.of(ResourceTarget.PRODUCTION.integer(25), ResourceTarget.PRODUCTION.percentage(10)));
-  public static final Card STONE_TOOLS =
-      new Card(
-          "STONE_TOOLS",
-          4.0,
-          40.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(5)));
   public static final Card METALWORKING =
       new Card(
           "METALWORKING",
@@ -394,7 +387,6 @@ public class CardCatalog {
             STOREHOUSE,
             BARN,
             MASON_GUILD,
-            STONE_TOOLS,
             METALWORKING,
             BLACKSMITH));
 

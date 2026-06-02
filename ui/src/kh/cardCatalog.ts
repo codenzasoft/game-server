@@ -219,12 +219,6 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A guild of master masons who drive substantial and compounding production.",
     tags: ["INDUSTRY"],
   },
-  STONE_TOOLS: {
-    name: "Stone Tools",
-    icon: "🪨",
-    description: "Craft stone tools each fall to steadily improve your kingdom's output.",
-    tags: ["INDUSTRY"],
-  },
   METALWORKING: {
     name: "Metalworking",
     icon: "⚙️",
@@ -292,6 +286,21 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
 /** Returns display metadata for a card, falling back to a placeholder for unknown cards. */
 export function getCardDisplayInfo(card: Card): CardDisplayInfo {
   return DISPLAY_CATALOG[card.name] ?? UNKNOWN_CARD;
+}
+
+/**
+ * Names that don't follow the simple CARD_NAME → card_name.png convention.
+ * All other cards map directly via toLowerCase().
+ */
+const IMAGE_NAME_OVERRIDES: Record<string, string> = {
+  SCHOOL_HOUSE: "schoolhouse",  // file has no underscore
+  MASON_GUILD:  "masons_guild", // file has an extra 's'
+};
+
+/** Returns the public path to a card's full-art PNG, e.g. "/img/barn.png". */
+export function cardImagePath(cardName: string): string {
+  const base = IMAGE_NAME_OVERRIDES[cardName] ?? cardName.toLowerCase();
+  return `/img/${base}.png`;
 }
 
 /** Formats an effect modifier as a signed string, e.g. "+10" or "+10%". */
