@@ -340,9 +340,12 @@ export class PlayPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const icon = e.target === ResourceTarget.FOOD ? "🌾"
+                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
+                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
         return `
           <div class="kh-tc-tt-effect">
-            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${targetStr}</span>
+            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
             <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -483,9 +486,12 @@ export class PlayPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const icon = e.target === ResourceTarget.FOOD ? "🌾"
+                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
+                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${targetStr}</span>
+            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -1314,7 +1320,7 @@ export class PlayPhaseScene {
       .kh-play-hc-desc {
         font-style: italic;
         color: #7a6a52;
-        font-size: .93rem;
+        font-size: 1.1rem;
         line-height: 1.45;
         padding-bottom: 12px;
         border-bottom: 1px dashed #c4a060;
@@ -1322,39 +1328,39 @@ export class PlayPhaseScene {
       }
       .kh-play-hc-effects-title {
         font-family: 'Cinzel', serif;
-        font-size: .62rem;
+        font-size: .78rem;
         letter-spacing: 1.5px;
         color: #7a6a52;
         text-transform: uppercase;
         margin-bottom: 7px;
       }
-      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .88rem; }
-      .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .68rem; font-weight: 600; letter-spacing: .8px; min-width: 90px; display: flex; align-items: center; gap: 4px; }
+      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
+      .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
       .kh-play-hc-et-food       { color: #3a7020; }
       .kh-play-hc-et-production { color: #a07010; }
       .kh-play-hc-et-population { color: #8b2020; }
-      .kh-play-hc-mod   { font-weight: 700; font-size: 1rem; color: #3d6b46; }
-      .kh-play-hc-freq  { font-size: .75rem; color: #a09070; font-style: italic; }
+      .kh-play-hc-mod   { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
+      .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
       /* Costs row */
       .kh-play-hc-costs { display: flex; align-items: center; gap: 18px; padding: 11px 0 12px; border-top: 1px dashed #c4a060; margin-top: 12px; }
       .kh-play-hc-cost-item  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .58rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
-      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; }
+      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .72rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
+      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.3rem; font-weight: 700; }
       .kh-play-hc-cost-prod  { color: #a07010; }
       .kh-play-hc-cost-pop   { color: #8b2020; }
-      .kh-play-hc-unavailable { margin-left: auto; font-family: 'Cinzel', serif; font-size: .63rem; letter-spacing: .5px; color: #c04030; }
+      .kh-play-hc-unavailable { margin-left: auto; font-family: 'Cinzel', serif; font-size: .78rem; letter-spacing: .5px; color: #c04030; }
 
       /* Play / Upgrade buttons */
       .kh-play-btn-play {
         width: 100%;
-        padding: 10px 0;
+        padding: 11px 0;
         border-radius: 8px;
         border: 2px solid #c49428;
         background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
         color: #f0e8c0;
         font-family: 'Cinzel', serif;
-        font-size: .82rem;
+        font-size: 1rem;
         font-weight: 700;
         letter-spacing: 1px;
         cursor: pointer;
@@ -1406,27 +1412,26 @@ export class PlayPhaseScene {
         right: 0;
         top: 50%;
         transform: translateY(-50%);
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-        padding: 32px 14px;
-        background: linear-gradient(180deg, #6b1a1a 0%, #4a0e0e 100%);
+        padding: 28px 112px 28px 56px;
+        background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
         color: #f0e8c0;
         border: 3px solid #c49428;
         border-right: none;
         border-radius: 14px 0 0 14px;
         font-family: 'Cinzel', serif;
-        font-size: 1.05rem;
+        font-size: 1.8rem;
         font-weight: 700;
-        letter-spacing: 4px;
+        letter-spacing: 5px;
         cursor: pointer;
         transition: all .2s ease;
-        box-shadow: -4px 0 24px rgba(0,0,0,.4);
+        box-shadow: -6px 0 30px rgba(0,0,0,.5);
         z-index: 50;
+        white-space: nowrap;
       }
       .kh-play-btn-end:hover:not(:disabled) {
-        background: linear-gradient(180deg, #8b2222 0%, #5e1212 100%);
-        box-shadow: -6px 0 30px rgba(0,0,0,.55);
-        padding-right: 18px;
+        background: linear-gradient(135deg, #8b2222 0%, #5e1212 100%);
+        box-shadow: -10px 0 40px rgba(0,0,0,.65);
+        padding-left: 72px;
       }
       .kh-play-btn-end:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -1727,10 +1732,10 @@ export class PlayPhaseScene {
         top: 7px;
         right: 7px;
         font-family: 'Cinzel', serif;
-        font-size: .58rem;
+        font-size: 1.16rem;
         font-weight: 700;
-        padding: 2px 6px;
-        border-radius: 8px;
+        padding: 4px 10px;
+        border-radius: 10px;
         letter-spacing: .3px;
         backdrop-filter: blur(3px);
       }
@@ -1745,9 +1750,9 @@ export class PlayPhaseScene {
         left: 0;
         right: 0;
         background: linear-gradient(transparent 0%, rgba(0,0,0,.78) 50%, rgba(0,0,0,.92) 100%);
-        padding: 22px 9px 8px;
+        padding: 28px 10px 10px;
         font-family: 'Cinzel', serif;
-        font-size: .72rem;
+        font-size: 1.44rem;
         font-weight: 700;
         color: #f0e8c0;
         letter-spacing: .4px;
@@ -1763,11 +1768,11 @@ export class PlayPhaseScene {
         bottom: calc(100% + 8px);
         left: 50%;
         transform: translateX(-50%);
-        width: 220px;
+        width: 340px;
         background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
         border: 2px solid #c49428;
         border-radius: 12px;
-        padding: 12px 14px 10px;
+        padding: 16px 18px 14px;
         box-shadow: 0 10px 36px rgba(0,0,0,.75);
         z-index: 30;
         pointer-events: none;
@@ -1782,14 +1787,14 @@ export class PlayPhaseScene {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 6px;
-        margin-bottom: 8px;
-        padding-bottom: 7px;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 9px;
         border-bottom: 1px solid rgba(196,160,96,.3);
       }
       .kh-tc-tt-name {
         font-family: 'Cinzel', serif;
-        font-size: .82rem;
+        font-size: 1.64rem;
         font-weight: 700;
         color: #f0e8c0;
         letter-spacing: .3px;
@@ -1798,10 +1803,10 @@ export class PlayPhaseScene {
       }
       .kh-tc-tt-fbadge {
         font-family: 'Cinzel', serif;
-        font-size: .5rem;
+        font-size: 1rem;
         font-weight: 600;
         letter-spacing: .6px;
-        padding: 2px 6px;
+        padding: 4px 10px;
         border-radius: 8px;
         flex-shrink: 0;
       }
@@ -1810,34 +1815,34 @@ export class PlayPhaseScene {
 
       .kh-tc-tt-staffing {
         font-family: 'Cinzel', serif;
-        font-size: .62rem;
+        font-size: 1.24rem;
         font-weight: 700;
         letter-spacing: .3px;
-        padding: 4px 8px;
+        padding: 6px 10px;
         border-radius: 6px;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         text-align: center;
       }
       .kh-tc-tt-staffing.kh-tc-chip-full { background: rgba(30,140,30,.22); color: #90e090; }
       .kh-tc-tt-staffing.kh-tc-chip-half { background: rgba(160,120,10,.28); color: #f0d060; }
       .kh-tc-tt-staffing.kh-tc-chip-none { background: rgba(180,30,30,.25);  color: #f09090; }
 
-      .kh-tc-tt-effects  { margin-bottom: 9px; }
-      .kh-tc-tt-effect   { display: flex; align-items: center; gap: 5px; padding: 1px 0; font-size: .8rem; }
-      .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: .58rem; font-weight: 600; letter-spacing: .5px; min-width: 80px; display: flex; align-items: center; gap: 3px; }
+      .kh-tc-tt-effects  { margin-bottom: 10px; }
+      .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }
+      .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: 1.16rem; font-weight: 600; letter-spacing: .5px; min-width: 120px; display: flex; align-items: center; gap: 4px; }
       .kh-tc-tt-et-food       { color: #7adc50; }
       .kh-tc-tt-et-production { color: #f0c060; }
       .kh-tc-tt-et-population { color: #f09090; }
-      .kh-tc-tt-mod  { font-weight: 700; font-size: .88rem; color: #90e090; }
-      .kh-tc-tt-freq { font-size: .68rem; color: #a09070; font-style: italic; }
+      .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
+      .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }
 
-      .kh-tc-tt-footer { border-top: 1px dashed rgba(196,160,96,.3); padding-top: 8px; margin-top: 2px; }
+      .kh-tc-tt-footer { border-top: 1px dashed rgba(196,160,96,.3); padding-top: 10px; margin-top: 4px; }
 
       /* ── Hand card art header ────────────────────────────────────────────── */
 
       .kh-play-hc-art-header {
         position: relative;
-        height: 150px;
+        height: 200px;
         overflow: hidden;
         border-bottom: 2px solid #c49428;
         border-radius: 14px 14px 0 0;
@@ -1860,7 +1865,10 @@ export class PlayPhaseScene {
         left: 0;
         right: 0;
         background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
-        padding: 24px 18px 11px;
+        padding: 32px 18px 14px;
+      }
+      .kh-play-hc-art-overlay .kh-play-hc-name {
+        font-size: 2.1rem;
       }
     `;
     document.head.appendChild(style);

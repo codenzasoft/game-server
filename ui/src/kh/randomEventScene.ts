@@ -224,7 +224,7 @@ export class RandomEventScene {
           return `
             <div class="kh-re-effect-row">
               <span class="kh-re-effect-target kh-re-et-${targetStr.toLowerCase()}">
-                ${targetStr}
+                ${e.target === ResourceTarget.FOOD ? "🌾" : e.target === ResourceTarget.PRODUCTION ? "⚒️" : e.target === ResourceTarget.POPULATION ? "👥" : ""} ${targetStr}
               </span>
               <span class="kh-re-effect-mod ${isNegative ? "kh-re-mod-neg" : "kh-re-mod-pos"}">
                 ${formatModifier(scaledModifier, e.valueType)}
