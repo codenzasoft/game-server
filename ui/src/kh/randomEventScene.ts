@@ -1,5 +1,5 @@
 import { GameState, Season, KhEvent, EventOption, Effect, ResourceTarget } from "./kingshand.ts";
-import { formatModifier, targetEmoji } from "./cardCatalog.ts";
+import { formatModifier } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
   buildDeckIndicator,
@@ -224,7 +224,7 @@ export class RandomEventScene {
           return `
             <div class="kh-re-effect-row">
               <span class="kh-re-effect-target kh-re-et-${targetStr.toLowerCase()}">
-                ${targetEmoji(e.target)} ${targetStr}
+                ${targetStr}
               </span>
               <span class="kh-re-effect-mod ${isNegative ? "kh-re-mod-neg" : "kh-re-mod-pos"}">
                 ${formatModifier(scaledModifier, e.valueType)}

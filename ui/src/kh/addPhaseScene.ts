@@ -1,8 +1,8 @@
 import { GameState, Season, Card } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
+  cardImagePath,
   formatModifier,
-  targetEmoji,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -220,7 +220,8 @@ export class AddPhaseScene {
   }
 
   private buildCard(card: Card, index: number, state: GameState): string {
-    const info = getCardDisplayInfo(card);
+    const info   = getCardDisplayInfo(card);
+    const imgSrc = cardImagePath(card.name);
     const season = state.curSeason;
 
     const tagsHTML = [
@@ -231,13 +232,10 @@ export class AddPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
-        const targetStr =
-          typeof e.target === "string" ? e.target : "CARD";
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
         return `
           <div class="kh-effect-row">
-            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">
-              ${targetEmoji(e.target)} ${targetStr}
-            </span>
+            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${targetStr}</span>
             <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -247,10 +245,12 @@ export class AddPhaseScene {
 
     return `
       <div class="kh-card" data-index="${index}">
-        <div class="kh-card-header">
-          <div class="kh-card-name">${info.name}</div>
-          <div class="kh-card-tags">${tagsHTML}</div>
-          <div class="kh-card-icon">${info.icon}</div>
+        <div class="kh-add-art-header">
+          <img class="kh-add-art-img" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-add-art-overlay">
+            <div class="kh-card-name">${info.name}</div>
+            <div class="kh-card-tags">${tagsHTML}</div>
+          </div>
         </div>
         <div class="kh-card-body">
           <div class="kh-card-desc">${info.description}</div>
@@ -258,12 +258,12 @@ export class AddPhaseScene {
           ${effectsHTML}
           <div class="kh-card-costs">
             <div class="kh-cost-item">
-              <span class="kh-cost-label">⚒️ To Play</span>
-              <span class="kh-cost-val kh-cost-prod">${card.productionRequirement}</span>
+              <span class="kh-cost-label">Cost</span>
+              <span class="kh-cost-val kh-cost-prod">${card.productionRequirement} ⚒️</span>
             </div>
             <div class="kh-cost-item">
-              <span class="kh-cost-label">👥 Pop. Req</span>
-              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement}</span>
+              <span class="kh-cost-label">Workers</span>
+              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement} 👥</span>
             </div>
           </div>
           <button class="kh-btn-select" data-index="${index}">
@@ -464,16 +464,29 @@ export class AddPhaseScene {
       .kh-card.kh-card-unaffordable { opacity: .68; filter: saturate(.6); }
       .kh-card.kh-card-unaffordable:hover { transform: translateY(-3px) scale(1.005); border-color: #cc6644; }
 
-      /* Card header */
-      .kh-card-header {
-        background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
-        padding: 16px 18px 13px;
-        border-bottom: 2px solid #c49428;
+      /* Card art header */
+      .kh-add-art-header {
         position: relative;
-        min-height: 72px;
+        height: 150px;
+        overflow: hidden;
+        border-bottom: 2px solid #c49428;
+        border-radius: 14px 14px 0 0;
       }
-      .kh-card-icon { position: absolute; top: 13px; right: 16px; font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
-      .kh-card-name { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; padding-right: 40px; }
+      .kh-add-art-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .kh-add-art-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
+        padding: 24px 18px 11px;
+      }
+      .kh-card-name { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; }
       .kh-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
 
       .kh-tag { font-family: 'Cinzel', serif; font-size: .58rem; font-weight: 600; letter-spacing: 1px; padding: 2px 7px; border-radius: 10px; }

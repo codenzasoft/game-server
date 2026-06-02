@@ -3,7 +3,6 @@ import {
   getCardDisplayInfo,
   cardImagePath,
   formatModifier,
-  targetEmoji,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -120,13 +119,12 @@ export class PlayPhaseScene {
         ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
-            Resolve all table cards from left to right, then advance the season.
+            Cards fire left-to-right when you End and Run.
           </div>
-          <button class="kh-play-btn-end" id="kh-play-btn-end">
-            ⚔ &nbsp;Play
-          </button>
         </div>
       </main>
+      <!-- Fixed End and Run button — right-centre of viewport -->
+      <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY</button>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
       ${buildDeckIndicator(state)}
@@ -344,7 +342,7 @@ export class PlayPhaseScene {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         return `
           <div class="kh-tc-tt-effect">
-            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${targetEmoji(e.target)} ${targetStr}</span>
+            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${targetStr}</span>
             <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -487,9 +485,7 @@ export class PlayPhaseScene {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">
-              ${targetEmoji(e.target)} ${targetStr}
-            </span>
+            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${targetStr}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -594,15 +590,12 @@ export class PlayPhaseScene {
       : cards.map((c) => {
           const info = getCardDisplayInfo(c);
           const effectsHTML = c.effects.map((e) => {
-            const emoji = e.target === ResourceTarget.FOOD       ? "🌾"
-                        : e.target === ResourceTarget.PRODUCTION  ? "⚒️"
-                        : e.target === ResourceTarget.POPULATION  ? "👥" : "🃏";
-            return `<span class="kh-cc-effect">${emoji} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            const targetStr = typeof e.target === "string" ? e.target : "CARD";
+            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
               <div class="kh-cc-left">
-                <span class="kh-cc-icon">${info.icon}</span>
                 <div>
                   <div class="kh-cc-name">${info.name}</div>
                   <div class="kh-cc-desc">${info.description}</div>
@@ -611,7 +604,7 @@ export class PlayPhaseScene {
               <div class="kh-cc-right">
                 <span class="kh-cc-freq ${c.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${c.frequencyType}</span>
                 <div class="kh-cc-effects">${effectsHTML}</div>
-                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.staffRequirement}</div>
+                <div class="kh-cc-costs">Cost ${c.productionRequirement} &nbsp; Workers ${c.staffRequirement}</div>
               </div>
             </div>
           `;
@@ -905,7 +898,7 @@ export class PlayPhaseScene {
 
       if (tier === StaffingTier.NONE) {
         // Card is understaffed — does not fire.
-        this.showToast(`🚫 ${info.icon} ${info.name} — understaffed (won't fire)`);
+        this.showToast(`${info.name} — understaffed (won't fire)`);
         await this.delay(1000);
         setHighlight(i, false);
         await this.delay(150);
@@ -963,7 +956,7 @@ export class PlayPhaseScene {
 
       const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
       const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
-      this.showToast(`${info.icon} ${info.name} ${freqLabel}${tierLabel}`);
+      this.showToast(`${info.name} ${freqLabel}${tierLabel}`);
 
       await this.delay(1500);
       setHighlight(i, false);
@@ -1407,26 +1400,35 @@ export class PlayPhaseScene {
         margin-bottom: 18px;
         text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
+      /* Fixed End and Run button — always visible on the right edge */
       .kh-play-btn-end {
-        padding: 15px 52px;
-        background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
+        position: fixed;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        padding: 32px 14px;
+        background: linear-gradient(180deg, #6b1a1a 0%, #4a0e0e 100%);
         color: #f0e8c0;
         border: 3px solid #c49428;
-        border-radius: 11px;
+        border-right: none;
+        border-radius: 14px 0 0 14px;
         font-family: 'Cinzel', serif;
         font-size: 1.05rem;
         font-weight: 700;
-        letter-spacing: 2px;
+        letter-spacing: 4px;
         cursor: pointer;
         transition: all .2s ease;
-        box-shadow: 3px 5px 18px rgba(0,0,0,.3);
+        box-shadow: -4px 0 24px rgba(0,0,0,.4);
+        z-index: 50;
       }
       .kh-play-btn-end:hover:not(:disabled) {
-        background: linear-gradient(135deg, #8b2222 0%, #5e1212 100%);
-        box-shadow: 4px 8px 24px rgba(0,0,0,.4);
-        transform: translateY(-2px);
+        background: linear-gradient(180deg, #8b2222 0%, #5e1212 100%);
+        box-shadow: -6px 0 30px rgba(0,0,0,.55);
+        padding-right: 18px;
       }
-      .kh-play-btn-end:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+      .kh-play-btn-end:disabled { opacity: .45; cursor: not-allowed; }
 
       /* ── Game Over screen ────────────────────────────────────────────── */
       .kh-play-game-over {
