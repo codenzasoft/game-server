@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <div class="container mt-4">
+            <h4 class="mb-3">Manage Feedback</h4>
+
+            <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+            <!-- Status filter tabs -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <a class="nav-link" th:classappend="${statusFilter == null ? 'active' : ''}"
+                       th:href="@{/admin/feedback}">All</a>
+                </li>
+                <li class="nav-item" th:each="s : ${statuses}">
+                    <a class="nav-link"
+                       th:classappend="${statusFilter != null && statusFilter.equalsIgnoreCase(s.name()) ? 'active' : ''}"
+                       th:href="@{/admin/feedback(status=${s.name()})}"
+                       th:text="${s.name()}"></a>
+                </li>
+            </ul>
+
+            <!-- Delete form (no table inside — checkboxes link to it via form="feedbackForm") -->
+            <form id="feedbackForm" th:action="@{/admin/feedback/delete}" method="post">
+                <input type="hidden" name="page" th:value="${feedbackPage.number}"/>
+                <input type="hidden" name="statusFilter" th:value="${statusFilter}"/>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small"
+                          th:text="${feedbackPage.numberOfElements + ' of ' + feedbackPage.totalElements + ' entries'}"></span>
+                    <button type="submit" class="btn btn-danger btn-sm">Delete Selected</button>
+                </div>
+            </form>
+
+            <!-- Table is outside the delete form -->
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:2.5rem"><input type="checkbox" id="selectAll"/></th>
+                        <th>Type</th>
+                        <th>Subject</th>
+                        <th>User</th>
+                        <th>Submitted</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="f : ${feedbackPage.content}">
+                        <!-- Checkbox linked to delete form via form= attribute -->
+                        <td>
+                            <input type="checkbox" name="ids" th:value="${f.id}" form="feedbackForm"/>
+                        </td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${f.type.name() == 'BUG' ? 'bg-danger' : 'bg-info text-dark'}"
+                                  th:text="${f.type.name()}"></span>
+                        </td>
+                        <td>
+                            <a class="text-decoration-none text-dark"
+                               data-bs-toggle="collapse"
+                               th:attr="href='#detail-' + ${f.id}"
+                               th:text="${f.subject}"></a>
+                            <div class="collapse mt-2 text-muted small"
+                                 th:id="'detail-' + ${f.id}"
+                                 th:text="${f.message}"></div>
+                        </td>
+                        <td th:text="${f.user.username}"></td>
+                        <td th:text="${#dates.format(f.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                        <td>
+                            <!-- Standalone status form — not nested in anything -->
+                            <form th:action="@{/admin/feedback/update-status}" method="post"
+                                  class="d-flex gap-1 align-items-center">
+                                <input type="hidden" name="id" th:value="${f.id}"/>
+                                <input type="hidden" name="page" th:value="${feedbackPage.number}"/>
+                                <input type="hidden" name="statusFilter" th:value="${statusFilter}"/>
+                                <select name="status" class="form-select form-select-sm"
+                                        style="width:auto"
+                                        onchange="this.form.submit()">
+                                    <option th:each="s : ${statuses}"
+                                            th:value="${s.name()}"
+                                            th:text="${s.name()}"
+                                            th:selected="${s == f.status}"></option>
+                                </select>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${feedbackPage.totalElements == 0}">
+                        <td colspan="6" class="text-center text-muted py-4">No feedback yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <nav th:if="${feedbackPage.totalPages > 1}">
+                <ul class="pagination pagination-sm">
+                    <li class="page-item" th:classappend="${feedbackPage.first ? 'disabled' : ''}">
+                        <a class="page-link"
+                           th:href="@{/admin/feedback(page=${feedbackPage.number - 1},status=${statusFilter})}">Previous</a>
+                    </li>
+                    <li class="page-item"
+                        th:each="i : ${#numbers.sequence(0, feedbackPage.totalPages - 1)}"
+                        th:classappend="${i == feedbackPage.number ? 'active' : ''}">
+                        <a class="page-link"
+                           th:href="@{/admin/feedback(page=${i},status=${statusFilter})}"
+                           th:text="${i + 1}"></a>
+                    </li>
+                    <li class="page-item" th:classappend="${feedbackPage.last ? 'disabled' : ''}">
+                        <a class="page-link"
+                           th:href="@{/admin/feedback(page=${feedbackPage.number + 1},status=${statusFilter})}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+        <script>
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = () => document.querySelectorAll('input[name="ids"]');
+
+            selectAll.addEventListener('change', () =>
+                checkboxes().forEach(cb => cb.checked = selectAll.checked));
+
+            checkboxes().forEach(cb => cb.addEventListener('change', () => {
+                const all = checkboxes();
+                selectAll.checked = all.length > 0 && [...all].every(c => c.checked);
+            }));
+
+            document.getElementById('feedbackForm').addEventListener('submit', e => {
+                if (!document.querySelector('input[name="ids"]:checked')) {
+                    e.preventDefault();
+                    alert('Select at least one item to delete.');
+                }
+            });
+        </script>
+    </body>
+</html>

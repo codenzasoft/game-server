@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div th:replace="~{fragments/header :: header}">&nbsp;</div>
+        <div class="container mt-4" style="max-width: 640px;">
+            <h4 class="mb-4">Submit Feedback</h4>
+
+            <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+            <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+            <form th:action="@{/feedback}" method="post">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Type</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="type"
+                                   id="typeFeedback" value="FEEDBACK" checked/>
+                            <label class="form-check-label" for="typeFeedback">General Feedback</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="type"
+                                   id="typeBug" value="BUG"/>
+                            <label class="form-check-label" for="typeBug">Bug Report</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="subject" class="form-label fw-semibold">Subject</label>
+                    <input type="text" class="form-control" id="subject" name="subject"
+                           placeholder="Brief description" maxlength="255" required/>
+                </div>
+
+                <div class="mb-4">
+                    <label for="message" class="form-label fw-semibold">Details</label>
+                    <textarea class="form-control" id="message" name="message"
+                              rows="6" placeholder="Describe the issue or suggestion in detail…"
+                              maxlength="5000" required></textarea>
+                    <div class="form-text text-end"><span id="charCount">0</span> / 5,000</div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Submit</button>
+                <a th:href="@{/}" class="btn btn-link text-muted">Cancel</a>
+            </form>
+        </div>
+        <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
+        <script>
+            const msg = document.getElementById('message');
+            const counter = document.getElementById('charCount');
+            msg.addEventListener('input', () => counter.textContent = msg.value.length);
+        </script>
+    </body>
+</html>

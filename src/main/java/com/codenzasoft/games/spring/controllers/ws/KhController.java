@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhGamePersistenceService;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,20 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
+  @Autowired private KhGamePersistenceService khGamePersistenceService;
+
+  /**
+   * Broadcasts the current game state to the player, then persists the result if the game has just
+   * ended. All state-mutating handlers call this instead of {@link KhBroadcastService#gameLoaded}
+   * directly so that game-over is captured regardless of which action triggered it (event, food
+   * consumption, card effect, etc.).
+   */
+  private void broadcastAndPersist(GameEngine game) {
+    khBroadcastService.gameLoaded(game);
+    if (game.getState().isGameOver()) {
+      khGamePersistenceService.saveResult(game);
+    }
+  }
 
   /**
    * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
@@ -49,7 +64,7 @@ public class KhController {
             game -> {
               try {
                 game.offerAddChoices();
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("addOffer rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -69,7 +84,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.pickCardByName(name);
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -87,7 +102,7 @@ public class KhController {
             game -> {
               try {
                 game.skipAdd();
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("addSkip rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -95,8 +110,9 @@ public class KhController {
   }
 
   /**
-   * Applies the chosen event option by its stable option name, then draws the player's hand to
-   * start the PLAY phase.
+   * Applies the chosen event option by its stable option name. If the event drops population to
+   * zero the game ends here; {@link #broadcastAndPersist} ensures the result is captured even
+   * though the PLAY phase is never reached.
    */
   @MessageMapping("/kh/{gameId}/event/pick")
   public void eventPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -107,7 +123,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.applyEventOptionByName(name);
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -127,7 +143,7 @@ public class KhController {
             game -> {
               try {
                 game.advancePhase();
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("eventSkip rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -150,7 +166,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.placeCardByName(name);
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("playCard rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -170,7 +186,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.demolishCardByName(name);
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("demolishCard rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -192,7 +208,7 @@ public class KhController {
               final List<String> names = (List<String>) body.get("names");
               try {
                 game.reorderTable(names);
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("reorderTable rejected for game {}: {}", gameId, e.getMessage());
               }
@@ -212,7 +228,7 @@ public class KhController {
             game -> {
               try {
                 game.endAndRun();
-                khBroadcastService.gameLoaded(game);
+                broadcastAndPersist(game);
               } catch (IllegalStateException e) {
                 log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());
               }

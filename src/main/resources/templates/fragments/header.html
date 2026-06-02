@@ -5,11 +5,15 @@
         <a class="navbar-brand" href="/">CodenzaSoft</a>
         <div class="collapse navbar-collapse d-flex flex-row justify-content-end" id="navbarSupportedContent">
             <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/feedback}">Feedback</a>
+                </li>
                 <li th:if="${helper.isAdmin(user)}" class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Admin</a>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" th:href="@{/admin/users}">Manage Users</a></li>
                         <li><a class="dropdown-item" th:href="@{/admin/whitelist}">Manage Whitelist</a></li>
+                        <li><a class="dropdown-item" th:href="@{/admin/feedback}">Manage Feedback</a></li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown">
