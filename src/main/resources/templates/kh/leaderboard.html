@@ -2,130 +2,290 @@
 <html xmlns:th="http://www.thymeleaf.org">
     <head th:replace="~{fragments/links :: head-js-css}"></head>
     <style>
-        .leaderboard-header {
-            background-image: linear-gradient(rgba(255,255,255,0.82), rgba(255,255,255,0.82)),
+        .lb-hero {
+            background-image: linear-gradient(135deg, rgba(255,200,50,0.15), rgba(255,255,255,0.95)),
                               url('/img/kingshand-bg.png');
             background-size: cover;
             background-position: center top;
+            border-bottom: 3px solid #e8b400;
         }
-        .rank-badge {
-            width: 2rem;
-            height: 2rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            font-weight: 700;
-            font-size: 0.85rem;
-        }
-        .rank-1 { background: #FFD700; color: #333; }
-        .rank-2 { background: #C0C0C0; color: #333; }
-        .rank-3 { background: #CD7F32; color: #fff; }
-        .rank-4, .rank-5 { background: #e9ecef; color: #555; }
+        /* Podium cards */
+        .podium-card { border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 0.75rem; transition: transform 0.15s; }
+        .podium-card:hover { transform: translateY(-2px); }
+
+        .rank-1st { background: linear-gradient(135deg, #fff9db, #fff3a0); border: 2px solid #e8b400; box-shadow: 0 6px 24px rgba(232,180,0,0.35); padding: 2rem 2.25rem; }
+        .rank-2nd { background: linear-gradient(135deg, #f5f5f5, #e8e8e8); border: 2px solid #aaa; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .rank-3rd { background: linear-gradient(135deg, #fff4ee, #ffe0cc); border: 2px solid #c87941; box-shadow: 0 2px 10px rgba(200,121,65,0.2); }
+
+        .rank-icon { font-size: 2rem; line-height: 1; }
+        .rank-1st .rank-icon { font-size: 4rem; }
+
+        .rank-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+        .rank-1st .rank-label { color: #8a6800; font-size: 0.85rem; }
+        .rank-2nd .rank-label { color: #555; }
+        .rank-3rd .rank-label { color: #7a4520; }
+
+        .rank-username { font-weight: 700; font-size: 1.15rem; }
+        .rank-1st .rank-username { font-size: 2rem; color: #5a4000; }
+        .rank-2nd .rank-username { color: #333; }
+        .rank-3rd .rank-username { color: #5a2e0a; }
+
+        .rank-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.55; margin-bottom: 0.1rem; }
+        .rank-stat-value { font-weight: 600; font-size: 0.95rem; }
+        .rank-1st .rank-stat-value { color: #6b4f00; font-size: 1.2rem; }
+        .sort-highlight { font-weight: 800 !important; font-size: 1.4rem !important; }
+        .rank-1st .rank-stat-label { font-size: 0.8rem; }
+
+        /* Lower ranks table */
+        .lower-ranks { border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden; }
+        .lower-ranks table { margin: 0; }
+        .lower-ranks thead { background: #f8f9fa; }
+        .lower-rank-num { width: 2.2rem; height: 2.2rem; border-radius: 50%; background: #e9ecef; color: #555;
+                           display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; }
+
+        /* Empty state */
+        .empty-board { border: 2px dashed #dee2e6; border-radius: 12px; padding: 3rem; text-align: center; }
     </style>
     <body>
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
-        <div class="container mt-4" style="max-width: 720px;">
 
-            <!-- Page header -->
-            <div class="rounded p-4 mb-4 leaderboard-header">
-                <h3 class="mb-0 fw-bold">King's Hand Leaderboard</h3>
-                <p class="text-muted mb-0 mt-1">Top 5 all-time games</p>
+        <!-- Hero header -->
+        <div class="lb-hero py-4 px-0 mb-0">
+            <div class="container">
+                <h2 class="fw-bold mb-1">👑 King's Hand Leaderboard</h2>
+                <p class="text-muted mb-0">The greatest rulers in King's Hand history</p>
             </div>
+        </div>
+
+        <div class="container mt-4">
 
             <!-- Tabs -->
-            <ul class="nav nav-tabs mb-0" id="leaderboardTabs">
+            <ul class="nav nav-tabs mb-0">
                 <li class="nav-item">
-                    <a class="nav-link"
+                    <a class="nav-link fw-semibold"
                        th:classappend="${activeTab == 'duration' ? 'active' : ''}"
                        th:href="@{/kh/leaderboard(tab='duration')}">
-                        Longest Survival
+                        ⏳ Longest Survival
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link"
+                    <a class="nav-link fw-semibold"
                        th:classappend="${activeTab == 'population' ? 'active' : ''}"
                        th:href="@{/kh/leaderboard(tab='population')}">
-                        Peak Population
+                        👥 Peak Population
                     </a>
                 </li>
             </ul>
 
-            <div class="border border-top-0 rounded-bottom p-3 mb-4 bg-white">
+            <div class="border border-top-0 rounded-bottom bg-white p-4 mb-4">
 
-                <!-- Longest Survival tab -->
+                <!-- ── Duration tab ─────────────────────────────────────────── -->
                 <div th:if="${activeTab == 'duration'}">
-                    <table class="table table-borderless align-middle mb-0"
-                           th:if="${not #lists.isEmpty(topByDuration)}">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width:3rem">#</th>
-                                <th>Player</th>
-                                <th>Survived Until</th>
-                                <th class="text-end">Peak Pop.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="entry, iter : ${topByDuration}">
-                                <td>
-                                    <span class="rank-badge"
-                                          th:classappend="'rank-' + ${iter.index + 1}"
-                                          th:text="${iter.index + 1}"></span>
-                                </td>
-                                <td th:text="${entry.user.username}"></td>
-                                <td>
-                                    Year <span th:text="${entry.yearSurvived}"></span>,
-                                    <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span>
-                                </td>
-                                <td class="text-end"
-                                    th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="text-muted text-center py-4 mb-0"
-                       th:if="${#lists.isEmpty(topByDuration)}">
-                        No completed games yet. Be the first on the board!
-                    </p>
+                    <div th:if="${not #lists.isEmpty(topByDuration)}">
+
+                        <!-- 1st place -->
+                        <div th:if="${#lists.size(topByDuration) >= 1}"
+                             class="podium-card rank-1st d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥇</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">1st Place</div>
+                                <div class="rank-username" th:text="${topByDuration[0].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value sort-highlight">
+                                    Year <span th:text="${topByDuration[0].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByDuration[0].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value" th:text="${#numbers.formatDecimal(topByDuration[0].peakPopulation, 1, 1)}"></div>
+                            </div>
+                        </div>
+
+                        <!-- 2nd place -->
+                        <div th:if="${#lists.size(topByDuration) >= 2}"
+                             class="podium-card rank-2nd d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥈</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">2nd Place</div>
+                                <div class="rank-username" th:text="${topByDuration[1].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value sort-highlight">
+                                    Year <span th:text="${topByDuration[1].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByDuration[1].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value" th:text="${#numbers.formatDecimal(topByDuration[1].peakPopulation, 1, 1)}"></div>
+                            </div>
+                        </div>
+
+                        <!-- 3rd place -->
+                        <div th:if="${#lists.size(topByDuration) >= 3}"
+                             class="podium-card rank-3rd d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥉</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">3rd Place</div>
+                                <div class="rank-username" th:text="${topByDuration[2].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value sort-highlight">
+                                    Year <span th:text="${topByDuration[2].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByDuration[2].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value" th:text="${#numbers.formatDecimal(topByDuration[2].peakPopulation, 1, 1)}"></div>
+                            </div>
+                        </div>
+
+                        <!-- 4th & 5th -->
+                        <div th:if="${#lists.size(topByDuration) > 3}" class="lower-ranks mt-3">
+                            <table class="table table-borderless align-middle mb-0">
+                                <thead>
+                                    <tr class="text-muted small">
+                                        <th style="width:3.5rem">#</th>
+                                        <th>Player</th>
+                                        <th>Survived Until</th>
+                                        <th class="text-end">Peak Pop.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="entry, iter : ${topByDuration}"
+                                        th:if="${iter.index >= 3}">
+                                        <td><span class="lower-rank-num" th:text="${iter.index + 1}"></span></td>
+                                        <td th:text="${entry.user.username}"></td>
+                                        <td>Year <span th:text="${entry.yearSurvived}"></span>,
+                                            <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span></td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div th:if="${#lists.isEmpty(topByDuration)}" class="empty-board">
+                        <div style="font-size:3rem">👑</div>
+                        <h5 class="mt-2 text-muted">No completed games yet</h5>
+                        <p class="text-muted mb-0">Be the first ruler on the board!</p>
+                    </div>
                 </div>
 
-                <!-- Peak Population tab -->
+                <!-- ── Peak Population tab ───────────────────────────────────── -->
                 <div th:if="${activeTab == 'population'}">
-                    <table class="table table-borderless align-middle mb-0"
-                           th:if="${not #lists.isEmpty(topByPopulation)}">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width:3rem">#</th>
-                                <th>Player</th>
-                                <th class="text-end">Peak Pop.</th>
-                                <th>Survived Until</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="entry, iter : ${topByPopulation}">
-                                <td>
-                                    <span class="rank-badge"
-                                          th:classappend="'rank-' + ${iter.index + 1}"
-                                          th:text="${iter.index + 1}"></span>
-                                </td>
-                                <td th:text="${entry.user.username}"></td>
-                                <td class="text-end fw-semibold"
-                                    th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
-                                <td>
-                                    Year <span th:text="${entry.yearSurvived}"></span>,
-                                    <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="text-muted text-center py-4 mb-0"
-                       th:if="${#lists.isEmpty(topByPopulation)}">
-                        No completed games yet. Be the first on the board!
-                    </p>
+                    <div th:if="${not #lists.isEmpty(topByPopulation)}">
+
+                        <!-- 1st place -->
+                        <div th:if="${#lists.size(topByPopulation) >= 1}"
+                             class="podium-card rank-1st d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥇</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">1st Place</div>
+                                <div class="rank-username" th:text="${topByPopulation[0].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value sort-highlight"
+                                     th:text="${#numbers.formatDecimal(topByPopulation[0].peakPopulation, 1, 1)}"></div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value">
+                                    Year <span th:text="${topByPopulation[0].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByPopulation[0].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2nd place -->
+                        <div th:if="${#lists.size(topByPopulation) >= 2}"
+                             class="podium-card rank-2nd d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥈</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">2nd Place</div>
+                                <div class="rank-username" th:text="${topByPopulation[1].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value sort-highlight"
+                                     th:text="${#numbers.formatDecimal(topByPopulation[1].peakPopulation, 1, 1)}"></div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value">
+                                    Year <span th:text="${topByPopulation[1].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByPopulation[1].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3rd place -->
+                        <div th:if="${#lists.size(topByPopulation) >= 3}"
+                             class="podium-card rank-3rd d-flex align-items-center gap-3">
+                            <div class="rank-icon">🥉</div>
+                            <div class="flex-grow-1">
+                                <div class="rank-label">3rd Place</div>
+                                <div class="rank-username" th:text="${topByPopulation[2].user.username}"></div>
+                            </div>
+                            <div class="text-end me-2">
+                                <div class="rank-stat-label">Peak Pop.</div>
+                                <div class="rank-stat-value sort-highlight"
+                                     th:text="${#numbers.formatDecimal(topByPopulation[2].peakPopulation, 1, 1)}"></div>
+                            </div>
+                            <div class="text-end">
+                                <div class="rank-stat-label">Survived Until</div>
+                                <div class="rank-stat-value">
+                                    Year <span th:text="${topByPopulation[2].yearSurvived}"></span>,
+                                    <span th:text="${#strings.capitalize(topByPopulation[2].seasonSurvived.name().toLowerCase())}"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4th & 5th -->
+                        <div th:if="${#lists.size(topByPopulation) > 3}" class="lower-ranks mt-3">
+                            <table class="table table-borderless align-middle mb-0">
+                                <thead>
+                                    <tr class="text-muted small">
+                                        <th style="width:3.5rem">#</th>
+                                        <th>Player</th>
+                                        <th class="text-end">Peak Pop.</th>
+                                        <th>Survived Until</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="entry, iter : ${topByPopulation}"
+                                        th:if="${iter.index >= 3}">
+                                        <td><span class="lower-rank-num" th:text="${iter.index + 1}"></span></td>
+                                        <td th:text="${entry.user.username}"></td>
+                                        <td class="text-end fw-semibold"
+                                            th:text="${#numbers.formatDecimal(entry.peakPopulation, 1, 1)}"></td>
+                                        <td>Year <span th:text="${entry.yearSurvived}"></span>,
+                                            <span th:text="${#strings.capitalize(entry.seasonSurvived.name().toLowerCase())}"></span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div th:if="${#lists.isEmpty(topByPopulation)}" class="empty-board">
+                        <div style="font-size:3rem">👑</div>
+                        <h5 class="mt-2 text-muted">No completed games yet</h5>
+                        <p class="text-muted mb-0">Be the first ruler on the board!</p>
+                    </div>
                 </div>
+
             </div>
 
-            <a th:href="@{/}" class="btn btn-outline-secondary btn-sm">← Back to Games</a>
+            <a th:href="@{/}" class="btn btn-outline-secondary btn-sm mb-4">← Back to Games</a>
         </div>
+
         <div th:replace="~{fragments/footer :: footer}">&nbsp;</div>
     </body>
 </html>
