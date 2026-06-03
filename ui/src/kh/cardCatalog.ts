@@ -272,7 +272,8 @@ const IMAGE_NAME_OVERRIDES: Record<string, string> = {
 
 /** Returns the public path to a card's full-art PNG, e.g. "/img/barn.png". */
 export function cardImagePath(cardName: string): string {
-  const base = IMAGE_NAME_OVERRIDES[cardName] ?? cardName.toLowerCase();
+  const stripped = baseName(cardName);
+  const base = IMAGE_NAME_OVERRIDES[stripped] ?? stripped.toLowerCase();
   return `/img/${base}.png`;
 }
 
