@@ -181,8 +181,7 @@ public class EventCatalog {
                     new EventOption(
                         "Suppress the uprising",
                         List.of(
-                            ResourceTarget.POPULATION.integer(-5),
-                            ResourceTarget.PRODUCTION.integer(-15))),
+                            ResourceTarget.POPULATION.integer(-8))),
                     new EventOption(
                         "Negotiate a compromise",
                         List.of(
@@ -482,8 +481,7 @@ public class EventCatalog {
                     new EventOption(
                         "Concede the levy entirely",
                         List.of(
-                            ResourceTarget.PRODUCTION.integer(-10),
-                            ResourceTarget.POPULATION.integer(-5))))),
+                            ResourceTarget.POPULATION.integer(-7))))),
             new Event(
                 "fall.winter_foreboding",
                 Season.FALL,
@@ -498,8 +496,7 @@ public class EventCatalog {
                     new EventOption(
                         "Prepare as usual",
                         List.of(
-                            ResourceTarget.PRODUCTION.integer(-15),
-                            ResourceTarget.FOOD.integer(-20))))),
+                            ResourceTarget.FOOD.integer(-30))))),
             new Event(
                 "fall.the_reckoning",
                 Season.FALL,
