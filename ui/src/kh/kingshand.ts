@@ -46,6 +46,7 @@ export enum ResourceTarget {
   POPULATION = "POPULATION",
   PRODUCTION = "PRODUCTION",
   FOOD = "FOOD",
+  POPULATION_CAP = "POPULATION_CAP",
 }
 
 // StaffingTier: the result of distributing floor(population) workers left-to-right
@@ -112,6 +113,7 @@ interface GameStateData {
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   population: number;
+  populationCap: number;
   production: number;
   food: number;
   curSeason: Season;
@@ -244,6 +246,7 @@ export class GameState {
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   population: number;
+  populationCap: number;
   production: number;
   food: number;
   curSeason: Season;
@@ -261,6 +264,7 @@ export class GameState {
     this.discardPile = data.discardPile;
     this.hand = data.hand;
     this.population = data.population;
+    this.populationCap = data.populationCap;
     this.production = data.production;
     this.food = data.food;
     this.curSeason = data.curSeason;
@@ -381,6 +385,7 @@ export const GameStateSchema = z
     discardPile: SeasonToCardsSchema,
     hand: z.array(CardSchema),
     population: z.number(),
+    populationCap: z.number(),
     production: z.number(),
     food: z.number(),
     curSeason: z.enum(Season),

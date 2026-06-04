@@ -224,7 +224,7 @@ export class PlayPhaseScene {
           <span class="kh-play-res-icon">👥</span>
           <div>
             <div class="kh-play-res-label">Population</div>
-            <div class="kh-play-res-value">${Math.floor(state.population)}</div>
+            <div class="kh-play-res-value"><span class="kh-play-pop-num">${Math.floor(state.population)}</span> <span class="kh-play-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-play-res-divider"></div>
@@ -340,12 +340,14 @@ export class PlayPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
                    : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+                   : e.target === ResourceTarget.POPULATION ? "👥"
+                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
         return `
           <div class="kh-tc-tt-effect">
-            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -486,12 +488,14 @@ export class PlayPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
                    : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+                   : e.target === ResourceTarget.POPULATION ? "👥"
+                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -597,7 +601,8 @@ export class PlayPhaseScene {
           const info = getCardDisplayInfo(c);
           const effectsHTML = c.effects.map((e) => {
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            const displayLabel = targetStr === "POPULATION_CAP" ? "🏠 POP CAP" : targetStr;
+            return `<span class="kh-cc-effect">${displayLabel} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
@@ -829,7 +834,7 @@ export class PlayPhaseScene {
   /** Returns the three live resource-value elements (pop, prod, food). */
   private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
     return {
-      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop  .kh-play-res-value"),
+      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
       prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
       food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
     };
@@ -861,6 +866,7 @@ export class PlayPhaseScene {
     let simPop  = state.population;
     let simProd = state.production;
     let simFood = state.food;
+    let simCap  = state.populationCap;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -877,9 +883,14 @@ export class PlayPhaseScene {
 
     const updateBar = (pop: number, prod: number, food: number,
                        which: { pop: boolean; prod: boolean; food: boolean }): void => {
-      flashEl(".kh-play-pop  .kh-play-res-value", pop,  which.pop);
-      flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
-      flashEl(".kh-play-food .kh-play-res-value", food, which.food);
+      flashEl(".kh-play-pop-num",                  pop,  which.pop);
+      flashEl(".kh-play-prod .kh-play-res-value",  prod, which.prod);
+      flashEl(".kh-play-food .kh-play-res-value",  food, which.food);
+    };
+
+    const updateCap = (cap: number): void => {
+      const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+      if (capEl) capEl.textContent = `/ ${Math.floor(cap)}`;
     };
 
     const setHighlight = (slot: number, on: boolean): void => {
@@ -915,6 +926,7 @@ export class PlayPhaseScene {
       const prevPop  = simPop;
       const prevProd = simProd;
       const prevFood = simFood;
+      let si = 0;
 
       for (const eff of card.effects) {
         if (typeof eff.target !== "string") continue; // skip CardTarget effects
@@ -944,18 +956,26 @@ export class PlayPhaseScene {
           if (next !== simPop) changed.pop = true;
           simPop = next;
         }
+        if (eff.target === ResourceTarget.POPULATION_CAP) {
+          const prevCap = simCap;
+          simCap = simCap + rawMod;
+          if (simCap !== prevCap) {
+            updateCap(simCap);
+            const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+            if (capEl) spawnResourceIndicator(capEl, simCap - prevCap, "🏠", si++);
+          }
+        }
       }
 
-      // Clamp — mirrors Java applyX helpers.
+      // Clamp — mirrors Java applyX helpers (including population cap).
       simProd = Math.max(0, simProd);
-      simPop  = Math.max(0, simPop);
+      simPop  = Math.max(0, Math.min(simPop, simCap));
       simFood = Math.max(0, simFood);
 
       updateBar(simPop, simProd, simFood, changed);
 
       // Floating indicators for each changed resource.
       const els = this.resEls();
-      let si = 0;
       if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  simPop  - prevPop,  "👥", si++);
       if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
       if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
@@ -980,9 +1000,17 @@ export class PlayPhaseScene {
       simFood -= consumed;
       if (simFood > 0 && simPop > 0) {
         const growthRate = Math.min(simFood / simPop, 0.20);
-        simPop = simPop + simPop * growthRate;
+        const grown = simPop + simPop * growthRate;
+        const capped = Math.min(grown, simCap);
+        if (capped < grown) {
+          this.showToast("🏠 Well-fed, but housing is full — build more to grow!");
+        } else {
+          this.showToast("🌱 Your people are well-fed — population grows!");
+        }
+        simPop = capped;
+      } else {
+        this.showToast("🌱 Your people are well-fed.");
       }
-      this.showToast("🌱 Your people are well-fed — population grows!");
     } else {
       const deficit = consumed - simFood;
       simFood = 0;
@@ -1100,6 +1128,7 @@ export class PlayPhaseScene {
       .kh-play-pop  .kh-play-res-value { color: #f09090; }
       .kh-play-prod .kh-play-res-value { color: #f0cc60; }
       .kh-play-food .kh-play-res-value { color: #90e060; }
+      .kh-play-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-play-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
       /* ── Phase tracker ───────────────────────────────────────────────── */
@@ -1217,9 +1246,10 @@ export class PlayPhaseScene {
       .kh-play-tc-effects { padding: 10px 14px; flex: 1; }
       .kh-play-tc-effect  { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: .82rem; }
       .kh-play-tc-et      { font-family: 'Cinzel', serif; font-size: .6rem; font-weight: 600; letter-spacing: .6px; min-width: 72px; display: flex; align-items: center; gap: 3px; }
-      .kh-play-tc-et-food       { color: #3a7020; }
-      .kh-play-tc-et-production { color: #a07010; }
-      .kh-play-tc-et-population { color: #8b2020; }
+      .kh-play-tc-et-food             { color: #3a7020; }
+      .kh-play-tc-et-production       { color: #a07010; }
+      .kh-play-tc-et-population       { color: #8b2020; }
+      .kh-play-tc-et-population_cap   { color: #4a6a9a; }
       .kh-play-tc-mod     { font-weight: 700; font-size: .9rem; color: #3d6b46; }
       .kh-play-tc-freq    { font-size: .7rem; color: #a09070; font-style: italic; }
 
@@ -1336,9 +1366,10 @@ export class PlayPhaseScene {
       }
       .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
       .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
-      .kh-play-hc-et-food       { color: #3a7020; }
-      .kh-play-hc-et-production { color: #a07010; }
-      .kh-play-hc-et-population { color: #8b2020; }
+      .kh-play-hc-et-food             { color: #3a7020; }
+      .kh-play-hc-et-production       { color: #a07010; }
+      .kh-play-hc-et-population       { color: #8b2020; }
+      .kh-play-hc-et-population_cap   { color: #4a6a9a; }
       .kh-play-hc-mod   { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
@@ -1830,9 +1861,10 @@ export class PlayPhaseScene {
       .kh-tc-tt-effects  { margin-bottom: 10px; }
       .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }
       .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: 1.16rem; font-weight: 600; letter-spacing: .5px; min-width: 120px; display: flex; align-items: center; gap: 4px; }
-      .kh-tc-tt-et-food       { color: #7adc50; }
-      .kh-tc-tt-et-production { color: #f0c060; }
-      .kh-tc-tt-et-population { color: #f09090; }
+      .kh-tc-tt-et-food             { color: #7adc50; }
+      .kh-tc-tt-et-production       { color: #f0c060; }
+      .kh-tc-tt-et-population       { color: #f09090; }
+      .kh-tc-tt-et-population_cap   { color: #7aace0; }
       .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
       .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }
 

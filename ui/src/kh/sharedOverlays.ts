@@ -447,7 +447,8 @@ function buildCompactCard(card: Card): string {
   const effectsHTML = card.effects
     .map((e) => {
       const targetStr = typeof e.target === "string" ? e.target : "CARD";
-      return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      const displayLabel = targetStr === "POPULATION_CAP" ? "🏠 POP CAP" : targetStr;
+      return `<span class="kh-cc-effect">${displayLabel} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
     })
     .join("");
 

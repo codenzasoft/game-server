@@ -178,7 +178,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">👥</span>
           <div>
             <div class="kh-res-label">Population</div>
-            <div class="kh-res-value">${Math.floor(state.population)}</div>
+            <div class="kh-res-value">${Math.floor(state.population)} <span class="kh-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-res-divider"></div>
@@ -233,12 +233,14 @@ export class AddPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
                    : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+                   : e.target === ResourceTarget.POPULATION ? "👥"
+                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
         return `
           <div class="kh-effect-row">
-            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -412,6 +414,7 @@ export class AddPhaseScene {
       .kh-pop  .kh-res-value { color: #f09090; }
       .kh-prod .kh-res-value { color: #f0cc60; }
       .kh-food .kh-res-value { color: #90e060; }
+      .kh-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
       /* Phase tracker */
@@ -519,9 +522,10 @@ export class AddPhaseScene {
       }
       .kh-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
       .kh-effect-target { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
-      .kh-et-food       { color: #3a7020; }
-      .kh-et-production { color: #a07010; }
-      .kh-et-population { color: #8b2020; }
+      .kh-et-food             { color: #3a7020; }
+      .kh-et-production       { color: #a07010; }
+      .kh-et-population       { color: #8b2020; }
+      .kh-et-population_cap   { color: #4a6a9a; }
       .kh-effect-mod  { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-effect-freq { font-size: .88rem; color: #a09070; font-style: italic; }
 

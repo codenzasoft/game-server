@@ -48,6 +48,13 @@ public class CardCatalog {
   // ----- Card constants -----
 
   // Spring
+  public static final Card BUNKHOUSE =
+      new Card(
+          "BUNKHOUSE",
+          4.0,
+          40.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.POPULATION_CAP.integer(5)));
   public static final Card FARM =
       new Card(
           "FARM", 4.0, 30.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(10)));
@@ -208,9 +215,9 @@ public class CardCatalog {
       new Card(
           "MANOR",
           12.0,
-          75.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.POPULATION.integer(5), ResourceTarget.PRODUCTION.integer(20)));
+          80.0,
+          FrequencyType.SINGLE,
+          List.of(ResourceTarget.POPULATION_CAP.integer(15)));
   public static final Card HARVEST =
       new Card(
           "HARVEST", 2.0, 20.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(40)));
@@ -335,7 +342,7 @@ public class CardCatalog {
   public static Map<Season, List<Card>> defaultStartingDeck() {
     Map<Season, List<Card>> deck = new EnumMap<>(Season.class);
     deck.put(Season.SPRING, List.of(MINE, SEEDS, FERTILIZER));
-    deck.put(Season.SUMMER, List.of(THE_HUNT, EARLY_HARVEST, STONE_QUARRY));
+    deck.put(Season.SUMMER, List.of(BUNKHOUSE, EARLY_HARVEST, STONE_QUARRY));
     deck.put(Season.FALL, List.of(WORKSHOP, HARVEST, BAKERY));
     deck.put(Season.WINTER, List.of(EMERGENCY_RATIONS, FORGE, PRAY));
     return Collections.unmodifiableMap(deck);
@@ -361,6 +368,8 @@ public class CardCatalog {
     seasonal.put(
         Season.SUMMER,
         List.of(
+            BUNKHOUSE,
+            MANOR,
             FARMSTEAD,
             THE_HUNT,
             LOGGING,
@@ -379,7 +388,6 @@ public class CardCatalog {
         Season.FALL,
         List.of(
             WORKSHOP,
-            MANOR,
             HARVEST,
             TEXTILES,
             BAKERY,

@@ -74,6 +74,16 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
 
   // ── Summer ─────────────────────────────────────────────────────────────────
+  BUNKHOUSE: {
+    name: "Bunkhouse",
+    description: "Shared worker housing that raises your settlement's population cap.",
+    tags: ["HOUSING", "POPULATION"],
+  },
+  MANOR: {
+    name: "Manor",
+    description: "A grand manor that dramatically expands your settlement's population cap.",
+    tags: ["HOUSING", "POPULATION"],
+  },
   FARMSTEAD: {
     name: "Farmstead",
     description: "A prosperous farmstead that steadily produces both food and goods.",
@@ -145,11 +155,6 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     name: "Workshop",
     description: "A workshop that steadily expands your production capacity each fall.",
     tags: ["INDUSTRY"],
-  },
-  MANOR: {
-    name: "Manor",
-    description: "A grand manor that attracts settlers and skilled workers each fall.",
-    tags: ["POPULATION", "INDUSTRY"],
   },
   HARVEST: {
     name: "Harvest",

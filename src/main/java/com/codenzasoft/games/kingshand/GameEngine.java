@@ -209,6 +209,7 @@ public class GameEngine implements Game<GameEngine> {
           case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
           case PRODUCTION -> applyProduction(scaled.apply(state.getProduction()));
           case FOOD -> applyFood(scaled.apply(state.getFood()));
+          case POPULATION_CAP -> {} // passive — not applied via events
         }
       }
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
@@ -326,6 +327,7 @@ public class GameEngine implements Game<GameEngine> {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
               case FOOD -> applyFood(effect.apply(state.getFood()));
+              case POPULATION_CAP -> {} // passive — derived from board, not fired
             }
           }
         }
@@ -383,6 +385,8 @@ public class GameEngine implements Game<GameEngine> {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
               case FOOD -> applyFood(effect.apply(state.getFood()));
+              case POPULATION_CAP ->
+                  state.setPopulationCap(state.getPopulationCap() + effect.modifier());
             }
           }
         }
@@ -460,7 +464,8 @@ public class GameEngine implements Game<GameEngine> {
    * scattered.
    */
   private void applyPopulation(double value) {
-    double clamped = Math.max(0.0, value);
+    // Clamp between zero and the current population cap.
+    double clamped = Math.max(0.0, Math.min(value, state.getPopulationCap()));
     state.setPopulation(clamped);
     // A fractional population (< 1) means nobody is actually alive.
     if (clamped < 1.0) {

@@ -129,7 +129,7 @@ export class RandomEventScene {
           <span class="kh-re-res-icon">👥</span>
           <div>
             <div class="kh-re-res-label">Population</div>
-            <div class="kh-re-res-value">${Math.floor(state.population)}</div>
+            <div class="kh-re-res-value">${Math.floor(state.population)} <span class="kh-re-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-re-res-divider"></div>
@@ -479,6 +479,7 @@ export class RandomEventScene {
       .kh-re-pop  .kh-re-res-value { color: #f09090; }
       .kh-re-prod .kh-re-res-value { color: #f0cc60; }
       .kh-re-food .kh-re-res-value { color: #90e060; }
+      .kh-re-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-re-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
       /* Phase tracker */

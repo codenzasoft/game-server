@@ -23,6 +23,7 @@ public class GameState {
   private List<Card> hand;
   // resources
   private double population;
+  private double populationCap;
   private double production;
   private double food;
   // where are we
@@ -45,6 +46,7 @@ public class GameState {
     this.discardPile = b.discardPile;
     this.hand = b.hand;
     this.population = b.population;
+    this.populationCap = b.populationCap;
     this.production = b.production;
     this.food = b.food;
     this.curSeason = b.curSeason;
@@ -156,6 +158,19 @@ public class GameState {
     return population;
   }
 
+  /**
+   * The maximum population allowed. Starts at 20 and is permanently raised whenever a housing card
+   * (e.g. BUNKHOUSE, MANOR) fires its {@link ResourceTarget#POPULATION_CAP} effect during {@link
+   * Phase#PLAY} resolution.
+   */
+  @JsonProperty("populationCap")
+  public double getPopulationCap() {
+    return populationCap;
+  }
+
+  public void setPopulationCap(double populationCap) {
+    this.populationCap = populationCap;
+  }
   @JsonProperty("production")
   public double getProduction() {
     return production;
@@ -273,6 +288,7 @@ public class GameState {
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
     private double population = 20.0;
+    private double populationCap = 20.0;
     private double production = 200.0;
     private double food = 150.0;
     private Season curSeason = Season.SPRING;
@@ -319,6 +335,10 @@ public class GameState {
       return this;
     }
 
+    public Builder populationCap(double populationCap) {
+      this.populationCap = populationCap;
+      return this;
+    }
     public Builder production(double production) {
       this.production = production;
       return this;
