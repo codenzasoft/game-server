@@ -66,7 +66,8 @@ export enum StaffingTier {
 // explicit up-front, schemas and classes can reference them freely.
 
 interface CardTargetData {
-  slotOffset: number;
+  targetResource: ResourceTarget;
+  adjacentOnly: boolean;
 }
 
 interface EffectData {
@@ -137,12 +138,16 @@ interface GameMessageData {
 // schema transforms can hand off validated data without extra casting.
 
 // CardTarget: the object branch of the EffectTarget union.  The server
-// serialises this as { slotOffset: <number> }.
+// serialises this as { targetResource: "FOOD", adjacentOnly: true }.
+// adjacentOnly=true  → boosts only the first matching card to the right (recurring, +4–8)
+// adjacentOnly=false → boosts all matching cards to the right (recurring +1–3 or single +4–8)
 export class CardTarget {
-  slotOffset: number;
+  targetResource: ResourceTarget;
+  adjacentOnly: boolean;
 
   constructor(data: CardTargetData) {
-    this.slotOffset = data.slotOffset;
+    this.targetResource = data.targetResource;
+    this.adjacentOnly   = data.adjacentOnly;
   }
 }
 
@@ -307,7 +312,7 @@ export class GameMessage {
 // schemas unexported since they are only composed into larger schemas.
 
 const CardTargetSchema = z
-  .object({ slotOffset: z.number().int() })
+  .object({ targetResource: z.enum(ResourceTarget), adjacentOnly: z.boolean() })
   .transform((data) => new CardTarget(data as CardTargetData));
 
 // EffectTarget union: ResourceTarget strings are tried first (the common case)

@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -339,6 +339,19 @@ export class PlayPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
+        if (e.target instanceof CardTarget) {
+          const res = e.target.targetResource;
+          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          return `
+            <div class="kh-tc-tt-effect">
+              <span class="kh-tc-tt-et kh-tc-tt-et-engine">${resIcon} ${scope}</span>
+              <span class="kh-tc-tt-mod">+${e.modifier}</span>
+              <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
@@ -487,6 +500,19 @@ export class PlayPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
+        if (e.target instanceof CardTarget) {
+          const res = e.target.targetResource;
+          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          return `
+            <div class="kh-play-hc-effect-row">
+              <span class="kh-play-hc-et kh-play-hc-et-engine">${resIcon} ${scope}</span>
+              <span class="kh-play-hc-mod">+${e.modifier}</span>
+              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
@@ -600,9 +626,16 @@ export class PlayPhaseScene {
       : cards.map((c) => {
           const info = getCardDisplayInfo(c);
           const effectsHTML = c.effects.map((e) => {
+            if (e.target instanceof CardTarget) {
+              const res = e.target.targetResource;
+              const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+              const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+              const sc = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
+              return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            const displayLabel = targetStr === "POPULATION_CAP" ? "🏠 POP CAP" : targetStr;
-            return `<span class="kh-cc-effect">${displayLabel} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            if (targetStr === "POPULATION_CAP") return `<span class="kh-cc-effect">🏠 POP CAP ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
@@ -928,8 +961,30 @@ export class PlayPhaseScene {
       const prevFood = simFood;
       let si = 0;
 
+      // Engine-builder cards (CardTarget effects) are resolved entirely server-side.
+      // Show a descriptive toast and skip resource simulation for them.
+      const isEngineBuilder = card.effects.every(e => e.target instanceof CardTarget);
+      if (isEngineBuilder) {
+        const targets = card.effects
+          .filter(e => e.target instanceof CardTarget)
+          .map(e => {
+            const ct = e.target as CardTarget;
+            const res = ct.targetResource;
+            const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+            const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+            const scope = ct.adjacentOnly ? `next ${label} card` : `all ${label} cards`;
+            return `+${e.modifier} ${icon} → ${scope}`;
+          })
+          .join(", ");
+        this.showToast(`${info.name} — ${targets}`);
+        await this.delay(1500);
+        setHighlight(i, false);
+        await this.delay(150);
+        continue;
+      }
+
       for (const eff of card.effects) {
-        if (typeof eff.target !== "string") continue; // skip CardTarget effects
+        if (eff.target instanceof CardTarget) continue; // engine builders handled above
 
         // Mirror Java halveEffects: floor(modifier / 2) for HALF tier.
         const rawMod = tier === StaffingTier.HALF
@@ -1250,6 +1305,7 @@ export class PlayPhaseScene {
       .kh-play-tc-et-production       { color: #a07010; }
       .kh-play-tc-et-population       { color: #8b2020; }
       .kh-play-tc-et-population_cap   { color: #4a6a9a; }
+      .kh-play-tc-et-engine           { color: #7a5aaa; }
       .kh-play-tc-mod     { font-weight: 700; font-size: .9rem; color: #3d6b46; }
       .kh-play-tc-freq    { font-size: .7rem; color: #a09070; font-style: italic; }
 
@@ -1370,6 +1426,7 @@ export class PlayPhaseScene {
       .kh-play-hc-et-production       { color: #a07010; }
       .kh-play-hc-et-population       { color: #8b2020; }
       .kh-play-hc-et-population_cap   { color: #4a6a9a; }
+      .kh-play-hc-et-engine           { color: #7a5aaa; }
       .kh-play-hc-mod   { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
@@ -1865,6 +1922,7 @@ export class PlayPhaseScene {
       .kh-tc-tt-et-production       { color: #f0c060; }
       .kh-tc-tt-et-population       { color: #f09090; }
       .kh-tc-tt-et-population_cap   { color: #7aace0; }
+      .kh-tc-tt-et-engine           { color: #c090f0; }
       .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
       .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }
 

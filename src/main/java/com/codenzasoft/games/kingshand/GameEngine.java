@@ -5,8 +5,12 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -318,7 +322,8 @@ public class GameEngine implements Game<GameEngine> {
 
     // Walk every card on the current season's table. Only RECURRING cards fire here; frequency is
     // checked once per card (it is a card-level property). The full end-of-PLAY resolver —
-    // including SINGLE-frequency cards and post-fire discard — lives in {@link #endAndRun()}.
+    // including SINGLE-frequency cards (engine builders) and post-fire discard — lives in
+    // endAndRun.
     for (Card card : table) {
       if (card.frequencyType() == FrequencyType.RECURRING) {
         for (Effect effect : card.effects()) {
@@ -327,9 +332,11 @@ public class GameEngine implements Game<GameEngine> {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
               case FOOD -> applyFood(effect.apply(state.getFood()));
-              case POPULATION_CAP -> {} // passive — derived from board, not fired
+              case POPULATION_CAP -> {} // passive
             }
           }
+          // CardTarget effects on RECURRING cards are intentionally ignored here;
+          // engine builders are SINGLE-use and are handled exclusively in endAndRun.
         }
       }
     }
@@ -372,6 +379,43 @@ public class GameEngine implements Game<GameEngine> {
     //    disturb the iteration sequence.
     List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
+    // ── Pass 1: SINGLE engine-builder pass (permanent card boosts) ───────────────
+    // SINGLE cards with CardTarget effects permanently rewrite the INTEGER modifier on
+    // matching cards to their right. adjacentOnly=true → first match only; false → all.
+    List<Card> liveTable = state.getCurrentTable();
+    for (int i = 0; i < snapshot.size(); i++) {
+      Card card = snapshot.get(i);
+      if (card.frequencyType() != FrequencyType.SINGLE) continue;
+      StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
+      if (tier == StaffingTier.NONE) continue;
+
+      List<Effect> effects =
+          tier == StaffingTier.HALF ? halveEffects(card.effects()) : card.effects();
+      for (Effect effect : effects) {
+        if (!(effect.target() instanceof CardTarget ct)) continue;
+
+        for (int j = i + 1; j < snapshot.size(); j++) {
+          Card target = snapshot.get(j);
+          boolean hasMatch =
+              target.effects().stream()
+                  .anyMatch(
+                      e -> e.target() == ct.targetResource() && e.valueType() == ValueType.INTEGER);
+          if (hasMatch) {
+            Card boosted = target.boostEffect(ct.targetResource(), effect.modifier());
+            snapshot.set(j, boosted);
+            liveTable.set(j, boosted);
+            if (ct.adjacentOnly()) break; // stop after first matching card
+          }
+        }
+      }
+    }
+
+    // ── Pass 2: Normal resolution + RECURRING engine-builder bonuses ─────────────
+    // bonusAll  — applied to every subsequent card that produces the target resource.
+    // bonusNext — applied only to the next such card (cleared after each use).
+    Map<ResourceTarget, Double> bonusAll = new EnumMap<>(ResourceTarget.class);
+    Map<ResourceTarget, Double> bonusNext = new EnumMap<>(ResourceTarget.class);
+
     for (int i = 0; i < snapshot.size(); i++) {
       Card card = snapshot.get(i);
       StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
@@ -379,24 +423,54 @@ public class GameEngine implements Game<GameEngine> {
       if (tier != StaffingTier.NONE) {
         List<Effect> effects =
             tier == StaffingTier.HALF ? halveEffects(card.effects()) : card.effects();
+
+        Set<ResourceTarget> produced = EnumSet.noneOf(ResourceTarget.class);
+
         for (Effect effect : effects) {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-              case FOOD -> applyFood(effect.apply(state.getFood()));
+              case PRODUCTION -> {
+                applyProduction(effect.apply(state.getProduction()));
+                produced.add(rt);
+              }
+              case FOOD -> {
+                applyFood(effect.apply(state.getFood()));
+                produced.add(rt);
+              }
               case POPULATION_CAP ->
                   state.setPopulationCap(state.getPopulationCap() + effect.modifier());
             }
+          } else if (effect.target() instanceof CardTarget ct
+              && card.frequencyType() == FrequencyType.RECURRING) {
+            // RECURRING engine builder: accumulate into the right bonus map.
+            if (ct.adjacentOnly()) {
+              bonusNext.merge(ct.targetResource(), effect.modifier(), Double::sum);
+            } else {
+              bonusAll.merge(ct.targetResource(), effect.modifier(), Double::sum);
+            }
+          }
+          // SINGLE CardTarget effects are already handled in pass 1 — skip here.
+        }
+
+        // Apply accumulated bonuses once per produced resource.
+        for (ResourceTarget rt : produced) {
+          double total = bonusAll.getOrDefault(rt, 0.0) + bonusNext.getOrDefault(rt, 0.0);
+          if (total != 0.0) {
+            switch (rt) {
+              case PRODUCTION -> applyProduction(state.getProduction() + total);
+              case FOOD -> applyFood(state.getFood() + total);
+              default -> {}
+            }
+            bonusNext.remove(rt); // "next" bonus consumed — clears for subsequent cards
           }
         }
       }
 
-      // SINGLE cards are always exhausted after resolution regardless of staffing tier.
+      // SINGLE cards are discarded after their turn.
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
       }
-      // RECURRING cards remain in their slot — no action needed.
     }
 
     // 4. Seasonal food consumption and starvation.

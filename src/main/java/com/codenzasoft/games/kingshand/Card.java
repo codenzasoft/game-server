@@ -25,6 +25,27 @@ public record Card(
   }
 
   /**
+   * Returns a new {@link Card} with the modifier of every {@link ValueType#INTEGER} effect whose
+   * target equals {@code resource} increased by {@code delta}. All other effects are preserved
+   * unchanged. Used by the engine-builder pass to permanently boost cards to the right of an
+   * engine-builder card during {@link Phase#PLAY} resolution.
+   *
+   * @param resource the resource target to boost
+   * @param delta the flat amount to add to each matching effect's modifier
+   */
+  public Card boostEffect(ResourceTarget resource, double delta) {
+    List<Effect> boosted =
+        effects.stream()
+            .map(
+                e ->
+                    (e.target() == resource && e.valueType() == ValueType.INTEGER)
+                        ? new Effect(e.target(), e.modifier() + delta, e.valueType())
+                        : e)
+            .toList();
+    return new Card(name, staffRequirement, productionRequirement, frequencyType, boosted);
+  }
+
+  /**
    * Returns a new {@link Card} with identical requirements but every effect's modifier multiplied
    * by {@code factor}. Used by the upgrade path when a duplicate is placed on the table.
    *

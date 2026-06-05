@@ -1,4 +1,4 @@
-import { GameState, Season, Card, ResourceTarget } from "./kingshand.ts";
+import { GameState, Season, Card, ResourceTarget, CardTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -232,6 +232,19 @@ export class AddPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
+        if (e.target instanceof CardTarget) {
+          const res = e.target.targetResource;
+          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const scope = e.target.adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          return `
+            <div class="kh-effect-row">
+              <span class="kh-effect-target kh-et-engine">${resIcon} ${scope}</span>
+              <span class="kh-effect-mod">+${e.modifier}</span>
+              <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
@@ -526,6 +539,7 @@ export class AddPhaseScene {
       .kh-et-production       { color: #a07010; }
       .kh-et-population       { color: #8b2020; }
       .kh-et-population_cap   { color: #4a6a9a; }
+      .kh-et-engine           { color: #7a5aaa; }
       .kh-effect-mod  { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-effect-freq { font-size: .88rem; color: #a09070; font-style: italic; }
 

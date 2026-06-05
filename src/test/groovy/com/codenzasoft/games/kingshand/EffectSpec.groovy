@@ -43,16 +43,17 @@ class EffectSpec extends Specification {
         250          | -20      || 200
     }
 
-    def "a card-targeting effect carries its slot offset"() {
+    def "a card-targeting effect carries its target resource and adjacentOnly flag"() {
         setup:
-        def target = new CardTarget(-1)
+        def target = new CardTarget(ResourceTarget.FOOD, true)
 
         when:
-        def effect = new Effect(target, 1, ValueType.INTEGER)
+        def effect = new Effect(target, 4, ValueType.INTEGER)
 
         then:
         effect.target() == target
-        (effect.target() as CardTarget).slotOffset() == -1
+        (effect.target() as CardTarget).targetResource() == ResourceTarget.FOOD
+        (effect.target() as CardTarget).adjacentOnly() == true
     }
 
     // ----- Effect.upgrade -----

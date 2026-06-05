@@ -7,7 +7,7 @@
 import { GameState, Season } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
-import { Card } from "./kingshand.ts";
+import { Card, CardTarget, ResourceTarget } from "./kingshand.ts";
 
 // ── Shared style injection ────────────────────────────────────────────────────
 
@@ -313,6 +313,7 @@ export function injectSharedStyles(): void {
     .kh-cc-single    { background: rgba(200,120,80,.25);  color: #e0b090; }
     .kh-cc-effects   { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
     .kh-cc-effect    { font-family: 'Cinzel', serif; font-size: .75rem; color: #a0c080; background: rgba(100,180,80,.12); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+    .kh-cc-effect-engine { color: #c090f0; background: rgba(120,80,180,.18); }
     .kh-cc-costs     { font-family: 'Cinzel', serif; font-size: .7rem; color: #7a6a52; }
 
     /* ── Handbook modal specifics ─────────────────────────────────────── */
@@ -446,6 +447,13 @@ function buildCompactCard(card: Card): string {
   const info = getCardDisplayInfo(card);
   const effectsHTML = card.effects
     .map((e) => {
+      if (e.target instanceof CardTarget) {
+        const res = e.target.targetResource;
+        const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+        const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+        const scope = e.target.adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+        return `<span class="kh-cc-effect kh-cc-effect-engine">${resIcon} ${scope} +${e.modifier}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      }
       const targetStr = typeof e.target === "string" ? e.target : "CARD";
       const displayLabel = targetStr === "POPULATION_CAP" ? "🏠 POP CAP" : targetStr;
       return `<span class="kh-cc-effect">${displayLabel} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;

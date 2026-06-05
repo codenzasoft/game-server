@@ -66,7 +66,7 @@ public class CardCatalog {
           2.0,
           30.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.percentage(10.0)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 4.0, ValueType.INTEGER)));
   public static final Card MINE =
       new Card(
           "MINE",
@@ -94,7 +94,9 @@ public class CardCatalog {
           10.0,
           80.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(40), ResourceTarget.PRODUCTION.percentage(5)));
+          List.of(
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 2.0, ValueType.INTEGER)));
   public static final Card COMMUNITY_WELL =
       new Card(
           "COMMUNITY_WELL",
@@ -106,9 +108,9 @@ public class CardCatalog {
       new Card(
           "IRRIGATION",
           15.0,
-          120.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.percentage(15.0), ResourceTarget.FOOD.integer(15)));
+          100.0,
+          FrequencyType.SINGLE,
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, false), 6.0, ValueType.INTEGER)));
 
   // Summer
   public static final Card FARMSTEAD =
@@ -134,7 +136,9 @@ public class CardCatalog {
           14.0,
           80.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(5.0), ResourceTarget.FOOD.percentage(5.0)));
+          List.of(
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 2.0, ValueType.INTEGER),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 2.0, ValueType.INTEGER)));
   public static final Card FISHING_VILLAGE =
       new Card(
           "FISHING_VILLAGE",
@@ -148,7 +152,9 @@ public class CardCatalog {
           14.0,
           75.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(8), ResourceTarget.FOOD.percentage(5)));
+          List.of(
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 2.0, ValueType.INTEGER),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 1.0, ValueType.INTEGER)));
   public static final Card EARLY_HARVEST =
       new Card(
           "EARLY_HARVEST",
@@ -160,26 +166,25 @@ public class CardCatalog {
       new Card(
           "WINDMILL",
           5.0,
-          70.0,
+          60.0,
           FrequencyType.RECURRING,
-          List.of(
-              ResourceTarget.FOOD.integer(10),
-              ResourceTarget.FOOD.percentage(5),
-              ResourceTarget.PRODUCTION.integer(10)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 5.0, ValueType.INTEGER)));
   public static final Card MARKETPLACE =
       new Card(
           "MARKETPLACE",
           12.0,
           70.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(10.0), ResourceTarget.FOOD.integer(10)));
+          List.of(
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 3.0, ValueType.INTEGER)));
   public static final Card CARAVAN =
       new Card(
           "CARAVAN",
           12.0,
-          70.0,
+          60.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(20), ResourceTarget.FOOD.percentage(10)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 5.0, ValueType.INTEGER)));
   public static final Card TOWN_FAIR =
       new Card(
           "TOWN_FAIR",
@@ -193,15 +198,17 @@ public class CardCatalog {
           6.0,
           60.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(30), ResourceTarget.PRODUCTION.percentage(5)));
+          List.of(
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 5.0, ValueType.INTEGER)));
   public static final Card MERCHANT_GUILD =
       new Card(
           "MERCHANT_GUILD",
           20.0,
           120.0,
-          FrequencyType.RECURRING,
+          FrequencyType.SINGLE,
           List.of(
-              ResourceTarget.PRODUCTION.percentage(10.0), ResourceTarget.FOOD.percentage(10.0)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 5.0, ValueType.INTEGER),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 5.0, ValueType.INTEGER)));
 
   // Fall
   public static final Card WORKSHOP =
@@ -228,7 +235,7 @@ public class CardCatalog {
           60.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.PRODUCTION.percentage(5.0), ResourceTarget.PRODUCTION.integer(20)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 5.0, ValueType.INTEGER)));
   public static final Card BAKERY =
       new Card(
           "BAKERY",
@@ -249,7 +256,7 @@ public class CardCatalog {
           6.0,
           45.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.percentage(8.0)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 4.0, ValueType.INTEGER)));
   public static final Card BARN =
       new Card(
           "BARN", 10.0, 40.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(20)));
@@ -258,22 +265,27 @@ public class CardCatalog {
           "MASON_GUILD",
           16.0,
           100.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(50), ResourceTarget.PRODUCTION.percentage(10)));
+          FrequencyType.SINGLE,
+          List.of(
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 8.0, ValueType.INTEGER)));
   public static final Card METALWORKING =
       new Card(
           "METALWORKING",
           8.0,
-          80.0,
+          70.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(10)));
+          List.of(
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 6.0, ValueType.INTEGER)));
   public static final Card BLACKSMITH =
       new Card(
           "BLACKSMITH",
           20.0,
           160.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.percentage(20)));
+          FrequencyType.SINGLE,
+          List.of(
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 8.0, ValueType.INTEGER)));
 
   // Winter
   public static final Card FORGE =
