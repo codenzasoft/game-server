@@ -39,6 +39,8 @@ public class GameState {
   private boolean gameOver;
   // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
   private List<CardStaffing> tableStaffing;
+  // per-card resolution log from the most recent endAndRun call — empty between seasons
+  private List<ResolutionStep> resolutionLog;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -57,6 +59,7 @@ public class GameState {
     this.currentEvent = b.currentEvent;
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
+    this.resolutionLog = b.resolutionLog;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -280,6 +283,20 @@ public class GameState {
             : Collections.unmodifiableList(new ArrayList<>(tableStaffing));
   }
 
+  /**
+   * Per-card resolution log from the most recent {@link Phase#PLAY} end-and-run. Empty between
+   * seasons (during ADD and RANDOM_EVENT phases). The client uses this to drive indicators and
+   * toasts without re-simulating game logic.
+   */
+  @JsonProperty("resolutionLog")
+  public List<ResolutionStep> getResolutionLog() {
+    return resolutionLog == null ? List.of() : resolutionLog;
+  }
+
+  public void setResolutionLog(List<ResolutionStep> log) {
+    this.resolutionLog = log == null ? List.of() : List.copyOf(log);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -299,6 +316,7 @@ public class GameState {
     private Event currentEvent = null;
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
+    private List<ResolutionStep> resolutionLog = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -386,6 +404,11 @@ public class GameState {
 
     public Builder tableStaffing(List<CardStaffing> tableStaffing) {
       this.tableStaffing = tableStaffing == null ? List.of() : new ArrayList<>(tableStaffing);
+      return this;
+    }
+
+    public Builder resolutionLog(List<ResolutionStep> resolutionLog) {
+      this.resolutionLog = resolutionLog == null ? List.of() : new ArrayList<>(resolutionLog);
       return this;
     }
 

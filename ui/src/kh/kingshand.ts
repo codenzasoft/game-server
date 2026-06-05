@@ -108,8 +108,19 @@ interface GameContextData {
   gameId: string;
 }
 
+interface ResolutionStepData {
+  cardName: string | undefined;
+  staffingTier: StaffingTier | undefined;
+  engineBoost: boolean;
+  populationDelta: number;
+  productionDelta: number;
+  foodDelta: number;
+  populationCapDelta: number;
+}
+
 interface GameStateData {
   board: Map<Season, Card[]>;
+  resolutionLog: ResolutionStep[];
   drawPile: Map<Season, Card[]>;
   discardPile: Map<Season, Card[]>;
   hand: Card[];
@@ -230,6 +241,28 @@ export class KhEvent {
   }
 }
 
+// ResolutionStep: one entry in the end-of-season resolution log sent by the server.
+// The frontend uses this to drive indicators and toasts without local simulation.
+export class ResolutionStep {
+  cardName: string | undefined;
+  staffingTier: StaffingTier | undefined;
+  engineBoost: boolean;
+  populationDelta: number;
+  productionDelta: number;
+  foodDelta: number;
+  populationCapDelta: number;
+
+  constructor(data: ResolutionStepData) {
+    this.cardName         = data.cardName;
+    this.staffingTier     = data.staffingTier;
+    this.engineBoost      = data.engineBoost;
+    this.populationDelta  = data.populationDelta;
+    this.productionDelta  = data.productionDelta;
+    this.foodDelta        = data.foodDelta;
+    this.populationCapDelta = data.populationCapDelta;
+  }
+}
+
 // GameContext: identifies the recipient (player) and the game.
 // Mirrors the Java KhContext record.
 export class GameContext {
@@ -262,6 +295,7 @@ export class GameState {
   currentEvent: KhEvent | undefined;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
+  resolutionLog: ResolutionStep[];
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -280,6 +314,7 @@ export class GameState {
     this.currentEvent = data.currentEvent;
     this.gameOver = data.gameOver;
     this.tableStaffing = data.tableStaffing;
+    this.resolutionLog = data.resolutionLog;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -367,6 +402,18 @@ const KhEventSchema = z
   })
   .transform((data) => new KhEvent(data as KhEventData));
 
+const ResolutionStepSchema = z
+  .object({
+    cardName:         z.string().optional(),
+    staffingTier:     z.enum(StaffingTier).optional(),
+    engineBoost:      z.boolean(),
+    populationDelta:  z.number(),
+    productionDelta:  z.number(),
+    foodDelta:        z.number(),
+    populationCapDelta: z.number(),
+  })
+  .transform((data) => new ResolutionStep(data as ResolutionStepData));
+
 export const GameContextSchema = z
   .object({
     player: z.string(),
@@ -404,6 +451,8 @@ export const GameStateSchema = z
     gameOver: z.boolean(),
     // tableStaffing is only populated during the PLAY phase; empty array otherwise.
     tableStaffing: z.array(CardStaffingSchema).default([]),
+    // resolutionLog is populated after endAndRun; empty between seasons.
+    resolutionLog: z.array(ResolutionStepSchema).default([]),
   })
   .transform((data) => new GameState(data as GameStateData));
 

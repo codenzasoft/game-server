@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget, ResolutionStep } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -84,6 +84,10 @@ export class PlayPhaseScene {
 
   public mount(parent: HTMLElement): void {
     parent.appendChild(this.overlay);
+  }
+
+  public getState(): GameState {
+    return this.state;
   }
 
   public unmount(): void {
@@ -873,33 +877,38 @@ export class PlayPhaseScene {
     };
   }
 
-  // ─── End-and-Run animation ───────────────────────────────────────────────
+  // ─── End-and-Run ─────────────────────────────────────────────────────────
 
   private readonly delay = (ms: number): Promise<void> =>
     new Promise(resolve => setTimeout(resolve, ms));
 
   /**
-   * Plays the End-and-Run resolution step-by-step so the player can see
-   * each RECURRING table card fire before the season advances.
-   *
-   * 1. Highlights each RECURRING card in order, updates the resource bar
-   *    with that card's effects, then pauses 750ms.
-   * 2. After all cards, shows the food-consumption / population step.
-   * 3. Dispatches the real {@link PlayPhaseActions.endAndRun} so the server
-   *    applies the authoritative result and pushes the next state.
+   * Fires the server action immediately.  The actual animation is driven by
+   * {@link animateFromResolutionLog}, called by main.ts once the server responds
+   * with the resolution log.
    */
   private async animateEndAndRun(): Promise<void> {
     this.disableAllActions();
+    this.showToast("Resolving season…");
+    this.actions.endAndRun();
+    // Animation continues in animateFromResolutionLog, called by main.ts once the
+    // server responds with the resolution log.
+  }
 
-    const { state } = this;
-    const season = state.curSeason;
-    const table  = state.getCurrentTable();
-
-    // Local display values — server remains source of truth after commit.
-    let simPop  = state.population;
-    let simProd = state.production;
-    let simFood = state.food;
-    let simCap  = state.populationCap;
+  /**
+   * Called by main.ts after the server responds with the new state containing a
+   * non-empty resolutionLog.  Animates each step — indicators, bar updates, toasts —
+   * using the server's authoritative deltas.  Returns a promise that resolves when
+   * the animation is complete so main.ts can then perform the scene transition.
+   *
+   * @param newState the state received from the server (curPhase = ADD, resolutionLog populated)
+   * @param preState the state that was active when End and Run was clicked
+   */
+  public async animateFromResolutionLog(newState: GameState, preState: GameState): Promise<void> {
+    let simPop  = preState.population;
+    let simProd = preState.production;
+    let simFood = preState.food;
+    let simCap  = preState.populationCap;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -909,16 +918,16 @@ export class PlayPhaseScene {
       el.textContent = Math.floor(val).toString();
       if (doFlash) {
         el.classList.remove("kh-res-flash");
-        void el.offsetWidth; // force reflow to restart animation
+        void el.offsetWidth;
         el.classList.add("kh-res-flash");
       }
     };
 
     const updateBar = (pop: number, prod: number, food: number,
                        which: { pop: boolean; prod: boolean; food: boolean }): void => {
-      flashEl(".kh-play-pop-num",                  pop,  which.pop);
-      flashEl(".kh-play-prod .kh-play-res-value",  prod, which.prod);
-      flashEl(".kh-play-food .kh-play-res-value",  food, which.food);
+      flashEl(".kh-play-pop-num",                 pop,  which.pop);
+      flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
+      flashEl(".kh-play-food .kh-play-res-value", food, which.food);
     };
 
     const updateCap = (cap: number): void => {
@@ -926,165 +935,100 @@ export class PlayPhaseScene {
       if (capEl) capEl.textContent = `/ ${Math.floor(cap)}`;
     };
 
-    const setHighlight = (slot: number, on: boolean): void => {
-      const el = this.overlay.querySelector<HTMLElement>(
-        `.kh-play-table-card[data-slot="${slot}"]`,
-      );
-      el?.classList.toggle("kh-resolving", on);
-    };
+    // Initialise the bar at pre-resolution values.
+    updateBar(simPop, simProd, simFood, { pop: false, prod: false, food: false });
+    updateCap(simCap);
 
-    // ── 1. Fire each table card left-to-right ────────────────────────────
-    // RECURRING cards stay on the table; SINGLE cards fire once then go to
-    // the discard pile (handled server-side after the commit).
+    // ── Step through the server log ───────────────────────────────────────
+    for (const step of newState.resolutionLog) {
+      const isFood = step.cardName === null || step.cardName === undefined;
 
-    for (let i = 0; i < table.length; i++) {
-      const card    = table[i];
-      const staffing = state.tableStaffing[i];
-      const tier    = staffing?.tier ?? StaffingTier.FULL;
+      if (isFood) {
+        // Food-consumption / starvation / growth step.
+        const prevPop  = simPop;
+        const prevFood = simFood;
+        simPop  += step.populationDelta;
+        simFood += step.foodDelta;
+        simPop  = Math.max(0, simPop);
+        simFood = Math.max(0, simFood);
 
-      setHighlight(i, true);
+        updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
 
-      const info = getCardDisplayInfo(card);
+        const els = this.resEls();
+        if (step.foodDelta !== 0 && els.food)
+          spawnResourceIndicator(els.food, step.foodDelta, "🌾", 0);
+        if (step.populationDelta !== 0 && els.pop)
+          spawnResourceIndicator(els.pop,  step.populationDelta, "👥", 1);
 
-      if (tier === StaffingTier.NONE) {
-        // Card is understaffed — does not fire.
-        this.showToast(`${info.name} — understaffed (won't fire)`);
-        await this.delay(1000);
-        setHighlight(i, false);
-        await this.delay(150);
+        if (step.populationDelta > 0) {
+          const cappedGrowth = simPop >= newState.populationCap;
+          this.showToast(cappedGrowth
+            ? "🏠 Well-fed, but housing is full — build more to grow!"
+            : "🌱 Your people are well-fed — population grows!");
+        } else if (step.populationDelta < 0) {
+          this.showToast("💀 Starvation — population falls!");
+        } else {
+          this.showToast("🌱 Your people are well-fed.");
+        }
+
+        await this.delay(1400);
         continue;
       }
 
-      const changed = { pop: false, prod: false, food: false };
+      // Card step.
+      const info = getCardDisplayInfo({ name: step.cardName! } as Card);
+
+      if (step.staffingTier === StaffingTier.NONE) {
+        this.showToast(`${info.name} — understaffed (won't fire)`);
+        await this.delay(1000);
+        continue;
+      }
+
+      if (step.engineBoost) {
+        // Engine builder: show boost description, no resource delta.
+        const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
+        this.showToast(`${info.name} — boosts adjacent cards${freqLabel}`);
+        await this.delay(1200);
+        continue;
+      }
+
+      // Resource card: apply server deltas and show indicators.
       const prevPop  = simPop;
       const prevProd = simProd;
       const prevFood = simFood;
       let si = 0;
 
-      // Engine-builder cards (CardTarget effects) are resolved entirely server-side.
-      // Show a descriptive toast and skip resource simulation for them.
-      const isEngineBuilder = card.effects.every(e => e.target instanceof CardTarget);
-      if (isEngineBuilder) {
-        const targets = card.effects
-          .filter(e => e.target instanceof CardTarget)
-          .map(e => {
-            const ct = e.target as CardTarget;
-            const res = ct.targetResource;
-            const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-            const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
-            const scope = ct.adjacentOnly ? `next ${label} card` : `all ${label} cards`;
-            return `+${e.modifier} ${icon} → ${scope}`;
-          })
-          .join(", ");
-        this.showToast(`${info.name} — ${targets}`);
-        await this.delay(1500);
-        setHighlight(i, false);
-        await this.delay(150);
-        continue;
-      }
-
-      for (const eff of card.effects) {
-        if (eff.target instanceof CardTarget) continue; // engine builders handled above
-
-        // Mirror Java halveEffects: floor(modifier / 2) for HALF tier.
-        const rawMod = tier === StaffingTier.HALF
-          ? Math.floor(eff.modifier / 2)
-          : eff.modifier;
-
-        const apply = (cur: number): number =>
-          eff.valueType === "PERCENTAGE"
-            ? cur + cur * (rawMod * 0.01)
-            : cur + rawMod;
-
-        if (eff.target === ResourceTarget.FOOD) {
-          const next = apply(simFood);
-          if (next !== simFood) changed.food = true;
-          simFood = next;
-        }
-        if (eff.target === ResourceTarget.PRODUCTION) {
-          const next = apply(simProd);
-          if (next !== simProd) changed.prod = true;
-          simProd = next;
-        }
-        if (eff.target === ResourceTarget.POPULATION) {
-          const next = apply(simPop);
-          if (next !== simPop) changed.pop = true;
-          simPop = next;
-        }
-        if (eff.target === ResourceTarget.POPULATION_CAP) {
-          const prevCap = simCap;
-          simCap = simCap + rawMod;
-          if (simCap !== prevCap) {
-            updateCap(simCap);
-            const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
-            if (capEl) spawnResourceIndicator(capEl, simCap - prevCap, "🏠", si++);
-          }
-        }
-      }
-
-      // Clamp — mirrors Java applyX helpers (including population cap).
+      simPop  += step.populationDelta;
+      simProd += step.productionDelta;
+      simFood += step.foodDelta;
+      simPop  = Math.max(0, simPop);
       simProd = Math.max(0, simProd);
-      simPop  = Math.max(0, Math.min(simPop, simCap));
       simFood = Math.max(0, simFood);
 
+      if (step.populationCapDelta !== 0) {
+        simCap += step.populationCapDelta;
+        updateCap(simCap);
+        const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+        if (capEl) spawnResourceIndicator(capEl, step.populationCapDelta, "🏠", si++);
+      }
+
+      const changed = {
+        pop:  step.populationDelta  !== 0,
+        prod: step.productionDelta  !== 0,
+        food: step.foodDelta        !== 0,
+      };
       updateBar(simPop, simProd, simFood, changed);
 
-      // Floating indicators for each changed resource.
       const els = this.resEls();
-      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  simPop  - prevPop,  "👥", si++);
-      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
-      if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
+      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  step.populationDelta,  "👥", si++);
+      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, step.productionDelta, "⚒️", si++);
+      if (changed.food && els.food) spawnResourceIndicator(els.food, step.foodDelta,       "🌾", si++);
 
-      const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
-      const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
-      this.showToast(`${info.name} ${freqLabel}${tierLabel}`);
+      const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
+      this.showToast(`${info.name} fires…${freqLabel}`);
 
       await this.delay(1500);
-      setHighlight(i, false);
-      await this.delay(150);
     }
-
-    // ── 2. Food consumption & population growth / starvation ─────────────
-
-    const rate     = season === Season.WINTER ? 2 : 1;
-    const consumed = Math.floor(simPop) * rate;
-    const prevPop2 = simPop;
-    const prevFood2 = simFood;
-
-    if (simFood >= consumed) {
-      simFood -= consumed;
-      if (simFood > 0 && simPop > 0) {
-        const growthRate = Math.min(simFood / simPop, 0.20);
-        const grown = simPop + simPop * growthRate;
-        const capped = Math.min(grown, simCap);
-        if (capped < grown) {
-          this.showToast("🏠 Well-fed, but housing is full — build more to grow!");
-        } else {
-          this.showToast("🌱 Your people are well-fed — population grows!");
-        }
-        simPop = capped;
-      } else {
-        this.showToast("🌱 Your people are well-fed.");
-      }
-    } else {
-      const deficit = consumed - simFood;
-      simFood = 0;
-      simPop  = Math.max(0, simPop - 0.5 * deficit);
-      this.showToast("💀 Starvation — population falls!");
-    }
-
-    updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
-
-    // Indicators for food consumed and population change.
-    const els2 = this.resEls();
-    if (els2.food) spawnResourceIndicator(els2.food, simFood - prevFood2, "🌾", 0);
-    if (els2.pop)  spawnResourceIndicator(els2.pop,  simPop  - prevPop2,  "👥", 1);
-
-    await this.delay(1400);
-
-    // ── 3. Commit to server ───────────────────────────────────────────────
-
-    this.actions.endAndRun();
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────
