@@ -828,10 +828,12 @@ public class GameEngine implements Game<GameEngine> {
     applyProduction(state.getProduction() - card.productionRequirement());
     state.getHand().remove(card);
 
-    // if duplicate exists, replace with one whose every effect modifier is doubled.
-    // else just add it to the table as a new card.
+    // If a matching card is already on the table, merge the hand card into it so that
+    // engine-boosted modifiers are preserved: Farm(14) + Farm(10) → Farm II(24).
+    // Otherwise just add it to the table as a new slot.
     if (state.tableContains(card)) {
-      state.replaceTableCard(card, card.amplify(2));
+      Card tableCard = state.findTableCard(card.name());
+      state.replaceTableCard(tableCard, tableCard.mergeWith(card));
     } else {
       state.addToTable(card);
     }

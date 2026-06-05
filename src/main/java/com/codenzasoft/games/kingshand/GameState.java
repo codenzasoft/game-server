@@ -84,9 +84,23 @@ public class GameState {
     return board.get(curSeason);
   }
 
-  /** Returns {@code true} if the current season's table contains {@code card}. */
+  /**
+   * Returns {@code true} if the current season's table contains a card whose name matches {@code
+   * card}'s name. Matching by name (rather than full record equality) ensures that an
+   * engine-boosted table card — whose effect modifiers differ from the hand card — is still
+   * recognised as the upgrade target.
+   */
   public boolean tableContains(Card card) {
-    return getCurrentTable().contains(card);
+    return getCurrentTable().stream().anyMatch(c -> c.name().equals(card.name()));
+  }
+
+  /**
+   * Returns the first table card whose name equals {@code name}, or {@code null} if none exists.
+   * Used by the upgrade path to retrieve the actual (potentially boosted) table card before
+   * merging.
+   */
+  public Card findTableCard(String name) {
+    return getCurrentTable().stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
   }
 
   /**

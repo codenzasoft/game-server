@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -47,16 +48,38 @@ public record Card(
 
   /**
    * Returns a new {@link Card} with identical requirements but every effect's modifier multiplied
-   * by {@code factor}. Used by the upgrade path when a duplicate is placed on the table.
+   * by {@code factor}. Used internally when both cards have identical modifiers (no engine boost).
    *
    * @param factor the multiplier to apply to every effect modifier (e.g. {@code 2} to double)
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    // Append a roman numeral suffix so upgraded cards are visually distinct and
-    // distinguishable from their base version by name alone.
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
     return new Card(
         upgradedName, staffRequirement, productionRequirement, frequencyType, amplified);
+  }
+
+  /**
+   * Returns a new {@link Card} whose effect modifiers are the sum of this card's modifiers and
+   * {@code other}'s modifiers, paired by index. Effects present only in this card are kept
+   * unchanged. Used by the upgrade path so that a boosted table card (e.g. Farm +4 from an engine)
+   * correctly combines with an unmodified hand card: Farm(14) + Farm(10) → Farm II(24).
+   *
+   * @param other the hand card being played onto this table card
+   */
+  public Card mergeWith(Card other) {
+    List<Effect> merged = new ArrayList<>(effects.size());
+    for (int i = 0; i < effects.size(); i++) {
+      Effect mine = effects.get(i);
+      if (i < other.effects().size()) {
+        Effect theirs = other.effects().get(i);
+        merged.add(
+            new Effect(mine.target(), mine.modifier() + theirs.modifier(), mine.valueType()));
+      } else {
+        merged.add(mine);
+      }
+    }
+    String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
+    return new Card(upgradedName, staffRequirement, productionRequirement, frequencyType, merged);
   }
 }

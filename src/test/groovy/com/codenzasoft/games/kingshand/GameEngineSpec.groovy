@@ -1331,6 +1331,30 @@ class GameEngineSpec extends Specification {
         state.board.get(Season.SPRING).size() == sizeBefore
     }
 
+    def "placing a duplicate onto an engine-boosted table card merges modifiers rather than doubling the hand card"() {
+        setup:
+        // Simulate a Farm that has been boosted by an engine-builder from 10 → 14.
+        def boostedFarm = CardCatalog.FARM.boostEffect(ResourceTarget.FOOD, 4)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .table(Season.SPRING, [boostedFarm])
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def upgraded = state.board.get(Season.SPRING).get(0)
+        upgraded.name() == "Farm II"
+        upgraded.effects().size() == 1
+        upgraded.effects().get(0).modifier() == 24.0   // boosted(14) + base(10)
+    }
+
     // ----- PLAY phase: reorderCard -----
 
     def "reorderTable reorders table to match the provided name list"() {
