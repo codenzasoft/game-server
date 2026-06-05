@@ -32,6 +32,10 @@ public record Card(
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    return new Card(name, staffRequirement, productionRequirement, frequencyType, amplified);
+    // Append a roman numeral suffix so upgraded cards are visually distinct and
+    // distinguishable from their base version by name alone.
+    String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
+    return new Card(
+        upgradedName, staffRequirement, productionRequirement, frequencyType, amplified);
   }
 }

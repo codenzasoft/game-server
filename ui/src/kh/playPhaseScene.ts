@@ -449,7 +449,7 @@ export class PlayPhaseScene {
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
     const canAffordProd = state.production >= card.productionRequirement;
-    const hasSlot   = !tableFull || isUpgrade;    // upgrade always has "space"
+    const hasSlot   = !tableFull || isUpgrade;
     const canPlay   = canAffordProd && hasSlot;
 
     // Warn if the card will be understaffed — but don't block placement.
