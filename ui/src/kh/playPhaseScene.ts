@@ -123,11 +123,11 @@ export class PlayPhaseScene {
         ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
-            Cards fire left-to-right when you End and Run.
+            Cards fire left-to-right when you Play.
           </div>
         </div>
       </main>
-      <!-- Fixed End and Run button — right-centre of viewport -->
+      <!-- Fixed Play button — right-centre of viewport -->
       <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY</button>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
@@ -291,7 +291,7 @@ export class PlayPhaseScene {
           <div class="kh-play-table-count">${table.length} / ${MAX_TABLE_SIZE} slots</div>
         </div>
         <p class="kh-play-section-sub">
-          Cards fire left-to-right when you End and Run.
+          Cards fire left-to-right when you Play.
           Demolishing a card costs 20% of its production requirement.
         </p>
         <div class="kh-play-table-slots">
@@ -424,7 +424,7 @@ export class PlayPhaseScene {
             <div class="kh-play-section-title"><span>✋</span><span>Your Hand</span></div>
           </div>
           <div class="kh-play-empty-hand">
-            No cards remain in hand — you may End and Run or have already played everything.
+            No cards remain in hand — you may Play or have already played everything.
           </div>
         </div>
       `;
@@ -446,7 +446,7 @@ export class PlayPhaseScene {
           <div class="kh-play-table-count">${state.hand.length} card${state.hand.length !== 1 ? "s" : ""}</div>
         </div>
         <p class="kh-play-section-sub">
-          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you End and Run.
+          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you Play.
         </p>
         <div class="kh-play-hand-grid kh-play-hand-cols-${colCount}">
           ${cardsHTML}

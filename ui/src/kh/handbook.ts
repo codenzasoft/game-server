@@ -26,37 +26,20 @@ export const HANDBOOK: HandbookChapter[] = [
     sections: [
       {
         title: "Your goal",
-        body: `Keep your population alive for as long as possible.  Your kingdom falls
-               the moment population hits zero — everything else is in service of
-               preventing that.`,
+        body: `Keep your population alive. If it hits zero, the game ends.`,
       },
       {
-        title: "Your first few turns",
-        body: `You start with a small starter deck spread across the seasons, 20 population,
-               200 production, and 150 food.
+        title: "Each season",
+        body: `<b>Add</b> — pick one of three offered cards to add to your deck. Skip or reroll if nothing fits.
                <br><br>
-               <b>Step 1 — Add phase:</b> You're offered three cards to add to your deck.
-               Pick one that generates food or production — <em>Farm</em> and <em>Seeds</em>
-               are safe early picks.  You can reroll the offer for a production cost or skip
-               if nothing looks useful.
+               <b>Random Event</b> — an event fires and you choose a response. Read both options before picking.
                <br><br>
-               <b>Step 2 — Random Event:</b> An event fires and you pick an option.  Read
-               both choices — one is usually clearly better for your current resources.
-               <br><br>
-               <b>Step 3 — Play phase:</b> You draw up to 3 cards. Drag a card onto an
-               open table slot (or click Play) to place it.  Check the staffing badge on
-               each table card — green means it will fire at full power.  When you're
-               ready, hit <em>End and Run</em> to resolve the table and feed your people.
-               <br><br>
-               Repeat across Spring → Summer → Fall → Winter, then a new year begins with
-               harder events.`,
+               <b>Play</b> — draw up to 3 cards and place them on your table. Hit Play when done.
+               Cards fire left to right, then food is consumed. Repeat each season.`,
       },
       {
-        title: "The one rule to survive early",
-        body: `Always enter End and Run with enough food to feed your population.
-               <b>Standard seasons cost 1 food per population; Winter costs 2.</b>
-               If you can't feed everyone, population drops — and a smaller population
-               means fewer workers to staff your cards next season.`,
+        title: "The one rule",
+        body: `Make sure you have enough food before you Play. Standard seasons cost 1 food per population; Winter costs 2.`,
       },
     ],
   },
@@ -79,7 +62,7 @@ export const HANDBOOK: HandbookChapter[] = [
                <br><br>
                <b>III. Play</b> — You draw three cards from your deck and may play
                any of them onto your table.  When you are ready, click
-               <em>End and Run</em> to resolve the table and advance to the next season.`,
+               <em>Play</em> to resolve the table and advance to the next season.`,
       },
       {
         title: "Season order",
@@ -100,7 +83,7 @@ export const HANDBOOK: HandbookChapter[] = [
         body: `Population is your most important resource — if it drops below 1, your
                kingdom falls and the game ends.
                <br><br>
-               Population doubles as your <b>worker pool</b>.  When you End and Run,
+               Population doubles as your <b>worker pool</b>.  When you Play,
                <em>floor(population)</em> workers are distributed left-to-right across
                your table cards, filling each card's staff requirement.  Cards that
                can't be staffed fire at reduced power or not at all — see the
@@ -120,7 +103,7 @@ export const HANDBOOK: HandbookChapter[] = [
       },
       {
         title: "Food 🌾",
-        body: `Food is consumed at the end of every season when you End and Run.
+        body: `Food is consumed at the end of every season when you Play.
                Surplus food carries over to the next season — it is never wasted.
                A persistent food stockpile is your safety net against bad seasons.`,
       },
@@ -134,7 +117,7 @@ export const HANDBOOK: HandbookChapter[] = [
     sections: [
       {
         title: "Food consumption",
-        body: `At the end of each season (when you End and Run), every unit of
+        body: `At the end of each season (when you Play), every unit of
                population consumes food:
                <br><br>
                &nbsp;&nbsp;• <b>Standard seasons</b> (Spring, Summer, Fall): <b>1 food</b> per population.
@@ -186,7 +169,7 @@ export const HANDBOOK: HandbookChapter[] = [
                <b>Recurring</b> — The card fires every season it sits on your table.
                These are your engine cards; build around them for compounding value.
                <br><br>
-               <b>Single-use</b> — The card fires once when you End and Run, then
+               <b>Single-use</b> — The card fires once when you Play, then
                is permanently removed from your deck.  Use them for burst value
                (a big one-time harvest, a stockpile of firewood) when you need it most.`,
       },
@@ -199,23 +182,23 @@ export const HANDBOOK: HandbookChapter[] = [
                <br><br>
                Cards also show a <b>Staff Req</b> value.  This is <em>not</em> a gate —
                you can play any card regardless of population — but a card you can't
-               staff will fire at half power or not at all when you End and Run.
+               staff will fire at half power or not at all when you Play.
                The hand card will warn you if your current population falls short.
                <br><br>
-               Unplayed hand cards are discarded to your discard pile when you End and Run.`,
+               Unplayed hand cards are discarded to your discard pile when you Play.`,
       },
       {
         title: "Upgrading a card",
-        body: `If a card in your hand matches a card already on your table (same type),
-               you can <em>upgrade</em> it instead of filling a new slot.  An upgrade
-               amplifies the existing table card's effect — effectively doubling its
-               output — without using an additional slot.
+        body: `If a card in your hand matches a card already on your table, you can upgrade
+               it instead of filling a new slot.  The hand card's modifiers are added to
+               the table card's current modifiers — so a Farm at 14 (boosted by an engine)
+               upgraded with a base Farm gives you Farm II at 24.
                <br><br>
                Upgraded cards are highlighted with a gold border and an "UPGRADES TABLE" tag.`,
       },
       {
         title: "The table",
-        body: `Your table holds up to <b>5 cards</b>.  When you End and Run, cards fire
+        body: `Your table holds up to <b>5 cards</b>.  When you Play, cards fire
                from left to right.  Recurring cards remain on the table after firing;
                single-use cards are removed.
                <br><br>
@@ -246,7 +229,7 @@ export const HANDBOOK: HandbookChapter[] = [
     sections: [
       {
         title: "How workers are allocated",
-        body: `When you End and Run, your total worker count is locked in as
+        body: `When you Play, your total worker count is locked in as
                <b>floor(population)</b> — fractional population doesn't contribute.
                Workers are then distributed <b>left to right</b> across your table,
                filling each card's staff requirement greedily until workers run out.
@@ -267,7 +250,7 @@ export const HANDBOOK: HandbookChapter[] = [
                &nbsp;&nbsp;• <b>None</b> (workers &lt; half threshold) — does not fire at all.
                Single-use cards are still consumed even at None tier.
                <br><br>
-               The End and Run animation shows each card's tier as it resolves, so you
+               The Play animation shows each card's tier as it resolves, so you
                always know exactly what fired and at what power.`,
       },
       {
@@ -314,7 +297,7 @@ export const HANDBOOK: HandbookChapter[] = [
       {
         title: "Discard pile",
         body: `Played cards and unplayed hand cards are moved to the discard pile when
-               you End and Run.  Recurring table cards stay on the table and are
+               you Play.  Recurring table cards stay on the table and are
                <em>not</em> discarded.  Single-use cards that fire are removed from the
                game entirely — they do not return to the discard pile.
                <br><br>
@@ -340,13 +323,11 @@ export const HANDBOOK: HandbookChapter[] = [
       },
       {
         title: "Winter scaling ❄️",
-        body: `Winter events grow more severe over time.  Every effect modifier in a
-               winter event is <b>multiplied by the current year</b> before it is applied.
+        body: `Winter event effects scale up each year. The multiplier follows a curve —
+               early years ramp gradually, later years accelerate. A −5 production effect
+               in Year 1 is manageable; the same event in Year 6 is not.
                <br><br>
-               Example: a −5 production effect in Year 3 Winter becomes −15.
-               <br><br>
-               The winter banner displayed during the Random Event phase shows the
-               active scaling multiplier.  Plan ahead — winters only get harsher.`,
+               Non-winter events also scale slightly each year, but much more slowly.`,
       },
       {
         title: "Event floors",
