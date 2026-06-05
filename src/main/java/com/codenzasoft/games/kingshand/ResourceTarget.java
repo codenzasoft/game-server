@@ -9,7 +9,12 @@ package com.codenzasoft.games.kingshand;
 public enum ResourceTarget implements EffectTarget {
   POPULATION,
   PRODUCTION,
-  FOOD;
+  FOOD,
+  /**
+   * Expands the maximum population allowed. Derived passively from board cards; never fired as an
+   * accumulated effect.
+   */
+  POPULATION_CAP;
 
   /** Creates an additive (flat integer) effect targeting this resource. */
   public Effect integer(int value) {

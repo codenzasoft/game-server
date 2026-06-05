@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget, ResolutionStep } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -86,6 +86,10 @@ export class PlayPhaseScene {
     parent.appendChild(this.overlay);
   }
 
+  public getState(): GameState {
+    return this.state;
+  }
+
   public unmount(): void {
     this.overlay.remove();
   }
@@ -119,11 +123,11 @@ export class PlayPhaseScene {
         ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
-            Cards fire left-to-right when you End and Run.
+            Cards fire left-to-right when you Play.
           </div>
         </div>
       </main>
-      <!-- Fixed End and Run button — right-centre of viewport -->
+      <!-- Fixed Play button — right-centre of viewport -->
       <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY</button>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
@@ -224,7 +228,7 @@ export class PlayPhaseScene {
           <span class="kh-play-res-icon">👥</span>
           <div>
             <div class="kh-play-res-label">Population</div>
-            <div class="kh-play-res-value">${Math.floor(state.population)}</div>
+            <div class="kh-play-res-value"><span class="kh-play-pop-num">${Math.floor(state.population)}</span> <span class="kh-play-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-play-res-divider"></div>
@@ -287,7 +291,7 @@ export class PlayPhaseScene {
           <div class="kh-play-table-count">${table.length} / ${MAX_TABLE_SIZE} slots</div>
         </div>
         <p class="kh-play-section-sub">
-          Cards fire left-to-right when you End and Run.
+          Cards fire left-to-right when you Play.
           Demolishing a card costs 20% of its production requirement.
         </p>
         <div class="kh-play-table-slots">
@@ -339,13 +343,28 @@ export class PlayPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
+        if (e.target instanceof CardTarget) {
+          const res = e.target.targetResource;
+          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          return `
+            <div class="kh-tc-tt-effect">
+              <span class="kh-tc-tt-et kh-tc-tt-et-engine">${resIcon} ${scope}</span>
+              <span class="kh-tc-tt-mod">+${e.modifier}</span>
+              <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
                    : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+                   : e.target === ResourceTarget.POPULATION ? "👥"
+                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
         return `
           <div class="kh-tc-tt-effect">
-            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -405,7 +424,7 @@ export class PlayPhaseScene {
             <div class="kh-play-section-title"><span>✋</span><span>Your Hand</span></div>
           </div>
           <div class="kh-play-empty-hand">
-            No cards remain in hand — you may End and Run or have already played everything.
+            No cards remain in hand — you may Play or have already played everything.
           </div>
         </div>
       `;
@@ -427,7 +446,7 @@ export class PlayPhaseScene {
           <div class="kh-play-table-count">${state.hand.length} card${state.hand.length !== 1 ? "s" : ""}</div>
         </div>
         <p class="kh-play-section-sub">
-          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you End and Run.
+          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you Play.
         </p>
         <div class="kh-play-hand-grid kh-play-hand-cols-${colCount}">
           ${cardsHTML}
@@ -485,13 +504,28 @@ export class PlayPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
+        if (e.target instanceof CardTarget) {
+          const res = e.target.targetResource;
+          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          return `
+            <div class="kh-play-hc-effect-row">
+              <span class="kh-play-hc-et kh-play-hc-et-engine">${resIcon} ${scope}</span>
+              <span class="kh-play-hc-mod">+${e.modifier}</span>
+              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
         const icon = e.target === ResourceTarget.FOOD ? "🌾"
                    : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+                   : e.target === ResourceTarget.POPULATION ? "👥"
+                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -596,7 +630,15 @@ export class PlayPhaseScene {
       : cards.map((c) => {
           const info = getCardDisplayInfo(c);
           const effectsHTML = c.effects.map((e) => {
+            if (e.target instanceof CardTarget) {
+              const res = e.target.targetResource;
+              const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
+              const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+              const sc = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
+              return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
+            if (targetStr === "POPULATION_CAP") return `<span class="kh-cc-effect">🏠 POP CAP ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
@@ -829,38 +871,44 @@ export class PlayPhaseScene {
   /** Returns the three live resource-value elements (pop, prod, food). */
   private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
     return {
-      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop  .kh-play-res-value"),
+      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
       prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
       food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
     };
   }
 
-  // ─── End-and-Run animation ───────────────────────────────────────────────
+  // ─── End-and-Run ─────────────────────────────────────────────────────────
 
   private readonly delay = (ms: number): Promise<void> =>
     new Promise(resolve => setTimeout(resolve, ms));
 
   /**
-   * Plays the End-and-Run resolution step-by-step so the player can see
-   * each RECURRING table card fire before the season advances.
-   *
-   * 1. Highlights each RECURRING card in order, updates the resource bar
-   *    with that card's effects, then pauses 750ms.
-   * 2. After all cards, shows the food-consumption / population step.
-   * 3. Dispatches the real {@link PlayPhaseActions.endAndRun} so the server
-   *    applies the authoritative result and pushes the next state.
+   * Fires the server action immediately.  The actual animation is driven by
+   * {@link animateFromResolutionLog}, called by main.ts once the server responds
+   * with the resolution log.
    */
   private async animateEndAndRun(): Promise<void> {
     this.disableAllActions();
+    this.showToast("Resolving season…");
+    this.actions.endAndRun();
+    // Animation continues in animateFromResolutionLog, called by main.ts once the
+    // server responds with the resolution log.
+  }
 
-    const { state } = this;
-    const season = state.curSeason;
-    const table  = state.getCurrentTable();
-
-    // Local display values — server remains source of truth after commit.
-    let simPop  = state.population;
-    let simProd = state.production;
-    let simFood = state.food;
+  /**
+   * Called by main.ts after the server responds with the new state containing a
+   * non-empty resolutionLog.  Animates each step — indicators, bar updates, toasts —
+   * using the server's authoritative deltas.  Returns a promise that resolves when
+   * the animation is complete so main.ts can then perform the scene transition.
+   *
+   * @param newState the state received from the server (curPhase = ADD, resolutionLog populated)
+   * @param preState the state that was active when End and Run was clicked
+   */
+  public async animateFromResolutionLog(newState: GameState, preState: GameState): Promise<void> {
+    let simPop  = preState.population;
+    let simProd = preState.production;
+    let simFood = preState.food;
+    let simCap  = preState.populationCap;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -870,138 +918,117 @@ export class PlayPhaseScene {
       el.textContent = Math.floor(val).toString();
       if (doFlash) {
         el.classList.remove("kh-res-flash");
-        void el.offsetWidth; // force reflow to restart animation
+        void el.offsetWidth;
         el.classList.add("kh-res-flash");
       }
     };
 
     const updateBar = (pop: number, prod: number, food: number,
                        which: { pop: boolean; prod: boolean; food: boolean }): void => {
-      flashEl(".kh-play-pop  .kh-play-res-value", pop,  which.pop);
+      flashEl(".kh-play-pop-num",                 pop,  which.pop);
       flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
       flashEl(".kh-play-food .kh-play-res-value", food, which.food);
     };
 
-    const setHighlight = (slot: number, on: boolean): void => {
-      const el = this.overlay.querySelector<HTMLElement>(
-        `.kh-play-table-card[data-slot="${slot}"]`,
-      );
-      el?.classList.toggle("kh-resolving", on);
+    const updateCap = (cap: number): void => {
+      const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+      if (capEl) capEl.textContent = `/ ${Math.floor(cap)}`;
     };
 
-    // ── 1. Fire each table card left-to-right ────────────────────────────
-    // RECURRING cards stay on the table; SINGLE cards fire once then go to
-    // the discard pile (handled server-side after the commit).
+    // Initialise the bar at pre-resolution values.
+    updateBar(simPop, simProd, simFood, { pop: false, prod: false, food: false });
+    updateCap(simCap);
 
-    for (let i = 0; i < table.length; i++) {
-      const card    = table[i];
-      const staffing = state.tableStaffing[i];
-      const tier    = staffing?.tier ?? StaffingTier.FULL;
+    // ── Step through the server log ───────────────────────────────────────
+    for (const step of newState.resolutionLog) {
+      const isFood = step.cardName === null || step.cardName === undefined;
 
-      setHighlight(i, true);
+      if (isFood) {
+        // Food-consumption / starvation / growth step.
+        const prevPop  = simPop;
+        const prevFood = simFood;
+        simPop  += step.populationDelta;
+        simFood += step.foodDelta;
+        simPop  = Math.max(0, simPop);
+        simFood = Math.max(0, simFood);
 
-      const info = getCardDisplayInfo(card);
+        updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
 
-      if (tier === StaffingTier.NONE) {
-        // Card is understaffed — does not fire.
-        this.showToast(`${info.name} — understaffed (won't fire)`);
-        await this.delay(1000);
-        setHighlight(i, false);
-        await this.delay(150);
+        const els = this.resEls();
+        if (step.foodDelta !== 0 && els.food)
+          spawnResourceIndicator(els.food, step.foodDelta, "🌾", 0);
+        if (step.populationDelta !== 0 && els.pop)
+          spawnResourceIndicator(els.pop,  step.populationDelta, "👥", 1);
+
+        if (step.populationDelta > 0) {
+          const cappedGrowth = simPop >= newState.populationCap;
+          this.showToast(cappedGrowth
+            ? "🏠 Well-fed, but housing is full — build more to grow!"
+            : "🌱 Your people are well-fed — population grows!");
+        } else if (step.populationDelta < 0) {
+          this.showToast("💀 Starvation — population falls!");
+        } else {
+          this.showToast("🌱 Your people are well-fed.");
+        }
+
+        await this.delay(1400);
         continue;
       }
 
-      const changed = { pop: false, prod: false, food: false };
+      // Card step.
+      const info = getCardDisplayInfo({ name: step.cardName! } as Card);
+
+      if (step.staffingTier === StaffingTier.NONE) {
+        this.showToast(`${info.name} — understaffed (won't fire)`);
+        await this.delay(1000);
+        continue;
+      }
+
+      if (step.engineBoost) {
+        // Engine builder: show boost description, no resource delta.
+        const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
+        this.showToast(`${info.name} — boosts adjacent cards${freqLabel}`);
+        await this.delay(1200);
+        continue;
+      }
+
+      // Resource card: apply server deltas and show indicators.
       const prevPop  = simPop;
       const prevProd = simProd;
       const prevFood = simFood;
+      let si = 0;
 
-      for (const eff of card.effects) {
-        if (typeof eff.target !== "string") continue; // skip CardTarget effects
-
-        // Mirror Java halveEffects: floor(modifier / 2) for HALF tier.
-        const rawMod = tier === StaffingTier.HALF
-          ? Math.floor(eff.modifier / 2)
-          : eff.modifier;
-
-        const apply = (cur: number): number =>
-          eff.valueType === "PERCENTAGE"
-            ? cur + cur * (rawMod * 0.01)
-            : cur + rawMod;
-
-        if (eff.target === ResourceTarget.FOOD) {
-          const next = apply(simFood);
-          if (next !== simFood) changed.food = true;
-          simFood = next;
-        }
-        if (eff.target === ResourceTarget.PRODUCTION) {
-          const next = apply(simProd);
-          if (next !== simProd) changed.prod = true;
-          simProd = next;
-        }
-        if (eff.target === ResourceTarget.POPULATION) {
-          const next = apply(simPop);
-          if (next !== simPop) changed.pop = true;
-          simPop = next;
-        }
-      }
-
-      // Clamp — mirrors Java applyX helpers.
-      simProd = Math.max(0, simProd);
+      simPop  += step.populationDelta;
+      simProd += step.productionDelta;
+      simFood += step.foodDelta;
       simPop  = Math.max(0, simPop);
+      simProd = Math.max(0, simProd);
       simFood = Math.max(0, simFood);
 
+      if (step.populationCapDelta !== 0) {
+        simCap += step.populationCapDelta;
+        updateCap(simCap);
+        const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+        if (capEl) spawnResourceIndicator(capEl, step.populationCapDelta, "🏠", si++);
+      }
+
+      const changed = {
+        pop:  step.populationDelta  !== 0,
+        prod: step.productionDelta  !== 0,
+        food: step.foodDelta        !== 0,
+      };
       updateBar(simPop, simProd, simFood, changed);
 
-      // Floating indicators for each changed resource.
       const els = this.resEls();
-      let si = 0;
-      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  simPop  - prevPop,  "👥", si++);
-      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, simProd - prevProd, "⚒️", si++);
-      if (changed.food && els.food) spawnResourceIndicator(els.food, simFood - prevFood, "🌾", si++);
+      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  step.populationDelta,  "👥", si++);
+      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, step.productionDelta, "⚒️", si++);
+      if (changed.food && els.food) spawnResourceIndicator(els.food, step.foodDelta,       "🌾", si++);
 
-      const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
-      const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
-      this.showToast(`${info.name} ${freqLabel}${tierLabel}`);
+      const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
+      this.showToast(`${info.name} fires…${freqLabel}`);
 
       await this.delay(1500);
-      setHighlight(i, false);
-      await this.delay(150);
     }
-
-    // ── 2. Food consumption & population growth / starvation ─────────────
-
-    const rate     = season === Season.WINTER ? 2 : 1;
-    const consumed = Math.floor(simPop) * rate;
-    const prevPop2 = simPop;
-    const prevFood2 = simFood;
-
-    if (simFood >= consumed) {
-      simFood -= consumed;
-      if (simFood > 0 && simPop > 0) {
-        const growthRate = Math.min(simFood / simPop, 0.20);
-        simPop = simPop + simPop * growthRate;
-      }
-      this.showToast("🌱 Your people are well-fed — population grows!");
-    } else {
-      const deficit = consumed - simFood;
-      simFood = 0;
-      simPop  = Math.max(0, simPop - 0.5 * deficit);
-      this.showToast("💀 Starvation — population falls!");
-    }
-
-    updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
-
-    // Indicators for food consumed and population change.
-    const els2 = this.resEls();
-    if (els2.food) spawnResourceIndicator(els2.food, simFood - prevFood2, "🌾", 0);
-    if (els2.pop)  spawnResourceIndicator(els2.pop,  simPop  - prevPop2,  "👥", 1);
-
-    await this.delay(1400);
-
-    // ── 3. Commit to server ───────────────────────────────────────────────
-
-    this.actions.endAndRun();
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────
@@ -1100,6 +1127,7 @@ export class PlayPhaseScene {
       .kh-play-pop  .kh-play-res-value { color: #f09090; }
       .kh-play-prod .kh-play-res-value { color: #f0cc60; }
       .kh-play-food .kh-play-res-value { color: #90e060; }
+      .kh-play-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-play-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
       /* ── Phase tracker ───────────────────────────────────────────────── */
@@ -1217,9 +1245,11 @@ export class PlayPhaseScene {
       .kh-play-tc-effects { padding: 10px 14px; flex: 1; }
       .kh-play-tc-effect  { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: .82rem; }
       .kh-play-tc-et      { font-family: 'Cinzel', serif; font-size: .6rem; font-weight: 600; letter-spacing: .6px; min-width: 72px; display: flex; align-items: center; gap: 3px; }
-      .kh-play-tc-et-food       { color: #3a7020; }
-      .kh-play-tc-et-production { color: #a07010; }
-      .kh-play-tc-et-population { color: #8b2020; }
+      .kh-play-tc-et-food             { color: #3a7020; }
+      .kh-play-tc-et-production       { color: #a07010; }
+      .kh-play-tc-et-population       { color: #8b2020; }
+      .kh-play-tc-et-population_cap   { color: #4a6a9a; }
+      .kh-play-tc-et-engine           { color: #7a5aaa; }
       .kh-play-tc-mod     { font-weight: 700; font-size: .9rem; color: #3d6b46; }
       .kh-play-tc-freq    { font-size: .7rem; color: #a09070; font-style: italic; }
 
@@ -1336,9 +1366,11 @@ export class PlayPhaseScene {
       }
       .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
       .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
-      .kh-play-hc-et-food       { color: #3a7020; }
-      .kh-play-hc-et-production { color: #a07010; }
-      .kh-play-hc-et-population { color: #8b2020; }
+      .kh-play-hc-et-food             { color: #3a7020; }
+      .kh-play-hc-et-production       { color: #a07010; }
+      .kh-play-hc-et-population       { color: #8b2020; }
+      .kh-play-hc-et-population_cap   { color: #4a6a9a; }
+      .kh-play-hc-et-engine           { color: #7a5aaa; }
       .kh-play-hc-mod   { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
@@ -1830,9 +1862,11 @@ export class PlayPhaseScene {
       .kh-tc-tt-effects  { margin-bottom: 10px; }
       .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }
       .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: 1.16rem; font-weight: 600; letter-spacing: .5px; min-width: 120px; display: flex; align-items: center; gap: 4px; }
-      .kh-tc-tt-et-food       { color: #7adc50; }
-      .kh-tc-tt-et-production { color: #f0c060; }
-      .kh-tc-tt-et-population { color: #f09090; }
+      .kh-tc-tt-et-food             { color: #7adc50; }
+      .kh-tc-tt-et-production       { color: #f0c060; }
+      .kh-tc-tt-et-population       { color: #f09090; }
+      .kh-tc-tt-et-population_cap   { color: #7aace0; }
+      .kh-tc-tt-et-engine           { color: #c090f0; }
       .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
       .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }
 

@@ -39,8 +39,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   FERTILIZER: {
     name: "Fertilizer",
-    description: "Enrich the soil each spring to boost all food output.",
-    tags: ["AGRICULTURE"],
+    description: "Enriches the soil — each food-producing card on the table yields extra food.",
+    tags: ["AGRICULTURE", "ENGINE"],
   },
   MINE: {
     name: "Mine",
@@ -59,8 +59,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   LUMBER_YARD: {
     name: "Lumber Yard",
-    description: "A lumber yard that harvests timber and compounds your production each spring.",
-    tags: ["INDUSTRY"],
+    description: "A lumber yard that multiplies the output of every production card on the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   COMMUNITY_WELL: {
     name: "Community Well",
@@ -69,11 +69,21 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   IRRIGATION: {
     name: "Irrigation",
-    description: "Channel water to the fields, dramatically boosting crop yields each spring.",
-    tags: ["AGRICULTURE"],
+    description: "A network of channels that amplifies the output of every food-producing card on the table.",
+    tags: ["AGRICULTURE", "ENGINE"],
   },
 
   // ── Summer ─────────────────────────────────────────────────────────────────
+  BUNKHOUSE: {
+    name: "Bunkhouse",
+    description: "Shared worker housing that raises your settlement's population cap.",
+    tags: ["HOUSING", "POPULATION"],
+  },
+  MANOR: {
+    name: "Manor",
+    description: "A grand manor that dramatically expands your settlement's population cap.",
+    tags: ["HOUSING", "POPULATION"],
+  },
   FARMSTEAD: {
     name: "Farmstead",
     description: "A prosperous farmstead that steadily produces both food and goods.",
@@ -91,8 +101,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   TRADE_ROUTES: {
     name: "Trade Routes",
-    description: "Establish routes that grow both production and food every summer.",
-    tags: ["COMMERCE"],
+    description: "Established routes that boost the output of every food and production card on the table.",
+    tags: ["COMMERCE", "ENGINE"],
   },
   FISHING_VILLAGE: {
     name: "Fishing Village",
@@ -101,8 +111,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   SCHOOL_HOUSE: {
     name: "School House",
-    description: "A school that trains workers and improves your kingdom's output.",
-    tags: ["INDUSTRY", "AGRICULTURE"],
+    description: "Trained workers improve productivity across the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   EARLY_HARVEST: {
     name: "Early Harvest",
@@ -111,17 +121,17 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   WINDMILL: {
     name: "Windmill",
-    description: "A windmill that grinds grain and keeps production turning each summer.",
-    tags: ["AGRICULTURE", "INDUSTRY"],
+    description: "A windmill that grinds grain and amplifies every food-producing card on the table.",
+    tags: ["AGRICULTURE", "ENGINE"],
   },
   MARKETPLACE: {
     name: "Marketplace",
-    description: "A bustling marketplace that drives commerce and brings in provisions.",
+    description: "A busy marketplace that brings in food and production each season.",
     tags: ["COMMERCE"],
   },
   CARAVAN: {
     name: "Caravan",
-    description: "A trade caravan that returns each summer with goods and extra provisions.",
+    description: "Regular trade routes that bring in food and production each season.",
     tags: ["COMMERCE"],
   },
   TOWN_FAIR: {
@@ -131,13 +141,13 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   STONE_QUARRY: {
     name: "Stone Quarry",
-    description: "A quarry that extracts stone each summer, boosting and compounding production.",
+    description: "A working quarry that steadily grows your production output.",
     tags: ["INDUSTRY"],
   },
   MERCHANT_GUILD: {
     name: "Merchant Guild",
-    description: "An established guild that expands both production and food stores.",
-    tags: ["COMMERCE"],
+    description: "A powerful guild that amplifies every food and production card on the table.",
+    tags: ["COMMERCE", "ENGINE"],
   },
 
   // ── Fall ───────────────────────────────────────────────────────────────────
@@ -146,11 +156,6 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A workshop that steadily expands your production capacity each fall.",
     tags: ["INDUSTRY"],
   },
-  MANOR: {
-    name: "Manor",
-    description: "A grand manor that attracts settlers and skilled workers each fall.",
-    tags: ["POPULATION", "INDUSTRY"],
-  },
   HARVEST: {
     name: "Harvest",
     description: "A bountiful fall harvest that fills your stores.",
@@ -158,13 +163,13 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   TEXTILES: {
     name: "Textiles",
-    description: "A textile mill that compounds and boosts your production output.",
-    tags: ["INDUSTRY"],
+    description: "A textile mill that sharpens every production card on the table each fall.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   BAKERY: {
     name: "Bakery",
-    description: "A bakery that turns the harvest grain into steady and growing food output.",
-    tags: ["FOOD"],
+    description: "A bakery that turns the harvest grain into steady food output, boosting every food card on the table.",
+    tags: ["FOOD", "ENGINE"],
   },
   TAX_COLLECTION: {
     name: "Tax Collection",
@@ -173,8 +178,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   STOREHOUSE: {
     name: "Storehouse",
-    description: "A storehouse that stretches your food reserves each fall.",
-    tags: ["AGRICULTURE"],
+    description: "Careful storage practices that boost the yield of every food-producing card each fall.",
+    tags: ["AGRICULTURE", "ENGINE"],
   },
   BARN: {
     name: "Barn",
@@ -183,18 +188,18 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   MASON_GUILD: {
     name: "Mason Guild",
-    description: "A guild of master masons who drive substantial and compounding production.",
-    tags: ["INDUSTRY"],
+    description: "Master masons whose expertise dramatically amplifies every production card on the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   METALWORKING: {
     name: "Metalworking",
-    description: "A metalworking operation that compounds your production output each fall.",
-    tags: ["INDUSTRY"],
+    description: "Advanced metalworking that amplifies the output of every production card on the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   BLACKSMITH: {
     name: "Blacksmith",
-    description: "A master blacksmith's forge that dramatically accelerates production each fall.",
-    tags: ["INDUSTRY"],
+    description: "A master blacksmith whose forge dramatically amplifies every production card on the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
 
   // ── Winter ─────────────────────────────────────────────────────────────────
@@ -272,7 +277,8 @@ const IMAGE_NAME_OVERRIDES: Record<string, string> = {
 
 /** Returns the public path to a card's full-art PNG, e.g. "/img/barn.png". */
 export function cardImagePath(cardName: string): string {
-  const base = IMAGE_NAME_OVERRIDES[cardName] ?? cardName.toLowerCase();
+  const stripped = baseName(cardName);
+  const base = IMAGE_NAME_OVERRIDES[stripped] ?? stripped.toLowerCase();
   return `/img/${base}.png`;
 }
 

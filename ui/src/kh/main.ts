@@ -118,10 +118,25 @@ const getGameId = (): string | undefined => {
     switch (state.curPhase) {
       case Phase.ADD: {
         if (currentScene instanceof AddPhaseScene) {
-          // Same phase, same scene type (e.g. after a reroll) — just refresh content.
+          // Same phase — just refresh content.
           currentScene.update(state);
+        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
+          // PLAY → ADD transition with resolution data: animate first, then switch.
+          // Capture the pre-resolution state (still live in the scene) before anything changes.
+          const preState = currentScene.getState();
+          const playScene = currentScene;
+          playScene.animateFromResolutionLog(state, preState).then(() => {
+            playScene.unmount();
+            const addScene = new AddPhaseScene(state, {
+              reroll:   () => handler.reroll(),
+              pickCard: (name) => handler.pickCard(name),
+              skipAdd:  () => handler.skipAdd(),
+            });
+            currentScene = addScene;
+            addScene.mount(mountTarget);
+          });
         } else {
-          // Phase changed to ADD from RANDOM_EVENT or PLAY — tear down the old scene first.
+          // Phase changed to ADD without a resolution log — tear down and switch normally.
           if (currentScene) {
             currentScene.unmount();
             currentScene = null;

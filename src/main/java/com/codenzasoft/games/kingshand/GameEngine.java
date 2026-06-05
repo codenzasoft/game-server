@@ -209,6 +209,7 @@ public class GameEngine implements Game<GameEngine> {
           case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
           case PRODUCTION -> applyProduction(scaled.apply(state.getProduction()));
           case FOOD -> applyFood(scaled.apply(state.getFood()));
+          case POPULATION_CAP -> {} // passive — not applied via events
         }
       }
       // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
@@ -317,15 +318,32 @@ public class GameEngine implements Game<GameEngine> {
 
     // Walk every card on the current season's table. Only RECURRING cards fire here; frequency is
     // checked once per card (it is a card-level property). The full end-of-PLAY resolver —
-    // including SINGLE-frequency cards and post-fire discard — lives in {@link #endAndRun()}.
-    for (Card card : table) {
-      if (card.frequencyType() == FrequencyType.RECURRING) {
-        for (Effect effect : card.effects()) {
-          if (effect.target() instanceof ResourceTarget rt) {
-            switch (rt) {
-              case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-              case FOOD -> applyFood(effect.apply(state.getFood()));
+    // including SINGLE-frequency cards (engine builders) and post-fire discard — lives in
+    // endAndRun.
+    for (int i = 0; i < table.size(); i++) {
+      Card card = table.get(i);
+      if (card.frequencyType() != FrequencyType.RECURRING) continue;
+      for (Effect effect : card.effects()) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          switch (rt) {
+            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
+            case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+            case FOOD -> applyFood(effect.apply(state.getFood()));
+            case POPULATION_CAP -> {} // passive
+          }
+        } else if (effect.target() instanceof CardTarget ct) {
+          // RECURRING engine builder: permanently boost matching cards to the right.
+          for (int j = i + 1; j < table.size(); j++) {
+            Card target = table.get(j);
+            boolean hasMatch =
+                target.effects().stream()
+                    .anyMatch(
+                        e ->
+                            e.target() == ct.targetResource()
+                                && e.valueType() == ValueType.INTEGER);
+            if (hasMatch) {
+              table.set(j, target.boostEffect(ct.targetResource(), effect.modifier()));
+              if (ct.adjacentOnly()) break;
             }
           }
         }
@@ -370,33 +388,89 @@ public class GameEngine implements Game<GameEngine> {
     //    disturb the iteration sequence.
     List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
+    // ── Single left-to-right resolution pass ─────────────────────────────────────
+    List<Card> liveTable = state.getCurrentTable();
+    int discardedCount = 0;
+    List<ResolutionStep> log = new ArrayList<>();
+
     for (int i = 0; i < snapshot.size(); i++) {
       Card card = snapshot.get(i);
       StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
 
+      double popBefore = state.getPopulation();
+      double prodBefore = state.getProduction();
+      double foodBefore = state.getFood();
+      double capBefore = state.getPopulationCap();
+
+      // Whether all effects on this card are engine-builder (CardTarget) effects.
+      boolean isEngineBoost =
+          tier != StaffingTier.NONE
+              && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
+
       if (tier != StaffingTier.NONE) {
         List<Effect> effects =
             tier == StaffingTier.HALF ? halveEffects(card.effects()) : card.effects();
+
         for (Effect effect : effects) {
           if (effect.target() instanceof ResourceTarget rt) {
             switch (rt) {
               case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
               case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
               case FOOD -> applyFood(effect.apply(state.getFood()));
+              case POPULATION_CAP ->
+                  state.setPopulationCap(state.getPopulationCap() + effect.modifier());
+            }
+          } else if (effect.target() instanceof CardTarget ct) {
+            for (int j = i + 1; j < snapshot.size(); j++) {
+              Card target = snapshot.get(j);
+              boolean hasMatch =
+                  target.effects().stream()
+                      .anyMatch(
+                          e ->
+                              e.target() == ct.targetResource()
+                                  && e.valueType() == ValueType.INTEGER);
+              if (hasMatch) {
+                Card boosted = target.boostEffect(ct.targetResource(), effect.modifier());
+                snapshot.set(j, boosted);
+                liveTable.set(j - discardedCount, boosted);
+                if (ct.adjacentOnly()) break;
+              }
             }
           }
         }
       }
 
-      // SINGLE cards are always exhausted after resolution regardless of staffing tier.
+      log.add(
+          new ResolutionStep(
+              card.name(),
+              tier,
+              isEngineBoost,
+              state.getPopulation() - popBefore,
+              state.getProduction() - prodBefore,
+              state.getFood() - foodBefore,
+              state.getPopulationCap() - capBefore));
+
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
+        discardedCount++;
       }
-      // RECURRING cards remain in their slot — no action needed.
     }
 
-    // 4. Seasonal food consumption and starvation.
+    // 4. Food consumption / starvation / growth — captured as a tail step.
+    double popBefore = state.getPopulation();
+    double foodBefore = state.getFood();
     consumeFood();
+    log.add(
+        new ResolutionStep(
+            null,
+            null,
+            false,
+            state.getPopulation() - popBefore,
+            0,
+            state.getFood() - foodBefore,
+            0));
+
+    state.setResolutionLog(log);
 
     // 5. Advance to the next phase (ADD for next season, or stay put if game is over).
     advancePhase();
@@ -460,7 +534,8 @@ public class GameEngine implements Game<GameEngine> {
    * scattered.
    */
   private void applyPopulation(double value) {
-    double clamped = Math.max(0.0, value);
+    // Clamp between zero and the current population cap.
+    double clamped = Math.max(0.0, Math.min(value, state.getPopulationCap()));
     state.setPopulation(clamped);
     // A fractional population (< 1) means nobody is actually alive.
     if (clamped < 1.0) {
@@ -753,10 +828,12 @@ public class GameEngine implements Game<GameEngine> {
     applyProduction(state.getProduction() - card.productionRequirement());
     state.getHand().remove(card);
 
-    // if duplicate exists, replace with one whose every effect modifier is doubled.
-    // else just add it to the table as a new card.
+    // If a matching card is already on the table, merge the hand card into it so that
+    // engine-boosted modifiers are preserved: Farm(14) + Farm(10) → Farm II(24).
+    // Otherwise just add it to the table as a new slot.
     if (state.tableContains(card)) {
-      state.replaceTableCard(card, card.amplify(2));
+      Card tableCard = state.findTableCard(card.name());
+      state.replaceTableCard(tableCard, tableCard.mergeWith(card));
     } else {
       state.addToTable(card);
     }

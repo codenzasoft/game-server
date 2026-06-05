@@ -23,6 +23,7 @@ public class GameState {
   private List<Card> hand;
   // resources
   private double population;
+  private double populationCap;
   private double production;
   private double food;
   // where are we
@@ -38,6 +39,8 @@ public class GameState {
   private boolean gameOver;
   // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
   private List<CardStaffing> tableStaffing;
+  // per-card resolution log from the most recent endAndRun call — empty between seasons
+  private List<ResolutionStep> resolutionLog;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -45,6 +48,7 @@ public class GameState {
     this.discardPile = b.discardPile;
     this.hand = b.hand;
     this.population = b.population;
+    this.populationCap = b.populationCap;
     this.production = b.production;
     this.food = b.food;
     this.curSeason = b.curSeason;
@@ -55,6 +59,7 @@ public class GameState {
     this.currentEvent = b.currentEvent;
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
+    this.resolutionLog = b.resolutionLog;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -79,9 +84,23 @@ public class GameState {
     return board.get(curSeason);
   }
 
-  /** Returns {@code true} if the current season's table contains {@code card}. */
+  /**
+   * Returns {@code true} if the current season's table contains a card whose name matches {@code
+   * card}'s name. Matching by name (rather than full record equality) ensures that an
+   * engine-boosted table card — whose effect modifiers differ from the hand card — is still
+   * recognised as the upgrade target.
+   */
   public boolean tableContains(Card card) {
-    return getCurrentTable().contains(card);
+    return getCurrentTable().stream().anyMatch(c -> c.name().equals(card.name()));
+  }
+
+  /**
+   * Returns the first table card whose name equals {@code name}, or {@code null} if none exists.
+   * Used by the upgrade path to retrieve the actual (potentially boosted) table card before
+   * merging.
+   */
+  public Card findTableCard(String name) {
+    return getCurrentTable().stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
   }
 
   /**
@@ -154,6 +173,20 @@ public class GameState {
   @JsonProperty("population")
   public double getPopulation() {
     return population;
+  }
+
+  /**
+   * The maximum population allowed. Starts at 20 and is permanently raised whenever a housing card
+   * (e.g. BUNKHOUSE, MANOR) fires its {@link ResourceTarget#POPULATION_CAP} effect during {@link
+   * Phase#PLAY} resolution.
+   */
+  @JsonProperty("populationCap")
+  public double getPopulationCap() {
+    return populationCap;
+  }
+
+  public void setPopulationCap(double populationCap) {
+    this.populationCap = populationCap;
   }
 
   @JsonProperty("production")
@@ -265,6 +298,20 @@ public class GameState {
             : Collections.unmodifiableList(new ArrayList<>(tableStaffing));
   }
 
+  /**
+   * Per-card resolution log from the most recent {@link Phase#PLAY} end-and-run. Empty between
+   * seasons (during ADD and RANDOM_EVENT phases). The client uses this to drive indicators and
+   * toasts without re-simulating game logic.
+   */
+  @JsonProperty("resolutionLog")
+  public List<ResolutionStep> getResolutionLog() {
+    return resolutionLog == null ? List.of() : resolutionLog;
+  }
+
+  public void setResolutionLog(List<ResolutionStep> log) {
+    this.resolutionLog = log == null ? List.of() : List.copyOf(log);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -273,6 +320,7 @@ public class GameState {
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
     private double population = 20.0;
+    private double populationCap = 20.0;
     private double production = 200.0;
     private double food = 150.0;
     private Season curSeason = Season.SPRING;
@@ -283,6 +331,7 @@ public class GameState {
     private Event currentEvent = null;
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
+    private List<ResolutionStep> resolutionLog = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -316,6 +365,11 @@ public class GameState {
 
     public Builder population(double population) {
       this.population = population;
+      return this;
+    }
+
+    public Builder populationCap(double populationCap) {
+      this.populationCap = populationCap;
       return this;
     }
 
@@ -366,6 +420,11 @@ public class GameState {
 
     public Builder tableStaffing(List<CardStaffing> tableStaffing) {
       this.tableStaffing = tableStaffing == null ? List.of() : new ArrayList<>(tableStaffing);
+      return this;
+    }
+
+    public Builder resolutionLog(List<ResolutionStep> resolutionLog) {
+      this.resolutionLog = resolutionLog == null ? List.of() : new ArrayList<>(resolutionLog);
       return this;
     }
 

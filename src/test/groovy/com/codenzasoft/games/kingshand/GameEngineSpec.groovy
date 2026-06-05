@@ -159,7 +159,7 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 30    // 20 + 10 from RECURRING card
+        state.population == 20    // 20 pop cap
         state.production == 220   // 200 + 20 from RECURRING card
         state.food       == 150   // unchanged — SINGLE card did not fire
     }
@@ -182,7 +182,7 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 21    // 20 + 1
+        state.population == 20    // 20 pop cap
         state.production == 205   // 200 + 5
         state.food == 153         // 150 + 3
     }
@@ -1182,7 +1182,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard succeeds regardless of population — staffing is evaluated at End and Run, not at placement"() {
         setup:
-        // FARM has staffRequirement=4 but cards can be placed regardless of population
+        // FARM has staffRequirement=5 but cards can be placed regardless of population
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1221,7 +1221,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard moves the card from hand to the current season's table and deducts production"() {
         setup:
-        // FARM: staffRequirement=4, productionRequirement=30
+        // FARM: staffRequirement=5, productionRequirement=30
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1290,8 +1290,8 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADE_ROUTES has two recurring effects: PRODUCTION +5% and FOOD +5%
-        // staffRequirement=14, productionRequirement=80
+        // TRADE_ROUTES has two recurring CardTarget effects with modifier 1.0 each
+        // staffRequirement=10, productionRequirement=40
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
@@ -1308,7 +1308,7 @@ class GameEngineSpec extends Specification {
         then:
         def upgraded = state.board.get(Season.SUMMER).get(0)
         upgraded.effects().size() == 2
-        upgraded.effects().every { it.modifier() == 10.0 }   // both doubled from 5
+        upgraded.effects().every { it.modifier() == 2.0 }   // table(1) + hand(1)
     }
 
     def "upgrade does not add a new slot — table size stays the same after placing a duplicate"() {
@@ -1329,6 +1329,30 @@ class GameEngineSpec extends Specification {
 
         then:
         state.board.get(Season.SPRING).size() == sizeBefore
+    }
+
+    def "placing a duplicate onto an engine-boosted table card merges modifiers rather than doubling the hand card"() {
+        setup:
+        // Simulate a Farm that has been boosted by an engine-builder from 10 → 14.
+        def boostedFarm = CardCatalog.FARM.boostEffect(ResourceTarget.FOOD, 4)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY)
+                .curSeason(Season.SPRING)
+                .population(5)
+                .production(100)
+                .table(Season.SPRING, [boostedFarm])
+                .hand([CardCatalog.FARM])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        def upgraded = state.board.get(Season.SPRING).get(0)
+        upgraded.name() == "FARM II"
+        upgraded.effects().size() == 1
+        upgraded.effects().get(0).modifier() == 24.0   // boosted(14) + base(10)
     }
 
     // ----- PLAY phase: reorderCard -----
@@ -1561,7 +1585,7 @@ class GameEngineSpec extends Specification {
 
     def "demolishCard removes the correct card when multiple cards are on the table"() {
         setup:
-        // Slot 1 is SEEDS (productionRequirement=15 → cost=3)
+        // Slot 1 is SEEDS (productionRequirement=10 → cost=2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1579,7 +1603,7 @@ class GameEngineSpec extends Specification {
         table.contains(CardCatalog.FARM)
         !table.contains(CardCatalog.SEEDS)
         table.contains(CardCatalog.FERTILIZER)
-        state.production == 97.0    // 100 - 3
+        state.production == 98.0    // 100 - 2
     }
 
     def "demolishCard throws when the slot index is out of range"() {

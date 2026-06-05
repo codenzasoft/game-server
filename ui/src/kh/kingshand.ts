@@ -46,6 +46,7 @@ export enum ResourceTarget {
   POPULATION = "POPULATION",
   PRODUCTION = "PRODUCTION",
   FOOD = "FOOD",
+  POPULATION_CAP = "POPULATION_CAP",
 }
 
 // StaffingTier: the result of distributing floor(population) workers left-to-right
@@ -65,7 +66,8 @@ export enum StaffingTier {
 // explicit up-front, schemas and classes can reference them freely.
 
 interface CardTargetData {
-  slotOffset: number;
+  targetResource: ResourceTarget;
+  adjacentOnly: boolean;
 }
 
 interface EffectData {
@@ -106,12 +108,24 @@ interface GameContextData {
   gameId: string;
 }
 
+interface ResolutionStepData {
+  cardName: string | undefined;
+  staffingTier: StaffingTier | undefined;
+  engineBoost: boolean;
+  populationDelta: number;
+  productionDelta: number;
+  foodDelta: number;
+  populationCapDelta: number;
+}
+
 interface GameStateData {
   board: Map<Season, Card[]>;
+  resolutionLog: ResolutionStep[];
   drawPile: Map<Season, Card[]>;
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   population: number;
+  populationCap: number;
   production: number;
   food: number;
   curSeason: Season;
@@ -135,12 +149,16 @@ interface GameMessageData {
 // schema transforms can hand off validated data without extra casting.
 
 // CardTarget: the object branch of the EffectTarget union.  The server
-// serialises this as { slotOffset: <number> }.
+// serialises this as { targetResource: "FOOD", adjacentOnly: true }.
+// adjacentOnly=true  → boosts only the first matching card to the right (recurring, +4–8)
+// adjacentOnly=false → boosts all matching cards to the right (recurring +1–3 or single +4–8)
 export class CardTarget {
-  slotOffset: number;
+  targetResource: ResourceTarget;
+  adjacentOnly: boolean;
 
   constructor(data: CardTargetData) {
-    this.slotOffset = data.slotOffset;
+    this.targetResource = data.targetResource;
+    this.adjacentOnly   = data.adjacentOnly;
   }
 }
 
@@ -223,6 +241,28 @@ export class KhEvent {
   }
 }
 
+// ResolutionStep: one entry in the end-of-season resolution log sent by the server.
+// The frontend uses this to drive indicators and toasts without local simulation.
+export class ResolutionStep {
+  cardName: string | undefined;
+  staffingTier: StaffingTier | undefined;
+  engineBoost: boolean;
+  populationDelta: number;
+  productionDelta: number;
+  foodDelta: number;
+  populationCapDelta: number;
+
+  constructor(data: ResolutionStepData) {
+    this.cardName         = data.cardName;
+    this.staffingTier     = data.staffingTier;
+    this.engineBoost      = data.engineBoost;
+    this.populationDelta  = data.populationDelta;
+    this.productionDelta  = data.productionDelta;
+    this.foodDelta        = data.foodDelta;
+    this.populationCapDelta = data.populationCapDelta;
+  }
+}
+
 // GameContext: identifies the recipient (player) and the game.
 // Mirrors the Java KhContext record.
 export class GameContext {
@@ -244,6 +284,7 @@ export class GameState {
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   population: number;
+  populationCap: number;
   production: number;
   food: number;
   curSeason: Season;
@@ -254,6 +295,7 @@ export class GameState {
   currentEvent: KhEvent | undefined;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
+  resolutionLog: ResolutionStep[];
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -261,6 +303,7 @@ export class GameState {
     this.discardPile = data.discardPile;
     this.hand = data.hand;
     this.population = data.population;
+    this.populationCap = data.populationCap;
     this.production = data.production;
     this.food = data.food;
     this.curSeason = data.curSeason;
@@ -271,6 +314,7 @@ export class GameState {
     this.currentEvent = data.currentEvent;
     this.gameOver = data.gameOver;
     this.tableStaffing = data.tableStaffing;
+    this.resolutionLog = data.resolutionLog;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -303,7 +347,7 @@ export class GameMessage {
 // schemas unexported since they are only composed into larger schemas.
 
 const CardTargetSchema = z
-  .object({ slotOffset: z.number().int() })
+  .object({ targetResource: z.enum(ResourceTarget), adjacentOnly: z.boolean() })
   .transform((data) => new CardTarget(data as CardTargetData));
 
 // EffectTarget union: ResourceTarget strings are tried first (the common case)
@@ -358,6 +402,18 @@ const KhEventSchema = z
   })
   .transform((data) => new KhEvent(data as KhEventData));
 
+const ResolutionStepSchema = z
+  .object({
+    cardName:         z.string().optional(),
+    staffingTier:     z.enum(StaffingTier).optional(),
+    engineBoost:      z.boolean(),
+    populationDelta:  z.number(),
+    productionDelta:  z.number(),
+    foodDelta:        z.number(),
+    populationCapDelta: z.number(),
+  })
+  .transform((data) => new ResolutionStep(data as ResolutionStepData));
+
 export const GameContextSchema = z
   .object({
     player: z.string(),
@@ -381,6 +437,7 @@ export const GameStateSchema = z
     discardPile: SeasonToCardsSchema,
     hand: z.array(CardSchema),
     population: z.number(),
+    populationCap: z.number(),
     production: z.number(),
     food: z.number(),
     curSeason: z.enum(Season),
@@ -394,6 +451,8 @@ export const GameStateSchema = z
     gameOver: z.boolean(),
     // tableStaffing is only populated during the PLAY phase; empty array otherwise.
     tableStaffing: z.array(CardStaffingSchema).default([]),
+    // resolutionLog is populated after endAndRun; empty between seasons.
+    resolutionLog: z.array(ResolutionStepSchema).default([]),
   })
   .transform((data) => new GameState(data as GameStateData));
 
