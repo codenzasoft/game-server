@@ -145,7 +145,7 @@ public class CardCatalog {
           12.0,
           60,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(15),ResourceTarget.PRODUCTION.integer(5)));
+          List.of(ResourceTarget.FOOD.integer(15), ResourceTarget.PRODUCTION.integer(5)));
   public static final Card SCHOOL_HOUSE =
       new Card(
           "SCHOOL_HOUSE",
@@ -153,7 +153,8 @@ public class CardCatalog {
           60.0,
           FrequencyType.SINGLE,
           List.of(
-              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 10.0, ValueType.INTEGER)));
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 10.0, ValueType.INTEGER)));
   public static final Card EARLY_HARVEST =
       new Card(
           "EARLY_HARVEST",
@@ -174,14 +175,14 @@ public class CardCatalog {
           15.0,
           70.0,
           FrequencyType.RECURRING,
-              List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(10)));
+          List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(10)));
   public static final Card CARAVAN =
       new Card(
           "CARAVAN",
           10.0,
           30.0,
           FrequencyType.RECURRING,
-              List.of(ResourceTarget.FOOD.integer(5), ResourceTarget.PRODUCTION.integer(5)));
+          List.of(ResourceTarget.FOOD.integer(5), ResourceTarget.PRODUCTION.integer(5)));
   public static final Card TOWN_FAIR =
       new Card(
           "TOWN_FAIR",
@@ -195,7 +196,7 @@ public class CardCatalog {
           10.0,
           55.0,
           FrequencyType.RECURRING,
-              List.of( ResourceTarget.PRODUCTION.integer(20)));
+          List.of(ResourceTarget.PRODUCTION.integer(20)));
   public static final Card MERCHANT_GUILD =
       new Card(
           "MERCHANT_GUILD",
@@ -238,7 +239,9 @@ public class CardCatalog {
           12.0,
           60.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(12), new Effect(new CardTarget(ResourceTarget.POPULATION, false), 1.0, ValueType.INTEGER)));
+          List.of(
+              ResourceTarget.FOOD.integer(12),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 1.0, ValueType.INTEGER)));
   public static final Card TAX_COLLECTION =
       new Card(
           "TAX_COLLECTION",
@@ -252,9 +255,9 @@ public class CardCatalog {
           14.0,
           65.0,
           FrequencyType.RECURRING,
-              List.of(
-                      new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 4.0, ValueType.INTEGER),
-                      new Effect(new CardTarget(ResourceTarget.FOOD, true), 4.0, ValueType.INTEGER)));
+          List.of(
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 4.0, ValueType.INTEGER),
+              new Effect(new CardTarget(ResourceTarget.FOOD, true), 4.0, ValueType.INTEGER)));
   public static final Card BARN =
       new Card(
           "BARN", 18.0, 50.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(25)));
@@ -274,7 +277,8 @@ public class CardCatalog {
           50.0,
           FrequencyType.RECURRING,
           List.of(
-              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 2.0, ValueType.INTEGER)));
+              new Effect(
+                  new CardTarget(ResourceTarget.PRODUCTION, false), 2.0, ValueType.INTEGER)));
   public static final Card BLACKSMITH =
       new Card(
           "BLACKSMITH",
@@ -282,8 +286,7 @@ public class CardCatalog {
           150.0,
           FrequencyType.RECURRING,
           List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, true), 9.0, ValueType.INTEGER)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 9.0, ValueType.INTEGER)));
 
   // Winter
   public static final Card FORGE =
@@ -302,11 +305,7 @@ public class CardCatalog {
           List.of(ResourceTarget.PRODUCTION.integer(50)));
   public static final Card GRANARY =
       new Card(
-          "GRANARY",
-          10.0,
-          20.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(10)));
+          "GRANARY", 10.0, 20.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(10)));
   public static final Card EMERGENCY_RATIONS =
       new Card(
           "EMERGENCY_RATIONS",

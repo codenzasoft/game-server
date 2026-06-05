@@ -111,8 +111,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   SCHOOL_HOUSE: {
     name: "School House",
-    description: "Trained workers make every card more effective — boosts both food and production cards.",
-    tags: ["INDUSTRY", "AGRICULTURE", "ENGINE"],
+    description: "Trained workers improve productivity across the table.",
+    tags: ["INDUSTRY", "ENGINE"],
   },
   EARLY_HARVEST: {
     name: "Early Harvest",
@@ -126,13 +126,13 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   MARKETPLACE: {
     name: "Marketplace",
-    description: "A bustling marketplace that amplifies the output of every production card on the table.",
-    tags: ["COMMERCE", "ENGINE"],
+    description: "A busy marketplace that brings in food and production each season.",
+    tags: ["COMMERCE"],
   },
   CARAVAN: {
     name: "Caravan",
-    description: "A trade caravan that boosts the yield of every food-producing card on the table.",
-    tags: ["COMMERCE", "ENGINE"],
+    description: "Regular trade routes that bring in food and production each season.",
+    tags: ["COMMERCE"],
   },
   TOWN_FAIR: {
     name: "Town Fair",
@@ -141,8 +141,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   STONE_QUARRY: {
     name: "Stone Quarry",
-    description: "A quarry whose operations sharpen every production card on the table.",
-    tags: ["INDUSTRY", "ENGINE"],
+    description: "A working quarry that steadily grows your production output.",
+    tags: ["INDUSTRY"],
   },
   MERCHANT_GUILD: {
     name: "Merchant Guild",
@@ -168,8 +168,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   BAKERY: {
     name: "Bakery",
-    description: "A bakery that turns the harvest grain into steady and growing food output.",
-    tags: ["FOOD"],
+    description: "A bakery that turns the harvest grain into steady food output, boosting every food card on the table.",
+    tags: ["FOOD", "ENGINE"],
   },
   TAX_COLLECTION: {
     name: "Tax Collection",
