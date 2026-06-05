@@ -159,7 +159,7 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 30    // 20 + 10 from RECURRING card
+        state.population == 20    // 20 pop cap
         state.production == 220   // 200 + 20 from RECURRING card
         state.food       == 150   // unchanged — SINGLE card did not fire
     }
@@ -182,7 +182,7 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 21    // 20 + 1
+        state.population == 20    // 20 pop cap
         state.production == 205   // 200 + 5
         state.food == 153         // 150 + 3
     }
@@ -1290,7 +1290,7 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADE_ROUTES has two recurring effects: PRODUCTION +5% and FOOD +5%
+        // TRADE_ROUTES has two recurring CardTarget effects with modifier 2.0 each
         // staffRequirement=14, productionRequirement=80
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
@@ -1308,7 +1308,7 @@ class GameEngineSpec extends Specification {
         then:
         def upgraded = state.board.get(Season.SUMMER).get(0)
         upgraded.effects().size() == 2
-        upgraded.effects().every { it.modifier() == 10.0 }   // both doubled from 5
+        upgraded.effects().every { it.modifier() == 4.0 }   // table(2) + hand(2)
     }
 
     def "upgrade does not add a new slot — table size stays the same after placing a duplicate"() {
@@ -1350,7 +1350,7 @@ class GameEngineSpec extends Specification {
 
         then:
         def upgraded = state.board.get(Season.SPRING).get(0)
-        upgraded.name() == "Farm II"
+        upgraded.name() == "FARM II"
         upgraded.effects().size() == 1
         upgraded.effects().get(0).modifier() == 24.0   // boosted(14) + base(10)
     }
