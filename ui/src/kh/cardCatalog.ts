@@ -240,9 +240,25 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
 };
 
-/** Returns display metadata for a card, falling back to a placeholder for unknown cards. */
+/** Strips a roman numeral upgrade suffix from a card name, e.g. "FARM II" → "FARM". */
+function baseName(name: string): string {
+  return name.replace(/ (II|III)$/, "");
+}
+
+/**
+ * Returns display metadata for a card. Handles upgraded cards (e.g. "FARM II") by looking up
+ * the base card and appending the suffix to the display name.
+ */
 export function getCardDisplayInfo(card: Card): CardDisplayInfo {
-  return DISPLAY_CATALOG[card.name] ?? UNKNOWN_CARD;
+  const base = DISPLAY_CATALOG[card.name];
+  if (base) return base;
+
+  const suffix = card.name.match(/ (II|III)$/)?.[1];
+  if (suffix) {
+    const baseInfo = DISPLAY_CATALOG[baseName(card.name)];
+    if (baseInfo) return { ...baseInfo, name: `${baseInfo.name} ${suffix}` };
+  }
+  return UNKNOWN_CARD;
 }
 
 /**
