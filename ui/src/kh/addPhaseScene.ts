@@ -1,8 +1,8 @@
-import { GameState, Season, Card } from "./kingshand.ts";
+import { GameState, Season, Card, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
+  cardImagePath,
   formatModifier,
-  targetEmoji,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -220,7 +220,8 @@ export class AddPhaseScene {
   }
 
   private buildCard(card: Card, index: number, state: GameState): string {
-    const info = getCardDisplayInfo(card);
+    const info   = getCardDisplayInfo(card);
+    const imgSrc = cardImagePath(card.name);
     const season = state.curSeason;
 
     const tagsHTML = [
@@ -231,13 +232,13 @@ export class AddPhaseScene {
 
     const effectsHTML = card.effects
       .map((e) => {
-        const targetStr =
-          typeof e.target === "string" ? e.target : "CARD";
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const icon = e.target === ResourceTarget.FOOD ? "🌾"
+                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
+                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
         return `
           <div class="kh-effect-row">
-            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">
-              ${targetEmoji(e.target)} ${targetStr}
-            </span>
+            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
             <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -247,10 +248,12 @@ export class AddPhaseScene {
 
     return `
       <div class="kh-card" data-index="${index}">
-        <div class="kh-card-header">
-          <div class="kh-card-name">${info.name}</div>
-          <div class="kh-card-tags">${tagsHTML}</div>
-          <div class="kh-card-icon">${info.icon}</div>
+        <div class="kh-add-art-header">
+          <img class="kh-add-art-img" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-add-art-overlay">
+            <div class="kh-card-name">${info.name}</div>
+            <div class="kh-card-tags">${tagsHTML}</div>
+          </div>
         </div>
         <div class="kh-card-body">
           <div class="kh-card-desc">${info.description}</div>
@@ -258,12 +261,12 @@ export class AddPhaseScene {
           ${effectsHTML}
           <div class="kh-card-costs">
             <div class="kh-cost-item">
-              <span class="kh-cost-label">⚒️ To Play</span>
-              <span class="kh-cost-val kh-cost-prod">${card.productionRequirement}</span>
+              <span class="kh-cost-label">Cost</span>
+              <span class="kh-cost-val kh-cost-prod">${card.productionRequirement} ⚒️</span>
             </div>
             <div class="kh-cost-item">
-              <span class="kh-cost-label">👥 Pop. Req</span>
-              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement}</span>
+              <span class="kh-cost-label">Workers</span>
+              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement} 👥</span>
             </div>
           </div>
           <button class="kh-btn-select" data-index="${index}">
@@ -464,16 +467,29 @@ export class AddPhaseScene {
       .kh-card.kh-card-unaffordable { opacity: .68; filter: saturate(.6); }
       .kh-card.kh-card-unaffordable:hover { transform: translateY(-3px) scale(1.005); border-color: #cc6644; }
 
-      /* Card header */
-      .kh-card-header {
-        background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
-        padding: 16px 18px 13px;
-        border-bottom: 2px solid #c49428;
+      /* Card art header */
+      .kh-add-art-header {
         position: relative;
-        min-height: 72px;
+        height: 200px;
+        overflow: hidden;
+        border-bottom: 2px solid #c49428;
+        border-radius: 14px 14px 0 0;
       }
-      .kh-card-icon { position: absolute; top: 13px; right: 16px; font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
-      .kh-card-name { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; padding-right: 40px; }
+      .kh-add-art-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .kh-add-art-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
+        padding: 32px 18px 14px;
+      }
+      .kh-card-name { font-family: 'Cinzel', serif; font-size: 2.1rem; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; }
       .kh-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
 
       .kh-tag { font-family: 'Cinzel', serif; font-size: .58rem; font-weight: 600; letter-spacing: 1px; padding: 2px 7px; border-radius: 10px; }
@@ -487,7 +503,7 @@ export class AddPhaseScene {
       .kh-card-desc {
         font-style: italic;
         color: #7a6a52;
-        font-size: .93rem;
+        font-size: 1.1rem;
         line-height: 1.45;
         padding-bottom: 13px;
         border-bottom: 1px dashed #c4a060;
@@ -495,39 +511,39 @@ export class AddPhaseScene {
       }
       .kh-effects-title {
         font-family: 'Cinzel', serif;
-        font-size: .62rem;
+        font-size: .78rem;
         letter-spacing: 1.5px;
         color: #7a6a52;
         text-transform: uppercase;
         margin-bottom: 7px;
       }
-      .kh-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .88rem; }
-      .kh-effect-target { font-family: 'Cinzel', serif; font-size: .68rem; font-weight: 600; letter-spacing: .8px; min-width: 90px; display: flex; align-items: center; gap: 4px; }
+      .kh-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
+      .kh-effect-target { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
       .kh-et-food       { color: #3a7020; }
       .kh-et-production { color: #a07010; }
       .kh-et-population { color: #8b2020; }
-      .kh-effect-mod  { font-weight: 700; font-size: 1rem; color: #3d6b46; }
-      .kh-effect-freq { font-size: .75rem; color: #a09070; font-style: italic; }
+      .kh-effect-mod  { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
+      .kh-effect-freq { font-size: .88rem; color: #a09070; font-style: italic; }
 
       /* Costs */
       .kh-card-costs { display: flex; align-items: center; gap: 18px; padding: 12px 0 13px; border-top: 1px dashed #c4a060; margin-top: 13px; }
       .kh-cost-item  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .kh-cost-label { font-family: 'Cinzel', serif; font-size: .58rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
-      .kh-cost-val   { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; }
+      .kh-cost-label { font-family: 'Cinzel', serif; font-size: .72rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
+      .kh-cost-val   { font-family: 'Cinzel', serif; font-size: 1.3rem; font-weight: 700; }
       .kh-cost-prod  { color: #a07010; }
       .kh-cost-pop   { color: #8b2020; }
-      .kh-unaffordable-flag { margin-left: auto; font-family: 'Cinzel', serif; font-size: .65rem; letter-spacing: .5px; color: #c04030; }
+      .kh-unaffordable-flag { margin-left: auto; font-family: 'Cinzel', serif; font-size: .78rem; letter-spacing: .5px; color: #c04030; }
 
       /* Select button */
       .kh-btn-select {
         width: 100%;
-        padding: 10px 0;
+        padding: 11px 0;
         border-radius: 8px;
         border: 2px solid #c49428;
         background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
         color: #f0e8c0;
         font-family: 'Cinzel', serif;
-        font-size: .82rem;
+        font-size: 1rem;
         font-weight: 700;
         letter-spacing: 1px;
         cursor: pointer;

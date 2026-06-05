@@ -7,7 +7,7 @@
 import { GameState, Season } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
-import { Card, ResourceTarget } from "./kingshand.ts";
+import { Card } from "./kingshand.ts";
 
 // ── Shared style injection ────────────────────────────────────────────────────
 
@@ -446,18 +446,14 @@ function buildCompactCard(card: Card): string {
   const info = getCardDisplayInfo(card);
   const effectsHTML = card.effects
     .map((e) => {
-      const emoji = e.target === ResourceTarget.FOOD       ? "🌾"
-                  : e.target === ResourceTarget.PRODUCTION  ? "⚒️"
-                  : e.target === ResourceTarget.POPULATION  ? "👥"
-                  : "🃏";
-      return `<span class="kh-cc-effect">${emoji} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      const targetStr = typeof e.target === "string" ? e.target : "CARD";
+      return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
     })
     .join("");
 
   return `
     <div class="kh-compact-card">
       <div class="kh-cc-left">
-        <span class="kh-cc-icon">${info.icon}</span>
         <div>
           <div class="kh-cc-name">${info.name}</div>
           <div class="kh-cc-desc">${info.description}</div>
@@ -466,7 +462,7 @@ function buildCompactCard(card: Card): string {
       <div class="kh-cc-right">
         <span class="kh-cc-freq ${card.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${card.frequencyType}</span>
         <div class="kh-cc-effects">${effectsHTML}</div>
-        <div class="kh-cc-costs">⚒️ ${card.productionRequirement} &nbsp; 👥 ${card.staffRequirement}</div>
+        <div class="kh-cc-costs">Cost ${card.productionRequirement} &nbsp; Workers ${card.staffRequirement}</div>
       </div>
     </div>
   `;

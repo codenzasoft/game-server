@@ -1,8 +1,8 @@
 import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
+  cardImagePath,
   formatModifier,
-  targetEmoji,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -119,13 +119,12 @@ export class PlayPhaseScene {
         ${this.buildHandSection(state, table, tableNames)}
         <div class="kh-play-action-bar">
           <div class="kh-play-end-hint">
-            Resolve all table cards from left to right, then advance the season.
+            Cards fire left-to-right when you End and Run.
           </div>
-          <button class="kh-play-btn-end" id="kh-play-btn-end">
-            ⚔ &nbsp;Play
-          </button>
         </div>
       </main>
+      <!-- Fixed End and Run button — right-centre of viewport -->
+      <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY</button>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
       ${buildDeckIndicator(state)}
@@ -304,48 +303,10 @@ export class PlayPhaseScene {
     state: GameState,
     staffing: CardStaffing | undefined,
   ): string {
-    const info = getCardDisplayInfo(card);
+    const info     = getCardDisplayInfo(card);
+    const imgSrc   = cardImagePath(card.name);
     const demolishCost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
-    const canDemolish = state.production >= demolishCost;
-
-    // Staffing badge — only shown when staffing data is present (PLAY phase).
-    const staffingHTML = staffing
-      ? (() => {
-          const tierClass =
-            staffing.tier === StaffingTier.FULL
-              ? "kh-play-staff-full"
-              : staffing.tier === StaffingTier.HALF
-                ? "kh-play-staff-half"
-                : "kh-play-staff-none";
-          const tierLabel =
-            staffing.tier === StaffingTier.FULL
-              ? "Full"
-              : staffing.tier === StaffingTier.HALF
-                ? "Half output"
-                : "Won't fire";
-          return `
-            <div class="kh-play-tc-staffing ${tierClass}">
-              <span class="kh-play-staff-badge">👥 ${staffing.workersAllocated} / ${staffing.workerCost}</span>
-              <span class="kh-play-staff-label">${tierLabel}</span>
-            </div>
-          `;
-        })()
-      : "";
-
-    const effectsHTML = card.effects
-      .map((e) => {
-        const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        return `
-          <div class="kh-play-tc-effect">
-            <span class="kh-play-tc-et kh-play-tc-et-${targetStr.toLowerCase()}">
-              ${targetEmoji(e.target)} ${targetStr}
-            </span>
-            <span class="kh-play-tc-mod">${formatModifier(e.modifier, e.valueType)}</span>
-            <span class="kh-play-tc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
-          </div>
-        `;
-      })
-      .join("");
+    const canDemolish  = state.production >= demolishCost;
 
     // Tier-based border colour applied inline so it overrides the default.
     const tierBorder =
@@ -357,26 +318,68 @@ export class PlayPhaseScene {
             ? "border-color: #e53935;"
             : "";
 
+    // Small staffing chip overlaid on the art (top-right corner).
+    const chipClass =
+      staffing?.tier === StaffingTier.FULL ? "kh-tc-chip-full"
+      : staffing?.tier === StaffingTier.HALF ? "kh-tc-chip-half"
+      : staffing?.tier === StaffingTier.NONE ? "kh-tc-chip-none"
+      : "";
+    const staffChipHTML = staffing
+      ? `<div class="kh-tc-staff-chip ${chipClass}">👥 ${staffing.workersAllocated}/${staffing.workerCost}</div>`
+      : "";
+
+    // Staffing line inside the hover tooltip.
+    const tierLabel =
+      staffing?.tier === StaffingTier.FULL ? "Full output"
+      : staffing?.tier === StaffingTier.HALF ? "Half output"
+      : "Won't fire";
+    const staffTooltipHTML = staffing
+      ? `<div class="kh-tc-tt-staffing ${chipClass}">👥 ${staffing.workersAllocated} / ${staffing.workerCost} — ${tierLabel}</div>`
+      : "";
+
+    const effectsHTML = card.effects
+      .map((e) => {
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const icon = e.target === ResourceTarget.FOOD ? "🌾"
+                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
+                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
+        return `
+          <div class="kh-tc-tt-effect">
+            <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
+            <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+          </div>
+        `;
+      })
+      .join("");
+
     return `
       <div class="kh-play-table-card" data-slot="${slot}" draggable="true" style="${tierBorder}">
-        <div class="kh-play-tc-header">
-          <div class="kh-play-tc-icon">${info.icon}</div>
-          <div class="kh-play-tc-meta">
-            <div class="kh-play-tc-name">${info.name}</div>
-            <div class="kh-play-tc-freq-badge ${card.frequencyType === "RECURRING" ? "kh-play-freq-recurring" : "kh-play-freq-single"}">
-              ${card.frequencyType}
-            </div>
+
+        <!-- ── Art frame ─────────────────────────────────────────────────── -->
+        <div class="kh-tc-art-wrapper">
+          <img class="kh-tc-art" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-tc-freq-pip ${card.frequencyType === "RECURRING" ? "kh-tc-pip-r" : "kh-tc-pip-s"}"></div>
+          ${staffChipHTML}
+          <div class="kh-tc-name-bar">${info.name}</div>
+        </div>
+
+        <!-- ── Hover tooltip ─────────────────────────────────────────────── -->
+        <div class="kh-tc-tooltip">
+          <div class="kh-tc-tt-head">
+            <span class="kh-tc-tt-name">${info.name}</span>
+            <span class="kh-tc-tt-fbadge ${card.frequencyType === "RECURRING" ? "kh-tc-fbadge-r" : "kh-tc-fbadge-s"}">${card.frequencyType}</span>
+          </div>
+          ${staffTooltipHTML}
+          <div class="kh-tc-tt-effects">${effectsHTML}</div>
+          <div class="kh-tc-tt-footer">
+            <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
+              🔨 Demolish <span class="kh-play-demolish-cost">${demolishCost} ⚒️</span>
+            </button>
+            ${!canDemolish ? `<div class="kh-play-tc-warn">Cannot afford</div>` : ""}
           </div>
         </div>
-        ${staffingHTML}
-        <div class="kh-play-tc-effects">${effectsHTML}</div>
-        <div class="kh-play-tc-footer">
-          <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
-            🔨 Demolish
-            <span class="kh-play-demolish-cost">${demolishCost} ⚒️</span>
-          </button>
-          ${!canDemolish ? `<div class="kh-play-tc-warn">Cannot afford</div>` : ""}
-        </div>
+
       </div>
     `;
   }
@@ -440,7 +443,8 @@ export class PlayPhaseScene {
     table: Card[],
     tableNames: Set<string>,
   ): string {
-    const info = getCardDisplayInfo(card);
+    const info   = getCardDisplayInfo(card);
+    const imgSrc = cardImagePath(card.name);
     const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
@@ -482,11 +486,12 @@ export class PlayPhaseScene {
     const effectsHTML = card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        const icon = e.target === ResourceTarget.FOOD ? "🌾"
+                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
+                   : e.target === ResourceTarget.POPULATION ? "👥" : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">
-              ${targetEmoji(e.target)} ${targetStr}
-            </span>
+            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${targetStr}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
@@ -500,10 +505,12 @@ export class PlayPhaseScene {
     return `
       <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
            data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
-        <div class="kh-play-hc-header ${isUpgrade ? "kh-play-hc-header-upgrade" : ""}">
-          <div class="kh-play-hc-name">${info.name}</div>
-          <div class="kh-play-hc-tags">${tagsHTML}</div>
-          <div class="kh-play-hc-icon">${info.icon}</div>
+        <div class="kh-play-hc-art-header ${isUpgrade ? "kh-play-hc-art-header-upgrade" : ""}">
+          <img class="kh-play-hc-art-img" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-play-hc-art-overlay">
+            <div class="kh-play-hc-name">${info.name}</div>
+            <div class="kh-play-hc-tags">${tagsHTML}</div>
+          </div>
         </div>
         <div class="kh-play-hc-body">
           <div class="kh-play-hc-desc">${info.description}</div>
@@ -589,15 +596,12 @@ export class PlayPhaseScene {
       : cards.map((c) => {
           const info = getCardDisplayInfo(c);
           const effectsHTML = c.effects.map((e) => {
-            const emoji = e.target === ResourceTarget.FOOD       ? "🌾"
-                        : e.target === ResourceTarget.PRODUCTION  ? "⚒️"
-                        : e.target === ResourceTarget.POPULATION  ? "👥" : "🃏";
-            return `<span class="kh-cc-effect">${emoji} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            const targetStr = typeof e.target === "string" ? e.target : "CARD";
+            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
               <div class="kh-cc-left">
-                <span class="kh-cc-icon">${info.icon}</span>
                 <div>
                   <div class="kh-cc-name">${info.name}</div>
                   <div class="kh-cc-desc">${info.description}</div>
@@ -606,7 +610,7 @@ export class PlayPhaseScene {
               <div class="kh-cc-right">
                 <span class="kh-cc-freq ${c.frequencyType === "RECURRING" ? "kh-cc-recurring" : "kh-cc-single"}">${c.frequencyType}</span>
                 <div class="kh-cc-effects">${effectsHTML}</div>
-                <div class="kh-cc-costs">⚒️ ${c.productionRequirement} &nbsp; 👥 ${c.staffRequirement}</div>
+                <div class="kh-cc-costs">Cost ${c.productionRequirement} &nbsp; Workers ${c.staffRequirement}</div>
               </div>
             </div>
           `;
@@ -900,7 +904,7 @@ export class PlayPhaseScene {
 
       if (tier === StaffingTier.NONE) {
         // Card is understaffed — does not fire.
-        this.showToast(`🚫 ${info.icon} ${info.name} — understaffed (won't fire)`);
+        this.showToast(`${info.name} — understaffed (won't fire)`);
         await this.delay(1000);
         setHighlight(i, false);
         await this.delay(150);
@@ -958,7 +962,7 @@ export class PlayPhaseScene {
 
       const freqLabel = card.frequencyType === "RECURRING" ? "fires…" : "fires (single use — discarded)";
       const tierLabel = tier === StaffingTier.HALF ? " ⚠ half output" : "";
-      this.showToast(`${info.icon} ${info.name} ${freqLabel}${tierLabel}`);
+      this.showToast(`${info.name} ${freqLabel}${tierLabel}`);
 
       await this.delay(1500);
       setHighlight(i, false);
@@ -1176,16 +1180,16 @@ export class PlayPhaseScene {
         gap: 12px;
       }
 
-      /* Table card — fortress/stone aesthetic */
+      /* Table card — art-first design, tooltip overflows */
       .kh-play-table-card {
-        background: #f5f0e4;
         border: 2px solid #9a8060;
         border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 2px 4px 12px rgba(0,0,0,.18), inset 0 0 30px rgba(200,180,130,.2);
-        display: flex;
-        flex-direction: column;
+        overflow: visible;
+        position: relative;
+        box-shadow: 2px 4px 12px rgba(0,0,0,.18);
+        cursor: pointer;
       }
+      .kh-play-table-card:hover { z-index: 10; }
       .kh-play-tc-header {
         background: linear-gradient(135deg, #2a1a08 0%, #4a2e14 100%);
         border-bottom: 2px solid #c49428;
@@ -1316,7 +1320,7 @@ export class PlayPhaseScene {
       .kh-play-hc-desc {
         font-style: italic;
         color: #7a6a52;
-        font-size: .93rem;
+        font-size: 1.1rem;
         line-height: 1.45;
         padding-bottom: 12px;
         border-bottom: 1px dashed #c4a060;
@@ -1324,39 +1328,39 @@ export class PlayPhaseScene {
       }
       .kh-play-hc-effects-title {
         font-family: 'Cinzel', serif;
-        font-size: .62rem;
+        font-size: .78rem;
         letter-spacing: 1.5px;
         color: #7a6a52;
         text-transform: uppercase;
         margin-bottom: 7px;
       }
-      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: .88rem; }
-      .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .68rem; font-weight: 600; letter-spacing: .8px; min-width: 90px; display: flex; align-items: center; gap: 4px; }
+      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
+      .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
       .kh-play-hc-et-food       { color: #3a7020; }
       .kh-play-hc-et-production { color: #a07010; }
       .kh-play-hc-et-population { color: #8b2020; }
-      .kh-play-hc-mod   { font-weight: 700; font-size: 1rem; color: #3d6b46; }
-      .kh-play-hc-freq  { font-size: .75rem; color: #a09070; font-style: italic; }
+      .kh-play-hc-mod   { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
+      .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
       /* Costs row */
       .kh-play-hc-costs { display: flex; align-items: center; gap: 18px; padding: 11px 0 12px; border-top: 1px dashed #c4a060; margin-top: 12px; }
       .kh-play-hc-cost-item  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .58rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
-      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.05rem; font-weight: 700; }
+      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .72rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
+      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.3rem; font-weight: 700; }
       .kh-play-hc-cost-prod  { color: #a07010; }
       .kh-play-hc-cost-pop   { color: #8b2020; }
-      .kh-play-hc-unavailable { margin-left: auto; font-family: 'Cinzel', serif; font-size: .63rem; letter-spacing: .5px; color: #c04030; }
+      .kh-play-hc-unavailable { margin-left: auto; font-family: 'Cinzel', serif; font-size: .78rem; letter-spacing: .5px; color: #c04030; }
 
       /* Play / Upgrade buttons */
       .kh-play-btn-play {
         width: 100%;
-        padding: 10px 0;
+        padding: 11px 0;
         border-radius: 8px;
         border: 2px solid #c49428;
         background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
         color: #f0e8c0;
         font-family: 'Cinzel', serif;
-        font-size: .82rem;
+        font-size: 1rem;
         font-weight: 700;
         letter-spacing: 1px;
         cursor: pointer;
@@ -1402,26 +1406,34 @@ export class PlayPhaseScene {
         margin-bottom: 18px;
         text-shadow: 0 1px 6px rgba(0,0,0,.6);
       }
+      /* Fixed End and Run button — always visible on the right edge */
       .kh-play-btn-end {
-        padding: 15px 52px;
+        position: fixed;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 28px 112px 28px 56px;
         background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
         color: #f0e8c0;
         border: 3px solid #c49428;
-        border-radius: 11px;
+        border-right: none;
+        border-radius: 14px 0 0 14px;
         font-family: 'Cinzel', serif;
-        font-size: 1.05rem;
+        font-size: 1.8rem;
         font-weight: 700;
-        letter-spacing: 2px;
+        letter-spacing: 5px;
         cursor: pointer;
         transition: all .2s ease;
-        box-shadow: 3px 5px 18px rgba(0,0,0,.3);
+        box-shadow: -6px 0 30px rgba(0,0,0,.5);
+        z-index: 50;
+        white-space: nowrap;
       }
       .kh-play-btn-end:hover:not(:disabled) {
         background: linear-gradient(135deg, #8b2222 0%, #5e1212 100%);
-        box-shadow: 4px 8px 24px rgba(0,0,0,.4);
-        transform: translateY(-2px);
+        box-shadow: -10px 0 40px rgba(0,0,0,.65);
+        padding-left: 72px;
       }
-      .kh-play-btn-end:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+      .kh-play-btn-end:disabled { opacity: .45; cursor: not-allowed; }
 
       /* ── Game Over screen ────────────────────────────────────────────── */
       .kh-play-game-over {
@@ -1682,6 +1694,181 @@ export class PlayPhaseScene {
       /* Applied only on the initial draw; removed on every subsequent render */
       .kh-play-hand-card.kh-deal-in {
         animation: kh-card-deal 1s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+      }
+
+      /* ── Table card art frame ─────────────────────────────────────────────── */
+
+      .kh-tc-art-wrapper {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        overflow: hidden;
+        border-radius: 10px;
+      }
+
+      .kh-tc-art {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* Frequency pip — top-left dot */
+      .kh-tc-freq-pip {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(255,255,255,.6);
+      }
+      .kh-tc-pip-r { background: #90e060; box-shadow: 0 0 6px rgba(144,224,96,.7); }
+      .kh-tc-pip-s { background: #f09060; box-shadow: 0 0 6px rgba(240,144,96,.7); }
+
+      /* Staffing chip — top-right corner */
+      .kh-tc-staff-chip {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        font-family: 'Cinzel', serif;
+        font-size: 1.16rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 10px;
+        letter-spacing: .3px;
+        backdrop-filter: blur(3px);
+      }
+      .kh-tc-chip-full { background: rgba(30,140,30,.85); color: #d0ffd0; }
+      .kh-tc-chip-half { background: rgba(160,120,10,.88); color: #ffe090; }
+      .kh-tc-chip-none { background: rgba(180,30,30,.88);  color: #ffd0d0; }
+
+      /* Name bar — gradient at bottom of art */
+      .kh-tc-name-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent 0%, rgba(0,0,0,.78) 50%, rgba(0,0,0,.92) 100%);
+        padding: 28px 10px 10px;
+        font-family: 'Cinzel', serif;
+        font-size: 1.44rem;
+        font-weight: 700;
+        color: #f0e8c0;
+        letter-spacing: .4px;
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      /* ── Table card hover tooltip ────────────────────────────────────────── */
+
+      .kh-tc-tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 340px;
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 12px;
+        padding: 16px 18px 14px;
+        box-shadow: 0 10px 36px rgba(0,0,0,.75);
+        z-index: 30;
+        pointer-events: none;
+      }
+
+      .kh-play-table-card:hover .kh-tc-tooltip {
+        display: block;
+        pointer-events: auto;
+      }
+
+      .kh-tc-tt-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 9px;
+        border-bottom: 1px solid rgba(196,160,96,.3);
+      }
+      .kh-tc-tt-name {
+        font-family: 'Cinzel', serif;
+        font-size: 1.64rem;
+        font-weight: 700;
+        color: #f0e8c0;
+        letter-spacing: .3px;
+        flex: 1;
+        min-width: 0;
+      }
+      .kh-tc-tt-fbadge {
+        font-family: 'Cinzel', serif;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: .6px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
+      .kh-tc-fbadge-r { background: rgba(100,180,100,.25); color: #a0e0a0; }
+      .kh-tc-fbadge-s { background: rgba(200,120,80,.30);  color: #f0c0a0; }
+
+      .kh-tc-tt-staffing {
+        font-family: 'Cinzel', serif;
+        font-size: 1.24rem;
+        font-weight: 700;
+        letter-spacing: .3px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+      .kh-tc-tt-staffing.kh-tc-chip-full { background: rgba(30,140,30,.22); color: #90e090; }
+      .kh-tc-tt-staffing.kh-tc-chip-half { background: rgba(160,120,10,.28); color: #f0d060; }
+      .kh-tc-tt-staffing.kh-tc-chip-none { background: rgba(180,30,30,.25);  color: #f09090; }
+
+      .kh-tc-tt-effects  { margin-bottom: 10px; }
+      .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }
+      .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: 1.16rem; font-weight: 600; letter-spacing: .5px; min-width: 120px; display: flex; align-items: center; gap: 4px; }
+      .kh-tc-tt-et-food       { color: #7adc50; }
+      .kh-tc-tt-et-production { color: #f0c060; }
+      .kh-tc-tt-et-population { color: #f09090; }
+      .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
+      .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }
+
+      .kh-tc-tt-footer { border-top: 1px dashed rgba(196,160,96,.3); padding-top: 10px; margin-top: 4px; }
+
+      /* ── Hand card art header ────────────────────────────────────────────── */
+
+      .kh-play-hc-art-header {
+        position: relative;
+        height: 200px;
+        overflow: hidden;
+        border-bottom: 2px solid #c49428;
+        border-radius: 14px 14px 0 0;
+      }
+      .kh-play-hc-art-header-upgrade {
+        border-bottom-color: #e0b040;
+      }
+
+      .kh-play-hc-art-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* Gradient overlay + text at bottom of art */
+      .kh-play-hc-art-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
+        padding: 32px 18px 14px;
+      }
+      .kh-play-hc-art-overlay .kh-play-hc-name {
+        font-size: 2.1rem;
       }
     `;
     document.head.appendChild(style);
