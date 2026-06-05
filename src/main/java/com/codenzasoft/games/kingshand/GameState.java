@@ -188,6 +188,7 @@ public class GameState {
   public void setPopulationCap(double populationCap) {
     this.populationCap = populationCap;
   }
+
   @JsonProperty("production")
   public double getProduction() {
     return production;
@@ -371,6 +372,7 @@ public class GameState {
       this.populationCap = populationCap;
       return this;
     }
+
     public Builder production(double production) {
       this.production = production;
       return this;
