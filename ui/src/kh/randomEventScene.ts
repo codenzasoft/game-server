@@ -170,14 +170,22 @@ export class RandomEventScene {
     `;
   }
 
+  // Mirrors GameEngine.computeScaleMultiplier exactly.
+  private computeScaleMultiplier(season: Season, year: number): number {
+    if (season === Season.WINTER) {
+      if (year <= 4) return 1.0 + (year - 1) * (1.0 / 3.0);
+      return Math.min(2.0 * Math.pow(1.30, year - 4), 20.0);
+    }
+    return 1.0 + (year - 1) * 0.05;
+  }
+
   // Returns true if the player can afford the production cost of this option.
   private canAffordOption(option: EventOption): boolean {
-    const isWinter = this.state.curSeason === Season.WINTER;
-    const year     = this.state.year;
+    const multiplier = this.computeScaleMultiplier(this.state.curSeason, this.state.year);
     let prod = this.state.production;
     for (const eff of option.effects) {
       if (typeof eff.target !== "string" || eff.target !== ResourceTarget.PRODUCTION) continue;
-      const delta = isWinter ? eff.modifier * year : eff.modifier;
+      const delta = eff.modifier * multiplier;
       prod = eff.valueType === "PERCENTAGE"
         ? prod + prod * (delta * 0.01)
         : prod + delta;
@@ -191,11 +199,7 @@ export class RandomEventScene {
       .map((opt, i) => this.buildOptionCard(opt, i, this.canAffordOption(opt)))
       .join("");
 
-    const winterBanner = isWinter ? `
-      <div class="kh-re-winter-banner">
-        ❄ Winter Scaling — all effects are multiplied by Year ${this.state.year}
-      </div>
-    ` : "";
+    const winterBanner = "";
 
     return `
       <div class="kh-re-prompt">
@@ -211,15 +215,14 @@ export class RandomEventScene {
   }
 
   private buildOptionCard(option: EventOption, index: number, canAfford: boolean): string {
-    const isWinter = this.state.curSeason === Season.WINTER;
-    const year     = this.state.year;
+    const multiplier = this.computeScaleMultiplier(this.state.curSeason, this.state.year);
 
     const effectsHTML = option.effects.length > 0
       ? option.effects.map((e: Effect) => {
           const targetStr      = typeof e.target === "string" ? e.target : "CARD";
-          // Apply winter year-scaling to the displayed modifier so what the player
-          // sees matches exactly what the server will apply via scaleForSeason().
-          const scaledModifier = isWinter ? e.modifier * year : e.modifier;
+          // Apply the server-matching scale multiplier so displayed values agree with
+          // the floating indicators and what GameEngine.scaleForSeason() will apply.
+          const scaledModifier = Math.round(e.modifier * multiplier);
           const isNegative     = scaledModifier < 0;
           return `
             <div class="kh-re-effect-row">
@@ -275,18 +278,16 @@ export class RandomEventScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
-    const isWinter = state.curSeason === Season.WINTER;
-    const year     = state.year;
+    const year = state.year;
 
     // Helper: spawn indicators for all effects of the chosen option.
-    // Winter scaling (modifier × year) is applied to match what the server will do.
     const spawnOptionIndicators = (index: number): void => {
       const option = state.currentEvent?.options[index];
       if (!option) return;
       let si = 0;
       for (const eff of option.effects) {
-        if (typeof eff.target !== "string") continue; // skip CardTarget effects
-        const delta = isWinter ? eff.modifier * year : eff.modifier;
+        if (typeof eff.target !== "string") continue;
+        const delta = eff.modifier * this.computeScaleMultiplier(state.curSeason, year);
         const sel =
           eff.target === ResourceTarget.POPULATION ? ".kh-re-pop  .kh-re-res-value" :
           eff.target === ResourceTarget.PRODUCTION  ? ".kh-re-prod .kh-re-res-value" :
@@ -310,10 +311,11 @@ export class RandomEventScene {
         (eff) => typeof eff.target === "string" && eff.target === ResourceTarget.FOOD,
       );
       if (!hasFoodEffect) return false;
+      const multiplier = this.computeScaleMultiplier(state.curSeason, year);
       let food = state.food;
       for (const eff of option.effects) {
         if (typeof eff.target !== "string" || eff.target !== ResourceTarget.FOOD) continue;
-        const delta = isWinter ? eff.modifier * year : eff.modifier;
+        const delta = eff.modifier * multiplier;
         food = eff.valueType === "PERCENTAGE"
           ? food + food * (delta * 0.01)
           : food + delta;
