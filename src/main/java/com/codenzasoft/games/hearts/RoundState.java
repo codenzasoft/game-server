@@ -180,7 +180,7 @@ public record RoundState(
   }
 
   @JsonProperty("complete")
-  boolean isComplete() {
+  public boolean isComplete() {
     return countCards(hands()) == 0;
   }
 

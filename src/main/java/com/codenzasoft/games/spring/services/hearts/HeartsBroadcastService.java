@@ -4,6 +4,7 @@ import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.hearts.*;
+import com.codenzasoft.games.hearts.Pass;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.HeartsContext;
 import com.codenzasoft.games.spring.messages.HeartsMessage;
@@ -63,7 +64,17 @@ public class HeartsBroadcastService implements HeartsListener {
     if (nextPlayer.isPresent() && nextPlayer.get().equals(player.name())) {
       validCards.addAll(game.getValidCards(player));
     }
-    return new HeartsContext(player.name(), game.getId(), hand, validCards, nextGameId);
+    final boolean passingRequired =
+        state
+            .getCurrentRound()
+            .map(
+                r ->
+                    r.pass() != Pass.KEEPER
+                        && !r.isPassComplete()
+                        && !r.passes().containsKey(player.name()))
+            .orElse(false);
+    return new HeartsContext(
+        player.name(), game.getId(), hand, validCards, passingRequired, nextGameId);
   }
 
   private List<UserEntity> getNonBots(final Game<?> game) {

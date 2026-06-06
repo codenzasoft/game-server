@@ -3,7 +3,12 @@ package com.codenzasoft.games.spring.services;
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.hearts.HeartsGame;
+import com.codenzasoft.games.hearts.HeartsListener;
+import com.codenzasoft.games.hearts.HeartsState;
+import com.codenzasoft.games.hearts.Pass;
+import com.codenzasoft.games.hearts.RoundState;
 import com.codenzasoft.games.hearts.strategies.RandomStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
@@ -323,13 +328,64 @@ public class GameService {
             .withId(entity.getId())
             .withPlayers(players)
             .withNotificationExecutor(gameNotificationExecutor)
-            .addListener(heartsBroadcastService);
+            .addListener(heartsBroadcastService)
+            .addListener(buildHeartsOrchestrator());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new RandomStrategy());
       }
     }
     return builder.build();
+  }
+
+  private HeartsListener buildHeartsOrchestrator() {
+    return new HeartsListener() {
+      @Override
+      public void gameStarted(final HeartsGame g, final HeartsState s) {}
+
+      @Override
+      public void gameOver(final HeartsGame g, final HeartsState s) {}
+
+      @Override
+      public void gameQuit(final HeartsGame g, final HeartsState s) {}
+
+      @Override
+      public void roundStarted(final HeartsGame g, final HeartsState s) {
+        s.getCurrentRound().filter(r -> r.pass() == Pass.KEEPER).ifPresent(r -> g.passCards());
+      }
+
+      @Override
+      public void roundEnded(final HeartsGame g, final HeartsState s) {
+        g.startNewRound();
+      }
+
+      @Override
+      public void trickStarted(final HeartsGame g, final HeartsState s) {}
+
+      @Override
+      public void trickEnded(final HeartsGame g, final HeartsState s) {
+        if (!s.getCurrentRound().map(RoundState::isComplete).orElse(true)) {
+          g.startNewTrick();
+        }
+      }
+
+      @Override
+      public void cardPlayed(
+          final HeartsGame g, final HeartsState s, final Player p, final Card c, final int n) {}
+
+      @Override
+      public void passSelected(
+          final HeartsGame g, final HeartsState s, final Player p, final List<Card> c) {
+        if (s.getCurrentRound().map(RoundState::isPassReady).orElse(false)) {
+          g.passCards();
+        }
+      }
+
+      @Override
+      public void passComplete(final HeartsGame g, final HeartsState s) {
+        g.startNewTrick();
+      }
+    };
   }
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {

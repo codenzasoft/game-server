@@ -14,11 +14,13 @@ import java.util.UUID;
  * @param gameId The id of the game being played.
  * @param hand The player's current hand of {@link Card}s.
  * @param validCards A collection of valid {@link Card}s to play, or empty if none.
+ * @param passingRequired Whether the player must select cards to pass this round.
  * @param nextGameId The id of the next game to play, possibly <code>null</code>.
  */
 public record HeartsContext(
     @JsonProperty("player") String player,
     @JsonProperty("gameId") UUID gameId,
     @JsonProperty("hand") List<Card> hand,
-    @JsonProperty("validCads") List<Card> validCards,
+    @JsonProperty("validCards") List<Card> validCards,
+    @JsonProperty("passingRequired") boolean passingRequired,
     @JsonInclude(JsonInclude.Include.NON_NULL) UUID nextGameId) {}
