@@ -3,18 +3,22 @@ package com.codenzasoft.games.spring.services;
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.hearts.HeartsGame;
+import com.codenzasoft.games.hearts.strategies.RandomStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
+import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Piece;
@@ -40,6 +44,7 @@ public class GameService {
   @Autowired private GamePlayersRepository gamePlayersRepository;
   @Autowired private UsersRepository usersRepository;
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
+  @Autowired private HeartsBroadcastService heartsBroadcastService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
@@ -263,6 +268,45 @@ public class GameService {
       return Optional.of(game);
     }
     return Optional.empty();
+  }
+
+  /**
+   * Returns a {@link HeartsGame} with the provided ID or {@code empty} if a game with the provided
+   * ID does not exist. The game is retrieved from the {@link GameCache} if present, otherwise it is
+   * built from the persisted entity and added to the cache.
+   *
+   * @param id A game {@link UUID}.
+   * @return A {@link HeartsGame} or {@code empty} if a game with the provided id does not exist.
+   */
+  public Optional<HeartsGame> getOrBuildHeartsGame(final UUID id) {
+    final Optional<Game<HeartsGame>> cached = gameCache.getGameOfType(id, GameType.HEARTS);
+    if (cached.isPresent()) {
+      return cached.map(Game::getGame);
+    }
+    final Optional<HeartsGameEntity> persisted = findGameEntity(id, HeartsGameEntity.class);
+    if (persisted.isPresent()) {
+      final HeartsGame game = buildHeartsGame(persisted.get());
+      gameCache.addGame(game);
+      return Optional.of(game);
+    }
+    return Optional.empty();
+  }
+
+  protected synchronized HeartsGame buildHeartsGame(final HeartsGameEntity entity) {
+    log.debug("Building Hearts game from entity: {}", entity.getId());
+    final List<Player> players = entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
+    final HeartsGame.Builder builder =
+        new HeartsGame.Builder()
+            .withId(entity.getId())
+            .withPlayers(players)
+            .withNotificationExecutor(gameNotificationExecutor)
+            .addListener(heartsBroadcastService);
+    for (final UserEntity user : entity.getPlayers()) {
+      if (user.isBot()) {
+        builder.addPlayerObserver(user.toPlayer(), new RandomStrategy());
+      }
+    }
+    return builder.build();
   }
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
