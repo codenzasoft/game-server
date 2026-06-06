@@ -14,6 +14,12 @@
             background-size: cover;
             background-position: center;
         }
+        .game-row-hearts {
+            background-image: linear-gradient(rgba(255,255,255,0.78), rgba(255,255,255,0.78)),
+                              url('/img/hearts-bg.png');
+            background-size: cover;
+            background-position: center;
+        }
     </style>
     <body>
         <div th:replace="~{fragments/header :: header}">&nbsp;</div>
@@ -26,7 +32,7 @@
                 <ul class="list-group">
                     <li class="list-group-item d-flex justify-content-between align-items-center"
                         th:each="game : ${activeGames}"
-                        th:classappend="${game.gameType.name() == 'KH' ? 'game-row-kh' : 'game-row-xo'}">
+                        th:classappend="${game.gameType.name() == 'KH' ? 'game-row-kh' : game.gameType.name() == 'HEARTS' ? 'game-row-hearts' : 'game-row-xo'}">
                         <div>
                             <span class="fw-semibold"
                                   th:text="${helper.getGameTypeName(game)}"></span>
@@ -71,6 +77,17 @@
                                 th:disabled="${atGameLimit}">
                             Play King's Hand
                         </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- New Hearts game -->
+            <section class="mb-3">
+                <h5>Hearts</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <form th:action="@{/games/hearts}" method="post">
+                        <button type="submit" class="btn btn-danger"
+                                th:disabled="${atGameLimit}">Play vs Bots</button>
                     </form>
                 </div>
             </section>

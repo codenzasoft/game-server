@@ -18,6 +18,7 @@ import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
+import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
@@ -44,6 +45,7 @@ public class GameService {
   @Autowired private GamePlayersRepository gamePlayersRepository;
   @Autowired private UsersRepository usersRepository;
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
+  @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
@@ -101,6 +103,27 @@ public class GameService {
     KhGameEntity game = new KhGameEntity(UUID.randomUUID());
     game.setPlayers(List.of(user));
     gamesRepository.save(game);
+    return game;
+  }
+
+  /**
+   * Returns a new Hearts game for the provided {@link UserEntity} playing against three bots.
+   *
+   * @param user The human player.
+   * @return A new game entity.
+   * @throws IllegalStateException if the user has reached the active game limit or fewer than three
+   *     bots are registered.
+   */
+  @Transactional
+  public HeartsGameEntity createHeartsGame(final UserEntity user) {
+    enforceGameLimit(user);
+    final List<UserEntity> bots = getBots(3);
+    final HeartsGameEntity game = new HeartsGameEntity(UUID.randomUUID());
+    final List<UserEntity> players = new ArrayList<>();
+    players.add(user);
+    players.addAll(bots);
+    game.setPlayers(players);
+    heartsGameRepository.save(game);
     return game;
   }
 
