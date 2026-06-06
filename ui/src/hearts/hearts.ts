@@ -154,6 +154,9 @@ export class HeartsGameHandler {
   // HTML overlay for pass button
   private passOverlay: HTMLDivElement | null = null;
 
+  // Last received message — used to re-render on pass card toggle
+  private lastMessage: HeartsMessage | null = null;
+
   constructor(app: Application) {
     this.app = app;
   }
@@ -254,6 +257,7 @@ export class HeartsGameHandler {
 
   private render(message: HeartsMessage) {
     const { context, state } = message;
+    this.lastMessage = message;
 
     // If pass phase ended, clear any stale pass selections
     if (!context.passingRequired) {
@@ -530,7 +534,7 @@ export class HeartsGameHandler {
     } else if (this.selectedPassCards.length < 3) {
       this.selectedPassCards.push(card);
     }
-    this.updatePassOverlay();
+    if (this.lastMessage) this.render(this.lastMessage);
   }
 
   // ── Pass overlay (HTML) ───────────────────────────────────────────────────
