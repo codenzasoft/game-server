@@ -8,6 +8,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.HeartsContext;
 import com.codenzasoft.games.spring.messages.HeartsMessage;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,8 +43,7 @@ public class HeartsBroadcastService implements HeartsListener {
   private void notifyUsers(final HeartsGame game, final HeartsState state, final UUID nextGameId) {
     final List<UserEntity> users = getNonBots(game);
     for (final UserEntity user : users) {
-      final HeartsContext context = buildContext(user, game, nextGameId);
-      // TODO: modify the state to hide other players' hands
+      final HeartsContext context = buildContext(user, game, state, nextGameId);
       final HeartsMessage message = new HeartsMessage(context, state);
       messagingTemplate.convertAndSendToUser(
           user.getUsername(), "/queue/games/" + context.gameId(), message);
@@ -52,9 +52,18 @@ public class HeartsBroadcastService implements HeartsListener {
   }
 
   public HeartsContext buildContext(
-      final UserEntity user, final HeartsGame game, final UUID nextGameId) {
+      final UserEntity user,
+      final HeartsGame game,
+      final HeartsState state,
+      final UUID nextGameId) {
     final Player player = user.toPlayer();
-    return new HeartsContext(player.name(), game.getId(), nextGameId);
+    final List<Card> hand = state.getHand(player);
+    final Optional<String> nextPlayer = state.getNextPlayer();
+    final List<Card> validCards = new ArrayList<>();
+    if (nextPlayer.isPresent() && nextPlayer.get().equals(player.name())) {
+      validCards.addAll(game.getValidCards(player));
+    }
+    return new HeartsContext(player.name(), game.getId(), hand, validCards, nextGameId);
   }
 
   private List<UserEntity> getNonBots(final Game<?> game) {

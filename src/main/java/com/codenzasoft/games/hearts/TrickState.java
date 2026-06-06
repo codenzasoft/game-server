@@ -2,6 +2,7 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Suit;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
 
@@ -27,11 +28,26 @@ public record TrickState(
     return cards.size() == 4;
   }
 
+  @JsonProperty("trump")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public Suit trump() {
+    return getTrump().orElse(null);
+  }
+
   public Optional<Suit> getTrump() {
     if (cards.isEmpty()) {
       return Optional.empty();
     }
     return Optional.of(cards.get(0).card().getSuit());
+  }
+
+  @JsonProperty("winner")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public PlayedCard winner() {
+    if (isComplete()) {
+      return getWinner().orElse(null);
+    }
+    return null;
   }
 
   Optional<PlayedCard> getWinner() {

@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
 public record HeartsState(
     @JsonProperty("players") List<String> players,
     @JsonProperty("rounds") List<RoundState> rounds,
-    @JsonProperty("isOver") boolean isOver,
-    @JsonProperty("isQuit") boolean isQuit) {
+    @JsonProperty("over") boolean isOver,
+    @JsonProperty("quit") boolean isQuit) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -87,6 +87,10 @@ public record HeartsState(
       return Optional.empty();
     }
     return Optional.of(rounds.get(rounds.size() - 1));
+  }
+
+  public Optional<String> getNextPlayer() {
+    return this.getCurrentRound().flatMap(r -> r.getNextPlayer(this));
   }
 
   public RoundState getRound() {

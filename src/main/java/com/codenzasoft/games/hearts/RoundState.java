@@ -179,6 +179,7 @@ public record RoundState(
         nextHands);
   }
 
+  @JsonProperty("complete")
   boolean isComplete() {
     return countCards(hands()) == 0;
   }
