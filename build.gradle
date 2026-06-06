@@ -34,6 +34,7 @@ dependencies {
             'org.springframework.boot:spring-boot-starter-websocket',
             'org.postgresql:postgresql',
             'com.google.cloud.sql:postgres-socket-factory:1.21.0',
+            'com.newrelic.agent.java:newrelic-api:9.2.0',
     )
 
     newrelic 'com.newrelic.agent.java:newrelic-agent:9.2.0'
