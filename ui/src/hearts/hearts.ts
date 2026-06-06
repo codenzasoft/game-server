@@ -250,11 +250,11 @@ export class HeartsGameHandler {
     if (!this.isProcessing) this.processQueue();
   }
 
-  private processQueue() {
+  private async processQueue() {
     this.isProcessing = true;
     while (this.messageQueue.length > 0) {
       const msg = this.messageQueue.shift()!;
-      this.render(msg);
+      await this.render(msg);
     }
     this.isProcessing = false;
   }
@@ -287,8 +287,9 @@ export class HeartsGameHandler {
 
   // ── Rendering ─────────────────────────────────────────────────────────────
 
-  private render(message: HeartsMessage) {
+  private async render(message: HeartsMessage): Promise<void> {
     const { context, state } = message;
+    const prevMessage = this.lastMessage;
     this.lastMessage = message;
 
     // If pass phase ended, clear any stale pass selections
@@ -311,9 +312,10 @@ export class HeartsGameHandler {
     const round = state.rounds[state.rounds.length - 1];
     this.renderStatus(this.buildStatusText(context, state, round));
     this.renderOpponents(context, state);
-    this.renderTrick(context, state, round);
+    // Render hand before trick so it's visible during card animation
     this.renderHand(context, state, round);
     this.renderPassOverlay(context, round);
+    await this.renderTrick(context, state, round, prevMessage);
   }
 
   private clearScene() {
@@ -450,11 +452,12 @@ export class HeartsGameHandler {
 
   // ── Current trick ──────────────────────────────────────────────────────────
 
-  private renderTrick(
+  private async renderTrick(
     context: HeartsContext,
     state: HeartsState,
     round: RoundState,
-  ) {
+    prevMessage: HeartsMessage | null,
+  ): Promise<void> {
     if (round.tricks.length === 0) return;
     const trick = round.tricks[round.tricks.length - 1];
     if (trick.playedCards.length === 0) return;
@@ -470,6 +473,23 @@ export class HeartsGameHandler {
       E: [CARD_W + 16, 0],
     };
 
+    // Detect the card added since the last render
+    const prevRound =
+      prevMessage?.state.rounds[prevMessage.state.rounds.length - 1];
+    const prevTrick = prevRound?.tricks.find((t) => t.number === trick.number);
+    const prevCount = prevTrick?.playedCards.length ?? 0;
+    const newPlayedCard =
+      trick.playedCards.length > prevCount
+        ? trick.playedCards[trick.playedCards.length - 1]
+        : null;
+
+    const spinDir = Math.random() < 0.5 ? 1 : -1;
+    let animSprite: Sprite | null = null;
+    let animFromX = 0,
+      animFromY = 0,
+      animToX = 0,
+      animToY = 0;
+
     const container = new Container();
 
     for (const { player, card } of trick.playedCards) {
@@ -478,15 +498,76 @@ export class HeartsGameHandler {
       const dir = dirs[(playerIdx - myIdx + 4) % 4];
       const [dx, dy] = slotOffsets[dir];
 
+      const finalX = cx - CARD_W / 2 + dx;
+      const finalY = cy - CARD_H / 2 + dy;
+
       const sprite = new Sprite(this.getTexture(card));
       sprite.width = CARD_W;
       sprite.height = CARD_H;
-      sprite.x = cx - CARD_W / 2 + dx;
-      sprite.y = cy - CARD_H / 2 + dy;
+
+      if (newPlayedCard && player === newPlayedCard.player) {
+        // Place card at its origin so there's no flash before animation starts
+        switch (dir) {
+          case "S":
+            animFromX = cx - CARD_W / 2;
+            animFromY = this.app.screen.height;
+            break;
+          case "N":
+            animFromX = cx - CARD_W / 2;
+            animFromY = -CARD_H;
+            break;
+          case "W":
+            animFromX = -CARD_W;
+            animFromY = cy - CARD_H / 2;
+            break;
+          default: // E
+            animFromX = this.app.screen.width;
+            animFromY = cy - CARD_H / 2;
+        }
+        sprite.x = animFromX;
+        sprite.y = animFromY;
+        sprite.rotation = spinDir * Math.PI * 1.5;
+        animSprite = sprite;
+        animToX = finalX;
+        animToY = finalY;
+      } else {
+        sprite.x = finalX;
+        sprite.y = finalY;
+      }
+
       container.addChild(sprite);
     }
 
     this.app.stage.addChild(container);
+
+    if (!animSprite) return;
+    await this.animateCard(animSprite, animFromX, animFromY, animToX, animToY, 450);
+  }
+
+  private animateCard(
+    sprite: Sprite,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    duration: number,
+  ): Promise<void> {
+    const startRotation = sprite.rotation;
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const tick = () => {
+        const t = Math.min((performance.now() - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        sprite.x = fromX + (toX - fromX) * ease;
+        sprite.y = fromY + (toY - fromY) * ease;
+        sprite.rotation = startRotation * (1 - ease);
+        if (t >= 1) {
+          this.app.ticker.remove(tick);
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
   }
 
   // ── Player hand ────────────────────────────────────────────────────────────
@@ -566,7 +647,7 @@ export class HeartsGameHandler {
     } else if (this.selectedPassCards.length < 3) {
       this.selectedPassCards.push(card);
     }
-    if (this.lastMessage) this.render(this.lastMessage);
+    if (this.lastMessage) void this.render(this.lastMessage);
   }
 
   // ── Pass overlay (HTML) ───────────────────────────────────────────────────
