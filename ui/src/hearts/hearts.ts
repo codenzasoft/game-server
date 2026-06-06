@@ -46,6 +46,38 @@ enum Pass {
   KEEPER = "KEEPER",
 }
 
+// ── Hand sorting ─────────────────────────────────────────────────────────────
+
+const SUIT_ORDER: Record<Suit, number> = {
+  [Suit.CLUBS]: 0,
+  [Suit.DIAMONDS]: 1,
+  [Suit.SPADES]: 2,
+  [Suit.HEARTS]: 3,
+};
+
+const RANK_ORDER: Record<Rank, number> = {
+  [Rank.TWO]: 0,
+  [Rank.THREE]: 1,
+  [Rank.FOUR]: 2,
+  [Rank.FIVE]: 3,
+  [Rank.SIX]: 4,
+  [Rank.SEVEN]: 5,
+  [Rank.EIGHT]: 6,
+  [Rank.NINE]: 7,
+  [Rank.TEN]: 8,
+  [Rank.JACK]: 9,
+  [Rank.QUEEN]: 10,
+  [Rank.KING]: 11,
+  [Rank.ACE]: 12,
+};
+
+function sortHand(hand: Card[]): Card[] {
+  return [...hand].sort((a, b) => {
+    const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+    return suitDiff !== 0 ? suitDiff : RANK_ORDER[a.rank] - RANK_ORDER[b.rank];
+  });
+}
+
 // ── SVG path helper ──────────────────────────────────────────────────────────
 
 const RANK_NUM: Record<string, number> = {
@@ -464,7 +496,7 @@ export class HeartsGameHandler {
     _state: HeartsState,
     round: RoundState,
   ) {
-    const hand = context.hand;
+    const hand = sortHand(context.hand);
     if (hand.length === 0) return;
 
     const maxWidth = this.app.screen.width * 0.9;
