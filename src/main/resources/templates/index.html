@@ -37,9 +37,7 @@
                             <span class="fw-semibold"
                                   th:text="${helper.getGameTypeName(game)}"></span>
                             <span class="text-muted mx-1">&mdash;</span>
-                            <span th:text="${#lists.size(game.players) > 1}
-                                ? ${game.players[0].username + ' vs. ' + game.players[1].username}
-                                : ${game.players[0].username}"></span>
+                            <span th:text="${helper.getGamePlayersDescription(game.players)}"></span>
                             <br>
                             <small class="text-muted"
                                    th:text="${#dates.format(game.createdAt, 'MMM d, yyyy h:mm a')}"></small>
