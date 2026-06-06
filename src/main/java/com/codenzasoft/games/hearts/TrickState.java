@@ -2,27 +2,24 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Suit;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
-import org.springframework.data.util.Pair;
 
-public record TrickState(int number, String leader, List<Pair<String, Card>> cards) {
+public record TrickState(
+    @JsonProperty("number") int number,
+    @JsonProperty("leader") String leader,
+    @JsonProperty("playedCards") List<PlayedCard> cards) {
 
-  private static class PairComparator implements Comparator<Pair<String, Card>> {
-    @Override
-    public int compare(final Pair<String, Card> p1, final Pair<String, Card> p2) {
-      return p1.getSecond().getRank().compareTo(p2.getSecond().getRank());
-    }
-  }
-
-  private static final PairComparator PAIR_COMPARATOR = new PairComparator();
+  private static final Comparator<PlayedCard> BY_RANK =
+      Comparator.comparing(pc -> pc.card().getRank());
 
   static TrickState with(int number, String leader) {
     return new TrickState(number, leader, List.of());
   }
 
   TrickState playCard(final String player, final Card card) {
-    final List<Pair<String, Card>> nextCards = new ArrayList<>(cards);
-    nextCards.add(Pair.of(player, card));
+    final List<PlayedCard> nextCards = new ArrayList<>(cards);
+    nextCards.add(new PlayedCard(player, card));
     return new TrickState(number, leader, Collections.unmodifiableList(nextCards));
   }
 
@@ -34,16 +31,13 @@ public record TrickState(int number, String leader, List<Pair<String, Card>> car
     if (cards.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(cards.get(0).getSecond().getSuit());
+    return Optional.of(cards.get(0).card().getSuit());
   }
 
-  Optional<Pair<String, Card>> getWinner() {
+  Optional<PlayedCard> getWinner() {
     return getTrump()
         .flatMap(
-            suit ->
-                cards.stream()
-                    .filter(pair -> pair.getSecond().getSuit().equals(suit))
-                    .max(PAIR_COMPARATOR));
+            suit -> cards.stream().filter(pc -> pc.card().getSuit().equals(suit)).max(BY_RANK));
   }
 
   Optional<String> getNextPlayer(final HeartsState gameState) {
@@ -53,12 +47,12 @@ public record TrickState(int number, String leader, List<Pair<String, Card>> car
     if (cards.isEmpty()) {
       return Optional.of(leader());
     }
-    final Pair<String, Card> prevCard = cards.get(cards.size() - 1);
-    final String nextPlayer = gameState.getPlayerLeftOf(prevCard.getFirst());
+    final PlayedCard prevCard = cards.get(cards.size() - 1);
+    final String nextPlayer = gameState.getPlayerLeftOf(prevCard.player());
     return Optional.of(nextPlayer);
   }
 
   int getPoints() {
-    return cards.stream().map(Pair::getSecond).mapToInt(HeartsGame::getPoints).sum();
+    return cards.stream().map(PlayedCard::card).mapToInt(HeartsGame::getPoints).sum();
   }
 }

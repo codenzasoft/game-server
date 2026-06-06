@@ -267,6 +267,7 @@ public class HeartsGame implements Game<HeartsGame> {
   }
 
   public synchronized void quit() {
+    setGameState(getGameState().setQuit());
     notifyListeners(GAME_QUIT_NOTIFICATION);
   }
 }

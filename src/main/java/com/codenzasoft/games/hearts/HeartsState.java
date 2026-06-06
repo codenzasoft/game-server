@@ -2,6 +2,7 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -11,9 +12,14 @@ import java.util.stream.Collectors;
  *
  * @param players The players in clockwise order, identified by username.
  * @param rounds The state of played rounds.
- * @param isOver Whether the hearts game is over or has been quit.
+ * @param isOver Whether the hearts game is over.
+ * @param isQuit Whether a player has quit the game (before it was over).
  */
-public record HeartsState(List<String> players, List<RoundState> rounds, boolean isOver) {
+public record HeartsState(
+    @JsonProperty("players") List<String> players,
+    @JsonProperty("rounds") List<RoundState> rounds,
+    @JsonProperty("isOver") boolean isOver,
+    @JsonProperty("isQuit") boolean isQuit) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -30,7 +36,7 @@ public record HeartsState(List<String> players, List<RoundState> rounds, boolean
   }
 
   public static HeartsState with(final List<String> players) {
-    return new HeartsState(players, List.of(), false);
+    return new HeartsState(players, List.of(), false, false);
   }
 
   public String getPlayerRelativeTo(final String player, final Pass pass) {
@@ -43,7 +49,11 @@ public record HeartsState(List<String> players, List<RoundState> rounds, boolean
   }
 
   public HeartsState setOver() {
-    return new HeartsState(players(), rounds(), true);
+    return new HeartsState(players(), rounds(), true, false);
+  }
+
+  public HeartsState setQuit() {
+    return new HeartsState(players(), rounds(), false, true);
   }
 
   HeartsState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -69,7 +79,7 @@ public record HeartsState(List<String> players, List<RoundState> rounds, boolean
         RoundState.with(rounds().size() + 1, nextPass, dealer, immutableDeal);
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.add(nextRound);
-    return new HeartsState(players(), nextRounds, isOver());
+    return new HeartsState(players(), nextRounds, isOver(), isQuit());
   }
 
   public Optional<RoundState> getCurrentRound() {
@@ -127,6 +137,6 @@ public record HeartsState(List<String> players, List<RoundState> rounds, boolean
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.remove(nextRounds.size() - 1);
     nextRounds.add(replacement);
-    return new HeartsState(players(), nextRounds, isOver());
+    return new HeartsState(players(), nextRounds, isOver(), isQuit());
   }
 }

@@ -2,8 +2,8 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
-import org.springframework.data.util.Pair;
 
 /**
  * A {@link RoundState} describes the point-in-time state of a round.
@@ -33,13 +33,13 @@ import org.springframework.data.util.Pair;
  * @param hands The {@link Card}s remaining in each player's hand.
  */
 public record RoundState(
-    int number,
-    Pass pass,
-    String dealer,
+    @JsonProperty("number") int number,
+    @JsonProperty("pass") Pass pass,
+    @JsonProperty("dealer") String dealer,
     Map<String, List<Card>> deal,
     Map<String, List<Card>> passes,
-    boolean passComplete,
-    List<TrickState> tricks,
+    @JsonProperty("passComplete") boolean passComplete,
+    @JsonProperty("tricks") List<TrickState> tricks,
     Map<String, List<Card>> hands) {
 
   public static RoundState with(
@@ -112,7 +112,7 @@ public record RoundState(
       if (!previousTrick.isComplete()) {
         throw new IllegalStateException("current trick is not complete");
       }
-      leader = previousTrick.getWinner().map(Pair::getFirst);
+      leader = previousTrick.getWinner().map(PlayedCard::player);
     }
     if (leader.isEmpty()) {
       throw new IllegalStateException("no leader found");
@@ -216,6 +216,6 @@ public record RoundState(
   }
 
   public List<Card> getPlayedCards() {
-    return tricks.stream().flatMap(t -> t.cards().stream()).map(Pair::getSecond).toList();
+    return tricks.stream().flatMap(t -> t.cards().stream()).map(PlayedCard::card).toList();
   }
 }
