@@ -2,6 +2,7 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Suit;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
@@ -34,6 +35,7 @@ public record TrickState(
     return getTrump().orElse(null);
   }
 
+  @JsonIgnore
   public Optional<Suit> getTrump() {
     if (cards.isEmpty()) {
       return Optional.empty();
@@ -50,12 +52,14 @@ public record TrickState(
     return null;
   }
 
+  @JsonIgnore
   Optional<PlayedCard> getWinner() {
     return getTrump()
         .flatMap(
             suit -> cards.stream().filter(pc -> pc.card().getSuit().equals(suit)).max(BY_RANK));
   }
 
+  @JsonIgnore
   Optional<String> getNextPlayer(final HeartsState gameState) {
     if (isComplete()) {
       return Optional.empty();

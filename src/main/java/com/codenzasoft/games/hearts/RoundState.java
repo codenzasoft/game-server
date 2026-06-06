@@ -2,6 +2,7 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
 
@@ -36,11 +37,11 @@ public record RoundState(
     @JsonProperty("number") int number,
     @JsonProperty("pass") Pass pass,
     @JsonProperty("dealer") String dealer,
-    Map<String, List<Card>> deal,
-    Map<String, List<Card>> passes,
+    @JsonIgnore Map<String, List<Card>> deal,
+    @JsonIgnore Map<String, List<Card>> passes,
     @JsonProperty("passComplete") boolean passComplete,
     @JsonProperty("tricks") List<TrickState> tricks,
-    Map<String, List<Card>> hands) {
+    @JsonIgnore Map<String, List<Card>> hands) {
 
   public static RoundState with(
       final int number, final Pass pass, final String dealer, final Map<String, List<Card>> deal) {
@@ -72,10 +73,12 @@ public record RoundState(
         number, pass, dealer, deal, Collections.unmodifiableMap(nextPasses), false, tricks, hands);
   }
 
+  @JsonIgnore
   public boolean isPassReady() {
     return passes.size() == 4;
   }
 
+  @JsonIgnore
   public boolean isPassComplete() {
     return passComplete;
   }
@@ -188,14 +191,17 @@ public record RoundState(
     return hands.values().stream().mapToInt(List::size).sum();
   }
 
+  @JsonIgnore
   public List<Card> getHand(final Player player) {
     return hands.get(player.name());
   }
 
+  @JsonIgnore
   Optional<String> getNextPlayer(final HeartsState gameState) {
     return getCurrentTrick().flatMap(t -> t.getNextPlayer(gameState));
   }
 
+  @JsonIgnore
   Optional<TrickState> getCurrentTrick() {
     if (tricks.isEmpty()) {
       return Optional.empty();
@@ -208,6 +214,7 @@ public record RoundState(
    *
    * @return the most recent trick in this hand.
    */
+  @JsonIgnore
   public TrickState getTrick() {
     if (tricks.isEmpty()) {
       throw new IllegalStateException("no tricks found");
@@ -216,6 +223,7 @@ public record RoundState(
     }
   }
 
+  @JsonIgnore
   public List<Card> getPlayedCards() {
     return tricks.stream().flatMap(t -> t.cards().stream()).map(PlayedCard::card).toList();
   }

@@ -2,6 +2,7 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
 import java.util.function.Supplier;
@@ -82,6 +83,7 @@ public record HeartsState(
     return new HeartsState(players(), nextRounds, isOver(), isQuit());
   }
 
+  @JsonIgnore
   public Optional<RoundState> getCurrentRound() {
     if (rounds.isEmpty()) {
       return Optional.empty();
@@ -89,14 +91,17 @@ public record HeartsState(
     return Optional.of(rounds.get(rounds.size() - 1));
   }
 
+  @JsonIgnore
   public Optional<String> getNextPlayer() {
     return this.getCurrentRound().flatMap(r -> r.getNextPlayer(this));
   }
 
+  @JsonIgnore
   public RoundState getRound() {
     return getCurrentRound().orElseThrow();
   }
 
+  @JsonIgnore
   public Optional<TrickState> getCurrentTrick() {
     return getCurrentRound().flatMap(RoundState::getCurrentTrick);
   }
