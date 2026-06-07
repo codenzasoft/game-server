@@ -135,6 +135,7 @@ const RoundStateSchema = z
     passComplete: z.boolean(),
     tricks: z.array(TrickStateSchema),
     complete: z.boolean(),
+    score: z.record(z.string(), z.number()).optional(),
   })
   .passthrough();
 type RoundState = z.infer<typeof RoundStateSchema>;
@@ -144,6 +145,9 @@ const HeartsStateSchema = z.object({
   rounds: z.array(RoundStateSchema),
   over: z.boolean(),
   quit: z.boolean(),
+  score: z.record(z.string(), z.number()).optional(),
+  winner: z.string().nullish(),
+  tied: z.array(z.string()).optional(),
 });
 type HeartsState = z.infer<typeof HeartsStateSchema>;
 
@@ -187,6 +191,10 @@ export class HeartsGameHandler {
 
   // HTML overlay for pass button
   private passOverlay: HTMLDivElement | null = null;
+
+  // HTML overlay for score table
+  private scoreOverlay: HTMLDivElement | null = null;
+  private scoreExpanded = false;
 
   // Last received message — used to re-render on pass card toggle
   private lastMessage: HeartsMessage | null = null;
@@ -333,6 +341,7 @@ export class HeartsGameHandler {
     await this.maybeAnimateTrickWon(prevMessage, message);
 
     this.clearScene();
+    this.renderScoreTable(context, state);
 
     if (state.over || state.quit) {
       this.renderGameOver(context, state);
@@ -356,6 +365,7 @@ export class HeartsGameHandler {
   private clearScene() {
     this.app.stage.removeChildren();
     this.removePassOverlay();
+    this.removeScoreOverlay();
     this.trickContainer = null;
   }
 
@@ -864,6 +874,157 @@ export class HeartsGameHandler {
       }
       #hearts-pass-btn:not(:disabled):hover {
         background: #e74c3c;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ── Score table ───────────────────────────────────────────────────────────
+
+  private renderScoreTable(context: HeartsContext, state: HeartsState) {
+    this.injectScoreStyles();
+
+    const { players } = state;
+    const totalScore = state.score ?? {};
+    const completedRounds = this.scoreExpanded
+      ? state.rounds.filter((r) => r.complete && r.score)
+      : [];
+
+    const overlay = document.createElement("div");
+    overlay.id = "hearts-score-overlay";
+
+    const table = document.createElement("table");
+    table.className = "hearts-score-table";
+
+    // Header row — toggle button in first column, player names in the rest
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+
+    const toggleTh = document.createElement("th");
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "hearts-score-toggle";
+    toggleBtn.textContent = this.scoreExpanded ? "▾" : "▸";
+    toggleBtn.addEventListener("click", () => {
+      this.scoreExpanded = !this.scoreExpanded;
+      this.removeScoreOverlay();
+      this.renderScoreTable(context, state);
+    });
+    toggleTh.appendChild(toggleBtn);
+    headerRow.appendChild(toggleTh);
+
+    for (const player of players) {
+      const th = document.createElement("th");
+      th.textContent = player;
+      if (player === context.player) th.classList.add("hearts-score-me");
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+
+    // One row per completed round when expanded
+    if (this.scoreExpanded) {
+      for (const round of completedRounds) {
+        const row = document.createElement("tr");
+        const labelTd = document.createElement("td");
+        labelTd.textContent = `R${round.number}`;
+        row.appendChild(labelTd);
+        for (const player of players) {
+          const td = document.createElement("td");
+          td.textContent = String(round.score?.[player] ?? 0);
+          if (player === context.player) td.classList.add("hearts-score-me-val");
+          row.appendChild(td);
+        }
+        tbody.appendChild(row);
+      }
+    }
+
+    // Summary row — totals (labelled "Total" when expanded, blank when collapsed)
+    const totalRow = document.createElement("tr");
+    if (this.scoreExpanded) totalRow.className = "hearts-score-total";
+    const totalLabel = document.createElement("td");
+    totalLabel.textContent = this.scoreExpanded ? "Total" : "";
+    totalRow.appendChild(totalLabel);
+    for (const player of players) {
+      const td = document.createElement("td");
+      td.textContent = String(totalScore[player] ?? 0);
+      if (player === context.player) td.classList.add("hearts-score-me-val");
+      totalRow.appendChild(td);
+    }
+    tbody.appendChild(totalRow);
+
+    table.appendChild(tbody);
+    overlay.appendChild(table);
+    document.getElementById("app")!.appendChild(overlay);
+    this.scoreOverlay = overlay;
+  }
+
+  private removeScoreOverlay() {
+    if (this.scoreOverlay) {
+      this.scoreOverlay.remove();
+      this.scoreOverlay = null;
+    }
+  }
+
+  private injectScoreStyles() {
+    if (document.getElementById("hearts-score-styles")) return;
+    const style = document.createElement("style");
+    style.id = "hearts-score-styles";
+    style.textContent = `
+      #hearts-score-overlay {
+        position: fixed;
+        top: 48px;
+        left: 16px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.65);
+        border-radius: 6px;
+        padding: 4px 2px;
+        user-select: none;
+      }
+      .hearts-score-table {
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        color: #fff;
+      }
+      .hearts-score-table th,
+      .hearts-score-table td {
+        padding: 2px 10px;
+        text-align: center;
+      }
+      .hearts-score-table th {
+        color: #aaffaa;
+        font-weight: bold;
+      }
+      .hearts-score-table th:first-child,
+      .hearts-score-table td:first-child {
+        text-align: left;
+        padding-left: 6px;
+        color: #888;
+        min-width: 28px;
+      }
+      .hearts-score-me {
+        color: #ffff88;
+      }
+      .hearts-score-me-val {
+        color: #ffff88;
+      }
+      .hearts-score-total td {
+        font-weight: bold;
+        border-top: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .hearts-score-toggle {
+        background: none;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 11px;
+        padding: 0 2px;
+        line-height: 1;
+      }
+      .hearts-score-toggle:hover {
+        color: #fff;
       }
     `;
     document.head.appendChild(style);
