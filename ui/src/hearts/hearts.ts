@@ -339,6 +339,7 @@ export class HeartsGameHandler {
     }
 
     await this.maybeAnimateTrickWon(prevMessage, message);
+    await this.maybeAnimatePassReceived(prevMessage, message);
 
     this.clearScene();
     this.renderScoreTable(context, state);
@@ -688,6 +689,102 @@ export class HeartsGameHandler {
         this.animateCard(sprite, sprite.x, sprite.y, targetX, targetY, 400),
       ),
     );
+  }
+
+  // ── Pass received animation ───────────────────────────────────────────────
+
+  private async maybeAnimatePassReceived(
+    prevMessage: HeartsMessage | null,
+    message: HeartsMessage,
+  ): Promise<void> {
+    if (!prevMessage) return;
+
+    // Trigger on the passComplete: false → true transition within the same round.
+    // Using passComplete (server-side round flag) rather than context.passingRequired
+    // because passingRequired can go false when the player submits their own cards,
+    // before all players have passed — making the transition unreliable.
+    const curRound = message.state.rounds[message.state.rounds.length - 1];
+    if (!curRound?.passComplete || curRound.pass === Pass.KEEPER) return;
+
+    const prevRound =
+      prevMessage.state.rounds[prevMessage.state.rounds.length - 1];
+    if (
+      !prevRound ||
+      prevRound.number !== curRound.number ||
+      prevRound.passComplete
+    )
+      return;
+
+    const prevKeys = new Set(
+      prevMessage.context.hand.map((c) => cardKey(c.suit, c.rank)),
+    );
+    const received = message.context.hand.filter(
+      (c) => !prevKeys.has(cardKey(c.suit, c.rank)),
+    );
+    console.log(
+      `[Hearts] Pass complete — received ${received.length} card(s):`,
+      received.map((c) => `${c.rank} of ${c.suit}`).join(", "),
+    );
+    if (received.length === 0) return;
+
+    await this.animatePassReceived(received, curRound.pass);
+  }
+
+  private async animatePassReceived(cards: Card[], pass: Pass): Promise<void> {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+
+    // Cards arrive from the opposite side of the pass direction
+    const receiveEdge: Record<Pass, [number, number]> = {
+      [Pass.LEFT]:   [sw + CARD_W,         sh / 2 - CARD_H / 2],  // receive from E
+      [Pass.RIGHT]:  [-CARD_W * 2,         sh / 2 - CARD_H / 2],  // receive from W
+      [Pass.ACROSS]: [sw / 2 - CARD_W / 2, -CARD_H * 2],          // receive from N
+      [Pass.KEEPER]: [sw / 2,              sh / 2],                // unreachable
+    };
+    const [fromX, fromY] = receiveEdge[pass];
+
+    // Land position: 3 cards spread in a fan above the hand
+    const spacing = CARD_W + 12;
+    const landY = sh - CARD_H * 2.5 - 40;
+
+    const container = new Container();
+    container.filters = [
+      new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
+    ];
+    this.app.stage.addChild(container);
+
+    const entries = cards.map((card, i) => {
+      const sprite = new Sprite(this.getTexture(card)!);
+      sprite.width = CARD_W;
+      sprite.height = CARD_H;
+      sprite.x = fromX;
+      sprite.y = fromY;
+      container.addChild(sprite);
+      return {
+        sprite,
+        landX: sw / 2 + (i - (cards.length - 1) / 2) * spacing - CARD_W / 2,
+      };
+    });
+
+    // Fly in
+    await Promise.all(
+      entries.map(({ sprite, landX }) =>
+        this.animateCard(sprite, fromX, fromY, landX, landY, 420),
+      ),
+    );
+
+    // Show briefly so the player can read the cards
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+
+    // Slide down into the hand area
+    await Promise.all(
+      entries.map(({ sprite, landX }) =>
+        this.animateCard(sprite, landX, landY, landX, sh + CARD_H, 280),
+      ),
+    );
+
+    this.app.stage.removeChild(container);
+    container.destroy({ children: true });
   }
 
   // ── Player hand ────────────────────────────────────────────────────────────
