@@ -6,7 +6,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public record TrickState(
     @JsonProperty("number") int number,
@@ -76,10 +75,9 @@ public record TrickState(
   @JsonProperty("score")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   public Map<String, Integer> getScore() {
-    if (isComplete()) {
-      return cards().stream()
-          .collect(Collectors.toMap(PlayedCard::player, c -> HeartsGame.getPoints(c.card())));
-    }
-    return Collections.emptyMap();
+    if (!isComplete()) return Collections.emptyMap();
+    final int totalPoints = cards().stream().mapToInt(c -> HeartsGame.getPoints(c.card())).sum();
+    if (totalPoints == 0) return Collections.emptyMap();
+    return getWinner().map(w -> Map.of(w.player(), totalPoints)).orElse(Collections.emptyMap());
   }
 }

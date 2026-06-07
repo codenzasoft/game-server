@@ -154,14 +154,29 @@ class HeartsScoreSpec extends Specification {
     }
 
     def "the player with the unique lowest score wins when the game is over"() {
-        // alice=0, bob=1, carol=13, dave=1  →  alice has unique minimum
+        // bob leads hearts → bob wins (only heart player) → bob: 1pt
+        // carol leads hearts → carol wins → carol: 1pt
+        // dave leads spades (QoS) → dave wins → dave gets QoS(13) + alice's heart discard(1) = 14pt
+        // alice: 0pt (unique minimum) → alice wins
         def s = state(over: true, rounds: [round(tricks: [
-            trick(playedCards: [
-                played("alice", CLUBS_2),
+            trick(number: 1, leader: "bob", playedCards: [
                 played("bob",   HEARTS_2),
-                played("carol", QUEEN_SPADES),
-                played("dave",  HEARTS_3),
-            ])
+                played("carol", CLUBS_3),
+                played("dave",  CLUBS_4),
+                played("alice", CLUBS_5),
+            ]),
+            trick(number: 2, leader: "carol", playedCards: [
+                played("carol", HEARTS_3),
+                played("dave",  CLUBS_2),
+                played("alice", CLUBS_6),
+                played("bob",   CLUBS_7),
+            ]),
+            trick(number: 3, leader: "dave", playedCards: [
+                played("dave",  QUEEN_SPADES),
+                played("alice", HEARTS_4),
+                played("bob",   CLUBS_2),
+                played("carol", CLUBS_3),
+            ]),
         ])])
 
         expect:
@@ -169,7 +184,8 @@ class HeartsScoreSpec extends Specification {
     }
 
     def "no winner when multiple players share the lowest score"() {
-        // alice=0, bob=0, carol=1, dave=1  →  alice and bob tied
+        // alice leads clubs → bob wins (highest club) → bob gets both hearts (2pt)
+        // alice=0, carol=0, dave=0 share the minimum → no unique winner
         def s = state(over: true, rounds: [round(tricks: [
             trick(playedCards: [
                 played("alice", CLUBS_2),
@@ -186,14 +202,22 @@ class HeartsScoreSpec extends Specification {
     // ── Tied players ──────────────────────────────────────────────────────────
 
     def "tied lists all players sharing the lowest score"() {
-        // alice=0, bob=0, carol=1, dave=1  →  tied: alice and bob
+        // carol leads hearts → carol wins → carol: 1pt
+        // dave leads spades (QoS) → dave wins → dave gets QoS(13) + alice's heart discard(1) = 14pt
+        // alice=0, bob=0 share the minimum → tied: alice and bob
         def s = state(over: true, rounds: [round(tricks: [
-            trick(playedCards: [
-                played("alice", CLUBS_2),
-                played("bob",   CLUBS_3),
+            trick(number: 1, leader: "carol", playedCards: [
                 played("carol", HEARTS_2),
-                played("dave",  HEARTS_3),
-            ])
+                played("dave",  CLUBS_2),
+                played("alice", CLUBS_3),
+                played("bob",   CLUBS_4),
+            ]),
+            trick(number: 2, leader: "dave", playedCards: [
+                played("dave",  QUEEN_SPADES),
+                played("alice", HEARTS_3),
+                played("bob",   CLUBS_5),
+                played("carol", CLUBS_6),
+            ]),
         ])])
 
         expect:
@@ -201,13 +225,26 @@ class HeartsScoreSpec extends Specification {
     }
 
     def "tied is empty when there is a clear winner"() {
+        // same layout as the unique-winner test: alice=0 (unique minimum)
         def s = state(over: true, rounds: [round(tricks: [
-            trick(playedCards: [
-                played("alice", CLUBS_2),
+            trick(number: 1, leader: "bob", playedCards: [
                 played("bob",   HEARTS_2),
-                played("carol", QUEEN_SPADES),
-                played("dave",  HEARTS_3),
-            ])
+                played("carol", CLUBS_3),
+                played("dave",  CLUBS_4),
+                played("alice", CLUBS_5),
+            ]),
+            trick(number: 2, leader: "carol", playedCards: [
+                played("carol", HEARTS_3),
+                played("dave",  CLUBS_2),
+                played("alice", CLUBS_6),
+                played("bob",   CLUBS_7),
+            ]),
+            trick(number: 3, leader: "dave", playedCards: [
+                played("dave",  QUEEN_SPADES),
+                played("alice", HEARTS_4),
+                played("bob",   CLUBS_2),
+                played("carol", CLUBS_3),
+            ]),
         ])])
 
         expect:

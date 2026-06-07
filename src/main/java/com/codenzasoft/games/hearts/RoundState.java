@@ -254,8 +254,14 @@ public record RoundState(
     // A player who took all 26 points shot the moon: they score 0, opponents each score 26
     final boolean shotTheMoon = raw.values().stream().anyMatch(v -> v == 26);
     if (shotTheMoon) {
-      final Map<String, Integer> adjusted = new HashMap<>(raw);
-      adjusted.replaceAll((_player, points) -> points == 26 ? 0 : 26);
+      // Derive all participants from the trick cards (raw only contains players who won tricks)
+      final Set<String> allPlayers =
+          tricks.stream()
+              .flatMap(t -> t.cards().stream())
+              .map(PlayedCard::player)
+              .collect(Collectors.toSet());
+      final Map<String, Integer> adjusted = new HashMap<>();
+      allPlayers.forEach(p -> adjusted.put(p, raw.getOrDefault(p, 0) == 26 ? 0 : 26));
       return Collections.unmodifiableMap(adjusted);
     }
 
