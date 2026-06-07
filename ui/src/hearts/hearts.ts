@@ -167,10 +167,12 @@ const HeartsMessageSchema = z.object({
 });
 type HeartsMessage = z.infer<typeof HeartsMessageSchema>;
 
-// ── Card dimensions ──────────────────────────────────────────────────────────
+// ── Card dimensions (base values — scaled at runtime) ────────────────────────
 
-const CARD_W = 80;
-const CARD_H = 112;
+const BASE_CARD_W = 80;
+const BASE_CARD_H = 112;
+const BASE_ARC_RADIUS = 1800;
+const ANGLE_STEP = Math.PI / 80; // ~2.25° between adjacent cards
 
 // ── HeartsGameHandler ────────────────────────────────────────────────────────
 
@@ -202,8 +204,66 @@ export class HeartsGameHandler {
   // Trick container retained across renders to support the win animation
   private trickContainer: Container | null = null;
 
+  private resizeTimer: number | null = null;
+
   constructor(app: Application) {
     this.app = app;
+    this.setupResizeHandler();
+  }
+
+  // ── Dynamic card sizing ────────────────────────────────────────────────────
+
+  private get cardScale(): number {
+    // 944 = actual hand span at scale 1: outermost card center (~420px) plus rotated card
+    // half-extent (CARD_W*cos(angle) + CARD_H*sin(angle))/2 ≈ 52px. Subtract 40px margin.
+    const scaleW = (this.app.screen.width - 40) / 944;
+    const scaleH = this.app.screen.height / 600;
+    return Math.max(1, Math.min(scaleW, scaleH, 2.5));
+  }
+
+  private get cardW(): number {
+    return Math.round(BASE_CARD_W * this.cardScale);
+  }
+
+  private get cardH(): number {
+    return Math.round(BASE_CARD_H * this.cardScale);
+  }
+
+  private get arcRadius(): number {
+    return Math.round(BASE_ARC_RADIUS * this.cardScale);
+  }
+
+  private setupResizeHandler() {
+    window.addEventListener("resize", () => {
+      if (this.resizeTimer !== null) clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(
+        () => this.rerenderLastMessage(),
+        150,
+      );
+    });
+  }
+
+  private rerenderLastMessage() {
+    const msg = this.lastMessage;
+    if (!msg || this.isProcessing) return;
+    const { context, state } = msg;
+    this.clearScene();
+    this.renderScoreTable(context, state);
+    if (state.over || state.quit) {
+      this.renderGameOver(context, state);
+      return;
+    }
+    if (state.rounds.length === 0) {
+      this.renderStatus("Starting game...");
+      return;
+    }
+    const round = state.rounds[state.rounds.length - 1];
+    this.renderStatus(this.buildStatusText(context, state, round));
+    this.renderOpponents(context, state);
+    this.renderHand(context, state, round);
+    this.renderPassOverlay(context, round);
+    // Pass msg as prevMessage so no new-card animation fires
+    void this.renderTrick(context, state, round, msg);
   }
 
   // ── Pre-load all 52 card SVGs ──────────────────────────────────────────────
@@ -511,14 +571,16 @@ export class HeartsGameHandler {
     if (trick.playedCards.length === 0) return;
 
     const myIdx = state.players.indexOf(context.player);
+    const cw = this.cardW;
+    const ch = this.cardH;
     const cx = this.app.screen.width / 2;
-    const cy = this.app.screen.height / 2 - CARD_H / 2 - 20;
+    const cy = this.app.screen.height / 2 - ch / 2 - 20;
 
     const slotOffsets: Record<string, [number, number]> = {
-      S: [0, CARD_H + 16],
-      N: [0, -CARD_H - 16],
-      W: [-CARD_W - 16, 0],
-      E: [CARD_W + 16, 0],
+      S: [0, ch + 16],
+      N: [0, -ch - 16],
+      W: [-cw - 16, 0],
+      E: [cw + 16, 0],
     };
 
     // Detect the card added since the last render
@@ -553,31 +615,31 @@ export class HeartsGameHandler {
       const dir = dirs[(playerIdx - myIdx + 4) % 4];
       const [dx, dy] = slotOffsets[dir];
 
-      const finalX = cx - CARD_W / 2 + dx;
-      const finalY = cy - CARD_H / 2 + dy;
+      const finalX = cx - cw / 2 + dx;
+      const finalY = cy - ch / 2 + dy;
 
       const sprite = new Sprite(this.getTexture(card));
-      sprite.width = CARD_W;
-      sprite.height = CARD_H;
+      sprite.width = cw;
+      sprite.height = ch;
 
       if (newPlayedCard && player === newPlayedCard.player) {
         // Place card at its origin so there's no flash before animation starts
         switch (dir) {
           case "S":
-            animFromX = cx - CARD_W / 2;
+            animFromX = cx - cw / 2;
             animFromY = this.app.screen.height;
             break;
           case "N":
-            animFromX = cx - CARD_W / 2;
-            animFromY = -CARD_H;
+            animFromX = cx - cw / 2;
+            animFromY = -ch;
             break;
           case "W":
-            animFromX = -CARD_W;
-            animFromY = cy - CARD_H / 2;
+            animFromX = -cw;
+            animFromY = cy - ch / 2;
             break;
           default: // E
             animFromX = this.app.screen.width;
-            animFromY = cy - CARD_H / 2;
+            animFromY = cy - ch / 2;
         }
         sprite.x = animFromX;
         sprite.y = animFromY;
@@ -601,7 +663,14 @@ export class HeartsGameHandler {
     console.log(
       `[Hearts] Animating ${rank} of ${suit} played by ${newPlayedCard!.player}`,
     );
-    await this.animateCard(animSprite, animFromX, animFromY, animToX, animToY, 450);
+    await this.animateCard(
+      animSprite,
+      animFromX,
+      animFromY,
+      animToX,
+      animToY,
+      450,
+    );
     console.log(`[Hearts] Animation complete for ${rank} of ${suit}`);
   }
 
@@ -664,19 +733,19 @@ export class HeartsGameHandler {
     await this.animateTrickWon(dir);
   }
 
-  private async animateTrickWon(
-    dir: "S" | "N" | "W" | "E",
-  ): Promise<void> {
+  private async animateTrickWon(dir: "S" | "N" | "W" | "E"): Promise<void> {
     if (!this.trickContainer) return;
 
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
+    const cw = this.cardW;
+    const ch = this.cardH;
 
     const targets: Record<string, [number, number]> = {
-      S: [sw / 2 - CARD_W / 2, sh + CARD_H],
-      N: [sw / 2 - CARD_W / 2, -CARD_H * 2],
-      W: [-CARD_W * 2, sh / 2 - CARD_H / 2],
-      E: [sw + CARD_W, sh / 2 - CARD_H / 2],
+      S: [sw / 2 - cw / 2, sh + ch],
+      N: [sw / 2 - cw / 2, -ch * 2],
+      W: [-cw * 2, sh / 2 - ch / 2],
+      E: [sw + cw, sh / 2 - ch / 2],
     };
     const [targetX, targetY] = targets[dir];
 
@@ -757,23 +826,25 @@ export class HeartsGameHandler {
   ): Promise<void> {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-    const spacing = CARD_W + 12;
-    const showY = sh - CARD_H * 2.5 - 40;
+    const cw = this.cardW;
+    const ch = this.cardH;
+    const spacing = cw + 12;
+    const showY = sh - ch * 2.5 - 40;
     const cx = sw / 2;
 
     // Where passed cards fly to (in the pass direction)
     const passTarget: Record<Pass, [number, number]> = {
-      [Pass.LEFT]:   [-CARD_W * 2,            sh / 2 - CARD_H / 2],
-      [Pass.RIGHT]:  [sw + CARD_W,            sh / 2 - CARD_H / 2],
-      [Pass.ACROSS]: [sw / 2 - CARD_W / 2,   -CARD_H * 2],
-      [Pass.KEEPER]: [sw / 2,                 sh / 2], // unreachable
+      [Pass.LEFT]: [-cw * 2, sh / 2 - ch / 2],
+      [Pass.RIGHT]: [sw + cw, sh / 2 - ch / 2],
+      [Pass.ACROSS]: [sw / 2 - cw / 2, -ch * 2],
+      [Pass.KEEPER]: [sw / 2, sh / 2], // unreachable
     };
     // Where received cards arrive from (opposite of pass direction)
     const receiveSource: Record<Pass, [number, number]> = {
-      [Pass.LEFT]:   [sw + CARD_W,            sh / 2 - CARD_H / 2],
-      [Pass.RIGHT]:  [-CARD_W * 2,            sh / 2 - CARD_H / 2],
-      [Pass.ACROSS]: [sw / 2 - CARD_W / 2,   -CARD_H * 2],
-      [Pass.KEEPER]: [sw / 2,                 sh / 2], // unreachable
+      [Pass.LEFT]: [sw + cw, sh / 2 - ch / 2],
+      [Pass.RIGHT]: [-cw * 2, sh / 2 - ch / 2],
+      [Pass.ACROSS]: [sw / 2 - cw / 2, -ch * 2],
+      [Pass.KEEPER]: [sw / 2, sh / 2], // unreachable
     };
 
     const [toX, toY] = passTarget[pass];
@@ -796,9 +867,9 @@ export class HeartsGameHandler {
 
     const passedSprites = passed.map((card, i) => {
       const sprite = new Sprite(this.getTexture(card)!);
-      sprite.width = CARD_W;
-      sprite.height = CARD_H;
-      sprite.x = cx + (i - (passed.length - 1) / 2) * spacing - CARD_W / 2;
+      sprite.width = cw;
+      sprite.height = ch;
+      sprite.x = cx + (i - (passed.length - 1) / 2) * spacing - cw / 2;
       sprite.y = showY;
       passContainer.addChild(sprite);
       return sprite;
@@ -825,14 +896,14 @@ export class HeartsGameHandler {
 
     const receivedEntries = received.map((card, i) => {
       const sprite = new Sprite(this.getTexture(card)!);
-      sprite.width = CARD_W;
-      sprite.height = CARD_H;
+      sprite.width = cw;
+      sprite.height = ch;
       sprite.x = fromX;
       sprite.y = fromY;
       recvContainer.addChild(sprite);
       return {
         sprite,
-        landX: cx + (i - (received.length - 1) / 2) * spacing - CARD_W / 2,
+        landX: cx + (i - (received.length - 1) / 2) * spacing - cw / 2,
       };
     });
 
@@ -848,7 +919,7 @@ export class HeartsGameHandler {
     // Slide into hand
     await Promise.all(
       receivedEntries.map(({ sprite, landX }) =>
-        this.animateCard(sprite, landX, showY, landX, sh + CARD_H, 260),
+        this.animateCard(sprite, landX, showY, landX, sh + ch, 260),
       ),
     );
 
@@ -863,10 +934,11 @@ export class HeartsGameHandler {
   private renderStaticHand(cards: Card[]): Container {
     const sorted = sortHand(cards);
     const n = sorted.length;
-    const ARC_RADIUS = 1800;
-    const ANGLE_STEP = Math.PI / 80;
+    const cw = this.cardW;
+    const ch = this.cardH;
+    const ar = this.arcRadius;
     const arcCenterX = this.app.screen.width / 2;
-    const arcCenterY = this.app.screen.height - CARD_H / 2 - 50 + ARC_RADIUS;
+    const arcCenterY = this.app.screen.height - ch / 2 - 50 + ar;
 
     const container = new Container();
     container.filters = [
@@ -875,12 +947,12 @@ export class HeartsGameHandler {
 
     for (let i = 0; i < n; i++) {
       const sprite = new Sprite(this.getTexture(sorted[i])!);
-      sprite.width = CARD_W;
-      sprite.height = CARD_H;
+      sprite.width = cw;
+      sprite.height = ch;
       sprite.anchor.set(0.5, 0.5);
       const angle = (i - (n - 1) / 2) * ANGLE_STEP;
-      sprite.x = arcCenterX + ARC_RADIUS * Math.sin(angle);
-      sprite.y = arcCenterY - ARC_RADIUS * Math.cos(angle);
+      sprite.x = arcCenterX + ar * Math.sin(angle);
+      sprite.y = arcCenterY - ar * Math.cos(angle);
       sprite.rotation = angle;
       container.addChild(sprite);
     }
@@ -900,12 +972,12 @@ export class HeartsGameHandler {
     if (hand.length === 0) return;
 
     const n = hand.length;
-    // Large arc radius — center card highest, edges arc downward
-    const ARC_RADIUS = 1800;
-    const ANGLE_STEP = Math.PI / 80; // ~2.25° between adjacent cards
+    const cw = this.cardW;
+    const ch = this.cardH;
+    const ar = this.arcRadius;
 
     const arcCenterX = this.app.screen.width / 2;
-    const arcCenterY = this.app.screen.height - CARD_H / 2 - 50 + ARC_RADIUS;
+    const arcCenterY = this.app.screen.height - ch / 2 - 50 + ar;
 
     const container = new Container();
     const dropShadow = new DropShadowFilter({
@@ -926,13 +998,13 @@ export class HeartsGameHandler {
       const key = cardKey(card.suit, card.rank);
       const texture = this.getTexture(card);
       const sprite = new Sprite(texture);
-      sprite.width = CARD_W;
-      sprite.height = CARD_H;
+      sprite.width = cw;
+      sprite.height = ch;
       sprite.anchor.set(0.5, 0.5);
 
       const angle = (i - (n - 1) / 2) * ANGLE_STEP;
-      const cardCenterX = arcCenterX + ARC_RADIUS * Math.sin(angle);
-      const cardCenterY = arcCenterY - ARC_RADIUS * Math.cos(angle);
+      const cardCenterX = arcCenterX + ar * Math.sin(angle);
+      const cardCenterY = arcCenterY - ar * Math.cos(angle);
 
       const isSelected = this.selectedPassCards.some(
         (c) => c.suit === card.suit && c.rank === card.rank,
@@ -942,7 +1014,7 @@ export class HeartsGameHandler {
       const isPlayable = !isPassPhase && validSet.has(key);
 
       // Selected cards lift outward along the arc radius
-      const liftAmount = CARD_H * 0.25;
+      const liftAmount = ch * 0.25;
       const liftX = isSelected ? Math.sin(angle) * liftAmount : 0;
       const liftY = isSelected ? -Math.cos(angle) * liftAmount : 0;
 
@@ -993,6 +1065,8 @@ export class HeartsGameHandler {
 
     const overlay = document.createElement("div");
     overlay.id = "hearts-pass-overlay";
+    // Position above the top of the center card: center card top = cardH + 50px from bottom
+    overlay.style.bottom = `${this.cardH + 50 + 12}px`;
 
     const dir = round.pass;
     const info = document.createElement("div");
@@ -1039,7 +1113,6 @@ export class HeartsGameHandler {
     style.textContent = `
       #hearts-pass-overlay {
         position: fixed;
-        bottom: 180px;
         left: 50%;
         transform: translateX(-50%);
         display: flex;
@@ -1132,7 +1205,8 @@ export class HeartsGameHandler {
         for (const player of players) {
           const td = document.createElement("td");
           td.textContent = String(round.score?.[player] ?? 0);
-          if (player === context.player) td.classList.add("hearts-score-me-val");
+          if (player === context.player)
+            td.classList.add("hearts-score-me-val");
           row.appendChild(td);
         }
         tbody.appendChild(row);
