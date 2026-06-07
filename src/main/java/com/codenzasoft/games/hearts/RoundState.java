@@ -3,8 +3,10 @@ package com.codenzasoft.games.hearts;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A {@link RoundState} describes the point-in-time state of a round.
@@ -226,5 +228,27 @@ public record RoundState(
   @JsonIgnore
   public List<Card> getPlayedCards() {
     return tricks.stream().flatMap(t -> t.cards().stream()).map(PlayedCard::card).toList();
+  }
+
+  @JsonProperty("score")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public Map<String, Integer> getScore() {
+    final Map<String, Integer> raw =
+        tricks.stream()
+            .filter(TrickState::isComplete)
+            .flatMap(t -> t.getScore().entrySet().stream())
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum));
+
+    if (raw.isEmpty()) return raw;
+
+    // A player who took all 26 points shot the moon: they score 0, opponents each score 26
+    final boolean shotTheMoon = raw.values().stream().anyMatch(v -> v == 26);
+    if (shotTheMoon) {
+      final Map<String, Integer> adjusted = new HashMap<>(raw);
+      adjusted.replaceAll((_player, points) -> points == 26 ? 0 : 26);
+      return Collections.unmodifiableMap(adjusted);
+    }
+
+    return raw;
   }
 }
