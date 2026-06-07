@@ -9,7 +9,7 @@ import com.codenzasoft.games.hearts.HeartsListener;
 import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.Pass;
 import com.codenzasoft.games.hearts.RoundState;
-import com.codenzasoft.games.hearts.strategies.RandomStrategy;
+import com.codenzasoft.games.hearts.strategies.DefensiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.spring.config.Role;
@@ -333,7 +333,7 @@ public class GameService {
             .addListener(buildHeartsOrchestrator());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
-        builder.addPlayerObserver(user.toPlayer(), new RandomStrategy());
+        builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
       }
     }
     return builder.build();

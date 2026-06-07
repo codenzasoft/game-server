@@ -1,6 +1,7 @@
 package com.codenzasoft.games.hearts
 
 import com.codenzasoft.games.common.Player
+import com.codenzasoft.games.hearts.strategies.DefensiveStrategy
 import com.codenzasoft.games.hearts.strategies.RandomStrategy
 import spock.lang.Specification
 
@@ -45,8 +46,7 @@ class HeartsFullGameSpec extends Specification {
         ] as HeartsListener
     }
 
-    def buildGame(HeartsListener controller) {
-        def strategy = new RandomStrategy()
+    def buildGame(HeartsListener controller, HeartsPlayerObserver strategy = new RandomStrategy()) {
         def builder = new HeartsGame.Builder()
                 .withPlayers([p1, p2, p3, p4])
                 .withId(UUID.randomUUID())
@@ -56,7 +56,7 @@ class HeartsFullGameSpec extends Specification {
         builder.build()
     }
 
-    def "four random-strategy bots complete a full round without errors"() {
+    def "four bots complete a full round without errors using any strategy"() {
         def roundsEnded = 0
         def game = buildGame(gameController { g, s -> roundsEnded++ })
 
@@ -64,22 +64,32 @@ class HeartsFullGameSpec extends Specification {
         game.startNewRound()
 
         then:
-        roundsEnded == 1
+        roundsEnded == expectedCount
         game.gameState.currentRound.get().hands().values().every { it.isEmpty() }
+
+        where:
+        strategy || expectedCount
+        new RandomStrategy() || 1
+        new DefensiveStrategy() || 1
     }
 
-    def "four random-strategy bots play four rounds covering all pass directions"() {
+    def "four bots play four rounds covering all pass directions using any strategy"() {
         def roundsEnded = 0
         def game = buildGame(gameController { g, s ->
             roundsEnded++
             if (roundsEnded < 4) g.startNewRound()
-        })
+        }, strategy)
 
         when:
         game.startNewRound()
 
         then:
-        roundsEnded == 4
+        roundsEnded == expectedCount
         game.gameState.currentRound.get().hands().values().every { it.isEmpty() }
+
+        where:
+        strategy || expectedCount
+        new RandomStrategy() || 4
+        new DefensiveStrategy() || 4
     }
 }

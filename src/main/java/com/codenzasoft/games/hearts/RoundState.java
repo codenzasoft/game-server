@@ -85,6 +85,11 @@ public record RoundState(
     return passComplete;
   }
 
+  @JsonIgnore
+  public List<Card> getPass(final String player) {
+    return passes.get(player);
+  }
+
   RoundState passCards(final HeartsState gameState) {
     if (!pass.equals(Pass.KEEPER)) {
       if (!isPassReady()) {
@@ -93,7 +98,7 @@ public record RoundState(
       final Map<String, List<Card>> nextHands = new HashMap<>();
       hands.forEach((player, hand) -> nextHands.put(player, new ArrayList<>(hand)));
       for (final String p : gameState.players()) {
-        final List<Card> thePass = passes.get(p);
+        final List<Card> thePass = getPass(p);
         final String recipient = gameState.getPlayerRelativeTo(p, pass);
         final List<Card> playerHand = nextHands.get(p);
         final List<Card> recipientHand = nextHands.get(recipient);
@@ -228,6 +233,11 @@ public record RoundState(
   @JsonIgnore
   public List<Card> getPlayedCards() {
     return tricks.stream().flatMap(t -> t.cards().stream()).map(PlayedCard::card).toList();
+  }
+
+  @JsonIgnore
+  public List<Card> getRemainingCards() {
+    return hands.values().stream().flatMap(List::stream).toList();
   }
 
   @JsonProperty("score")
