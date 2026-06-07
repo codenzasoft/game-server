@@ -6,8 +6,12 @@ import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsPlayerObserver;
 import com.codenzasoft.games.hearts.HeartsState;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RandomStrategy implements HeartsPlayerObserver {
+
+  private static final Logger log = LoggerFactory.getLogger(RandomStrategy.class);
 
   private final Random random = new Random();
 
@@ -18,7 +22,17 @@ public class RandomStrategy implements HeartsPlayerObserver {
       final Player player,
       final Set<Card> validCards) {
     final Card card = getRandomCard(new ArrayList<>(validCards));
-    game.playCard(player, card);
+    log.info("[{}] RandomStrategy: {} playing {}", game.getId(), player.name(), card);
+    try {
+      game.playCard(player, card);
+    } catch (Exception e) {
+      log.error(
+          "[{}] RandomStrategy: {} failed to play {} — game may be stuck",
+          game.getId(),
+          player.name(),
+          card,
+          e);
+    }
   }
 
   @Override

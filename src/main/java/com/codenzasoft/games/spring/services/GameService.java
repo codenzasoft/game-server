@@ -33,6 +33,7 @@ import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.strategies.LookAheadStrategy;
 import jakarta.transaction.Transactional;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -327,7 +328,7 @@ public class GameService {
         new HeartsGame.Builder()
             .withId(entity.getId())
             .withPlayers(players)
-            .withNotificationExecutor(gameNotificationExecutor)
+            .withNotificationExecutor(Executors.newSingleThreadExecutor())
             .addListener(heartsBroadcastService)
             .addListener(buildHeartsOrchestrator());
     for (final UserEntity user : entity.getPlayers()) {

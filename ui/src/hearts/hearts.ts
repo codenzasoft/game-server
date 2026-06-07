@@ -219,14 +219,24 @@ export class HeartsGameHandler {
     this.gameId = gameId;
     const client = new Client({ brokerURL: wsUrl });
     client.onConnect = () => {
+      console.log("[Hearts] STOMP connected, subscribing to game", this.gameId);
       this.subscription = this.stompClient.subscribe(
         `/user/queue/games/${this.gameId}`,
         (msg) => {
           try {
             const message = HeartsMessageSchema.parse(JSON.parse(msg.body));
+            const round = message.state.rounds[message.state.rounds.length - 1];
+            const trick = round?.tricks[round.tricks.length - 1];
+            console.log(
+              `[Hearts] Message received — hand:${message.context.hand.length}`,
+              `valid:${message.context.validCards.length}`,
+              `passing:${message.context.passingRequired}`,
+              `trick cards:${trick?.playedCards.length ?? 0}/4`,
+              `queue:${this.messageQueue.length + 1}`,
+            );
             this.enqueue(message);
           } catch (e) {
-            console.error("Failed to parse Hearts message", e);
+            console.error("[Hearts] Failed to parse message", e);
           }
         },
       );
@@ -235,11 +245,18 @@ export class HeartsGameHandler {
         body: "",
       });
     };
+    client.onWebSocketClose = () => {
+      console.warn("[Hearts] WebSocket closed");
+    };
     client.onWebSocketError = () => {
+      console.error("[Hearts] WebSocket error — redirecting to login");
       window.location.href = loginUrl;
     };
     client.onStompError = (frame: Frame) => {
-      console.error("STOMP error", frame.headers["message"]);
+      console.error("[Hearts] STOMP error", frame.headers["message"]);
+    };
+    client.onDisconnect = () => {
+      console.warn("[Hearts] STOMP disconnected");
     };
     this.stompClient = client;
     this.stompClient.activate();
@@ -252,11 +269,18 @@ export class HeartsGameHandler {
 
   private async processQueue() {
     this.isProcessing = true;
+    let seq = 0;
     while (this.messageQueue.length > 0) {
       const msg = this.messageQueue.shift()!;
+      seq++;
+      console.log(
+        `[Hearts] Processing message #${seq} (${this.messageQueue.length} remaining in queue)`,
+      );
       await this.render(msg);
+      console.log(`[Hearts] Render #${seq} complete`);
     }
     this.isProcessing = false;
+    console.log("[Hearts] Queue drained");
   }
 
   // ── WebSocket actions ──────────────────────────────────────────────────────
@@ -541,7 +565,12 @@ export class HeartsGameHandler {
     this.app.stage.addChild(container);
 
     if (!animSprite) return;
+    const { suit, rank } = newPlayedCard!.card;
+    console.log(
+      `[Hearts] Animating ${rank} of ${suit} played by ${newPlayedCard!.player}`,
+    );
     await this.animateCard(animSprite, animFromX, animFromY, animToX, animToY, 450);
+    console.log(`[Hearts] Animation complete for ${rank} of ${suit}`);
   }
 
   private animateCard(

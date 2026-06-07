@@ -14,8 +14,12 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HeartsGame implements Game<HeartsGame> {
+
+  private static final Logger log = LoggerFactory.getLogger(HeartsGame.class);
 
   public static final Card QUEEN_OF_SPADES = new Card(Suit.SPADES, Rank.QUEEN);
   public static final Card TWO_OF_CLUBS = new Card(Suit.CLUBS, Rank.TWO);
@@ -156,11 +160,24 @@ public class HeartsGame implements Game<HeartsGame> {
 
   private void notifyPlayerToPlay(final String playerName) {
     final HeartsPlayerObserver observer = playerObservers.get(playerName);
-    if (observer == null) return;
+    if (observer == null) {
+      log.info("[{}] notifyPlayerToPlay: {} is human, skipping bot trigger", id, playerName);
+      return;
+    }
     final Player player = findPlayer(playerName);
     final HeartsState state = getGameState();
     final Set<Card> valid = getValidCards(player);
-    executor.execute(() -> observer.yourTurnToPlay(this, state, player, valid));
+    log.info(
+        "[{}] notifyPlayerToPlay: scheduling {} to play ({} valid cards)",
+        id,
+        playerName,
+        valid.size());
+    try {
+      executor.execute(() -> observer.yourTurnToPlay(this, state, player, valid));
+    } catch (Exception e) {
+      log.error(
+          "[{}] Failed to schedule bot play for {} — executor rejected task", id, playerName, e);
+    }
   }
 
   private void notifyPlayerToPass(final String playerName) {
@@ -234,17 +251,29 @@ public class HeartsGame implements Game<HeartsGame> {
   }
 
   public synchronized void startNewTrick() {
+    log.info("[{}] startNewTrick", id);
     setGameState(getGameState().startNewTrick());
     notifyListeners(TRICK_STARTED_NOTIFICATION);
     getGameState()
         .getCurrentRound()
         .flatMap(r -> r.getNextPlayer(getGameState()))
-        .ifPresent(this::notifyPlayerToPlay);
+        .ifPresentOrElse(
+            this::notifyPlayerToPlay,
+            () ->
+                log.warn(
+                    "[{}] startNewTrick: could not determine next player — no trigger sent", id));
   }
 
   public synchronized void playCard(final Player player, final Card card) {
+    log.info("[{}] playCard: {} playing {}", id, player.name(), card);
     final Set<Card> validCards = getValidCards(player);
     if (!validCards.contains(card)) {
+      log.error(
+          "[{}] playCard rejected: {} is not valid for {} (valid: {})",
+          id,
+          card,
+          player.name(),
+          validCards);
       throw new IllegalStateException("card " + card + " is not valid for " + player.name());
     }
     setGameState(getGameState().playCard(player.name(), card));
@@ -252,12 +281,23 @@ public class HeartsGame implements Game<HeartsGame> {
     final TrickState trick = getGameState().getCurrentTrick().orElseThrow();
     notifyListeners(new HeartsCardPlayedNotification(player, card, trick.cards().size()));
     if (trick.isComplete()) {
+      log.info("[{}] trick complete", id);
       notifyListeners(TRICK_ENDED_NOTIFICATION);
       if (round.isComplete()) {
+        log.info("[{}] round complete", id);
         notifyListeners(ROUND_ENDED_NOTIFICATION);
       }
     } else {
-      round.getNextPlayer(getGameState()).ifPresent(this::notifyPlayerToPlay);
+      round
+          .getNextPlayer(getGameState())
+          .ifPresentOrElse(
+              this::notifyPlayerToPlay,
+              () ->
+                  log.warn(
+                      "[{}] playCard: could not determine next player after {} played {}",
+                      id,
+                      player.name(),
+                      card));
     }
   }
 
