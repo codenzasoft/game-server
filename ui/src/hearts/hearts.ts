@@ -124,6 +124,7 @@ const TrickStateSchema = z.object({
   number: z.number(),
   leader: z.string(),
   playedCards: z.array(PlayedCardSchema),
+  winner: PlayedCardSchema.optional(),
 });
 
 const RoundStateSchema = z
@@ -189,6 +190,9 @@ export class HeartsGameHandler {
 
   // Last received message — used to re-render on pass card toggle
   private lastMessage: HeartsMessage | null = null;
+
+  // Trick container retained across renders to support the win animation
+  private trickContainer: Container | null = null;
 
   constructor(app: Application) {
     this.app = app;
@@ -326,6 +330,8 @@ export class HeartsGameHandler {
       this.selectedPassCards = [];
     }
 
+    await this.maybeAnimateTrickWon(prevMessage, message);
+
     this.clearScene();
 
     if (state.over || state.quit) {
@@ -350,6 +356,7 @@ export class HeartsGameHandler {
   private clearScene() {
     this.app.stage.removeChildren();
     this.removePassOverlay();
+    this.trickContainer = null;
   }
 
   // ── Status bar ─────────────────────────────────────────────────────────────
@@ -574,6 +581,7 @@ export class HeartsGameHandler {
       container.addChild(sprite);
     }
 
+    this.trickContainer = container;
     this.app.stage.addChild(container);
 
     if (!animSprite) return;
@@ -609,6 +617,66 @@ export class HeartsGameHandler {
       };
       this.app.ticker.add(tick);
     });
+  }
+
+  // ── Trick win animation ────────────────────────────────────────────────────
+
+  private async maybeAnimateTrickWon(
+    prevMessage: HeartsMessage | null,
+    message: HeartsMessage,
+  ): Promise<void> {
+    if (!this.trickContainer || !prevMessage) return;
+
+    const prevRound =
+      prevMessage.state.rounds[prevMessage.state.rounds.length - 1];
+    const prevTrick = prevRound?.tricks[prevRound.tricks.length - 1];
+    if (!prevTrick?.winner) return;
+
+    // Skip if the current message still shows the same complete trick — the
+    // server emits separate card-played and trick-ended broadcasts that both
+    // carry the same 4-card state; only animate on the transition away from it.
+    const curRound = message.state.rounds[message.state.rounds.length - 1];
+    const curTrick = curRound?.tricks[curRound.tricks.length - 1];
+    if (
+      curTrick?.number === prevTrick.number &&
+      curTrick?.playedCards.length === 4
+    )
+      return;
+
+    const winner = prevTrick.winner.player;
+    const myIdx = message.state.players.indexOf(message.context.player);
+    const winnerIdx = message.state.players.indexOf(winner);
+    const dirs = ["S", "W", "N", "E"] as const;
+    const dir = dirs[(winnerIdx - myIdx + 4) % 4];
+
+    await this.animateTrickWon(dir);
+  }
+
+  private async animateTrickWon(
+    dir: "S" | "N" | "W" | "E",
+  ): Promise<void> {
+    if (!this.trickContainer) return;
+
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+
+    const targets: Record<string, [number, number]> = {
+      S: [sw / 2 - CARD_W / 2, sh + CARD_H],
+      N: [sw / 2 - CARD_W / 2, -CARD_H * 2],
+      W: [-CARD_W * 2, sh / 2 - CARD_H / 2],
+      E: [sw + CARD_W, sh / 2 - CARD_H / 2],
+    };
+    const [targetX, targetY] = targets[dir];
+
+    // Let the player see the completed trick before cards fly away
+    await new Promise<void>((resolve) => setTimeout(resolve, 600));
+
+    const sprites = [...this.trickContainer.children] as Sprite[];
+    await Promise.all(
+      sprites.map((sprite) =>
+        this.animateCard(sprite, sprite.x, sprite.y, targetX, targetY, 400),
+      ),
+    );
   }
 
   // ── Player hand ────────────────────────────────────────────────────────────
