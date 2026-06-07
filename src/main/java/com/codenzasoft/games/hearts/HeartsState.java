@@ -3,6 +3,7 @@ package com.codenzasoft.games.hearts;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.*;
 import java.util.function.Supplier;
@@ -147,5 +148,46 @@ public record HeartsState(
     nextRounds.remove(nextRounds.size() - 1);
     nextRounds.add(replacement);
     return new HeartsState(players(), nextRounds, isOver(), isQuit());
+  }
+
+  @JsonIgnore
+  public boolean isComplete() {
+    return isOver() || isQuit();
+  }
+
+  @JsonProperty("score")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public Map<String, Integer> getScore() {
+    final Map<String, Integer> scores = new HashMap<>();
+    players().forEach(p -> scores.put(p, 0));
+    rounds.stream()
+        .filter(RoundState::isComplete)
+        .flatMap(r -> r.getScore().entrySet().stream())
+        .forEach(e -> scores.merge(e.getKey(), e.getValue(), Integer::sum));
+    return Collections.unmodifiableMap(scores);
+  }
+
+  @JsonProperty("winner")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public String getWinner() {
+    final List<String> leaders = getLeaders();
+    return leaders.size() == 1 ? leaders.get(0) : null;
+  }
+
+  @JsonProperty("tied")
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  public List<String> getTied() {
+    final List<String> leaders = getLeaders();
+    return leaders.size() > 1 ? leaders : List.of();
+  }
+
+  private List<String> getLeaders() {
+    if (!isOver()) return List.of();
+    final Map<String, Integer> scores = getScore();
+    final int minScore = scores.values().stream().mapToInt(Integer::intValue).min().orElse(0);
+    return scores.entrySet().stream()
+        .filter(e -> e.getValue() == minScore)
+        .map(Map.Entry::getKey)
+        .toList();
   }
 }
