@@ -718,73 +718,175 @@ export class HeartsGameHandler {
     const prevKeys = new Set(
       prevMessage.context.hand.map((c) => cardKey(c.suit, c.rank)),
     );
+    const curKeys = new Set(
+      message.context.hand.map((c) => cardKey(c.suit, c.rank)),
+    );
+    const passed = prevMessage.context.hand.filter(
+      (c) => !curKeys.has(cardKey(c.suit, c.rank)),
+    );
     const received = message.context.hand.filter(
       (c) => !prevKeys.has(cardKey(c.suit, c.rank)),
     );
+    const staying = prevMessage.context.hand.filter((c) =>
+      curKeys.has(cardKey(c.suit, c.rank)),
+    );
+
     console.log(
-      `[Hearts] Pass complete — received ${received.length} card(s):`,
-      received.map((c) => `${c.rank} of ${c.suit}`).join(", "),
+      `[Hearts] Pass animation — passed: ${passed.map((c) => `${c.rank} of ${c.suit}`).join(", ")}`,
+      `| received: ${received.map((c) => `${c.rank} of ${c.suit}`).join(", ")}`,
     );
     if (received.length === 0) return;
 
-    await this.animatePassReceived(received, curRound.pass);
+    await this.animatePassReceived(
+      passed,
+      received,
+      staying,
+      curRound.pass,
+      message.context,
+      message.state,
+    );
   }
 
-  private async animatePassReceived(cards: Card[], pass: Pass): Promise<void> {
+  private async animatePassReceived(
+    passed: Card[],
+    received: Card[],
+    staying: Card[],
+    pass: Pass,
+    context: HeartsContext,
+    state: HeartsState,
+  ): Promise<void> {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
-
-    // Cards arrive from the opposite side of the pass direction
-    const receiveEdge: Record<Pass, [number, number]> = {
-      [Pass.LEFT]:   [sw + CARD_W,         sh / 2 - CARD_H / 2],  // receive from E
-      [Pass.RIGHT]:  [-CARD_W * 2,         sh / 2 - CARD_H / 2],  // receive from W
-      [Pass.ACROSS]: [sw / 2 - CARD_W / 2, -CARD_H * 2],          // receive from N
-      [Pass.KEEPER]: [sw / 2,              sh / 2],                // unreachable
-    };
-    const [fromX, fromY] = receiveEdge[pass];
-
-    // Land position: 3 cards spread in a fan above the hand
     const spacing = CARD_W + 12;
-    const landY = sh - CARD_H * 2.5 - 40;
+    const showY = sh - CARD_H * 2.5 - 40;
+    const cx = sw / 2;
 
-    const container = new Container();
-    container.filters = [
+    // Where passed cards fly to (in the pass direction)
+    const passTarget: Record<Pass, [number, number]> = {
+      [Pass.LEFT]:   [-CARD_W * 2,            sh / 2 - CARD_H / 2],
+      [Pass.RIGHT]:  [sw + CARD_W,            sh / 2 - CARD_H / 2],
+      [Pass.ACROSS]: [sw / 2 - CARD_W / 2,   -CARD_H * 2],
+      [Pass.KEEPER]: [sw / 2,                 sh / 2], // unreachable
+    };
+    // Where received cards arrive from (opposite of pass direction)
+    const receiveSource: Record<Pass, [number, number]> = {
+      [Pass.LEFT]:   [sw + CARD_W,            sh / 2 - CARD_H / 2],
+      [Pass.RIGHT]:  [-CARD_W * 2,            sh / 2 - CARD_H / 2],
+      [Pass.ACROSS]: [sw / 2 - CARD_W / 2,   -CARD_H * 2],
+      [Pass.KEEPER]: [sw / 2,                 sh / 2], // unreachable
+    };
+
+    const [toX, toY] = passTarget[pass];
+    const [fromX, fromY] = receiveSource[pass];
+
+    // Clear to intermediate state and restore persistent scene elements
+    this.clearScene();
+    this.renderScoreTable(context, state);
+    const round = state.rounds[state.rounds.length - 1];
+    this.renderStatus(this.buildStatusText(context, state, round));
+    this.renderOpponents(context, state);
+    const handContainer = this.renderStaticHand(staying);
+
+    // Phase 1 — show the 3 passed cards above the hand, then fly them out
+    const passContainer = new Container();
+    passContainer.filters = [
       new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
     ];
-    this.app.stage.addChild(container);
+    this.app.stage.addChild(passContainer);
 
-    const entries = cards.map((card, i) => {
+    const passedSprites = passed.map((card, i) => {
+      const sprite = new Sprite(this.getTexture(card)!);
+      sprite.width = CARD_W;
+      sprite.height = CARD_H;
+      sprite.x = cx + (i - (passed.length - 1) / 2) * spacing - CARD_W / 2;
+      sprite.y = showY;
+      passContainer.addChild(sprite);
+      return sprite;
+    });
+
+    // Brief pause: player sees which cards are leaving
+    await new Promise<void>((resolve) => setTimeout(resolve, 450));
+
+    // Fly passed cards out
+    await Promise.all(
+      passedSprites.map((sprite) =>
+        this.animateCard(sprite, sprite.x, sprite.y, toX, toY, 320),
+      ),
+    );
+    this.app.stage.removeChild(passContainer);
+    passContainer.destroy({ children: true });
+
+    // Phase 2 — received cards fly in from the opposite edge
+    const recvContainer = new Container();
+    recvContainer.filters = [
+      new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
+    ];
+    this.app.stage.addChild(recvContainer);
+
+    const receivedEntries = received.map((card, i) => {
       const sprite = new Sprite(this.getTexture(card)!);
       sprite.width = CARD_W;
       sprite.height = CARD_H;
       sprite.x = fromX;
       sprite.y = fromY;
-      container.addChild(sprite);
+      recvContainer.addChild(sprite);
       return {
         sprite,
-        landX: sw / 2 + (i - (cards.length - 1) / 2) * spacing - CARD_W / 2,
+        landX: cx + (i - (received.length - 1) / 2) * spacing - CARD_W / 2,
       };
     });
 
-    // Fly in
     await Promise.all(
-      entries.map(({ sprite, landX }) =>
-        this.animateCard(sprite, fromX, fromY, landX, landY, 420),
+      receivedEntries.map(({ sprite, landX }) =>
+        this.animateCard(sprite, fromX, fromY, landX, showY, 400),
       ),
     );
 
-    // Show briefly so the player can read the cards
-    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+    // Show received cards so the player can read them
+    await new Promise<void>((resolve) => setTimeout(resolve, 950));
 
-    // Slide down into the hand area
+    // Slide into hand
     await Promise.all(
-      entries.map(({ sprite, landX }) =>
-        this.animateCard(sprite, landX, landY, landX, sh + CARD_H, 280),
+      receivedEntries.map(({ sprite, landX }) =>
+        this.animateCard(sprite, landX, showY, landX, sh + CARD_H, 260),
       ),
     );
 
-    this.app.stage.removeChild(container);
-    container.destroy({ children: true });
+    this.app.stage.removeChild(recvContainer);
+    recvContainer.destroy({ children: true });
+    this.app.stage.removeChild(handContainer);
+    handContainer.destroy({ children: true });
+  }
+
+  // Renders the given cards in the arc hand layout with no interaction — used
+  // for the intermediate state during the pass animation.
+  private renderStaticHand(cards: Card[]): Container {
+    const sorted = sortHand(cards);
+    const n = sorted.length;
+    const ARC_RADIUS = 1800;
+    const ANGLE_STEP = Math.PI / 80;
+    const arcCenterX = this.app.screen.width / 2;
+    const arcCenterY = this.app.screen.height - CARD_H / 2 - 50 + ARC_RADIUS;
+
+    const container = new Container();
+    container.filters = [
+      new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 30 }),
+    ];
+
+    for (let i = 0; i < n; i++) {
+      const sprite = new Sprite(this.getTexture(sorted[i])!);
+      sprite.width = CARD_W;
+      sprite.height = CARD_H;
+      sprite.anchor.set(0.5, 0.5);
+      const angle = (i - (n - 1) / 2) * ANGLE_STEP;
+      sprite.x = arcCenterX + ARC_RADIUS * Math.sin(angle);
+      sprite.y = arcCenterY - ARC_RADIUS * Math.cos(angle);
+      sprite.rotation = angle;
+      container.addChild(sprite);
+    }
+
+    this.app.stage.addChild(container);
+    return container;
   }
 
   // ── Player hand ────────────────────────────────────────────────────────────
