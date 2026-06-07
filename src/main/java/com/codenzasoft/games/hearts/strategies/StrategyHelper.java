@@ -40,9 +40,9 @@ public final class StrategyHelper {
     return filterSuit(cards, suit).collect(Collectors.toSet());
   }
 
-  public static Set<Card> getHigherCards(
+  public static List<Card> getHigherCards(
       final Collection<Card> cards, final Suit suit, final Rank rank) {
-    return filterSuit(cards, suit).filter(c -> c.outRanks(rank)).collect(Collectors.toSet());
+    return filterSuit(cards, suit).filter(c -> c.outRanks(rank)).toList();
   }
 
   public static Optional<Card> getMinRank(final Collection<Card> cards, final Suit suit) {

@@ -10,9 +10,6 @@ import java.util.stream.Collectors;
 
 public class DefensiveStrategy implements HeartsPlayerObserver {
 
-  // TODO: remove
-  private final RandomStrategy randomStrategy = new RandomStrategy();
-
   @Override
   public void yourTurnToPlay(
       final HeartsGame game,
@@ -26,8 +23,7 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
   @Override
   public void yourTurnToPass(
       final HeartsGame game, final HeartsState state, final Player player, final List<Card> hand) {
-    // TODO: replace
-    randomStrategy.yourTurnToPass(game, state, player, hand);
+    game.setPass(player, selectCardsToPass(state.getRound(), player, state.getRound().pass()));
   }
 
   private Optional<Card> selectNextCard(
@@ -200,7 +196,8 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
     if (!StrategyHelper.hasQueenBeenPlayed(round)) {
       if (StrategyHelper.filterSuit(legalCards, Suit.SPADES).findAny().isPresent()) {
         // lead a spade, if I don't have the Q, K, A
-        final Set<Card> trouble = StrategyHelper.getHigherCards(legalCards, Suit.SPADES, Rank.JACK);
+        final List<Card> trouble =
+            StrategyHelper.getHigherCards(legalCards, Suit.SPADES, Rank.JACK);
         if (trouble.isEmpty()) {
           return StrategyHelper.getMaxRank(legalCards, Suit.SPADES);
         } else {
@@ -287,5 +284,39 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
     } else {
       return Optional.empty();
     }
+  }
+
+  protected List<Card> selectCardsToPass(
+      final RoundState round, final Player player, final Pass pass) {
+    final List<Card> cardsToPass = new ArrayList<>(selectSpadesToPass(round, player));
+
+    if (cardsToPass.size() < 3) {
+      final List<Card> spades =
+          StrategyHelper.filterSuit(round.getHand(player), Suit.SPADES).toList();
+      final List<Card> others = new ArrayList<>(round.getHand(player));
+      others.removeAll(spades);
+      final List<Suit> suits = List.of(Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS);
+      Rank rank = Rank.ACE;
+      while (cardsToPass.size() < 3) {
+        for (final Suit suit : suits) {
+          if (others.contains(new Card(suit, rank)) && (cardsToPass.size() < 3)) {
+            cardsToPass.add(new Card(suit, rank));
+          }
+        }
+        rank = rank.getPrevious().get();
+      }
+    }
+    return cardsToPass;
+  }
+
+  protected List<Card> selectSpadesToPass(final RoundState round, final Player player) {
+    final List<Card> spades =
+        StrategyHelper.filterSuit(round.getHand(player), Suit.SPADES).toList();
+    // if spades are a long suit (4 or more), it's OK to keep them
+    if (spades.size() < 4) {
+      // otherwise, pass any spades queen and higher
+      return StrategyHelper.getHigherCards(spades, Suit.SPADES, Rank.JACK);
+    }
+    return List.of();
   }
 }
