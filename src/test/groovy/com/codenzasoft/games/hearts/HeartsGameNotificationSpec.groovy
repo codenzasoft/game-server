@@ -30,7 +30,6 @@ class HeartsGameNotificationSpec extends Specification {
                 game.setPass(player, hand.take(3))
             }
         }
-        game.passCards()
     }
 
     /** Plays one card for the current next player, choosing from their valid cards. */
@@ -47,7 +46,7 @@ class HeartsGameNotificationSpec extends Specification {
         4.times { playNextCard(game) }
     }
 
-    def "gameStarted is fired on construction"() {
+    def "gameStarted and roundStarted are fired on construction"() {
         def listener = Mock(HeartsListener)
 
         when:
@@ -55,17 +54,7 @@ class HeartsGameNotificationSpec extends Specification {
 
         then:
         1 * listener.gameStarted(_, _)
-    }
-
-    def "gameOver fires gameOver notification"() {
-        def listener = Mock(HeartsListener)
-        def game = buildGame(listener)
-
-        when:
-        game.gameOver()
-
-        then:
-        1 * listener.gameOver(game, _)
+        1 * listener.roundStarted(_ ,_)
     }
 
     def "quit fires gameQuit notification"() {
@@ -79,21 +68,9 @@ class HeartsGameNotificationSpec extends Specification {
         1 * listener.gameQuit(game, _)
     }
 
-    def "startNewRound fires roundStarted with the new round"() {
-        def listener = Mock(HeartsListener)
-        def game = buildGame(listener)
-
-        when:
-        game.startNewRound()
-
-        then:
-        1 * listener.roundStarted(game, _)
-    }
-
     def "setPass fires passSelected with the player and selected cards"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
         def cards = game.gameState.currentRound.get().hands().get(p1.name()).take(3)
 
         when:
@@ -103,33 +80,31 @@ class HeartsGameNotificationSpec extends Specification {
         1 * listener.passSelected(game, _, p1, cards)
     }
 
-    def "passCards fires passComplete"() {
+    def "setting the last pass fires passComplete"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
         def round = game.gameState.currentRound.get()
         if (round.pass() != Pass.KEEPER) {
-            [p1, p2, p3, p4].each { player ->
+            [p1, p2, p3].each { player ->
                 def hand = game.gameState.currentRound.get().hands().get(player.name())
                 game.setPass(player, hand.take(3))
             }
         }
 
         when:
-        game.passCards()
+        def hand = game.gameState.currentRound.get().hands().get(p4.name())
+        game.setPass(p4, hand.take(3))
 
         then:
         1 * listener.passComplete(game, _)
     }
 
-    def "startNewTrick fires trickStarted"() {
+    def "startNewTrick fires after passes are complete"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
-        selectPassesAndPass(game)
 
         when:
-        game.startNewTrick()
+        selectPassesAndPass(game)
 
         then:
         1 * listener.trickStarted(game, _)
@@ -138,9 +113,7 @@ class HeartsGameNotificationSpec extends Specification {
     def "playCard fires cardPlayed with sequential card numbers within the trick"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
 
         when:
         4.times { playNextCard(game) }
@@ -155,9 +128,7 @@ class HeartsGameNotificationSpec extends Specification {
     def "fourth card in a trick fires trickEnded but not roundEnded"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
         3.times { playNextCard(game) }
 
         when:
@@ -171,12 +142,10 @@ class HeartsGameNotificationSpec extends Specification {
     def "completing all tricks in a round fires roundEnded"() {
         def listener = Mock(HeartsListener)
         def game = buildGame(listener)
-        game.startNewRound()
         selectPassesAndPass(game)
 
         when:
         13.times {
-            game.startNewTrick()
             playTrick(game)
         }
 
@@ -188,13 +157,19 @@ class HeartsGameNotificationSpec extends Specification {
     def "all listeners receive each notification"() {
         def listener1 = Mock(HeartsListener)
         def listener2 = Mock(HeartsListener)
-        def game = buildGame(listener1, listener2)
 
         when:
-        game.startNewRound()
+        def game = buildGame(listener1, listener2)
 
         then:
-        1 * listener1.roundStarted(game, _)
-        1 * listener2.roundStarted(game, _)
+        1 * listener1.gameStarted(_, _)
+        1 * listener2.gameStarted(_, _)
+
+        when:
+        selectPassesAndPass(game)
+
+        then:
+        4 * listener1.passSelected(_, _, _, _)
+        4 * listener2.passSelected(_, _, _, _)
     }
 }

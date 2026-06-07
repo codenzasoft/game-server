@@ -30,7 +30,6 @@ class HeartsGameRulesSpec extends Specification {
                 game.setPass(player, hand.take(3))
             }
         }
-        game.passCards()
     }
 
     def findNextPlayer(HeartsGame game) {
@@ -41,9 +40,7 @@ class HeartsGameRulesSpec extends Specification {
 
     def "getValidCards on the first trick before any card is played returns only the 2 of clubs"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
         def leader = findNextPlayer(game)
 
         expect:
@@ -52,9 +49,7 @@ class HeartsGameRulesSpec extends Specification {
 
     def "playing the 2 of clubs on trick 1 succeeds"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
         def leader = findNextPlayer(game)
 
         when:
@@ -66,9 +61,7 @@ class HeartsGameRulesSpec extends Specification {
 
     def "playing a card not in the valid set throws"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
         def leader = findNextPlayer(game)
         def invalidCard = game.gameState.currentRound.get().hands().get(leader.name())
                 .find { it != HeartsGame.TWO_OF_CLUBS }
@@ -82,9 +75,7 @@ class HeartsGameRulesSpec extends Specification {
 
     def "getValidCards after suit is led restricts to led suit if player has it"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
-        game.startNewTrick()
 
         // Play 2♣ to establish clubs as the led suit
         game.playCard(findNextPlayer(game), HeartsGame.TWO_OF_CLUBS)
@@ -102,11 +93,9 @@ class HeartsGameRulesSpec extends Specification {
 
     def "getValidCards when leading trick 2 or later excludes hearts when hearts not broken"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
 
         // Play out trick 1 fully
-        game.startNewTrick()
         4.times {
             def player = findNextPlayer(game)
             def validCards = game.getValidCards(player)
@@ -117,7 +106,6 @@ class HeartsGameRulesSpec extends Specification {
         def playedCards = game.gameState.currentRound.get().playedCards
         def heartsPlayed = playedCards.any { it.suit == Suit.HEARTS }
 
-        game.startNewTrick()
         def leader = findNextPlayer(game)
         def hand = game.gameState.currentRound.get().hands().get(leader.name())
         def nonHearts = hand.findAll { it.suit != Suit.HEARTS }
@@ -132,13 +120,11 @@ class HeartsGameRulesSpec extends Specification {
 
     def "getValidCards when leading includes hearts after a heart has been played"() {
         def game = buildGame()
-        game.startNewRound()
         selectPassesAndPass(game)
 
         // Play tricks until a heart is played (void in led suit → can discard a heart)
         boolean heartPlayed = false
         while (!heartPlayed) {
-            game.startNewTrick()
             4.times {
                 def player = findNextPlayer(game)
                 def validCards = game.getValidCards(player)
@@ -152,7 +138,6 @@ class HeartsGameRulesSpec extends Specification {
         if (!heartPlayed) return  // hearts never broken in this deal; skip
 
         // Start a new trick and confirm leader can lead hearts
-        game.startNewTrick()
         def leader = findNextPlayer(game)
         def hand = game.gameState.currentRound.get().hands().get(leader.name())
         def hearts = hand.findAll { it.suit == Suit.HEARTS }

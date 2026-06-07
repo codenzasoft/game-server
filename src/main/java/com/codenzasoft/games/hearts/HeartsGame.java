@@ -110,7 +110,9 @@ public class HeartsGame implements Game<HeartsGame> {
     this.executor = executor;
     this.playerObservers = Map.copyOf(playerObservers);
     setGameState(gameState);
+    // TODO: this only works for new empty games
     notifyListeners(GAME_STARTED_NOTIFICATION);
+    startNewRound();
   }
 
   private void setGameState(final HeartsState gameState) {
@@ -233,6 +235,8 @@ public class HeartsGame implements Game<HeartsGame> {
     final RoundState round = getGameState().getCurrentRound().orElseThrow();
     if (round.pass() != Pass.KEEPER) {
       players.forEach(p -> notifyPlayerToPass(p.name()));
+    } else {
+      startNewTrick();
     }
   }
 
@@ -243,11 +247,15 @@ public class HeartsGame implements Game<HeartsGame> {
   public synchronized void setPass(final Player player, final List<Card> cards) {
     setGameState(getGameState().setPass(player.name(), cards));
     notifyListeners(new HeartsPassSelectedNotification(player, cards));
+    if (getGameState().getCurrentRound().map(RoundState::isPassReady).orElse(false)) {
+      passCards();
+    }
   }
 
   public synchronized void passCards() {
     setGameState(getGameState().passCards());
     notifyListeners(PASS_COMPLETE_NOTIFICATION);
+    startNewTrick();
   }
 
   public synchronized void startNewTrick() {
@@ -286,6 +294,14 @@ public class HeartsGame implements Game<HeartsGame> {
       if (round.isComplete()) {
         log.info("[{}] round complete", id);
         notifyListeners(ROUND_ENDED_NOTIFICATION);
+        if (getGameState().isOver()) {
+          log.info("[{}] game over", id);
+          notifyListeners(GAME_OVER_NOTIFICATION);
+        } else {
+          startNewRound();
+        }
+      } else {
+        startNewTrick();
       }
     } else {
       round
@@ -299,11 +315,6 @@ public class HeartsGame implements Game<HeartsGame> {
                       player.name(),
                       card));
     }
-  }
-
-  public synchronized void gameOver() {
-    setGameState(getGameState().setOver());
-    notifyListeners(GAME_OVER_NOTIFICATION);
   }
 
   public synchronized void quit() {

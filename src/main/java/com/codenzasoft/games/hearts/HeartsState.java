@@ -129,10 +129,17 @@ public record HeartsState(
   }
 
   HeartsState playCard(final String player, final Card card) {
-    return replaceLastRound(
-        getCurrentRound()
-            .map(r -> r.playCard(this, player, card))
-            .orElseThrow(new IseSupplier("unable to play card - no current round")));
+    final HeartsState nextState =
+        replaceLastRound(
+            getCurrentRound()
+                .map(r -> r.playCard(this, player, card))
+                .orElseThrow(new IseSupplier("unable to play card - no current round")));
+    if (nextState.getRound().isComplete()) {
+      if (getScore().values().stream().anyMatch(v -> v >= 100)) {
+        return nextState.setOver();
+      }
+    }
+    return nextState;
   }
 
   public List<Card> getHand(final Player player) {
