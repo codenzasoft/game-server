@@ -394,7 +394,8 @@ export class HeartsGameHandler {
     state: HeartsState,
     round: RoundState,
   ): string {
-    const passDir = round.pass === Pass.KEEPER ? "" : ` · Pass ${round.pass}`;
+    const passDir =
+      round.pass === Pass.KEEPER ? " · KEEPER" : ` · Pass ${round.pass}`;
     const prefix = `Round ${round.number}${passDir}`;
 
     if (context.passingRequired) return `${prefix} · Select 3 cards to pass`;
@@ -790,9 +791,16 @@ export class HeartsGameHandler {
     info.textContent = `Select 3 cards to pass ${dir}`;
     overlay.appendChild(info);
 
+    const passArrows: Record<Pass, string> = {
+      [Pass.LEFT]: "←",
+      [Pass.RIGHT]: "→",
+      [Pass.ACROSS]: "↑",
+      [Pass.KEEPER]: "",
+    };
+
     const btn = document.createElement("button");
     btn.id = "hearts-pass-btn";
-    btn.textContent = `Pass ${dir} →`;
+    btn.textContent = `Pass ${dir} ${passArrows[dir]}`;
     btn.disabled = this.selectedPassCards.length !== 3;
     btn.addEventListener("click", () => this.sendPass());
     overlay.appendChild(btn);
