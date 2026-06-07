@@ -199,11 +199,15 @@ export class HeartsGameHandler {
   async preloadTextures() {
     const suits = Object.values(Suit);
     const ranks = Object.values(Rank);
+    const resolution = window.devicePixelRatio || 1;
     await Promise.all(
       suits.flatMap((suit) =>
         ranks.map(async (rank) => {
           const key = cardKey(suit, rank);
-          const texture = await Assets.load(cardPath(suit, rank));
+          const texture = await Assets.load<Texture>({
+            src: cardPath(suit, rank),
+            data: { resolution },
+          });
           this.textures.set(key, texture);
         }),
       ),
@@ -617,21 +621,20 @@ export class HeartsGameHandler {
     const hand = sortHand(context.hand);
     if (hand.length === 0) return;
 
-    const maxWidth = this.app.screen.width * 0.9;
-    const spacing =
-      hand.length > 1
-        ? Math.min(CARD_W, (maxWidth - CARD_W) / (hand.length - 1))
-        : CARD_W;
-    const totalWidth = CARD_W + (hand.length - 1) * spacing;
-    const startX = (this.app.screen.width - totalWidth) / 2;
-    const baseY = this.app.screen.height - CARD_H - 50;
+    const n = hand.length;
+    // Large arc radius — center card highest, edges arc downward
+    const ARC_RADIUS = 1800;
+    const ANGLE_STEP = Math.PI / 80; // ~2.25° between adjacent cards
+
+    const arcCenterX = this.app.screen.width / 2;
+    const arcCenterY = this.app.screen.height - CARD_H / 2 - 50 + ARC_RADIUS;
 
     const container = new Container();
     const dropShadow = new DropShadowFilter({
-      alpha: 0.6, // Shadow opacity (range 0 to 1)
-      blur: 4, // Blur radius (0 = sharp)
-      distance: 5, // Distance from the sprite
-      padding: 20,
+      alpha: 0.6,
+      blur: 4,
+      distance: 5,
+      padding: 30,
     });
     container.filters = [dropShadow];
 
@@ -640,14 +643,18 @@ export class HeartsGameHandler {
       context.validCards.map((c) => cardKey(c.suit, c.rank)),
     );
 
-    for (let i = 0; i < hand.length; i++) {
+    for (let i = 0; i < n; i++) {
       const card = hand[i];
       const key = cardKey(card.suit, card.rank);
       const texture = this.getTexture(card);
       const sprite = new Sprite(texture);
       sprite.width = CARD_W;
       sprite.height = CARD_H;
-      sprite.x = startX + i * spacing;
+      sprite.anchor.set(0.5, 0.5);
+
+      const angle = (i - (n - 1) / 2) * ANGLE_STEP;
+      const cardCenterX = arcCenterX + ARC_RADIUS * Math.sin(angle);
+      const cardCenterY = arcCenterY - ARC_RADIUS * Math.cos(angle);
 
       const isSelected = this.selectedPassCards.some(
         (c) => c.suit === card.suit && c.rank === card.rank,
@@ -656,8 +663,14 @@ export class HeartsGameHandler {
         isPassPhase && (isSelected || this.selectedPassCards.length < 3);
       const isPlayable = !isPassPhase && validSet.has(key);
 
-      // Vertical position: selected cards slide up
-      sprite.y = isSelected ? -CARD_H * 0.25 : 0;
+      // Selected cards lift outward along the arc radius
+      const liftAmount = CARD_H * 0.25;
+      const liftX = isSelected ? Math.sin(angle) * liftAmount : 0;
+      const liftY = isSelected ? -Math.cos(angle) * liftAmount : 0;
+
+      sprite.x = cardCenterX + liftX;
+      sprite.y = cardCenterY + liftY;
+      sprite.rotation = angle;
 
       if (isPassPhase) {
         if (isPassable || isSelected) {
@@ -678,7 +691,6 @@ export class HeartsGameHandler {
       container.addChild(sprite);
     }
 
-    container.y = baseY;
     this.app.stage.addChild(container);
   }
 
