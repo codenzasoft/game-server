@@ -135,7 +135,8 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
       final RoundState round,
       final Player player,
       final TrickState trick) {
-    if (round.getPass(player.name()).contains(HeartsGame.QUEEN_OF_SPADES)) {
+    if (round.pass() != Pass.KEEPER
+        && round.getPass(player.name()).contains(HeartsGame.QUEEN_OF_SPADES)) {
       final String passedToPlayer = hearts.getPlayerRelativeTo(player.name(), round.pass());
       return trick.cards().stream().map(PlayedCard::player).toList().contains(passedToPlayer);
     }
