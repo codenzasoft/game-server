@@ -7,6 +7,7 @@ import {
   TextStyle,
   Texture,
 } from "pixi.js";
+import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
@@ -515,6 +516,13 @@ export class HeartsGameHandler {
       animToY = 0;
 
     const container = new Container();
+    const dropShadow = new DropShadowFilter({
+      alpha: 0.6, // Shadow opacity (range 0 to 1)
+      blur: 4, // Blur radius (0 = sharp)
+      distance: 5, // Distance from the sprite
+      padding: 20,
+    });
+    container.filters = [dropShadow];
 
     for (const { player, card } of trick.playedCards) {
       const playerIdx = state.players.indexOf(player);
@@ -619,6 +627,13 @@ export class HeartsGameHandler {
     const baseY = this.app.screen.height - CARD_H - 50;
 
     const container = new Container();
+    const dropShadow = new DropShadowFilter({
+      alpha: 0.6, // Shadow opacity (range 0 to 1)
+      blur: 4, // Blur radius (0 = sharp)
+      distance: 5, // Distance from the sprite
+      padding: 20,
+    });
+    container.filters = [dropShadow];
 
     const isPassPhase = context.passingRequired;
     const validSet = new Set(
