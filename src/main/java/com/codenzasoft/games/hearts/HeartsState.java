@@ -135,7 +135,7 @@ public record HeartsState(
                 .map(r -> r.playCard(this, player, card))
                 .orElseThrow(new IseSupplier("unable to play card - no current round")));
     if (nextState.getRound().isComplete()) {
-      if (getScore().values().stream().anyMatch(v -> v >= 100)) {
+      if (nextState.getScore().values().stream().anyMatch(v -> v >= 100)) {
         return nextState.setOver();
       }
     }
