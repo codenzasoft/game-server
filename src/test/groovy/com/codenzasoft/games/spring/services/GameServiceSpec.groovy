@@ -33,6 +33,7 @@ class GameServiceSpec extends Specification {
 
     UserEntity testUser
 
+    @Transactional
     def setup() {
         jdbcTemplate.execute("DELETE FROM xo_game_moves")
         jdbcTemplate.execute("DELETE FROM xo_game_pieces")
@@ -44,6 +45,7 @@ class GameServiceSpec extends Specification {
         testUser = usersRepository.save(testUser)
     }
 
+    @Transactional
     def ensureBots(int count) {
         List<UserEntity> bots = usersRepository.findByRolesRole(Role.BOT);
         for (int i = bots.size(); i < count; i++) {
@@ -211,7 +213,7 @@ class GameServiceSpec extends Specification {
 
     def "getOrBuildHeartsGame adds the built game to the cache"() {
         ensureBots(3)
-        
+
         given:
         def entity = gameService.createHeartsGame(testUser)
         def gameId = entity.id
