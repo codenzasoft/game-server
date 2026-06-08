@@ -2,14 +2,11 @@ package com.codenzasoft.games.spring.services
 
 import com.codenzasoft.games.hearts.HeartsGame
 import com.codenzasoft.games.kingshand.GameEngine
-import com.codenzasoft.games.spring.config.Role
-import com.codenzasoft.games.spring.entities.RoleEntity
 import com.codenzasoft.games.spring.entities.UserEntity
 import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity
 import com.codenzasoft.games.spring.repositories.GamesRepository
 import com.codenzasoft.games.common.GameType
-import com.codenzasoft.games.spring.repositories.UserRolesRepository
 import com.codenzasoft.games.spring.repositories.UsersRepository
 import com.codenzasoft.games.xo.Piece
 import org.springframework.beans.factory.annotation.Autowired
@@ -29,11 +26,9 @@ class GameServiceSpec extends Specification {
     @Autowired JdbcTemplate jdbcTemplate
     @Autowired GamesRepository gamesRepository
     @Autowired GameCache gameCache
-    @Autowired UserRolesRepository userRolesRepository
 
     UserEntity testUser
 
-    @Transactional
     def setup() {
         jdbcTemplate.execute("DELETE FROM xo_game_moves")
         jdbcTemplate.execute("DELETE FROM xo_game_pieces")
@@ -43,18 +38,6 @@ class GameServiceSpec extends Specification {
         testUser = new UserEntity()
         testUser.setUserName("test-limit-user")
         testUser = usersRepository.save(testUser)
-    }
-
-    @Transactional
-    def ensureBots(int count) {
-        List<UserEntity> bots = usersRepository.findByRolesRole(Role.BOT);
-        for (int i = bots.size(); i < count; i++) {
-            def bot = new UserEntity()
-            bot.setUserName("bot-" + i);
-            bot = usersRepository.save(bot)
-            def role = new RoleEntity(bot.getId(), Role.BOT)
-            userRolesRepository.save(role)
-        }
     }
 
     def "isAtGameLimit returns false when user has no active games"() {
@@ -179,8 +162,6 @@ class GameServiceSpec extends Specification {
     }
 
     def "createHeartsGame persists a new Hearts game with the user and three bots as players"() {
-        ensureBots(3)
-
         when:
         def entity = gameService.createHeartsGame(testUser)
 
@@ -190,12 +171,10 @@ class GameServiceSpec extends Specification {
         entity.gameType == GameType.HEARTS
         entity.players.size() == 4
         entity.players[0] == testUser
-        entity.players[1..-1].every { it.isBot() }
+        entity.players[1..3].every { it.isBot() }
     }
 
     def "getOrBuildHeartsGame fetches from DB on first call and returns a HeartsGame"() {
-        ensureBots(3)
-
         given:
         def entity = gameService.createHeartsGame(testUser)
         def gameId = entity.id
@@ -212,8 +191,6 @@ class GameServiceSpec extends Specification {
     }
 
     def "getOrBuildHeartsGame adds the built game to the cache"() {
-        ensureBots(3)
-
         given:
         def entity = gameService.createHeartsGame(testUser)
         def gameId = entity.id

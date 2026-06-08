@@ -41,6 +41,7 @@ public class GameService {
   private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
   public static final int MAX_ACTIVE_GAMES = 10;
+  private static final List<String> BOT_NAMES = List.of("meg-bot", "tom-bot", "hex-bot");
 
   @Autowired private GamesRepository gamesRepository;
   @Autowired private GamePlayersRepository gamePlayersRepository;
@@ -51,6 +52,7 @@ public class GameService {
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
+  @Autowired private UserService userService;
 
   /**
    * Returns whether the provided user has reached {@link #MAX_ACTIVE_GAMES} active (incomplete)
@@ -175,7 +177,18 @@ public class GameService {
   List<UserEntity> getBots(final int count) {
     List<UserEntity> bots = usersRepository.findByRolesRole(Role.BOT);
     if (bots.size() < count) {
-      throw new IllegalStateException("Not enough bots to create a game");
+      final List<String> existing = bots.stream().map(UserEntity::getUsername).toList();
+      final List<String> newNames = new ArrayList<>(BOT_NAMES);
+      newNames.removeAll(existing);
+      final int createCount = count - bots.size();
+      if (newNames.size() >= createCount) {
+        for (int i = 0; i < createCount; i++) {
+          userService.createBot(newNames.get(i));
+        }
+        return getBots(count);
+      } else {
+        throw new IllegalStateException("Not enough bots to create a game");
+      }
     }
     return bots.subList(0, count);
   }
