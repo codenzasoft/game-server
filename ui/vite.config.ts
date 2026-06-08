@@ -7,6 +7,7 @@ export default defineConfig({
       input: {
         xsandos: "xsandos.html",
         kingshand: "kingshand.html",
+        hearts: "hearts.html",
       },
     },
   },
@@ -32,17 +33,17 @@ export default defineConfig({
             return url;
           }
           // Serve the game page from Vite for HMR
-          if (
-            req.method === "GET" &&
-            /^\/games\/xo\/[0-9a-f-]{36}/.test(url)
-          ) {
+          if (req.method === "GET" && /^\/games\/xo\/[0-9a-f-]{36}/.test(url)) {
             return "/xsandos.html";
+          }
+          if (req.method === "GET" && /^\/games\/kh\/[0-9a-f-]{36}/.test(url)) {
+            return "/kingshand.html";
           }
           if (
             req.method === "GET" &&
-            /^\/games\/kh\/[0-9a-f-]{36}/.test(url)
+            /^\/games\/hearts\/[0-9a-f-]{36}/.test(url)
           ) {
-            return "/kingshand.html";
+            return "/hearts.html";
           }
         },
       },

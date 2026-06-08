@@ -3,18 +3,23 @@ package com.codenzasoft.games.spring.services;
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.hearts.HeartsGame;
+import com.codenzasoft.games.hearts.strategies.DefensiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
+import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
+import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Piece;
@@ -23,6 +28,7 @@ import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.strategies.LookAheadStrategy;
 import jakarta.transaction.Transactional;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,14 +41,18 @@ public class GameService {
   private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
   public static final int MAX_ACTIVE_GAMES = 10;
+  private static final List<String> BOT_NAMES = List.of("meg-bot", "tom-bot", "hex-bot");
 
   @Autowired private GamesRepository gamesRepository;
   @Autowired private GamePlayersRepository gamePlayersRepository;
   @Autowired private UsersRepository usersRepository;
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
+  @Autowired private HeartsGameRepository heartsGameRepository;
+  @Autowired private HeartsBroadcastService heartsBroadcastService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
+  @Autowired private UserService userService;
 
   /**
    * Returns whether the provided user has reached {@link #MAX_ACTIVE_GAMES} active (incomplete)
@@ -100,6 +110,27 @@ public class GameService {
   }
 
   /**
+   * Returns a new Hearts game for the provided {@link UserEntity} playing against three bots.
+   *
+   * @param user The human player.
+   * @return A new game entity.
+   * @throws IllegalStateException if the user has reached the active game limit or fewer than three
+   *     bots are registered.
+   */
+  @Transactional
+  public HeartsGameEntity createHeartsGame(final UserEntity user) {
+    enforceGameLimit(user);
+    final List<UserEntity> bots = getBots(3);
+    final HeartsGameEntity game = new HeartsGameEntity(UUID.randomUUID());
+    final List<UserEntity> players = new ArrayList<>();
+    players.add(user);
+    players.addAll(bots);
+    game.setPlayers(players);
+    heartsGameRepository.save(game);
+    return game;
+  }
+
+  /**
    * Creates a new game with assigned {@link Piece}s. Must specify at least a single {@link
    * UserEntity}. A bot will be added as needed.
    *
@@ -146,7 +177,18 @@ public class GameService {
   List<UserEntity> getBots(final int count) {
     List<UserEntity> bots = usersRepository.findByRolesRole(Role.BOT);
     if (bots.size() < count) {
-      throw new IllegalStateException("Not enough bots to create a game");
+      final List<String> existing = bots.stream().map(UserEntity::getUsername).toList();
+      final List<String> newNames = new ArrayList<>(BOT_NAMES);
+      newNames.removeAll(existing);
+      final int createCount = count - bots.size();
+      if (newNames.size() >= createCount) {
+        for (int i = 0; i < createCount; i++) {
+          userService.createBot(newNames.get(i));
+        }
+        return getBots(count);
+      } else {
+        throw new IllegalStateException("Not enough bots to create a game");
+      }
     }
     return bots.subList(0, count);
   }
@@ -263,6 +305,45 @@ public class GameService {
       return Optional.of(game);
     }
     return Optional.empty();
+  }
+
+  /**
+   * Returns a {@link HeartsGame} with the provided ID or {@code empty} if a game with the provided
+   * ID does not exist. The game is retrieved from the {@link GameCache} if present, otherwise it is
+   * built from the persisted entity and added to the cache.
+   *
+   * @param id A game {@link UUID}.
+   * @return A {@link HeartsGame} or {@code empty} if a game with the provided id does not exist.
+   */
+  public Optional<HeartsGame> getOrBuildHeartsGame(final UUID id) {
+    final Optional<Game<HeartsGame>> cached = gameCache.getGameOfType(id, GameType.HEARTS);
+    if (cached.isPresent()) {
+      return cached.map(Game::getGame);
+    }
+    final Optional<HeartsGameEntity> persisted = findGameEntity(id, HeartsGameEntity.class);
+    if (persisted.isPresent()) {
+      final HeartsGame game = buildHeartsGame(persisted.get());
+      gameCache.addGame(game);
+      return Optional.of(game);
+    }
+    return Optional.empty();
+  }
+
+  protected synchronized HeartsGame buildHeartsGame(final HeartsGameEntity entity) {
+    log.debug("Building Hearts game from entity: {}", entity.getId());
+    final List<Player> players = entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
+    final HeartsGame.Builder builder =
+        new HeartsGame.Builder()
+            .withId(entity.getId())
+            .withPlayers(players)
+            .withNotificationExecutor(Executors.newSingleThreadExecutor())
+            .addListener(heartsBroadcastService);
+    for (final UserEntity user : entity.getPlayers()) {
+      if (user.isBot()) {
+        builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
+      }
+    }
+    return builder.build();
   }
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {

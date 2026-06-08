@@ -5,5 +5,7 @@ public enum GameType {
   /** X's and O's type. */
   XO,
   /** KingsHand type. */
-  KH
+  KH,
+  /** Hearts type. */
+  HEARTS
 }

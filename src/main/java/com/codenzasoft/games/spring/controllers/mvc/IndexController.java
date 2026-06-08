@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.controllers.mvc;
 
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.services.GameService;
@@ -71,6 +72,28 @@ public class IndexController {
         return "redirect:/games/xo/" + game.getId();
       } catch (IllegalStateException e) {
         log.warn("Game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
+  @GetMapping("/games/hearts/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}")
+  public String heartsGame() {
+    return "forward:/hearts.html";
+  }
+
+  /** Creates a new vs-bots {@link com.codenzasoft.games.hearts.HeartsGame}. */
+  @PostMapping("/games/hearts")
+  public String newHeartsGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        final HeartsGameEntity game = gameService.createHeartsGame(entity.get());
+        return "redirect:/games/hearts/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Hearts game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
       }
     }
     return "redirect:/";
