@@ -4,6 +4,8 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.RoleEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /** Helper methods for Thymeleaf views. */
@@ -24,7 +26,28 @@ public class ViewHelper {
     return switch (game.getGameType()) {
       case XO -> "/games/xo/" + game.getId().toString();
       case KH -> "/games/kh/" + game.getId().toString();
+      case HEARTS -> "/games/hearts/" + game.getId().toString();
     };
+  }
+
+  /**
+   * Returns a display string describing the players of a game. When all opponents are bots the
+   * string reads "player vs. Bots"; otherwise each opponent's username is listed individually.
+   *
+   * @param players The ordered list of players in the game.
+   * @return A human-readable player summary.
+   */
+  public String getGamePlayersDescription(final List<UserEntity> players) {
+    if (players.isEmpty()) return "";
+    if (players.size() == 1) return players.get(0).getUsername();
+    final String first = players.get(0).getUsername();
+    final List<UserEntity> opponents = players.subList(1, players.size());
+    if (opponents.stream().allMatch(UserEntity::isBot)) {
+      return first + " vs. Bots";
+    }
+    return first
+        + " vs. "
+        + opponents.stream().map(UserEntity::getUsername).collect(Collectors.joining(", "));
   }
 
   /**
@@ -37,6 +60,7 @@ public class ViewHelper {
     return switch (game.getGameType()) {
       case XO -> "Xs & Os";
       case KH -> "King's Hand";
+      case HEARTS -> "Hearts";
     };
   }
 }

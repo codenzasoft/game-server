@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.newrelic.api.agent.NewRelic;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -50,8 +51,9 @@ public class KhController {
               try {
                 game.offerAddChoices();
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("addOffer rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("addOffer rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -70,14 +72,16 @@ public class KhController {
               try {
                 game.pickCardByName(name);
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("addPick rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("addPick rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
 
   /**
-   * Skips the ADD phase without picking a card. Advances the phase to {@link Phase#RANDOM_EVENT}.
+   * Skips the ADD phase without picking a card. Advances the phase to {@link
+   * com.codenzasoft.games.kingshand.Phase#RANDOM_EVENT}.
    */
   @MessageMapping("/kh/{gameId}/add/skip")
   public void addSkip(@DestinationVariable String gameId) {
@@ -88,8 +92,9 @@ public class KhController {
               try {
                 game.skipAdd();
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("addSkip rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("addSkip rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -108,8 +113,9 @@ public class KhController {
               try {
                 game.applyEventOptionByName(name);
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("eventPick rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("eventPick rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -117,7 +123,7 @@ public class KhController {
   /**
    * Skips the RANDOM_EVENT phase when no eligible event was rolled (i.e. {@code currentEvent} is
    * {@code null}). Delegates to {@link GameEngine#advancePhase()}, which transitions to {@link
-   * Phase#PLAY} and draws the player's hand in one step.
+   * com.codenzasoft.games.kingshand.Phase#PLAY} and draws the player's hand in one step.
    */
   @MessageMapping("/kh/{gameId}/event/skip")
   public void eventSkip(@DestinationVariable String gameId) {
@@ -128,8 +134,9 @@ public class KhController {
               try {
                 game.advancePhase();
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("eventSkip rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("eventSkip rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -151,8 +158,9 @@ public class KhController {
               try {
                 game.placeCardByName(name);
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("playCard rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("playCard rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -171,8 +179,9 @@ public class KhController {
               try {
                 game.demolishCardByName(name);
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("demolishCard rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("demolishCard rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -193,8 +202,9 @@ public class KhController {
               try {
                 game.reorderTable(names);
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("reorderTable rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("reorderTable rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -213,8 +223,9 @@ public class KhController {
               try {
                 game.endAndRun();
                 khBroadcastService.gameLoaded(game);
-              } catch (IllegalStateException e) {
-                log.warn("endAndRun rejected for game {}: {}", gameId, e.getMessage());
+              } catch (final IllegalStateException e) {
+                log.error("endAndRun rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
               }
             });
   }
@@ -228,8 +239,9 @@ public class KhController {
     final UUID id = UUID.fromString(gameId);
     try {
       gameService.quitGame(id, userEntity.get());
-    } catch (IllegalStateException e) {
-      log.warn("Quit rejected for {}: {}", userEntity.get().getUsername(), e.getMessage());
+    } catch (final IllegalStateException e) {
+      log.error("Quit rejected for {}: {}", userEntity.get().getUsername(), e.getMessage());
+      NewRelic.noticeError(e);
       return;
     }
     khBroadcastService.gameQuit(id, userEntity.get().getUsername());

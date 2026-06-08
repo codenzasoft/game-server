@@ -1,7 +1,9 @@
 package com.codenzasoft.games.spring.services
 
+import com.codenzasoft.games.hearts.HeartsGame
 import com.codenzasoft.games.kingshand.GameEngine
 import com.codenzasoft.games.spring.entities.UserEntity
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity
 import com.codenzasoft.games.spring.repositories.GamesRepository
 import com.codenzasoft.games.common.GameType
@@ -157,6 +159,47 @@ class GameServiceSpec extends Specification {
 
         then:
         gameCache.getGameOfType(gameId, GameType.KH).isPresent()
+    }
+
+    def "createHeartsGame persists a new Hearts game with the user and three bots as players"() {
+        when:
+        def entity = gameService.createHeartsGame(testUser)
+
+        then:
+        entity instanceof HeartsGameEntity
+        entity.id != null
+        entity.gameType == GameType.HEARTS
+        entity.players.size() == 4
+        entity.players[0] == testUser
+        entity.players[1..3].every { it.isBot() }
+    }
+
+    def "getOrBuildHeartsGame fetches from DB on first call and returns a HeartsGame"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+        def gameId = entity.id
+
+        when:
+        def result = gameService.getOrBuildHeartsGame(gameId)
+
+        then:
+        result.isPresent()
+        result.get() instanceof HeartsGame
+        result.get().id == gameId
+        result.get().players.size() == 4
+        result.get().players[0].name() == testUser.username
+    }
+
+    def "getOrBuildHeartsGame adds the built game to the cache"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+        def gameId = entity.id
+
+        when:
+        gameService.getOrBuildHeartsGame(gameId)
+
+        then:
+        gameCache.getGameOfType(gameId, GameType.HEARTS).isPresent()
     }
 
 }
