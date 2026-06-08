@@ -3,6 +3,7 @@ import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
 import { RandomEventScene } from "./randomEventScene.ts";
 import { PlayPhaseScene } from "./playPhaseScene.ts";
+import { initMusic, unlockMusicOnFirstInteraction } from "./audio.ts";
 
 const homeUrl = `${window.location.origin}/`;
 const loginUrl =
@@ -28,6 +29,13 @@ const getGameId = (): string | undefined => {
 
   // Append the application canvas to the document body
   document.getElementById("pixi-container")!.appendChild(app.canvas);
+
+  // Looping background music — browsers require a user gesture before audio
+  // can play, so we prep the <audio> element now and start it on the first
+  // click/tap/keypress anywhere on the page. Volume is controlled from the
+  // Options menu (see sharedOverlays.ts) and persisted in localStorage.
+  initMusic();
+  unlockMusicOnFirstInteraction();
 
   const gameId = getGameId();
   if (!gameId || gameId.length === 0) {

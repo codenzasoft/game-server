@@ -8,6 +8,7 @@ import { GameState, Season } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
 import { Card, CardTarget, ResourceTarget } from "./kingshand.ts";
+import { getMusicVolume, setMusicVolume } from "./audio.ts";
 
 // ── Shared style injection ────────────────────────────────────────────────────
 
@@ -176,6 +177,63 @@ export function injectSharedStyles(): void {
       text-align: center;
       font-style: italic;
       padding: 0 4px;
+    }
+    .kh-opt-music-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 4px 4px;
+    }
+    .kh-opt-music-icon {
+      font-size: 1.1rem;
+      line-height: 1;
+      width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .kh-opt-music-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #c49428 0%, #c49428 var(--kh-music-pct, 35%), #3a2a14 var(--kh-music-pct, 35%), #3a2a14 100%);
+      outline: none;
+      cursor: pointer;
+    }
+    .kh-opt-music-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f0cc50;
+      border: 2px solid #8a6818;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    }
+    .kh-opt-music-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f0cc50;
+      border: 2px solid #8a6818;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.5);
+    }
+    .kh-opt-music-value {
+      font-family: 'Cinzel', serif;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #c4a060;
+      width: 34px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .kh-opt-divider {
+      border: none;
+      border-top: 1px solid #3a2a14;
+      margin: 2px 0;
     }
 
     /* ── Shared modal backdrop ───────────────────────────────────────── */
@@ -632,6 +690,21 @@ export function buildOptionsButton(): string {
           <button class="kh-shared-modal-close" id="kh-opt-close">✕</button>
         </div>
         <div class="kh-opt-modal-body">
+          <div class="kh-opt-music-row">
+            <span class="kh-opt-music-icon" id="kh-opt-music-icon">🎵</span>
+            <input
+              type="range"
+              class="kh-opt-music-slider"
+              id="kh-opt-music-slider"
+              min="0"
+              max="100"
+              step="1"
+              value="${getMusicVolume()}"
+              style="--kh-music-pct: ${getMusicVolume()}%;"
+            />
+            <span class="kh-opt-music-value" id="kh-opt-music-value">${getMusicVolume()}%</span>
+          </div>
+          <hr class="kh-opt-divider" />
           <button class="kh-opt-action-btn kh-opt-save-btn" id="kh-opt-save-exit">
             🏠 &nbsp;Save &amp; Exit
           </button>
@@ -653,6 +726,23 @@ export function attachOptionsListeners(overlay: HTMLElement): void {
   const backdrop = overlay.querySelector<HTMLDivElement>("#kh-opt-backdrop");
   const saveBtn  = overlay.querySelector<HTMLButtonElement>("#kh-opt-save-exit");
   const quitBtn  = overlay.querySelector<HTMLButtonElement>("#kh-opt-quit");
+  const musicSlider = overlay.querySelector<HTMLInputElement>("#kh-opt-music-slider");
+  const musicValue  = overlay.querySelector<HTMLSpanElement>("#kh-opt-music-value");
+  const musicIcon   = overlay.querySelector<HTMLSpanElement>("#kh-opt-music-icon");
+
+  const updateMusicUI = (volume: number) => {
+    if (musicSlider) musicSlider.style.setProperty("--kh-music-pct", `${volume}%`);
+    if (musicValue)  musicValue.textContent = `${volume}%`;
+    if (musicIcon)   musicIcon.textContent  = volume === 0 ? "🔇" : volume < 50 ? "🔉" : "🔊";
+  };
+
+  updateMusicUI(getMusicVolume());
+
+  musicSlider?.addEventListener("input", () => {
+    const volume = Number(musicSlider.value);
+    setMusicVolume(volume);
+    updateMusicUI(volume);
+  });
 
   openBtn?.addEventListener("click",  () => { if (backdrop) backdrop.style.display = "flex"; });
   closeBtn?.addEventListener("click", () => { if (backdrop) backdrop.style.display = "none"; });
