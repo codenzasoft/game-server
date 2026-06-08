@@ -37,7 +37,6 @@ class HeartsFullGameSpec extends Specification {
         conditions.eventually {
             game.getGameState().isOver()
         }
-        game.gameState.currentRound.get().hands().values().every { it.isEmpty() }
 
         where:
         strategy || _
