@@ -34,7 +34,6 @@ const getGameId = () => {
   } else {
     console.log(`Using game ID: ${gameId}`);
     const eventHandler = new GameEventHandler(app);
-    await eventHandler.initImages();
     app.stage.addChild(eventHandler.getBoard());
     eventHandler.connect(gameId);
   }
