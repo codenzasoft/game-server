@@ -582,7 +582,8 @@ export class GameEventHandler {
         if (state.winner == myPiece) {
           this.displayWin(app, "You Win!", state);
         } else {
-          this.displayWin(app, "You Loose!", state);
+          const opponent = state.getOpponentName(message.context) ?? "Opponent";
+          this.displayWin(app, `${opponent} wins!`, state);
         }
       } else if (state.quitter !== undefined) {
         const myPiece = state.getMyPiece(message.context);
