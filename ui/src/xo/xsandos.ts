@@ -5,6 +5,7 @@ import {
   Text,
   TextStyle,
 } from "pixi.js";
+import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
@@ -332,6 +333,7 @@ class BoardSquare extends Container {
     if (token !== undefined && this.token !== token) {
       this.token = token;
       const g = new Graphics();
+      g.filters = [new DropShadowFilter({ alpha: 0.45, blur: 4, distance: 5, padding: 16 })];
       this.pieceGraphics = g;
       this.addChild(g);
       animation = this.animatePiece(token, app);
