@@ -327,16 +327,18 @@ class BoardSquare extends Container {
     this.on("pointerdown", (_event: PointerEvent) => handler.play(this));
   }
 
-  update(token: GamePiece | undefined, isMove: boolean, app: Application) {
+  update(token: GamePiece | undefined, isMove: boolean, app: Application): Promise<void> {
+    let animation = Promise.resolve();
     if (token !== undefined && this.token !== token) {
       this.token = token;
       const g = new Graphics();
       this.pieceGraphics = g;
       this.addChild(g);
-      this.animatePiece(token, app);
+      animation = this.animatePiece(token, app);
     }
     this.eventMode = isMove ? "static" : "none";
     this.cursor = isMove ? "pointer" : "default";
+    return animation;
   }
 
   shrink() {
@@ -349,38 +351,46 @@ class BoardSquare extends Container {
     }
   }
 
-  private animatePiece(piece: GamePiece, app: Application) {
+  private animatePiece(piece: GamePiece, app: Application): Promise<void> {
     const s = this.size;
     const pad = s * 0.18;
     const sw = s * 0.1;
     const g = this.pieceGraphics!;
 
-    if (piece === GamePiece.X) {
-      const path1 = brushPath(pad, pad, s - pad, s - pad, 20, sw * 0.25, 42);
-      const path2 = brushPath(s - pad, pad, pad, s - pad, 20, sw * 0.25, 99);
-      let p1 = 0, p2 = 0;
-      const tick = () => {
-        g.clear();
-        p1 = Math.min(1, p1 + 0.07);
-        strokePath(g, path1, p1, 0xc0392b, sw);
-        if (p1 >= 1) {
-          p2 = Math.min(1, p2 + 0.07);
-          strokePath(g, path2, p2, 0xc0392b, sw);
-        }
-        if (p2 >= 1) app.ticker.remove(tick);
-      };
-      app.ticker.add(tick);
-    } else {
-      const path = circlePath(s / 2, s / 2, s * 0.3, 48, 0.08, 77);
-      let p = 0;
-      const tick = () => {
-        g.clear();
-        p = Math.min(1, p + 0.04);
-        strokePath(g, path, p, 0x2471a3, sw);
-        if (p >= 1) app.ticker.remove(tick);
-      };
-      app.ticker.add(tick);
-    }
+    return new Promise<void>((resolve) => {
+      if (piece === GamePiece.X) {
+        const path1 = brushPath(pad, pad, s - pad, s - pad, 20, sw * 0.06, 42);
+        const path2 = brushPath(s - pad, pad, pad, s - pad, 20, sw * 0.06, 99);
+        let p1 = 0, p2 = 0;
+        const tick = () => {
+          g.clear();
+          p1 = Math.min(1, p1 + 0.07);
+          strokePath(g, path1, p1, 0xc0392b, sw);
+          if (p1 >= 1) {
+            p2 = Math.min(1, p2 + 0.07);
+            strokePath(g, path2, p2, 0xc0392b, sw);
+          }
+          if (p2 >= 1) {
+            app.ticker.remove(tick);
+            resolve();
+          }
+        };
+        app.ticker.add(tick);
+      } else {
+        const path = circlePath(s / 2, s / 2, s * 0.3, 48, 0.02, 77);
+        let p = 0;
+        const tick = () => {
+          g.clear();
+          p = Math.min(1, p + 0.04);
+          strokePath(g, path, p, 0x2471a3, sw);
+          if (p >= 1) {
+            app.ticker.remove(tick);
+            resolve();
+          }
+        };
+        app.ticker.add(tick);
+      }
+    });
   }
 }
 
@@ -455,9 +465,10 @@ export class Board extends Container {
     return undefined;
   }
 
-  updateSquares(message: GameMessage, app: Application) {
+  async updateSquares(message: GameMessage, app: Application): Promise<void> {
     const state = message.state;
     const myPiece = state.getMyPiece(message.context);
+    const animations: Promise<void>[] = [];
     for (let row = 1; row <= 3; row++) {
       for (let col = 1; col <= 3; col++) {
         const position = Position.with(row, col);
@@ -465,13 +476,14 @@ export class Board extends Container {
         const piece = state.getPiece(position);
         const isMove = state.isMove(position, myPiece);
         if (square !== undefined) {
-          square.update(piece, isMove, app);
+          animations.push(square.update(piece, isMove, app));
           if (state.over && !state.isWinner(position)) {
             square.shrink();
           }
         }
       }
     }
+    await Promise.all(animations);
   }
 }
 
@@ -534,12 +546,12 @@ export class GameEventHandler {
         if (nextSequence > this.sequence) {
           // new state - update the board
           this.sequence = nextSequence;
-          this.board.updateSquares(nextMessage, this.app);
+          await this.board.updateSquares(nextMessage, this.app);
           this.displayGameOver(nextMessage, this.app);
         } else {
           // same sequence - game was quit (no board move) or contains a "play again" link
           if (nextMessage.state.over) {
-            this.board.updateSquares(nextMessage, this.app);
+            await this.board.updateSquares(nextMessage, this.app);
             this.displayGameOver(nextMessage, this.app);
           }
           if (nextMessage.context.nextGameId !== undefined && nextMessage.state.over) {
