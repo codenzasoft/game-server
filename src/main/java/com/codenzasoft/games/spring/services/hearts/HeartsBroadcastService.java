@@ -11,6 +11,7 @@ import com.codenzasoft.games.spring.messages.HeartsMessage;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -84,6 +85,23 @@ public class HeartsBroadcastService implements HeartsListener {
         .map(Optional::get)
         .filter(user -> !user.isBot())
         .toList();
+  }
+
+  /**
+   * Sends a lobby-phase update to all current players, letting the frontend know the game has not
+   * yet started and who has joined so far.
+   *
+   * @param gameId The game ID.
+   * @param players The players currently in the lobby (human only; bots are not in lobby phase).
+   */
+  public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
+    final List<String> names = players.stream().map(UserEntity::getUsername).toList();
+    final Map<String, Object> payload =
+        Map.of("lobby", Map.of("gameId", gameId.toString(), "players", names));
+    for (final UserEntity player : players) {
+      messagingTemplate.convertAndSendToUser(
+          player.getUsername(), "/queue/games/" + gameId, payload);
+    }
   }
 
   @Override

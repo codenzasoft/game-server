@@ -168,6 +168,14 @@ const HeartsMessageSchema = z.object({
 });
 type HeartsMessage = z.infer<typeof HeartsMessageSchema>;
 
+const HeartsLobbyMessageSchema = z.object({
+  lobby: z.object({
+    gameId: z.string(),
+    players: z.array(z.string()),
+  }),
+});
+type HeartsLobbyState = z.infer<typeof HeartsLobbyMessageSchema>["lobby"];
+
 // ── Card dimensions (base values — scaled at runtime) ────────────────────────
 
 const BASE_CARD_W = 80;
@@ -202,6 +210,12 @@ export class HeartsGameHandler {
 
   // Last received message — used to re-render on pass card toggle
   private lastMessage: HeartsMessage | null = null;
+
+  // Last lobby state — used to re-render on resize while in lobby
+  private lastLobbyState: HeartsLobbyState | null = null;
+
+  // HTML overlay for lobby waiting room
+  private lobbyOverlay: HTMLDivElement | null = null;
 
   // Trick container retained across renders to support the win animation
   private trickContainer: Container | null = null;
@@ -246,6 +260,10 @@ export class HeartsGameHandler {
   }
 
   private rerenderLastMessage() {
+    if (this.lastLobbyState) {
+      this.renderLobby(this.lastLobbyState);
+      return;
+    }
     const msg = this.lastMessage;
     if (!msg || this.isProcessing) return;
     const { context, state } = msg;
@@ -306,17 +324,29 @@ export class HeartsGameHandler {
         `/user/queue/games/${this.gameId}`,
         (msg) => {
           try {
-            const message = HeartsMessageSchema.parse(JSON.parse(msg.body));
-            const round = message.state.rounds[message.state.rounds.length - 1];
-            const trick = round?.tricks[round.tricks.length - 1];
-            console.log(
-              `[Hearts] Message received — hand:${message.context.hand.length}`,
-              `valid:${message.context.validCards.length}`,
-              `passing:${message.context.passingRequired}`,
-              `trick cards:${trick?.playedCards.length ?? 0}/4`,
-              `queue:${this.messageQueue.length + 1}`,
-            );
-            this.enqueue(message);
+            const raw = JSON.parse(msg.body);
+            if ("lobby" in raw) {
+              const { lobby } = HeartsLobbyMessageSchema.parse(raw);
+              console.log(
+                `[Hearts] Lobby update — players: ${lobby.players.join(", ")}`,
+              );
+              this.lastLobbyState = lobby;
+              this.lastMessage = null;
+              this.renderLobby(lobby);
+            } else {
+              const message = HeartsMessageSchema.parse(raw);
+              const round = message.state.rounds[message.state.rounds.length - 1];
+              const trick = round?.tricks[round.tricks.length - 1];
+              console.log(
+                `[Hearts] Message received — hand:${message.context.hand.length}`,
+                `valid:${message.context.validCards.length}`,
+                `passing:${message.context.passingRequired}`,
+                `trick cards:${trick?.playedCards.length ?? 0}/4`,
+                `queue:${this.messageQueue.length + 1}`,
+              );
+              this.lastLobbyState = null;
+              this.enqueue(message);
+            }
           } catch (e) {
             console.error("[Hearts] Failed to parse message", e);
           }
@@ -391,6 +421,95 @@ export class HeartsGameHandler {
     });
   }
 
+  private sendStart() {
+    this.stompClient.publish({
+      destination: `/games/hearts/${this.gameId}/start`,
+      body: "",
+    });
+  }
+
+  // ── Lobby ──────────────────────────────────────────────────────────────────
+
+  private removeLobbyOverlay() {
+    if (this.lobbyOverlay) {
+      this.lobbyOverlay.remove();
+      this.lobbyOverlay = null;
+    }
+  }
+
+  private renderLobby(lobby: HeartsLobbyState) {
+    this.clearScene();
+
+    const slots = Array.from({ length: 4 }, (_, i) =>
+      i < lobby.players.length
+        ? `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.12)">
+             <span style="color:#7fff7f">&#x25cf;</span>&ensp;${lobby.players[i]}
+           </div>`
+        : `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.35)">
+             <span>&#x25cb;</span>&ensp;Waiting for player&hellip;
+           </div>`,
+    ).join("");
+
+    const overlay = document.createElement("div");
+    overlay.style.cssText = `
+      position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+      background:rgba(10,60,20,0.96);border:1px solid rgba(255,255,255,0.18);
+      border-radius:14px;padding:28px 32px;color:white;font-family:Arial,sans-serif;
+      min-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.55);z-index:100;
+    `;
+    const inviteUrl = window.location.href;
+    overlay.innerHTML = `
+      <h3 style="margin:0 0 20px;font-size:20px">Hearts &mdash; Waiting Room</h3>
+      <p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,0.65)">
+        Share this link to invite players:
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:22px">
+        <input id="hlo-link" type="text" readonly value="${inviteUrl}"
+          style="flex:1;min-width:0;background:rgba(255,255,255,0.1);
+                 border:1px solid rgba(255,255,255,0.3);border-radius:6px;
+                 padding:6px 10px;color:white;font-size:12px">
+        <button id="hlo-copy"
+          style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);
+                 border-radius:6px;padding:6px 14px;color:white;cursor:pointer;
+                 font-size:12px;white-space:nowrap">
+          Copy
+        </button>
+      </div>
+      <div style="margin-bottom:22px">${slots}</div>
+      <div style="display:flex;gap:10px">
+        <button id="hlo-start"
+          style="flex:1;background:#2ecc71;border:none;border-radius:8px;
+                 padding:10px;color:white;font-size:15px;font-weight:bold;cursor:pointer">
+          Start Game (${lobby.players.length}/4)
+        </button>
+        <button id="hlo-leave"
+          style="background:rgba(200,50,50,0.25);border:1px solid rgba(220,80,80,0.45);
+                 border-radius:8px;padding:10px 16px;color:#ffaaaa;cursor:pointer;font-size:14px">
+          Leave
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    this.lobbyOverlay = overlay;
+
+    document.getElementById("hlo-copy")?.addEventListener("click", () => {
+      void navigator.clipboard.writeText(inviteUrl);
+      const btn = document.getElementById("hlo-copy");
+      if (btn) {
+        btn.textContent = "Copied!";
+        window.setTimeout(() => {
+          btn.textContent = "Copy";
+        }, 2000);
+      }
+    });
+    document.getElementById("hlo-start")?.addEventListener("click", () => this.sendStart());
+    document.getElementById("hlo-leave")?.addEventListener("click", () => {
+      this.sendQuit();
+      window.location.href = "/";
+    });
+  }
+
   // ── Rendering ─────────────────────────────────────────────────────────────
 
   private async render(message: HeartsMessage): Promise<void> {
@@ -433,6 +552,7 @@ export class HeartsGameHandler {
     this.app.stage.removeChildren();
     this.removePassOverlay();
     this.removeScoreOverlay();
+    this.removeLobbyOverlay();
     this.trickContainer = null;
   }
 

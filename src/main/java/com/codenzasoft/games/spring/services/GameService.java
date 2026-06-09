@@ -309,11 +309,12 @@ public class GameService {
 
   /**
    * Returns a {@link HeartsGame} with the provided ID or {@code empty} if a game with the provided
-   * ID does not exist. The game is retrieved from the {@link GameCache} if present, otherwise it is
-   * built from the persisted entity and added to the cache.
+   * ID does not exist or is still in the lobby (fewer than 4 players). The game is retrieved from
+   * the {@link GameCache} if present, otherwise it is built from the persisted entity and added to
+   * the cache.
    *
    * @param id A game {@link UUID}.
-   * @return A {@link HeartsGame} or {@code empty} if a game with the provided id does not exist.
+   * @return A {@link HeartsGame} or {@code empty} if the game does not exist or is not yet started.
    */
   public Optional<HeartsGame> getOrBuildHeartsGame(final UUID id) {
     final Optional<Game<HeartsGame>> cached = gameCache.getGameOfType(id, GameType.HEARTS);
@@ -322,11 +323,101 @@ public class GameService {
     }
     final Optional<HeartsGameEntity> persisted = findGameEntity(id, HeartsGameEntity.class);
     if (persisted.isPresent()) {
+      if (persisted.get().getPlayers().size() < 4) {
+        log.warn(
+            "getOrBuildHeartsGame: game {} is pending ({} players)",
+            id,
+            persisted.get().getPlayers().size());
+        return Optional.empty();
+      }
       final HeartsGame game = buildHeartsGame(persisted.get());
       gameCache.addGame(game);
       return Optional.of(game);
     }
     return Optional.empty();
+  }
+
+  /**
+   * Returns the {@link HeartsGameEntity} with the provided ID, or {@code empty} if not found.
+   *
+   * @param id A game {@link UUID}.
+   * @return The entity, or {@code empty}.
+   */
+  public Optional<HeartsGameEntity> findHeartsGame(final UUID id) {
+    return findGameEntity(id, HeartsGameEntity.class);
+  }
+
+  /**
+   * Creates a pending Hearts game for the provided host with no bots. Other human players may join
+   * via {@link #joinHeartsGame} before the host starts the game via {@link #startHeartsGame}.
+   *
+   * @param user The host player.
+   * @return A new pending game entity with exactly one player.
+   * @throws IllegalStateException if the user has reached the active game limit.
+   */
+  @Transactional
+  public HeartsGameEntity createPendingHeartsGame(final UserEntity user) {
+    enforceGameLimit(user);
+    final HeartsGameEntity game = new HeartsGameEntity(UUID.randomUUID());
+    game.setPlayers(List.of(user));
+    heartsGameRepository.save(game);
+    return game;
+  }
+
+  /**
+   * Adds the provided user to an existing pending Hearts game. If the user is already a player this
+   * is a no-op and the unmodified entity is returned. The game must be active and not yet full.
+   *
+   * @param gameId The pending game to join.
+   * @param user The user joining.
+   * @return The updated game entity.
+   * @throws IllegalStateException if the game is full, complete, or not found.
+   */
+  @Transactional
+  public HeartsGameEntity joinHeartsGame(final UUID gameId, final UserEntity user) {
+    final HeartsGameEntity game =
+        heartsGameRepository
+            .findById(gameId)
+            .orElseThrow(() -> new IllegalStateException("Game not found: " + gameId));
+    if (game.isComplete()) throw new IllegalStateException("Cannot join a completed game");
+    if (game.getPlayers().size() >= 4) throw new IllegalStateException("Game is already full");
+    if (game.getPlayers().stream().anyMatch(p -> p.getId().equals(user.getId()))) return game;
+    enforceGameLimit(user);
+    final List<UserEntity> players = new ArrayList<>(game.getPlayers());
+    players.add(user);
+    game.setPlayers(players);
+    heartsGameRepository.save(game);
+    return game;
+  }
+
+  /**
+   * Fills any remaining seats with bots so the game can proceed. The requesting user must already
+   * be a player. If the game already has 4 players this is a no-op.
+   *
+   * @param gameId The pending game to start.
+   * @param user The user requesting the start.
+   * @return The updated game entity with exactly 4 players.
+   * @throws IllegalStateException if the game is not found, already complete, or the user is not a
+   *     player.
+   */
+  @Transactional
+  public HeartsGameEntity startHeartsGame(final UUID gameId, final UserEntity user) {
+    final HeartsGameEntity game =
+        heartsGameRepository
+            .findById(gameId)
+            .orElseThrow(() -> new IllegalStateException("Game not found: " + gameId));
+    if (game.isComplete()) throw new IllegalStateException("Cannot start a completed game");
+    if (game.getPlayers().stream().noneMatch(p -> p.getId().equals(user.getId())))
+      throw new IllegalStateException(
+          "User " + user.getUsername() + " is not a player of game " + gameId);
+    final int botsNeeded = 4 - game.getPlayers().size();
+    if (botsNeeded > 0) {
+      final List<UserEntity> players = new ArrayList<>(game.getPlayers());
+      players.addAll(getBots(botsNeeded));
+      game.setPlayers(players);
+      heartsGameRepository.save(game);
+    }
+    return game;
   }
 
   protected synchronized HeartsGame buildHeartsGame(final HeartsGameEntity entity) {

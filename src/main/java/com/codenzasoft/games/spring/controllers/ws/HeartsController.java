@@ -3,6 +3,7 @@ package com.codenzasoft.games.spring.controllers.ws;
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.messages.HeartsPassMessage;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
@@ -27,8 +28,28 @@ public class HeartsController {
   @Autowired private HeartsBroadcastService heartsBroadcastService;
 
   @MessageMapping("/hearts/{gameId}/load")
-  public void load(@DestinationVariable String gameId) {
+  public void load(@DestinationVariable String gameId, Principal principal) {
     final UUID id = UUID.fromString(gameId);
+    final Optional<UserEntity> user = findUser(principal);
+    if (user.isEmpty()) return;
+
+    final Optional<HeartsGameEntity> entityOpt = gameService.findHeartsGame(id);
+    if (entityOpt.isEmpty()) {
+      log.warn("load: hearts game {} not found", id);
+      return;
+    }
+
+    if (entityOpt.get().getPlayers().size() < 4) {
+      // Lobby phase — auto-join if there is room, then broadcast the updated lobby state.
+      try {
+        final HeartsGameEntity updated = gameService.joinHeartsGame(id, user.get());
+        heartsBroadcastService.broadcastLobby(id, updated.getPlayers());
+      } catch (IllegalStateException e) {
+        log.warn("load: lobby join rejected for {}: {}", user.get().getUsername(), e.getMessage());
+      }
+      return;
+    }
+
     gameService
         .getOrBuildHeartsGame(id)
         .ifPresentOrElse(
@@ -39,7 +60,24 @@ public class HeartsController {
                 heartsBroadcastService.gameStarted(game, game.getGameState());
               }
             },
-            () -> log.warn("load: hearts game {} not found", id));
+            () -> log.warn("load: hearts game {} could not be built", id));
+  }
+
+  @MessageMapping("/hearts/{gameId}/start")
+  public void start(@DestinationVariable String gameId, Principal principal) {
+    final UUID id = UUID.fromString(gameId);
+    final Optional<UserEntity> user = findUser(principal);
+    if (user.isEmpty()) return;
+    try {
+      gameService.startHeartsGame(id, user.get());
+      gameService
+          .getOrBuildHeartsGame(id)
+          .ifPresentOrElse(
+              game -> game.startNewRound(),
+              () -> log.warn("start: hearts game {} could not be built after starting", id));
+    } catch (IllegalStateException e) {
+      log.warn("start: {}", e.getMessage());
+    }
   }
 
   @MessageMapping("/hearts/{gameId}/pass")
