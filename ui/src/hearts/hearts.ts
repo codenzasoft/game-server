@@ -10,6 +10,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
+import { playDealSound, playCardPlaySound } from "./sounds";
 
 const wsUrl =
   import.meta.env.VITE_WS_URL ||
@@ -187,6 +188,7 @@ export class HeartsGameHandler {
 
   // Loaded card textures (key = "SUIT-RANK")
   private textures = new Map<string, Texture>();
+  private cardBackTexture: Texture | null = null;
 
   // Pass selection state (cleared on each new message when not required)
   private selectedPassCards: Card[] = [];
@@ -272,8 +274,8 @@ export class HeartsGameHandler {
     const suits = Object.values(Suit);
     const ranks = Object.values(Rank);
     const resolution = window.devicePixelRatio || 1;
-    await Promise.all(
-      suits.flatMap((suit) =>
+    await Promise.all([
+      ...suits.flatMap((suit) =>
         ranks.map(async (rank) => {
           const key = cardKey(suit, rank);
           const texture = await Assets.load<Texture>({
@@ -283,7 +285,10 @@ export class HeartsGameHandler {
           this.textures.set(key, texture);
         }),
       ),
-    );
+      Assets.load<Texture>({ src: "/assets/backs/blue.svg", data: { resolution } }).then(
+        (t) => (this.cardBackTexture = t),
+      ),
+    ]);
   }
 
   private getTexture(card: Card) {
@@ -398,6 +403,7 @@ export class HeartsGameHandler {
       this.selectedPassCards = [];
     }
 
+    await this.maybeAnimateDeal(prevMessage, message);
     await this.maybeAnimateTrickWon(prevMessage, message);
     await this.maybeAnimatePassReceived(prevMessage, message);
 
@@ -663,6 +669,7 @@ export class HeartsGameHandler {
     console.log(
       `[Hearts] Animating ${rank} of ${suit} played by ${newPlayedCard!.player}`,
     );
+    playCardPlaySound();
     await this.animateCard(
       animSprite,
       animFromX,
@@ -927,6 +934,128 @@ export class HeartsGameHandler {
     recvContainer.destroy({ children: true });
     this.app.stage.removeChild(handContainer);
     handContainer.destroy({ children: true });
+  }
+
+  // ── Deal animation ────────────────────────────────────────────────────────
+
+  private async maybeAnimateDeal(
+    prevMessage: HeartsMessage | null,
+    message: HeartsMessage,
+  ): Promise<void> {
+    if (!prevMessage || !this.cardBackTexture) return;
+    const curRound = message.state.rounds[message.state.rounds.length - 1];
+    if (!curRound || curRound.tricks.length > 0 || message.context.hand.length === 0) return;
+    const prevRound = prevMessage.state.rounds[prevMessage.state.rounds.length - 1];
+    // Fire only when the round number advances (new round just started)
+    if ((prevRound?.number ?? 0) >= curRound.number) return;
+    await this.animateDeal(message.context, message.state, curRound);
+  }
+
+  private async animateDeal(
+    context: HeartsContext,
+    state: HeartsState,
+    round: RoundState,
+  ): Promise<void> {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const cw = this.cardW;
+    const ch = this.cardH;
+    const ar = this.arcRadius;
+
+    this.clearScene();
+    this.renderScoreTable(context, state);
+    this.renderStatus(this.buildStatusText(context, state, round));
+    this.renderOpponents(context, state);
+
+    const myIdx = state.players.indexOf(context.player);
+    const positions = this.compassPositions(myIdx, state.players);
+
+    const sortedHand = sortHand(context.hand);
+    const n = sortedHand.length;
+    const arcCenterX = sw / 2;
+    const arcCenterY = sh - ch / 2 - 50 + ar;
+
+    // Player's cards land at their arc positions (face-up)
+    const playerDests: Array<[number, number]> = sortedHand.map((_, i) => {
+      const angle = (i - (n - 1) / 2) * ANGLE_STEP;
+      return [arcCenterX + ar * Math.sin(angle), arcCenterY - ar * Math.cos(angle)];
+    });
+
+    // Opponent cards land near their label (face-down), partially visible at edges
+    const opponentDests: Record<string, [number, number]> = {};
+    for (const { name, pos } of positions) {
+      if (name === context.player) continue;
+      switch (pos) {
+        case "N":
+          opponentDests[name] = [sw / 2, ch / 2 + 8];
+          break;
+        case "W":
+          opponentDests[name] = [cw / 2 + 8, sh / 2];
+          break;
+        case "E":
+          opponentDests[name] = [sw - cw / 2 - 8, sh / 2];
+          break;
+      }
+    }
+
+    // Deck: all cards start here (creates a visible pile that gets dealt away)
+    const deckX = sw / 2;
+    const deckY = sh * 0.4;
+
+    const container = new Container();
+    this.app.stage.addChild(container);
+
+    // Deal order: S (player), then the opponents in table order
+    const opponents = positions.filter((p) => p.pos !== "S").map((p) => p.name);
+    const dealOrder = [context.player, ...opponents];
+
+    const STAGGER_MS = 30;
+    const FLIGHT_MS = 200;
+    let playerCardIdx = 0;
+    const allDone: Promise<void>[] = [];
+
+    for (let dealRound = 0; dealRound < n; dealRound++) {
+      for (let pi = 0; pi < dealOrder.length; pi++) {
+        const playerName = dealOrder[pi];
+        const seqIdx = dealRound * dealOrder.length + pi;
+        const delay = seqIdx * STAGGER_MS;
+
+        let destX: number, destY: number;
+        let texture: Texture;
+        if (playerName === context.player) {
+          const idx = playerCardIdx++;
+          [destX, destY] = playerDests[idx];
+          texture = this.getTexture(sortedHand[idx])!;
+        } else {
+          [destX, destY] = opponentDests[playerName] ?? [sw / 2, sh / 2];
+          texture = this.cardBackTexture!;
+        }
+
+        const sprite = new Sprite(texture);
+        sprite.width = cw;
+        sprite.height = ch;
+        sprite.anchor.set(0.5, 0.5);
+        sprite.x = deckX;
+        sprite.y = deckY;
+        container.addChild(sprite);
+
+        allDone.push(
+          new Promise<void>((resolve) => {
+            window.setTimeout(() => {
+              playDealSound();
+              void this.animateCard(sprite, deckX, deckY, destX, destY, FLIGHT_MS).then(
+                resolve,
+              );
+            }, delay);
+          }),
+        );
+      }
+    }
+
+    await Promise.all(allDone);
+    // Brief pause so the player sees their dealt hand before the normal render takes over
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    container.destroy({ children: true });
   }
 
   // Renders the given cards in the arc hand layout with no interaction — used
