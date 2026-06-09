@@ -3,11 +3,15 @@ package com.codenzasoft.games.kingshand;
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
+import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
+import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
+import com.codenzasoft.games.kingshand.notifications.KhNotification;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
@@ -37,12 +41,85 @@ public class GameEngine implements Game<GameEngine> {
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
 
+  private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
+      new KhGameStartedNotification();
+  private static final KhGameOverNotification GAME_OVER_NOTIFICATION = new KhGameOverNotification();
+
+  /**
+   * Builder for assembling a {@link GameEngine}, optionally with {@link KhObserver} listeners and a
+   * notification {@link Executor}. Mirrors the pattern used by {@code HeartsGame.Builder}.
+   */
+  public static class Builder {
+    private UUID id;
+    private Player player;
+    private GameState state;
+    private CardCatalog cardCatalog;
+    private EventCatalog eventCatalog;
+    private Random rng;
+    private final List<KhObserver> listeners = new ArrayList<>();
+    private Executor executor;
+
+    public Builder withId(final UUID id) {
+      this.id = id;
+      return this;
+    }
+
+    public Builder withPlayer(final Player player) {
+      this.player = player;
+      return this;
+    }
+
+    public Builder withState(final GameState state) {
+      this.state = state;
+      return this;
+    }
+
+    public Builder withCardCatalog(final CardCatalog cardCatalog) {
+      this.cardCatalog = cardCatalog;
+      return this;
+    }
+
+    public Builder withEventCatalog(final EventCatalog eventCatalog) {
+      this.eventCatalog = eventCatalog;
+      return this;
+    }
+
+    public Builder withRng(final Random rng) {
+      this.rng = rng;
+      return this;
+    }
+
+    public Builder addListener(final KhObserver listener) {
+      listeners.add(listener);
+      return this;
+    }
+
+    public Builder withNotificationExecutor(final Executor executor) {
+      this.executor = executor;
+      return this;
+    }
+
+    public GameEngine build() {
+      return new GameEngine(
+          id,
+          player,
+          state,
+          cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
+          eventCatalog != null ? eventCatalog : EventCatalog.defaultCatalog(),
+          rng != null ? rng : new Random(),
+          listeners,
+          executor != null ? executor : Runnable::run);
+    }
+  }
+
   private final UUID id;
   private final Player player;
   private final GameState state;
   private final CardCatalog cardCatalog;
   private final EventCatalog eventCatalog;
   private final Random rng;
+  private final List<KhObserver> listeners;
+  private final Executor executor;
 
   /**
    * Primary constructor — all fields injected. Prefer this form in tests so that the random
@@ -63,7 +140,7 @@ public class GameEngine implements Game<GameEngine> {
         new Random());
   }
 
-  /** Full constructor with all dependencies injected. */
+  /** Full constructor with all dependencies injected, no listeners. */
   GameEngine(
       UUID id,
       Player player,
@@ -71,6 +148,19 @@ public class GameEngine implements Game<GameEngine> {
       CardCatalog cardCatalog,
       EventCatalog eventCatalog,
       Random rng) {
+    this(id, player, state, cardCatalog, eventCatalog, rng, List.of(), Runnable::run);
+  }
+
+  /** Full constructor with all dependencies injected, including listeners and an executor. */
+  GameEngine(
+      UUID id,
+      Player player,
+      GameState state,
+      CardCatalog cardCatalog,
+      EventCatalog eventCatalog,
+      Random rng,
+      List<KhObserver> listeners,
+      Executor executor) {
     if (state == null) {
       throw new IllegalArgumentException("state cannot be null");
     }
@@ -89,6 +179,17 @@ public class GameEngine implements Game<GameEngine> {
     this.cardCatalog = cardCatalog;
     this.eventCatalog = eventCatalog;
     this.rng = rng;
+    this.listeners = listeners == null ? List.of() : List.copyOf(listeners);
+    this.executor = executor != null ? executor : Runnable::run;
+  }
+
+  /** Notifies every registered {@link KhObserver} of the given notification via the executor. */
+  private void notifyListeners(final KhNotification notification) {
+    final GameEngine game = this;
+    final GameState currentState = state;
+    for (final KhObserver listener : listeners) {
+      executor.execute(() -> notification.execute(game, currentState, listener));
+    }
   }
 
   /**
@@ -104,6 +205,7 @@ public class GameEngine implements Game<GameEngine> {
     if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
       offerAddChoices();
     }
+    notifyListeners(GAME_STARTED_NOTIFICATION);
   }
 
   @Override
@@ -538,9 +640,10 @@ public class GameEngine implements Game<GameEngine> {
     double clamped = Math.max(0.0, Math.min(value, state.getPopulationCap()));
     state.setPopulation(clamped);
     // A fractional population (< 1) means nobody is actually alive.
-    if (clamped < 1.0) {
+    if (clamped < 1.0 && !state.isGameOver()) {
       state.setPopulation(0.0);
       state.setGameOver(true);
+      notifyListeners(GAME_OVER_NOTIFICATION);
     }
   }
 
