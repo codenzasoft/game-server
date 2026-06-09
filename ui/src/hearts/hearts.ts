@@ -10,6 +10,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
+import { playDealSound, playCardPlaySound } from "./sounds";
 
 const wsUrl =
   import.meta.env.VITE_WS_URL ||
@@ -668,6 +669,7 @@ export class HeartsGameHandler {
     console.log(
       `[Hearts] Animating ${rank} of ${suit} played by ${newPlayedCard!.player}`,
     );
+    playCardPlaySound();
     await this.animateCard(
       animSprite,
       animFromX,
@@ -1040,6 +1042,7 @@ export class HeartsGameHandler {
         allDone.push(
           new Promise<void>((resolve) => {
             window.setTimeout(() => {
+              playDealSound();
               void this.animateCard(sprite, deckX, deckY, destX, destY, FLIGHT_MS).then(
                 resolve,
               );
