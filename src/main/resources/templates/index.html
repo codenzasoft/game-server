@@ -36,6 +36,8 @@
                         <div>
                             <span class="fw-semibold"
                                   th:text="${helper.getGameTypeName(game)}"></span>
+                            <span class="badge bg-secondary ms-1"
+                                  th:if="${game.gameType.name() == 'HEARTS' and game.players.size() < 4}">Lobby</span>
                             <span class="text-muted mx-1">&mdash;</span>
                             <span th:text="${helper.getGamePlayersDescription(game.players)}"></span>
                             <br>
@@ -86,6 +88,10 @@
                     <form th:action="@{/games/hearts}" method="post">
                         <button type="submit" class="btn btn-danger"
                                 th:disabled="${atGameLimit}">Play vs Bots</button>
+                    </form>
+                    <form th:action="@{/games/hearts/multiplayer}" method="post">
+                        <button type="submit" class="btn btn-outline-danger"
+                                th:disabled="${atGameLimit}">Play with Friends</button>
                     </form>
                 </div>
             </section>

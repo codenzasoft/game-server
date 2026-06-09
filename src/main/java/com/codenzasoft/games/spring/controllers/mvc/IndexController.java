@@ -99,6 +99,25 @@ public class IndexController {
     return "redirect:/";
   }
 
+  /** Creates a pending multiplayer Hearts game and redirects the host to the game page. */
+  @PostMapping("/games/hearts/multiplayer")
+  public String newMultiplayerHeartsGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        final HeartsGameEntity game = gameService.createPendingHeartsGame(entity.get());
+        return "redirect:/games/hearts/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Pending Hearts game creation rejected for {}: {}",
+            entity.get().getUsername(),
+            e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
   /** Creates a new kh game {@link com.codenzasoft.games.kingshand.GameEngine}. */
   @PostMapping("/games/kh")
   public String newKhGame(@AuthenticationPrincipal UserDetails user) {

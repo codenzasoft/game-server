@@ -28,6 +28,7 @@ class GameServiceSpec extends Specification {
     @Autowired GameCache gameCache
 
     UserEntity testUser
+    UserEntity testUser2
 
     def setup() {
         jdbcTemplate.execute("DELETE FROM xo_game_moves")
@@ -38,6 +39,10 @@ class GameServiceSpec extends Specification {
         testUser = new UserEntity()
         testUser.setUserName("test-limit-user")
         testUser = usersRepository.save(testUser)
+
+        testUser2 = new UserEntity()
+        testUser2.setUserName("test-user-2")
+        testUser2 = usersRepository.save(testUser2)
     }
 
     def "isAtGameLimit returns false when user has no active games"() {
@@ -200,6 +205,186 @@ class GameServiceSpec extends Specification {
 
         then:
         gameCache.getGameOfType(gameId, GameType.HEARTS).isPresent()
+    }
+
+    // ── createPendingHeartsGame ───────────────────────────────────────────────
+
+    def "createPendingHeartsGame creates a Hearts game with only the host as a player"() {
+        when:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        then:
+        entity instanceof HeartsGameEntity
+        entity.id != null
+        entity.gameType == GameType.HEARTS
+        entity.players.size() == 1
+        entity.players[0] == testUser
+    }
+
+    def "createPendingHeartsGame does not assign any bots"() {
+        when:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        then:
+        entity.players.every { !it.isBot() }
+    }
+
+    def "createPendingHeartsGame throws when the user is at the game limit"() {
+        given:
+        GameService.MAX_ACTIVE_GAMES.times {
+            gameService.createXoGame(testUser, Piece.X, Piece.X)
+        }
+
+        when:
+        gameService.createPendingHeartsGame(testUser)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "getOrBuildHeartsGame returns empty for a pending game with fewer than 4 players"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        when:
+        def result = gameService.getOrBuildHeartsGame(entity.id)
+
+        then:
+        result.isEmpty()
+    }
+
+    // ── joinHeartsGame ────────────────────────────────────────────────────────
+
+    def "joinHeartsGame adds a new player to a pending game"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        when:
+        def updated = gameService.joinHeartsGame(entity.id, testUser2)
+
+        then:
+        updated.players.size() == 2
+        updated.players.contains(testUser)
+        updated.players.contains(testUser2)
+    }
+
+    def "joinHeartsGame is a no-op when the user is already a player"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        when:
+        def updated = gameService.joinHeartsGame(entity.id, testUser)
+
+        then:
+        updated.players.size() == 1
+    }
+
+    def "joinHeartsGame throws when the game already has 4 players"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+
+        when:
+        gameService.joinHeartsGame(entity.id, testUser2)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "joinHeartsGame throws when the game is completed"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+        gameService.quitGame(entity.id, testUser)
+
+        when:
+        gameService.joinHeartsGame(entity.id, testUser2)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "joinHeartsGame throws when the game does not exist"() {
+        when:
+        gameService.joinHeartsGame(UUID.randomUUID(), testUser)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    // ── startHeartsGame ───────────────────────────────────────────────────────
+
+    def "startHeartsGame fills the remaining seats with bots"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        when:
+        def started = gameService.startHeartsGame(entity.id, testUser)
+
+        then:
+        started.players.size() == 4
+        started.players[0] == testUser
+        started.players[1..3].every { it.isBot() }
+    }
+
+    def "startHeartsGame with two human players adds exactly two bots"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+        gameService.joinHeartsGame(entity.id, testUser2)
+
+        when:
+        def started = gameService.startHeartsGame(entity.id, testUser)
+
+        then:
+        started.players.size() == 4
+        started.players.count { !it.isBot() } == 2
+        started.players.count { it.isBot() } == 2
+    }
+
+    def "startHeartsGame is a no-op when the game already has 4 players"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+
+        when:
+        def started = gameService.startHeartsGame(entity.id, testUser)
+
+        then:
+        started.players.size() == 4
+    }
+
+    def "startHeartsGame throws when the requesting user is not a player"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+
+        when:
+        gameService.startHeartsGame(entity.id, testUser2)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "startHeartsGame throws when the game is completed"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+        gameService.quitGame(entity.id, testUser)
+
+        when:
+        gameService.startHeartsGame(entity.id, testUser)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "getOrBuildHeartsGame succeeds after startHeartsGame fills the roster"() {
+        given:
+        def entity = gameService.createPendingHeartsGame(testUser)
+        gameService.startHeartsGame(entity.id, testUser)
+
+        when:
+        def result = gameService.getOrBuildHeartsGame(entity.id)
+
+        then:
+        result.isPresent()
+        result.get() instanceof HeartsGame
+        result.get().players.size() == 4
     }
 
 }
