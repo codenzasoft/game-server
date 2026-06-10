@@ -22,6 +22,20 @@ public class ViewHelper {
     return user.getRoles().stream().map(RoleEntity::getRole).anyMatch(Role::isAdmin);
   }
 
+  /**
+   * Returns whether the provided game is in the lobby phase (waiting for players to join).
+   *
+   * @param game A {@link GameEntity}.
+   * @return {@code true} if the game has not yet reached its required player count.
+   */
+  public boolean isLobby(final GameEntity game) {
+    return switch (game.getGameType()) {
+      case HEARTS -> game.getPlayers().size() < 4;
+      case XO -> game.getPlayers().size() < 2;
+      case KH -> false;
+    };
+  }
+
   public String getGameUrl(final GameEntity game) {
     return switch (game.getGameType()) {
       case XO -> "/games/xo/" + game.getId().toString();

@@ -8,7 +8,6 @@ import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.views.ViewHelper;
 import com.codenzasoft.games.xo.Piece;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -21,7 +20,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * The {@link IndexController} serves the home (index) page and requires authentication. Its
@@ -44,7 +42,6 @@ public class IndexController {
       model.addAttribute(PageConstants.PAGE_TITLE, "Codenza Games");
       model.addAttribute(PageConstants.PAGE_USER, currentUser);
       model.addAttribute(PageConstants.PAGE_HELPER, viewHelper);
-      model.addAttribute("opponents", gameService.getAvailableOpponents(currentUser));
       model.addAttribute("activeGames", gameService.getActiveGames(currentUser));
       model.addAttribute("atGameLimit", gameService.isAtGameLimit(currentUser));
     }
@@ -63,7 +60,7 @@ public class IndexController {
 
   /** Creates a new vs-bot {@link com.codenzasoft.games.xo.XoGame}. */
   @PostMapping("/games/xo")
-  public String newGame(@AuthenticationPrincipal UserDetails user) {
+  public String newXoGame(@AuthenticationPrincipal UserDetails user) {
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
@@ -94,6 +91,25 @@ public class IndexController {
       } catch (IllegalStateException e) {
         log.warn(
             "Hearts game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
+  /** Creates a pending multiplayer XO game and redirects the host to the lobby. */
+  @PostMapping("/games/xo/multiplayer")
+  public String newMultiplayerXoGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        final XoGameEntity game = gameService.createPendingXoGame(entity.get());
+        return "redirect:/games/xo/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Pending XO game creation rejected for {}: {}",
+            entity.get().getUsername(),
+            e.getMessage());
       }
     }
     return "redirect:/";
@@ -145,27 +161,6 @@ public class IndexController {
         gameService.quitGame(gameId, entity.get());
       } catch (IllegalStateException e) {
         log.warn("Game deletion rejected for {}: {}", entity.get().getUsername(), e.getMessage());
-      }
-    }
-    return "redirect:/";
-  }
-
-  /** Creates a new two-player game and redirects the creator to it immediately. */
-  @PostMapping("/games/xo/challenge")
-  public String newChallenge(
-      @AuthenticationPrincipal UserDetails user, @RequestParam UUID opponentId) {
-    final Optional<UserEntity> creator =
-        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
-    final Optional<UserEntity> opponent = gameService.findUser(opponentId);
-    if (creator.isPresent() && opponent.isPresent()) {
-      try {
-        final XoGameEntity game =
-            gameService.createXoGame(
-                Map.of(Piece.X, creator.get(), Piece.O, opponent.get()), Piece.X);
-        return "redirect:/games/xo/" + game.getId();
-      } catch (IllegalStateException e) {
-        log.warn(
-            "Challenge creation rejected for {}: {}", creator.get().getUsername(), e.getMessage());
       }
     }
     return "redirect:/";

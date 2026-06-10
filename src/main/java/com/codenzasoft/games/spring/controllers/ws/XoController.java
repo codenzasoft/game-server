@@ -27,9 +27,34 @@ public class XoController {
   @Autowired private XoBroadcastService xoBroadcastService;
 
   @MessageMapping("/xo/{gameId}/load")
-  public void load(@DestinationVariable String gameId) {
+  public void load(@DestinationVariable String gameId, Principal principal) {
+    final UUID id = UUID.fromString(gameId);
+
+    final Optional<XoGameEntity> entityOpt = gameService.findXoGame(id);
+    if (entityOpt.isEmpty()) return;
+
+    if (entityOpt.get().getGamePieces().size() < 2) {
+      // Lobby phase — auto-join if there is room, then broadcast the updated lobby state.
+      final Optional<UserEntity> user = findUser(principal);
+      if (user.isEmpty()) return;
+      try {
+        final XoGameEntity updated = gameService.joinXoGame(id, user.get());
+        if (updated.getGamePieces().size() < 2) {
+          xoBroadcastService.broadcastLobby(id, updated.getPlayers());
+        } else {
+          // Second player just joined — auto-start.
+          gameService
+              .getOrBuildXoGame(id)
+              .ifPresent(game -> xoBroadcastService.gameStarted(game, game.buildState()));
+        }
+      } catch (IllegalStateException e) {
+        log.warn("load: XO lobby join rejected for {}: {}", principal.getName(), e.getMessage());
+      }
+      return;
+    }
+
     gameService
-        .getOrBuildXoGame(UUID.fromString(gameId))
+        .getOrBuildXoGame(id)
         .ifPresent(game -> xoBroadcastService.gameStarted(game, game.buildState()));
   }
 
