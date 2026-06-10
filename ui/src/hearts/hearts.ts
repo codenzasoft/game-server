@@ -569,16 +569,25 @@ export class HeartsGameHandler {
     label.y = 12;
     this.app.stage.addChild(label);
 
-    // Quit button
-    const quitStyle = new TextStyle({
-      fontFamily: "Arial",
-      fontSize: 18,
-      fill: "#ffaaaa",
-      fontWeight: "bold",
+    const btnStyle = (color: string) =>
+      new TextStyle({ fontFamily: "Arial", fontSize: 18, fill: color, fontWeight: "bold" });
+
+    // Exit button — navigate home; game stays active for later resumption
+    const exit = new Text({ text: "Exit", style: btnStyle("#aaccff") });
+    exit.anchor.set(1, 0);
+    exit.x = this.app.screen.width - 16;
+    exit.y = 14;
+    exit.eventMode = "static";
+    exit.cursor = "pointer";
+    exit.on("pointerdown", () => {
+      window.location.href = "/";
     });
-    const quit = new Text({ text: "Quit", style: quitStyle });
+    this.app.stage.addChild(exit);
+
+    // Quit button — permanently forfeit the game
+    const quit = new Text({ text: "Quit", style: btnStyle("#ffaaaa") });
     quit.anchor.set(1, 0);
-    quit.x = this.app.screen.width - 16;
+    quit.x = exit.x - exit.width - 12;
     quit.y = 14;
     quit.eventMode = "static";
     quit.cursor = "pointer";
