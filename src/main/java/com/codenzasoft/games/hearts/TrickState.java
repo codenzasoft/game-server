@@ -25,7 +25,8 @@ public record TrickState(
     return new TrickState(number, leader, Collections.unmodifiableList(nextCards));
   }
 
-  boolean isComplete() {
+  @JsonIgnore
+  public boolean isComplete() {
     return cards.size() == 4;
   }
 
