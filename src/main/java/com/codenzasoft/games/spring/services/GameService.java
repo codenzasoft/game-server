@@ -312,14 +312,6 @@ public class GameService {
     }
   }
 
-  public List<UserEntity> getAvailableOpponents(final UserEntity currentUser) {
-    return usersRepository.findAll().stream()
-        .filter(u -> !u.getId().equals(currentUser.getId()))
-        .filter(u -> !u.isBot())
-        .sorted(Comparator.comparing(UserEntity::getUsername))
-        .toList();
-  }
-
   /**
    * Returns an {@link XoGame} with the provided ID or <code>empty</code> if a game with the
    * provided ID does not exist. The game is retrieved from the {@link GameCache} if present,

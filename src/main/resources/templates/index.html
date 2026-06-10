@@ -108,19 +108,7 @@
                         <button type="submit" class="btn btn-outline-primary"
                                 th:disabled="${atGameLimit}">Play with Friends</button>
                     </form>
-                    <form th:action="@{/games/xo/challenge}" method="post"
-                          class="d-flex gap-2 align-items-center"
-                          th:if="${not #lists.isEmpty(opponents)}">
-                        <select name="opponentId" class="form-select form-select-sm"
-                                th:disabled="${atGameLimit}" required>
-                            <option value="" disabled selected>Select opponent…</option>
-                            <option th:each="u : ${opponents}"
-                                    th:value="${u.id}"
-                                    th:text="${u.username}"></option>
-                        </select>
-                        <button type="submit" class="btn btn-outline-primary"
-                                th:disabled="${atGameLimit}">Challenge</button>
-                    </form>
+
                 </div>
             </section>
         </main>
