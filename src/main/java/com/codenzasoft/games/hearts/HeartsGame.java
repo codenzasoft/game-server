@@ -30,6 +30,7 @@ public class HeartsGame implements Game<HeartsGame> {
     private final List<HeartsListener> listeners = new ArrayList<>();
     private final Map<String, HeartsPlayerObserver> playerObservers = new HashMap<>();
     private Executor executor;
+    private HeartsState restoredState;
 
     public Builder withPlayers(final List<Player> players) {
       this.players = players;
@@ -56,17 +57,21 @@ public class HeartsGame implements Game<HeartsGame> {
       return this;
     }
 
+    public Builder withRestoredState(final HeartsState state) {
+      this.restoredState = state;
+      return this;
+    }
+
     public HeartsGame build() {
       if (executor == null) {
         withNotificationExecutor(Executors.newSingleThreadExecutor());
       }
+      final HeartsState initialState =
+          restoredState != null
+              ? restoredState
+              : HeartsState.with(players.stream().map(Player::name).toList());
       return new HeartsGame(
-          id,
-          HeartsState.with(players.stream().map(Player::name).toList()),
-          players,
-          listeners,
-          executor,
-          playerObservers);
+          id, initialState, players, listeners, executor, playerObservers, restoredState != null);
     }
   }
 
@@ -103,16 +108,18 @@ public class HeartsGame implements Game<HeartsGame> {
       final List<Player> players,
       final List<HeartsListener> listeners,
       final Executor executor,
-      final Map<String, HeartsPlayerObserver> playerObservers) {
+      final Map<String, HeartsPlayerObserver> playerObservers,
+      final boolean restored) {
     this.id = id;
     this.players = players;
     this.listeners = listeners;
     this.executor = executor;
     this.playerObservers = Map.copyOf(playerObservers);
     setGameState(gameState);
-    // TODO: this only works for new empty games
-    notifyListeners(GAME_STARTED_NOTIFICATION);
-    startNewRound();
+    if (!restored) {
+      notifyListeners(GAME_STARTED_NOTIFICATION);
+      startNewRound();
+    }
   }
 
   private void setGameState(final HeartsState gameState) {
@@ -314,6 +321,23 @@ public class HeartsGame implements Game<HeartsGame> {
                       id,
                       player.name(),
                       card));
+    }
+  }
+
+  /**
+   * Re-triggers any bots that need to act on the current game state. Called after a game is
+   * restored from persistence so that bot players resume play without waiting for a human action.
+   */
+  public synchronized void resumePlay() {
+    final RoundState round = getGameState().getCurrentRound().orElse(null);
+    if (round == null) return;
+    if (round.pass() != Pass.KEEPER && !round.isPassComplete()) {
+      players.stream()
+          .filter(p -> playerObservers.containsKey(p.name()))
+          .filter(p -> !round.passes().containsKey(p.name()))
+          .forEach(p -> notifyPlayerToPass(p.name()));
+    } else {
+      getGameState().getNextPlayer().ifPresent(this::notifyPlayerToPlay);
     }
   }
 

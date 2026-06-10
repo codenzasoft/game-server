@@ -4,6 +4,7 @@ import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.hearts.HeartsGame;
+import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.strategies.DefensiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
@@ -20,6 +21,7 @@ import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
+import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Piece;
@@ -49,6 +51,7 @@ public class GameService {
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
   @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
+  @Autowired private HeartsPersistenceService heartsPersistenceService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
@@ -379,19 +382,25 @@ public class GameService {
       return cached.map(Game::getGame);
     }
     final Optional<HeartsGameEntity> persisted = findGameEntity(id, HeartsGameEntity.class);
-    if (persisted.isPresent()) {
-      if (persisted.get().getPlayers().size() < 4) {
-        log.warn(
-            "getOrBuildHeartsGame: game {} is pending ({} players)",
-            id,
-            persisted.get().getPlayers().size());
-        return Optional.empty();
-      }
-      final HeartsGame game = buildHeartsGame(persisted.get());
-      gameCache.addGame(game);
-      return Optional.of(game);
+    if (persisted.isEmpty()) return Optional.empty();
+    final HeartsGameEntity entity = persisted.get();
+    if (entity.getPlayers().size() < 4) {
+      log.warn(
+          "getOrBuildHeartsGame: game {} is pending ({} players)", id, entity.getPlayers().size());
+      return Optional.empty();
     }
-    return Optional.empty();
+    final Optional<HeartsState> restoredState =
+        heartsPersistenceService.reconstructState(id, entity.getPlayers());
+    final HeartsGame game;
+    if (restoredState.isPresent()) {
+      log.info("getOrBuildHeartsGame: restoring game {} from persisted state", id);
+      game = buildRestoredHeartsGame(entity, restoredState.get());
+      game.resumePlay();
+    } else {
+      game = buildHeartsGame(entity);
+    }
+    gameCache.addGame(game);
+    return Optional.of(game);
   }
 
   /**
@@ -485,7 +494,28 @@ public class GameService {
             .withId(entity.getId())
             .withPlayers(players)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
-            .addListener(heartsBroadcastService);
+            .addListener(heartsBroadcastService)
+            .addListener(heartsPersistenceService);
+    for (final UserEntity user : entity.getPlayers()) {
+      if (user.isBot()) {
+        builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
+      }
+    }
+    return builder.build();
+  }
+
+  protected synchronized HeartsGame buildRestoredHeartsGame(
+      final HeartsGameEntity entity, final HeartsState state) {
+    log.debug("Restoring Hearts game {} from persisted state", entity.getId());
+    final List<Player> players = entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
+    final HeartsGame.Builder builder =
+        new HeartsGame.Builder()
+            .withId(entity.getId())
+            .withPlayers(players)
+            .withRestoredState(state)
+            .withNotificationExecutor(Executors.newSingleThreadExecutor())
+            .addListener(heartsBroadcastService)
+            .addListener(heartsPersistenceService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
