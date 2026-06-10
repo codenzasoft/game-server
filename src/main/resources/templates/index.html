@@ -87,7 +87,7 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <form th:action="@{/games/hearts}" method="post">
                         <button type="submit" class="btn btn-danger"
-                                th:disabled="${atGameLimit}">Play vs Bots</button>
+                                th:disabled="${atGameLimit}">Single Player</button>
                     </form>
                     <form th:action="@{/games/hearts/multiplayer}" method="post">
                         <button type="submit" class="btn btn-outline-danger"
@@ -102,7 +102,7 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <form th:action="@{/games/xo}" method="post">
                         <button type="submit" class="btn btn-primary"
-                                th:disabled="${atGameLimit}">Play vs Bot</button>
+                                th:disabled="${atGameLimit}">Single Player</button>
                     </form>
                     <form th:action="@{/games/xo/multiplayer}" method="post">
                         <button type="submit" class="btn btn-outline-primary"
