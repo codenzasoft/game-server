@@ -10,6 +10,7 @@ import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.XoGameListener;
 import com.codenzasoft.games.xo.XoState;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -51,6 +52,19 @@ public class XoBroadcastService implements XoGameListener {
 
   public void playAgain(final XoGame game, final XoState state, final UUID nextGameId) {
     notifyUsers(game, state, nextGameId);
+  }
+
+  public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
+    final List<String> playerNames = players.stream().map(UserEntity::getUsername).toList();
+    for (final UserEntity player : players) {
+      if (!player.isBot()) {
+        messagingTemplate.convertAndSendToUser(
+            player.getUsername(),
+            "/queue/games/" + gameId,
+            Map.of("lobby", Map.of("gameId", gameId.toString(), "players", playerNames)));
+        log.debug("sent lobby update to {} for game {}", player.getUsername(), gameId);
+      }
+    }
   }
 
   /**

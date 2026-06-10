@@ -11,6 +11,7 @@ import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 import { playDealSound, playCardPlaySound } from "./sounds";
+import { renderLobbyOverlay } from "../shared/lobby";
 
 const wsUrl =
   import.meta.env.VITE_WS_URL ||
@@ -439,74 +440,18 @@ export class HeartsGameHandler {
 
   private renderLobby(lobby: HeartsLobbyState) {
     this.clearScene();
-
-    const slots = Array.from({ length: 4 }, (_, i) =>
-      i < lobby.players.length
-        ? `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.12)">
-             <span style="color:#7fff7f">&#x25cf;</span>&ensp;${lobby.players[i]}
-           </div>`
-        : `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.35)">
-             <span>&#x25cb;</span>&ensp;Waiting for player&hellip;
-           </div>`,
-    ).join("");
-
-    const overlay = document.createElement("div");
-    overlay.style.cssText = `
-      position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-      background:rgba(10,60,20,0.96);border:1px solid rgba(255,255,255,0.18);
-      border-radius:14px;padding:28px 32px;color:white;font-family:Arial,sans-serif;
-      min-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.55);z-index:100;
-    `;
-    const inviteUrl = window.location.href;
-    overlay.innerHTML = `
-      <h3 style="margin:0 0 20px;font-size:20px">Hearts &mdash; Waiting Room</h3>
-      <p style="margin:0 0 6px;font-size:13px;color:rgba(255,255,255,0.65)">
-        Share this link to invite players:
-      </p>
-      <div style="display:flex;gap:8px;margin-bottom:22px">
-        <input id="hlo-link" type="text" readonly value="${inviteUrl}"
-          style="flex:1;min-width:0;background:rgba(255,255,255,0.1);
-                 border:1px solid rgba(255,255,255,0.3);border-radius:6px;
-                 padding:6px 10px;color:white;font-size:12px">
-        <button id="hlo-copy"
-          style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);
-                 border-radius:6px;padding:6px 14px;color:white;cursor:pointer;
-                 font-size:12px;white-space:nowrap">
-          Copy
-        </button>
-      </div>
-      <div style="margin-bottom:22px">${slots}</div>
-      <div style="display:flex;gap:10px">
-        <button id="hlo-start"
-          style="flex:1;background:#2ecc71;border:none;border-radius:8px;
-                 padding:10px;color:white;font-size:15px;font-weight:bold;cursor:pointer">
-          Start Game (${lobby.players.length}/4)
-        </button>
-        <button id="hlo-leave"
-          style="background:rgba(200,50,50,0.25);border:1px solid rgba(220,80,80,0.45);
-                 border-radius:8px;padding:10px 16px;color:#ffaaaa;cursor:pointer;font-size:14px">
-          Leave
-        </button>
-      </div>
-    `;
-
-    document.body.appendChild(overlay);
-    this.lobbyOverlay = overlay;
-
-    document.getElementById("hlo-copy")?.addEventListener("click", () => {
-      void navigator.clipboard.writeText(inviteUrl);
-      const btn = document.getElementById("hlo-copy");
-      if (btn) {
-        btn.textContent = "Copied!";
-        window.setTimeout(() => {
-          btn.textContent = "Copy";
-        }, 2000);
-      }
-    });
-    document.getElementById("hlo-start")?.addEventListener("click", () => this.sendStart());
-    document.getElementById("hlo-leave")?.addEventListener("click", () => {
-      this.sendQuit();
-      window.location.href = "/";
+    this.removeLobbyOverlay();
+    this.lobbyOverlay = renderLobbyOverlay({
+      title: "Hearts",
+      gameId: lobby.gameId,
+      players: lobby.players,
+      maxPlayers: 4,
+      bgColor: "rgba(10,60,20,0.96)",
+      onLeave: () => {
+        this.sendQuit();
+        window.location.href = "/";
+      },
+      onStart: () => this.sendStart(),
     });
   }
 

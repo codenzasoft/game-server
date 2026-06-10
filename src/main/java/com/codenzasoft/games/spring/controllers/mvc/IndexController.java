@@ -63,7 +63,7 @@ public class IndexController {
 
   /** Creates a new vs-bot {@link com.codenzasoft.games.xo.XoGame}. */
   @PostMapping("/games/xo")
-  public String newGame(@AuthenticationPrincipal UserDetails user) {
+  public String newXoGame(@AuthenticationPrincipal UserDetails user) {
     final Optional<UserEntity> entity =
         gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
     if (entity.isPresent()) {
@@ -94,6 +94,25 @@ public class IndexController {
       } catch (IllegalStateException e) {
         log.warn(
             "Hearts game creation rejected for {}: {}", entity.get().getUsername(), e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
+  /** Creates a pending multiplayer XO game and redirects the host to the lobby. */
+  @PostMapping("/games/xo/multiplayer")
+  public String newMultiplayerXoGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        final XoGameEntity game = gameService.createPendingXoGame(entity.get());
+        return "redirect:/games/xo/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Pending XO game creation rejected for {}: {}",
+            entity.get().getUsername(),
+            e.getMessage());
       }
     }
     return "redirect:/";

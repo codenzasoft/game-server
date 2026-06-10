@@ -8,6 +8,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
+import { renderLobbyOverlay } from "../shared/lobby";
 
 const wsUrl = import.meta.env.VITE_WS_URL ||
   `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/games/connect`;
@@ -226,6 +227,14 @@ export const GameMessageSchema = z.object({
   context: GameContextSchema,
   state: GameStateSchema,
 }).transform((data) => new GameMessage(data as GameMessageData));
+
+const XoLobbyMessageSchema = z.object({
+  lobby: z.object({
+    gameId: z.string(),
+    players: z.array(z.string()),
+  }),
+});
+type XoLobbyState = z.infer<typeof XoLobbyMessageSchema>["lobby"];
 
 class GameSettings {
   constructor(
@@ -502,6 +511,9 @@ export class GameEventHandler {
   yourMove: Text | undefined = undefined;
   quitButton: Text | undefined = undefined;
 
+  private lobbyOverlay: HTMLDivElement | null = null;
+  private lastLobbyState: XoLobbyState | null = null;
+
   constructor(app: Application) {
     this.app = app;
     this.board = Board.build(app, this);
@@ -681,13 +693,42 @@ export class GameEventHandler {
     app.stage.addChild(playAgain);
   }
 
+  private showLobby(lobby: XoLobbyState) {
+    this.lastLobbyState = lobby;
+    this.removeLobbyOverlay();
+    this.lobbyOverlay = renderLobbyOverlay({
+      title: "X's & O's",
+      gameId: lobby.gameId,
+      players: lobby.players,
+      maxPlayers: 2,
+      bgColor: "rgba(10,20,60,0.96)",
+      onLeave: () => {
+        window.location.href = "/";
+      },
+    });
+  }
+
+  private removeLobbyOverlay() {
+    if (this.lobbyOverlay) {
+      this.lobbyOverlay.remove();
+      this.lobbyOverlay = null;
+    }
+  }
+
   onConnect(frame: Frame) {
     console.log("Connected: " + frame);
     this.subscription = this.stompClient.subscribe(
       `/user/queue/games/${this.gameId}`,
       (stompMessage) => {
-        const body = JSON.parse(stompMessage.body);
+        const body = JSON.parse(stompMessage.body) as unknown;
+        const lobbyResult = XoLobbyMessageSchema.safeParse(body);
+        if (lobbyResult.success) {
+          this.showLobby(lobbyResult.data.lobby);
+          return;
+        }
         const message = GameMessageSchema.parse(body);
+        this.lastLobbyState = null;
+        this.removeLobbyOverlay();
         console.log(message);
         this.processMessage(message);
       },

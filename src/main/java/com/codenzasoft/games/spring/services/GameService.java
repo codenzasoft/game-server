@@ -94,6 +94,64 @@ public class GameService {
   }
 
   /**
+   * Creates a pending multiplayer XO game for the provided host with no opponent yet. The host is
+   * assigned {@link Piece#X} and goes first. A second player may join via {@link #joinXoGame}.
+   *
+   * @param user The host player.
+   * @return A new pending game entity with exactly one player.
+   * @throws IllegalStateException if the user has reached the active game limit.
+   */
+  @Transactional
+  public XoGameEntity createPendingXoGame(final UserEntity user) {
+    enforceGameLimit(user);
+    final XoGameEntity game = new XoGameEntity(UUID.randomUUID());
+    game.setPlayers(List.of(user));
+    game.setGamePieces(List.of(new XoPieceEntity(game.getId(), user.getId(), Piece.X)));
+    gamesRepository.save(game);
+    return game;
+  }
+
+  /**
+   * Returns the {@link XoGameEntity} with the provided ID, or {@code empty} if not found.
+   *
+   * @param id A game {@link UUID}.
+   * @return The entity, or {@code empty}.
+   */
+  public Optional<XoGameEntity> findXoGame(final UUID id) {
+    return findGameEntity(id, XoGameEntity.class);
+  }
+
+  /**
+   * Adds the provided user as the {@link Piece#O} player in an existing pending XO game. If the
+   * user is already a player this is a no-op and the unmodified entity is returned. The game must
+   * be active and not yet full (i.e. have fewer than 2 pieces).
+   *
+   * @param gameId The pending game to join.
+   * @param user The user joining.
+   * @return The updated game entity.
+   * @throws IllegalStateException if the game is full, complete, or not found.
+   */
+  @Transactional
+  public XoGameEntity joinXoGame(final UUID gameId, final UserEntity user) {
+    final XoGameEntity game =
+        findGameEntity(gameId, XoGameEntity.class)
+            .orElseThrow(() -> new IllegalStateException("Game not found: " + gameId));
+    if (game.isComplete()) throw new IllegalStateException("Cannot join a completed game");
+    if (game.getGamePieces().size() >= 2) throw new IllegalStateException("Game is already full");
+    if (game.getGamePieces().stream().anyMatch(p -> p.getUserId().equals(user.getId())))
+      return game;
+    enforceGameLimit(user);
+    final List<UserEntity> players = new ArrayList<>(game.getPlayers());
+    players.add(user);
+    game.setPlayers(players);
+    final List<XoPieceEntity> pieces = new ArrayList<>(game.getGamePieces());
+    pieces.add(new XoPieceEntity(game.getId(), user.getId(), Piece.O));
+    game.setGamePieces(pieces);
+    gamesRepository.save(game);
+    return game;
+  }
+
+  /**
    * Returns a new single user kh game for the provided {@link UserEntity}.
    *
    * @param user The user.
@@ -277,6 +335,13 @@ public class GameService {
     }
     final Optional<XoGameEntity> persisted = findGameEntity(id, XoGameEntity.class);
     if (persisted.isPresent()) {
+      if (persisted.get().getGamePieces().size() < 2) {
+        log.warn(
+            "getOrBuildXoGame: game {} is pending ({} pieces)",
+            id,
+            persisted.get().getGamePieces().size());
+        return Optional.empty();
+      }
       final XoGame game = buildXoGame(persisted.get());
       gameCache.addGame(game);
       return Optional.of(game);

@@ -104,6 +104,10 @@
                         <button type="submit" class="btn btn-primary"
                                 th:disabled="${atGameLimit}">Play vs Bot</button>
                     </form>
+                    <form th:action="@{/games/xo/multiplayer}" method="post">
+                        <button type="submit" class="btn btn-outline-primary"
+                                th:disabled="${atGameLimit}">Play with Friends</button>
+                    </form>
                     <form th:action="@{/games/xo/challenge}" method="post"
                           class="d-flex gap-2 align-items-center"
                           th:if="${not #lists.isEmpty(opponents)}">
