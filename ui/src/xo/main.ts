@@ -20,7 +20,7 @@ const getGameId = () => {
   const app = new Application();
 
   // Initialize the application
-  await app.init({ background: "#1099bb", resizeTo: window });
+  await app.init({ background: "#d8d8d8", resizeTo: window });
 
   // Append the application canvas to the document body
   document.getElementById("pixi-container")!.appendChild(app.canvas);
@@ -34,7 +34,6 @@ const getGameId = () => {
   } else {
     console.log(`Using game ID: ${gameId}`);
     const eventHandler = new GameEventHandler(app);
-    await eventHandler.initImages();
     app.stage.addChild(eventHandler.getBoard());
     eventHandler.connect(gameId);
   }

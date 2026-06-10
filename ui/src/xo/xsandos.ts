@@ -1,12 +1,11 @@
 import {
   Application,
-  Assets,
   Container,
   Graphics,
-  Sprite,
   Text,
   TextStyle,
 } from "pixi.js";
+import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
 
@@ -236,17 +235,81 @@ class GameSettings {
   ) {}
 }
 
+// ── Brush-stroke helpers ──────────────────────────────────────────────────────
+
+function seededRng(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+// Line path with slight perpendicular jitter that tapers to zero at each end.
+function brushPath(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  segments: number,
+  jitter: number,
+  seed: number,
+): [number, number][] {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const nx = -dy / len, ny = dx / len;
+  const rand = seededRng(seed);
+  return Array.from({ length: segments + 1 }, (_, i) => {
+    const t = i / segments;
+    const taper = Math.sin(t * Math.PI); // 0 at ends, 1 at midpoint
+    const j = (rand() - 0.5) * 2 * jitter * taper;
+    return [x1 + dx * t + nx * j, y1 + dy * t + ny * j] as [number, number];
+  });
+}
+
+// Circle path starting at 12 o'clock with a small seeded radius wobble.
+// Last point equals first so the stroke closes cleanly at progress = 1.
+function circlePath(
+  cx: number, cy: number,
+  r: number,
+  segments: number,
+  jitterAmp: number,
+  seed: number,
+): [number, number][] {
+  const rand = seededRng(seed);
+  const pts = Array.from({ length: segments }, (_, i) => {
+    const angle = -Math.PI / 2 + (i / segments) * Math.PI * 2;
+    const jr = 1 + (rand() - 0.5) * jitterAmp;
+    return [cx + r * jr * Math.cos(angle), cy + r * jr * Math.sin(angle)] as [number, number];
+  });
+  pts.push(pts[0]);
+  return pts;
+}
+
+// Draws a leading fraction of a path as a single rounded stroke.
+function strokePath(
+  g: Graphics,
+  path: [number, number][],
+  progress: number,
+  color: number,
+  width: number,
+): void {
+  const end = Math.max(2, Math.round((path.length - 1) * progress) + 1);
+  g.setStrokeStyle({ width, color, cap: "round", join: "round" });
+  g.moveTo(path[0][0], path[0][1]);
+  for (let i = 1; i < end; i++) g.lineTo(path[i][0], path[i][1]);
+  g.stroke();
+}
+
 class BoardSquare extends Container {
   cell: Position;
   size: number;
   token: GamePiece | undefined = undefined;
   square: Graphics;
-  sprite: Sprite | undefined;
+  private pieceGraphics: Graphics | undefined;
 
   constructor(
     size: number,
     cell: Position,
-    app: Application,
+    _app: Application,
     handler: GameEventHandler,
   ) {
     super();
@@ -257,54 +320,80 @@ class BoardSquare extends Container {
 
   init(size: number, handler: GameEventHandler) {
     const square = new Graphics();
-    square.rect(0, 0, size, size).fill({
-      color: 0x1099bb,
-      alpha: 0.001,
-    });
+    square.rect(0, 0, size, size).fill({ color: 0x1099bb, alpha: 0.001 });
     this.square = square;
     this.addChild(square);
     this.eventMode = "none";
     this.cursor = "pointer";
-    this.on("pointerdown", (_event: PointerEvent) => {
-      handler.play(this);
-    });
+    this.on("pointerdown", (_event: PointerEvent) => handler.play(this));
   }
 
-  /**
-   * Sets the game piece in this square and whether the square is a valid move option.
-   *
-   * @param token the game piece to render
-   * @param isMove whether this square is a valid move (enable pointer)
-   * @param pool a pool to get an image from
-   */
-  update(token: GamePiece | undefined, isMove: boolean, pool: SpritePool) {
+  update(token: GamePiece | undefined, isMove: boolean, app: Application): Promise<void> {
+    let animation = Promise.resolve();
     if (token !== undefined && this.token !== token) {
       this.token = token;
-      const sprite: Sprite = pool.getSprite(token);
-      sprite.anchor.set(0.5);
-      const scale = (0.4 * this.size) / sprite.texture.width;
-      sprite.scale.set(scale);
-      sprite.position.set(this.size / 2, this.size / 2);
-      this.addChild(sprite);
-      this.sprite = sprite;
+      const g = new Graphics();
+      g.filters = [new DropShadowFilter({ alpha: 0.45, blur: 4, distance: 5, padding: 16 })];
+      this.pieceGraphics = g;
+      this.addChild(g);
+      animation = this.animatePiece(token, app);
     }
-    if (isMove) {
-      this.eventMode = "static";
-      this.cursor = "pointer";
-    } else {
-      this.eventMode = "none";
-      this.cursor = "default";
-    }
+    this.eventMode = isMove ? "static" : "none";
+    this.cursor = isMove ? "pointer" : "default";
+    return animation;
   }
 
   shrink() {
-    if (this.sprite !== undefined) {
-      const scale = (0.2 * this.size) / this.sprite.texture.width;
-      this.sprite.scale.set(scale);
-      this.sprite.alpha = 0.5;
+    if (this.pieceGraphics !== undefined) {
+      const s = this.size;
+      this.pieceGraphics.pivot.set(s / 2, s / 2);
+      this.pieceGraphics.position.set(s / 2, s / 2);
+      this.pieceGraphics.scale.set(0.55);
+      this.pieceGraphics.alpha = 0.4;
     }
   }
 
+  private animatePiece(piece: GamePiece, app: Application): Promise<void> {
+    const s = this.size;
+    const pad = s * 0.18;
+    const sw = s * 0.1;
+    const g = this.pieceGraphics!;
+
+    return new Promise<void>((resolve) => {
+      if (piece === GamePiece.X) {
+        const path1 = brushPath(pad, pad, s - pad, s - pad, 20, sw * 0.06, 42);
+        const path2 = brushPath(s - pad, pad, pad, s - pad, 20, sw * 0.06, 99);
+        let p1 = 0, p2 = 0;
+        const tick = () => {
+          g.clear();
+          p1 = Math.min(1, p1 + 0.07);
+          strokePath(g, path1, p1, 0xc0392b, sw);
+          if (p1 >= 1) {
+            p2 = Math.min(1, p2 + 0.07);
+            strokePath(g, path2, p2, 0xc0392b, sw);
+          }
+          if (p2 >= 1) {
+            app.ticker.remove(tick);
+            resolve();
+          }
+        };
+        app.ticker.add(tick);
+      } else {
+        const path = circlePath(s / 2, s / 2, s * 0.3, 48, 0.02, 77);
+        let p = 0;
+        const tick = () => {
+          g.clear();
+          p = Math.min(1, p + 0.04);
+          strokePath(g, path, p, 0x2471a3, sw);
+          if (p >= 1) {
+            app.ticker.remove(tick);
+            resolve();
+          }
+        };
+        app.ticker.add(tick);
+      }
+    });
+  }
 }
 
 export class Board extends Container {
@@ -378,9 +467,10 @@ export class Board extends Container {
     return undefined;
   }
 
-  updateSquares(message: GameMessage, pool: SpritePool) {
+  async updateSquares(message: GameMessage, app: Application): Promise<void> {
     const state = message.state;
     const myPiece = state.getMyPiece(message.context);
+    const animations: Promise<void>[] = [];
     for (let row = 1; row <= 3; row++) {
       for (let col = 1; col <= 3; col++) {
         const position = Position.with(row, col);
@@ -388,49 +478,14 @@ export class Board extends Container {
         const piece = state.getPiece(position);
         const isMove = state.isMove(position, myPiece);
         if (square !== undefined) {
-          square.update(piece, isMove, pool);
-          if (state.over) {
-            if (!state.isWinner(position)) {
-              square.shrink();
-            }
+          animations.push(square.update(piece, isMove, app));
+          if (state.over && !state.isWinner(position)) {
+            square.shrink();
           }
         }
       }
     }
-  }
-}
-
-class SpritePool {
-  pool: Map<GamePiece, Sprite[]> = new Map();
-  numCopies: number; // the number of sprites per image
-
-  constructor(numCopies: number) {
-    this.numCopies = numCopies;
-  }
-
-  async init() {
-    await this.initTexture("/assets/suits/diamond.svg", GamePiece.X);
-    await this.initTexture("/assets/suits/club.svg", GamePiece.O);
-  }
-
-  async initTexture(url: string, piece: GamePiece) {
-    Assets.load(url).then((texture) => {
-      const copies = [];
-      for (let copy = 1; copy <= this.numCopies; copy++) {
-        const sprite = new Sprite(texture);
-        sprite.anchor.set(0.5);
-        copies.push(sprite);
-      }
-      this.pool.set(piece, copies);
-    });
-  }
-
-  public getSprite(piece: GamePiece): Sprite {
-    return this.pool.get(piece).pop();
-  }
-
-  public returnSprite(piece: GamePiece, sprite: Sprite) {
-    this.pool.get(piece).push(sprite);
+    await Promise.all(animations);
   }
 }
 
@@ -443,7 +498,6 @@ export class GameEventHandler {
   subscription: StompSubscription;
   gameId: string;
   board: Board;
-  spritePool: SpritePool = new SpritePool(5);
   myMove: Text | undefined = undefined;
   yourMove: Text | undefined = undefined;
   quitButton: Text | undefined = undefined;
@@ -455,10 +509,6 @@ export class GameEventHandler {
 
   public getBoard(): Board {
     return this.board;
-  }
-
-  public async initImages() {
-    await this.spritePool.init();
   }
 
   public play(square: BoardSquare) {
@@ -498,12 +548,12 @@ export class GameEventHandler {
         if (nextSequence > this.sequence) {
           // new state - update the board
           this.sequence = nextSequence;
-          this.board.updateSquares(nextMessage, this.spritePool);
+          await this.board.updateSquares(nextMessage, this.app);
           this.displayGameOver(nextMessage, this.app);
         } else {
           // same sequence - game was quit (no board move) or contains a "play again" link
           if (nextMessage.state.over) {
-            this.board.updateSquares(nextMessage, this.spritePool);
+            await this.board.updateSquares(nextMessage, this.app);
             this.displayGameOver(nextMessage, this.app);
           }
           if (nextMessage.context.nextGameId !== undefined && nextMessage.state.over) {
@@ -534,7 +584,8 @@ export class GameEventHandler {
         if (state.winner == myPiece) {
           this.displayWin(app, "You Win!", state);
         } else {
-          this.displayWin(app, "You Loose!", state);
+          const opponent = state.getOpponentName(message.context) ?? "Opponent";
+          this.displayWin(app, `${opponent} wins!`, state);
         }
       } else if (state.quitter !== undefined) {
         const myPiece = state.getMyPiece(message.context);
