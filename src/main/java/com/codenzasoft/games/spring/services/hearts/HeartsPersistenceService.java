@@ -6,9 +6,11 @@ import com.codenzasoft.games.common.cards.Rank;
 import com.codenzasoft.games.common.cards.Suit;
 import com.codenzasoft.games.hearts.*;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.hearts.HeartsRoundHandEntity;
 import com.codenzasoft.games.spring.entities.hearts.HeartsRoundPassEntity;
 import com.codenzasoft.games.spring.entities.hearts.HeartsTrickCardEntity;
+import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsRoundHandRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsRoundPassRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsTrickCardRepository;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 public class HeartsPersistenceService implements HeartsListener {
   private static final Logger log = LoggerFactory.getLogger(HeartsPersistenceService.class);
 
+  @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsRoundHandRepository handRepository;
   @Autowired private HeartsRoundPassRepository passRepository;
   @Autowired private HeartsTrickCardRepository trickRepository;
@@ -113,7 +116,15 @@ public class HeartsPersistenceService implements HeartsListener {
   public void gameStarted(final HeartsGame game, final HeartsState state) {}
 
   @Override
-  public void gameOver(final HeartsGame game, final HeartsState state) {}
+  @Transactional
+  public void gameOver(final HeartsGame game, final HeartsState state) {
+    final Optional<HeartsGameEntity> maybeGame = heartsGameRepository.findById(game.getId());
+    if (maybeGame.isPresent()) {
+      final HeartsGameEntity gameEntity = maybeGame.get();
+      gameEntity.setOverAt(new Date());
+      heartsGameRepository.save(gameEntity);
+    }
+  }
 
   @Override
   public void gameQuit(final HeartsGame game, final HeartsState state) {}

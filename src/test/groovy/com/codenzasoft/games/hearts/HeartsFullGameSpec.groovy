@@ -1,6 +1,7 @@
 package com.codenzasoft.games.hearts
 
 import com.codenzasoft.games.common.Player
+import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy
 import com.codenzasoft.games.hearts.strategies.DefensiveStrategy
 import com.codenzasoft.games.hearts.strategies.RandomStrategy
 import spock.lang.Specification
@@ -42,6 +43,7 @@ class HeartsFullGameSpec extends Specification {
         strategy || _
         new RandomStrategy() || _
         new DefensiveStrategy() || _
+        new AdaptiveStrategy() || _
     }
 
 }
