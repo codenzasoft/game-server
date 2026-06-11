@@ -7,6 +7,7 @@ import com.codenzasoft.games.common.cards.Suit;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.RoundState;
+import com.codenzasoft.games.hearts.TrickState;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,7 +18,10 @@ import java.util.stream.Collectors;
  *   <li>{@link Mode#OFFENSIVE} — attempts to shoot the moon; committed when {@link
  *       HandEvaluator#isShootViable} is true for the dealt hand. Reverts to DEFENSIVE the moment an
  *       opponent wins a point trick.
- *   <li>{@link Mode#SABOTEUR} — not yet active (Stage 3).
+ *   <li>{@link Mode#SABOTEUR} — detects when an opponent has reached the moon-shot threat threshold
+ *       ({@link RoundContext#SHOOT_THREAT_THRESHOLD}) and blocks them: beats their winning tricks
+ *       when possible; avoids giving them more point cards when unable to beat. Falls back to
+ *       {@link DefensiveStrategy} when the shooter is not currently winning the trick.
  *   <li>{@link Mode#DEFENSIVE} — delegates all play to {@link DefensiveStrategy}.
  * </ul>
  */
@@ -43,8 +47,17 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       final Player player,
       final Set<Card> validCards) {
     evaluateRoundIfNeeded(state, player);
-    if (resolveMode(state, player) == Mode.OFFENSIVE) {
+    final Mode mode = resolveMode(state, player);
+    if (mode == Mode.OFFENSIVE) {
       selectOffensiveCard(state, player, validCards).ifPresent(card -> game.playCard(player, card));
+    } else if (mode == Mode.SABOTEUR) {
+      final String shooter = RoundContext.shootingPlayer(state).orElseThrow();
+      final Optional<Card> card = selectSaboteurCard(state, player, validCards, shooter);
+      if (card.isPresent()) {
+        game.playCard(player, card.get());
+      } else {
+        super.yourTurnToPlay(game, state, player, validCards);
+      }
     } else {
       super.yourTurnToPlay(game, state, player, validCards);
     }
@@ -66,6 +79,10 @@ public class AdaptiveStrategy extends DefensiveStrategy {
   Mode resolveMode(final HeartsState state, final Player player) {
     if (committedToShoot && !RoundContext.hasMoonShotFailed(state, player.name())) {
       return Mode.OFFENSIVE;
+    }
+    final Optional<String> shooter = RoundContext.shootingPlayer(state);
+    if (shooter.isPresent() && !shooter.get().equals(player.name())) {
+      return Mode.SABOTEUR;
     }
     return Mode.DEFENSIVE;
   }
@@ -154,6 +171,63 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     if (card.getSuit() == Suit.SPADES && card.outRanks(Rank.QUEEN)) return true; // A♠, K♠
     if (card.getRank() == Rank.ACE) return true; // A♣, A♦
     return false;
+  }
+
+  // ── Saboteur card selection ──────────────────────────────────────────────────
+
+  Optional<Card> selectSaboteurCard(
+      final HeartsState state,
+      final Player player,
+      final Set<Card> validCards,
+      final String shooter) {
+    if (validCards.isEmpty()) return Optional.empty();
+    if (validCards.size() == 1) return validCards.stream().findFirst();
+
+    final RoundState round = state.getRound();
+    final TrickState trick = round.getTrick();
+    final Optional<Suit> maybeTrump = trick.getTrump();
+
+    if (maybeTrump.isEmpty()) {
+      return Optional.empty(); // leading — defer to defensive
+    }
+
+    final Suit trump = maybeTrump.get();
+    final Optional<Card> currentWinner = StrategyHelper.getMaxTrump(trick);
+    final boolean shooterIsWinning =
+        currentWinner
+            .flatMap(max -> trick.cards().stream().filter(pc -> pc.card().equals(max)).findFirst())
+            .map(pc -> pc.player().equals(shooter))
+            .orElse(false);
+
+    if (!shooterIsWinning) {
+      return Optional.empty(); // shooter not currently winning — defer to defensive
+    }
+
+    if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
+      // Must follow suit — try to beat the shooter with the highest available card
+      final Optional<Card> beater =
+          currentWinner.flatMap(
+              max ->
+                  StrategyHelper.filterSuit(validCards, trump)
+                      .filter(c -> c.outRanks(max.getRank()))
+                      .max(Comparator.comparing(Card::getRank)));
+      if (beater.isPresent()) return beater;
+      // Can't beat — play lowest to minimise points given to the shooter
+      return StrategyHelper.getMinRank(validCards, trump);
+    }
+
+    // Void in trump — must sluff; avoid giving the shooter more point cards
+    return selectSaboteurSafeSluff(validCards);
+  }
+
+  private Optional<Card> selectSaboteurSafeSluff(final Set<Card> validCards) {
+    final Optional<Card> safeCard =
+        validCards.stream()
+            .filter(c -> c.getSuit() != Suit.HEARTS)
+            .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .min(Comparator.comparing(Card::getRank));
+    if (safeCard.isPresent()) return safeCard;
+    return validCards.stream().min(Comparator.comparing(Card::getRank));
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────

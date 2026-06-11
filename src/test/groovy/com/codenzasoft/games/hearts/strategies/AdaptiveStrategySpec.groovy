@@ -207,6 +207,86 @@ class AdaptiveStrategySpec extends Specification {
         strategy.resolveMode(state, alice) == Mode.DEFENSIVE
     }
 
+    // ── saboteur mode ─────────────────────────────────────────────────────────────
+
+    def "mode is SABOTEUR when opponent has crossed the shoot threshold"() {
+        given: "bob has won Q♠ + A♥ = 14 points this round"
+        def strategy = new AdaptiveStrategy(false)
+        def trick1 = new TrickState(1, "bob", [
+            new PlayedCard("bob",   QS),
+            new PlayedCard("carol", c(Suit.SPADES, Rank.TWO)),
+            new PlayedCard("dave",  c(Suit.SPADES, Rank.THREE)),
+            new PlayedCard("alice", c(Suit.SPADES, Rank.FOUR)),
+        ])
+        def trick2 = new TrickState(2, "bob", [
+            new PlayedCard("bob",   AH),
+            new PlayedCard("carol", _2C),
+            new PlayedCard("dave",  _3C),
+            new PlayedCard("alice", _4C),
+        ])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick1, trick2])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        expect:
+        strategy.resolveMode(state, alice) == Mode.SABOTEUR
+    }
+
+    def "saboteur beats shooter when it can follow suit"() {
+        given: "bob leads 3♣ and is currently winning; alice holds A♣ which beats it"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "bob", [new PlayedCard("bob", _3C)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectSaboteurCard(state, alice, [AC, KH] as Set, "bob")
+
+        then:
+        card.get() == AC
+    }
+
+    def "saboteur plays lowest when it cannot beat shooter following hearts"() {
+        given: "bob leads A♥; alice must follow hearts but cannot beat it"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "bob", [new PlayedCard("bob", AH)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectSaboteurCard(state, alice, [QH, NH] as Set, "bob")
+
+        then: "plays lowest heart to minimise points given to the shooter"
+        card.get() == NH
+    }
+
+    def "saboteur sluffs a safe card when shooter is winning the trick"() {
+        given: "bob leads A♣ and is winning; alice has no clubs and must sluff"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "bob", [new PlayedCard("bob", AC)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectSaboteurCard(state, alice, [AH, _2D] as Set, "bob")
+
+        then: "discards 2♦ instead of A♥ to avoid giving the shooter a heart"
+        card.get() == _2D
+    }
+
+    def "saboteur defers to defensive when shooter is not currently winning"() {
+        given: "carol (not the shooter) is winning; alice returns empty to fall back to defensive"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "carol", [new PlayedCard("carol", _3C)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectSaboteurCard(state, alice, [AC, _2D] as Set, "bob")
+
+        then:
+        card.isEmpty()
+    }
+
     // ── full game completion ──────────────────────────────────────────────────────
 
     def "four bots using AdaptiveStrategy complete a full game without errors"() {
