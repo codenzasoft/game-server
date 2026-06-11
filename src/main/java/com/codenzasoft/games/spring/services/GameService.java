@@ -16,8 +16,10 @@ import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
+import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
+import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
@@ -30,6 +32,7 @@ import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.strategies.LookAheadStrategy;
 import jakarta.transaction.Transactional;
 import java.util.*;
+import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -56,6 +59,7 @@ public class GameService {
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
   @Autowired private UserService userService;
+  @Autowired private UserGamesPlayedRepository userGamesPlayedRepository;
 
   /**
    * Returns whether the provided user has reached {@link #MAX_ACTIVE_GAMES} active (incomplete)
@@ -537,6 +541,63 @@ public class GameService {
 
   public Optional<UserEntity> findUser(final UUID id) {
     return usersRepository.findById(id);
+  }
+
+  /**
+   * Inserts or incrementally updates the games-played summary for the given user and game type.
+   * If no record exists yet, a new one is created. Otherwise the existing record's win/loss/draw
+   * counts are incremented and {@code last_played_at} is refreshed.
+   *
+   * @param user The user who played.
+   * @param gameType The type of game played.
+   * @param wins Number of wins to add.
+   * @param losses Number of losses to add.
+   * @param draws Number of draws to add.
+   * @return The updated (or newly created) entity.
+   */
+  @Transactional
+  public UserGamesPlayedEntity updateGamesPlayed(
+      final UserEntity user,
+      final GameType gameType,
+      final int wins,
+      final int losses,
+      final int draws) {
+    final Optional<UserGamesPlayedEntity> existing =
+        userGamesPlayedRepository.findByUserIdAndGameType(user.getId(), gameType);
+    final UserGamesPlayedEntity entity;
+    if (existing.isPresent()) {
+      entity = existing.get();
+      entity.setWins(entity.getWins() + wins);
+      entity.setLosses(entity.getLosses() + losses);
+      entity.setDraws(entity.getDraws() + draws);
+      entity.setLastPlayedAt(new Date());
+    } else {
+      entity = new UserGamesPlayedEntity(user.getId(), gameType, wins, losses, draws, new Date());
+    }
+    return userGamesPlayedRepository.save(entity);
+  }
+
+  /**
+   * Returns the games-played summary for the given user and game type, or {@code empty} if the
+   * user has not yet played that type of game.
+   *
+   * @param user The user.
+   * @param gameType The game type.
+   * @return The summary, or {@code empty}.
+   */
+  public Optional<UserGamesPlayedEntity> getGamesPlayed(
+      final UserEntity user, final GameType gameType) {
+    return userGamesPlayedRepository.findByUserIdAndGameType(user.getId(), gameType);
+  }
+
+  /**
+   * Returns all games-played summaries for the given user across every game type.
+   *
+   * @param user The user.
+   * @return A list of summaries (may be empty if the user has never played).
+   */
+  public List<UserGamesPlayedEntity> getAllGamesPlayed(final UserEntity user) {
+    return userGamesPlayedRepository.findByUserId(user.getId());
   }
 
   protected <T extends GameEntity> Optional<T> findGameEntity(final UUID id, final Class<T> clazz) {
