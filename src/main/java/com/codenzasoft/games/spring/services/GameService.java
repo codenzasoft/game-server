@@ -5,7 +5,7 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsState;
-import com.codenzasoft.games.hearts.strategies.DefensiveStrategy;
+import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.spring.config.Role;
@@ -498,7 +498,7 @@ public class GameService {
             .addListener(heartsPersistenceService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
-        builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
+        builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
       }
     }
     return builder.build();
@@ -518,7 +518,7 @@ public class GameService {
             .addListener(heartsPersistenceService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
-        builder.addPlayerObserver(user.toPlayer(), new DefensiveStrategy());
+        builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
       }
     }
     return builder.build();
