@@ -52,7 +52,8 @@ class HeartsStateBuilder {
             opts.get('players', PLAYERS) as List,
             opts.get('rounds', []) as List,
             opts.get('over', false) as boolean,
-            opts.get('quit', false) as boolean
+            opts.get('quit', false) as boolean,
+            null
         )
     }
 }

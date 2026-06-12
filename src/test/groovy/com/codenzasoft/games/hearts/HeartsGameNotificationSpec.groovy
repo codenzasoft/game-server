@@ -62,7 +62,7 @@ class HeartsGameNotificationSpec extends Specification {
         def game = buildGame(listener)
 
         when:
-        game.quit()
+        game.quit("alice")
 
         then:
         1 * listener.gameQuit(game, _)

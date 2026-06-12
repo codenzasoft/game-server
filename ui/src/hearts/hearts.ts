@@ -147,6 +147,7 @@ const HeartsStateSchema = z.object({
   rounds: z.array(RoundStateSchema),
   over: z.boolean(),
   quit: z.boolean(),
+  quitBy: z.string().optional(),
   score: z.record(z.string(), z.number()).optional(),
   winner: z.string().nullish(),
   tied: z.array(z.string()).optional(),
@@ -1273,7 +1274,7 @@ export class HeartsGameHandler {
 
     const items: { label: string; action: () => void }[] = [
       { label: "Save and Exit", action: () => { window.location.href = "/"; } },
-      { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
+      { label: "Abandon Game",  action: () => { this.sendQuit(); window.location.href = "/"; } },
     ];
 
     for (const item of items) {
@@ -1600,7 +1601,7 @@ export class HeartsGameHandler {
 
   // ── Game over ──────────────────────────────────────────────────────────────
 
-  private renderGameOver(context: HeartsContext, state: HeartsState) {
+  private renderGameOver(_context: HeartsContext, state: HeartsState) {
     const style = new TextStyle({
       fontFamily: "Arial",
       fontSize: 56,
@@ -1625,10 +1626,10 @@ export class HeartsGameHandler {
       },
     });
 
-    const title = new Text({
-      text: state.quit ? "Game Quit" : "Game Over",
-      style,
-    });
+    const titleText = state.quit
+      ? (state.quitBy ? `${state.quitBy} quit the game` : "Game Quit")
+      : "Game Over";
+    const title = new Text({ text: titleText, style });
     title.anchor.set(0.5);
     title.x = this.app.screen.width / 2;
     title.y = this.app.screen.height / 2 - 60;

@@ -103,7 +103,7 @@ public class HeartsController {
     final Optional<HeartsGame> game = gameService.getOrBuildHeartsGame(id);
     final Optional<UserEntity> user = findUser(principal);
     if (game.isEmpty() || user.isEmpty()) return;
-    game.get().quit();
+    game.get().quit(user.get().toPlayer().name());
     try {
       gameService.quitGame(id, user.get());
     } catch (IllegalStateException e) {
