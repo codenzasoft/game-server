@@ -12,11 +12,11 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
-import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
@@ -544,8 +544,8 @@ public class GameService {
   }
 
   /**
-   * Inserts or incrementally updates the games-played summary for the given user and game type.
-   * If no record exists yet, a new one is created. Otherwise the existing record's win/loss/draw
+   * Inserts or incrementally updates the games-played summary for the given user and game type. If
+   * no record exists yet, a new one is created. Otherwise the existing record's win/loss/draw
    * counts are incremented and {@code last_played_at} is refreshed.
    *
    * @param user The user who played.
@@ -578,8 +578,8 @@ public class GameService {
   }
 
   /**
-   * Returns the games-played summary for the given user and game type, or {@code empty} if the
-   * user has not yet played that type of game.
+   * Returns the games-played summary for the given user and game type, or {@code empty} if the user
+   * has not yet played that type of game.
    *
    * @param user The user.
    * @param gameType The game type.

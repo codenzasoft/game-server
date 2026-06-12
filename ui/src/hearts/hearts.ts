@@ -218,6 +218,10 @@ export class HeartsGameHandler {
   // HTML overlay for lobby waiting room
   private lobbyOverlay: HTMLDivElement | null = null;
 
+  // HTML overlay for in-game menu dropdown
+  private menuOverlay: HTMLDivElement | null = null;
+  private menuOutsideClickHandler: ((e: PointerEvent) => void) | null = null;
+
   // Trick container retained across renders to support the win animation
   private trickContainer: Container | null = null;
 
@@ -498,6 +502,7 @@ export class HeartsGameHandler {
     this.removePassOverlay();
     this.removeScoreOverlay();
     this.removeLobbyOverlay();
+    this.removeMenuOverlay();
     this.trickContainer = null;
   }
 
@@ -514,30 +519,21 @@ export class HeartsGameHandler {
     label.y = 12;
     this.app.stage.addChild(label);
 
-    const btnStyle = (color: string) =>
-      new TextStyle({ fontFamily: "Arial", fontSize: 18, fill: color, fontWeight: "bold" });
-
-    // Exit button — navigate home; game stays active for later resumption
-    const exit = new Text({ text: "Exit", style: btnStyle("#aaccff") });
-    exit.anchor.set(1, 0);
-    exit.x = this.app.screen.width - 16;
-    exit.y = 14;
-    exit.eventMode = "static";
-    exit.cursor = "pointer";
-    exit.on("pointerdown", () => {
-      window.location.href = "/";
+    const menuBtnStyle = new TextStyle({
+      fontFamily: "Arial",
+      fontSize: 18,
+      fill: "#ffffff",
+      fontWeight: "bold",
     });
-    this.app.stage.addChild(exit);
 
-    // Quit button — permanently forfeit the game
-    const quit = new Text({ text: "Quit", style: btnStyle("#ffaaaa") });
-    quit.anchor.set(1, 0);
-    quit.x = exit.x - exit.width - 12;
-    quit.y = 14;
-    quit.eventMode = "static";
-    quit.cursor = "pointer";
-    quit.on("pointerdown", () => this.sendQuit());
-    this.app.stage.addChild(quit);
+    const menuBtn = new Text({ text: "Menu ▾", style: menuBtnStyle });
+    menuBtn.anchor.set(1, 0);
+    menuBtn.x = this.app.screen.width - 16;
+    menuBtn.y = 14;
+    menuBtn.eventMode = "static";
+    menuBtn.cursor = "pointer";
+    menuBtn.on("pointerdown", () => this.toggleMenuOverlay());
+    this.app.stage.addChild(menuBtn);
   }
 
   private buildStatusText(
@@ -1257,6 +1253,102 @@ export class HeartsGameHandler {
       this.selectedPassCards.push(card);
     }
     if (this.lastMessage) void this.render(this.lastMessage);
+  }
+
+  // ── Menu overlay (HTML) ──────────────────────────────────────────────────
+
+  private toggleMenuOverlay() {
+    if (this.menuOverlay) {
+      this.removeMenuOverlay();
+    } else {
+      this.renderMenuOverlay();
+    }
+  }
+
+  private renderMenuOverlay() {
+    this.injectMenuStyles();
+
+    const overlay = document.createElement("div");
+    overlay.id = "hearts-menu-overlay";
+
+    const items: { label: string; action: () => void }[] = [
+      { label: "Save and Exit", action: () => { window.location.href = "/"; } },
+      { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
+    ];
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.className = "hearts-menu-item";
+      btn.textContent = item.label;
+      btn.addEventListener("click", item.action);
+      overlay.appendChild(btn);
+    }
+
+    document.getElementById("app")!.appendChild(overlay);
+    this.menuOverlay = overlay;
+
+    // Defer so the opening click doesn't immediately trigger the outside-click handler
+    setTimeout(() => {
+      if (!this.menuOverlay) return; // menu was already closed before timeout fired
+      const onOutsideClick = (e: PointerEvent) => {
+        if (this.menuOverlay && !this.menuOverlay.contains(e.target as Node)) {
+          this.removeMenuOverlay();
+        }
+      };
+      this.menuOutsideClickHandler = onOutsideClick;
+      document.addEventListener("pointerdown", onOutsideClick);
+    }, 0);
+  }
+
+  private removeMenuOverlay() {
+    if (this.menuOutsideClickHandler) {
+      document.removeEventListener("pointerdown", this.menuOutsideClickHandler);
+      this.menuOutsideClickHandler = null;
+    }
+    if (this.menuOverlay) {
+      this.menuOverlay.remove();
+      this.menuOverlay = null;
+    }
+  }
+
+  private injectMenuStyles() {
+    if (document.getElementById("hearts-menu-styles")) return;
+    const style = document.createElement("style");
+    style.id = "hearts-menu-styles";
+    style.textContent = `
+      #hearts-menu-overlay {
+        position: fixed;
+        top: 44px;
+        right: 16px;
+        display: flex;
+        flex-direction: column;
+        background: rgba(20,20,20,0.96);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 20;
+        min-width: 160px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      }
+      .hearts-menu-item {
+        background: transparent;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        font-family: Arial, sans-serif;
+        font-size: 15px;
+        text-align: left;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .hearts-menu-item:hover {
+        background: rgba(255,255,255,0.1);
+      }
+      .hearts-menu-item:last-child {
+        color: #ffaaaa;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   // ── Pass overlay (HTML) ───────────────────────────────────────────────────
