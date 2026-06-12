@@ -1452,38 +1452,57 @@ export class HeartsGameHandler {
   private renderScoreTable(context: HeartsContext, state: HeartsState) {
     this.injectScoreStyles();
 
+    const isGameOver = state.over;
+    const showAllRounds = isGameOver || this.scoreExpanded;
     const { players } = state;
     const totalScore = state.score ?? {};
-    const completedRounds = this.scoreExpanded
+    const completedRounds = showAllRounds
       ? state.rounds.filter((r) => r.complete && r.score)
       : [];
 
     const overlay = document.createElement("div");
     overlay.id = "hearts-score-overlay";
+    if (isGameOver) overlay.classList.add("hearts-score-gameover");
+
+    // Winner / tie line shown only on game over
+    if (isGameOver) {
+      const winnerDiv = document.createElement("div");
+      winnerDiv.className = "hearts-score-winner-line";
+      if (state.tied && state.tied.length > 1) {
+        winnerDiv.textContent = `Tie: ${state.tied.join(", ")}`;
+      } else if (state.winner) {
+        winnerDiv.textContent =
+          state.winner === context.player ? "You win!" : `${state.winner} wins!`;
+      }
+      overlay.appendChild(winnerDiv);
+    }
 
     const table = document.createElement("table");
     table.className = "hearts-score-table";
 
-    // Header row — toggle button in first column, player names in the rest
+    // Header row — toggle button in first column (hidden on game over), player names in the rest
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
 
     const toggleTh = document.createElement("th");
-    const toggleBtn = document.createElement("button");
-    toggleBtn.className = "hearts-score-toggle";
-    toggleBtn.textContent = this.scoreExpanded ? "▾" : "▸";
-    toggleBtn.addEventListener("click", () => {
-      this.scoreExpanded = !this.scoreExpanded;
-      this.removeScoreOverlay();
-      this.renderScoreTable(context, state);
-    });
-    toggleTh.appendChild(toggleBtn);
+    if (!isGameOver) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = "hearts-score-toggle";
+      toggleBtn.textContent = this.scoreExpanded ? "▾" : "▸";
+      toggleBtn.addEventListener("click", () => {
+        this.scoreExpanded = !this.scoreExpanded;
+        this.removeScoreOverlay();
+        this.renderScoreTable(context, state);
+      });
+      toggleTh.appendChild(toggleBtn);
+    }
     headerRow.appendChild(toggleTh);
 
     for (const player of players) {
       const th = document.createElement("th");
       th.textContent = player;
       if (player === context.player) th.classList.add("hearts-score-me");
+      if (isGameOver && player === state.winner) th.classList.add("hearts-score-winner-col");
       headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
@@ -1491,8 +1510,8 @@ export class HeartsGameHandler {
 
     const tbody = document.createElement("tbody");
 
-    // One row per completed round when expanded
-    if (this.scoreExpanded) {
+    // One row per completed round when expanded or on game over
+    if (showAllRounds) {
       for (const round of completedRounds) {
         const row = document.createElement("tr");
         const labelTd = document.createElement("td");
@@ -1501,24 +1520,25 @@ export class HeartsGameHandler {
         for (const player of players) {
           const td = document.createElement("td");
           td.textContent = String(round.score?.[player] ?? 0);
-          if (player === context.player)
-            td.classList.add("hearts-score-me-val");
+          if (player === context.player) td.classList.add("hearts-score-me-val");
+          if (isGameOver && player === state.winner) td.classList.add("hearts-score-winner-val");
           row.appendChild(td);
         }
         tbody.appendChild(row);
       }
     }
 
-    // Summary row — totals (labelled "Total" when expanded, blank when collapsed)
+    // Summary row — totals (labelled "Total" when expanded/game-over, blank when collapsed)
     const totalRow = document.createElement("tr");
-    if (this.scoreExpanded) totalRow.className = "hearts-score-total";
+    if (showAllRounds) totalRow.className = "hearts-score-total";
     const totalLabel = document.createElement("td");
-    totalLabel.textContent = this.scoreExpanded ? "Total" : "";
+    totalLabel.textContent = showAllRounds ? "Total" : "";
     totalRow.appendChild(totalLabel);
     for (const player of players) {
       const td = document.createElement("td");
       td.textContent = String(totalScore[player] ?? 0);
       if (player === context.player) td.classList.add("hearts-score-me-val");
+      if (isGameOver && player === state.winner) td.classList.add("hearts-score-winner-val");
       totalRow.appendChild(td);
     }
     tbody.appendChild(totalRow);
@@ -1595,6 +1615,26 @@ export class HeartsGameHandler {
       .hearts-score-toggle:hover {
         color: #fff;
       }
+      #hearts-score-overlay.hearts-score-gameover {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 16px 24px;
+      }
+      .hearts-score-winner-line {
+        font-family: Arial, sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        color: #ffd700;
+        text-align: center;
+        margin-bottom: 12px;
+      }
+      .hearts-score-winner-col {
+        color: #ffd700;
+      }
+      .hearts-score-winner-val {
+        color: #ffd700;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -1632,19 +1672,21 @@ export class HeartsGameHandler {
       },
     });
 
-    const titleText = state.quit
+    const isQuit = state.quit;
+
+    const titleText = isQuit
       ? (state.quitBy ? `${state.quitBy} quit the game` : "Game Quit")
       : "Game Over";
     const title = new Text({ text: titleText, style });
-    title.anchor.set(0.5);
+    title.anchor.set(0.5, isQuit ? 0.5 : 0);
     title.x = this.app.screen.width / 2;
-    title.y = this.app.screen.height / 2 - 60;
+    title.y = isQuit ? this.app.screen.height / 2 - 60 : 20;
     this.app.stage.addChild(title);
 
     const exitBtn = new Text({ text: "Exit", style: subStyle });
-    exitBtn.anchor.set(0.5);
+    exitBtn.anchor.set(0.5, isQuit ? 0.5 : 1);
     exitBtn.x = this.app.screen.width / 2;
-    exitBtn.y = this.app.screen.height / 2 + 60;
+    exitBtn.y = isQuit ? this.app.screen.height / 2 + 60 : this.app.screen.height - 20;
     exitBtn.eventMode = "static";
     exitBtn.cursor = "pointer";
     exitBtn.on("pointerdown", () => {
