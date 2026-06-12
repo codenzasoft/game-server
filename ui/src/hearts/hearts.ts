@@ -1274,7 +1274,7 @@ export class HeartsGameHandler {
 
     const items: { label: string; action: () => void }[] = [
       { label: "Save and Exit", action: () => { window.location.href = "/"; } },
-      { label: "Abandon Game",  action: () => { this.sendQuit(); window.location.href = "/"; } },
+      { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
     ];
 
     for (const item of items) {
@@ -1601,7 +1601,13 @@ export class HeartsGameHandler {
 
   // ── Game over ──────────────────────────────────────────────────────────────
 
-  private renderGameOver(_context: HeartsContext, state: HeartsState) {
+  private renderGameOver(context: HeartsContext, state: HeartsState) {
+    // If this player quit, navigate home now that the server has confirmed the quit
+    // and persisted quitAt — so the index page won't show a stale active game.
+    if (state.quit && state.quitBy === context.player) {
+      window.location.href = "/";
+      return;
+    }
     const style = new TextStyle({
       fontFamily: "Arial",
       fontSize: 56,

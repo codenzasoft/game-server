@@ -315,8 +315,8 @@ public class GameService {
     if (!game.isComplete()) {
       game.setQuitAt(new Date());
       gamesRepository.save(game);
-      gameCache.removeGame(gameId);
     }
+    gameCache.removeGame(gameId);
   }
 
   /**
@@ -498,8 +498,8 @@ public class GameService {
             .withId(entity.getId())
             .withPlayers(players)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
-            .addListener(heartsBroadcastService)
-            .addListener(heartsPersistenceService);
+            .addListener(heartsPersistenceService)
+            .addListener(heartsBroadcastService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
@@ -518,8 +518,8 @@ public class GameService {
             .withPlayers(players)
             .withRestoredState(state)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
-            .addListener(heartsBroadcastService)
-            .addListener(heartsPersistenceService);
+            .addListener(heartsPersistenceService)
+            .addListener(heartsBroadcastService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
