@@ -174,7 +174,7 @@ public class HeartsPersistenceService implements HeartsListener {
 
     log.debug("Reconstructed {} rounds for game {}", rounds.size(), gameId);
     return Optional.of(
-        new HeartsState(playerNames, Collections.unmodifiableList(rounds), false, false, null));
+        new HeartsState(playerNames, Collections.unmodifiableList(rounds), false, null));
   }
 
   private RoundState buildRoundState(
