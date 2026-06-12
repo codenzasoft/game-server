@@ -427,6 +427,13 @@ export class HeartsGameHandler {
     });
   }
 
+  private sendAgain() {
+    this.stompClient.publish({
+      destination: `/games/hearts/${this.gameId}/again`,
+      body: "",
+    });
+  }
+
   private sendStart() {
     this.stompClient.publish({
       destination: `/games/hearts/${this.gameId}/start`,
@@ -466,6 +473,11 @@ export class HeartsGameHandler {
     const { context, state } = message;
     const prevMessage = this.lastMessage;
     this.lastMessage = message;
+
+    if (context.nextGameId) {
+      window.location.href = `/games/hearts/${context.nextGameId}`;
+      return;
+    }
 
     // If pass phase ended, clear any stale pass selections
     if (!context.passingRequired) {
@@ -1685,7 +1697,7 @@ export class HeartsGameHandler {
 
     const exitBtn = new Text({ text: "Exit", style: subStyle });
     exitBtn.anchor.set(0.5, isQuit ? 0.5 : 1);
-    exitBtn.x = this.app.screen.width / 2;
+    exitBtn.x = isQuit ? this.app.screen.width / 2 : this.app.screen.width / 2 + 80;
     exitBtn.y = isQuit ? this.app.screen.height / 2 + 60 : this.app.screen.height - 20;
     exitBtn.eventMode = "static";
     exitBtn.cursor = "pointer";
@@ -1693,5 +1705,16 @@ export class HeartsGameHandler {
       window.location.href = "/";
     });
     this.app.stage.addChild(exitBtn);
+
+    if (!isQuit) {
+      const againBtn = new Text({ text: "Play Again", style: subStyle });
+      againBtn.anchor.set(0.5, 1);
+      againBtn.x = this.app.screen.width / 2 - 80;
+      againBtn.y = this.app.screen.height - 20;
+      againBtn.eventMode = "static";
+      againBtn.cursor = "pointer";
+      againBtn.on("pointerdown", () => this.sendAgain());
+      this.app.stage.addChild(againBtn);
+    }
   }
 }

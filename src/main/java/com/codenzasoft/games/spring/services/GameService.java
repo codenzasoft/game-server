@@ -195,6 +195,19 @@ public class GameService {
     return game;
   }
 
+  @Transactional
+  public HeartsGameEntity createNextHeartsGame(final HeartsGame currentGame) {
+    final List<UserEntity> players =
+        currentGame.getPlayers().stream()
+            .map(player -> usersRepository.findById(player.id()).orElseThrow())
+            .toList();
+    players.stream().filter(u -> !u.isBot()).forEach(this::enforceGameLimit);
+    final HeartsGameEntity game = new HeartsGameEntity(UUID.randomUUID());
+    game.setPlayers(players);
+    heartsGameRepository.save(game);
+    return game;
+  }
+
   /**
    * Creates a new game with assigned {@link Piece}s. Must specify at least a single {@link
    * UserEntity}. A bot will be added as needed.
