@@ -854,6 +854,36 @@ export class HeartsGameHandler {
     });
   }
 
+  private animateDealCard(
+    sprite: Sprite,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    toW: number,
+    toH: number,
+    duration: number,
+  ): Promise<void> {
+    const fromW = sprite.width;
+    const fromH = sprite.height;
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const tick = () => {
+        const t = Math.min((performance.now() - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        sprite.x = fromX + (toX - fromX) * ease;
+        sprite.y = fromY + (toY - fromY) * ease;
+        sprite.width = fromW + (toW - fromW) * ease;
+        sprite.height = fromH + (toH - fromH) * ease;
+        if (t >= 1) {
+          this.app.ticker.remove(tick);
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
+  }
+
   // ── Trick win animation ────────────────────────────────────────────────────
 
   private async maybeAnimateTrickWon(
@@ -1171,17 +1201,23 @@ export class HeartsGameHandler {
         const delay = seqIdx * STAGGER_MS;
 
         let destX: number, destY: number;
+        let targetW: number, targetH: number;
         if (playerName === context.player) {
           const idx = playerCardIdx++;
           [destX, destY] = playerDests[idx];
+          targetW = cw;
+          targetH = ch;
         } else {
           [destX, destY] = opponentDests[playerName] ?? [sw / 2, sh / 2];
+          targetW = this.oppCardW;
+          targetH = this.oppCardH;
         }
-        const texture = this.cardBackTexture!;
 
-        const sprite = new Sprite(texture);
-        sprite.width = playerName === context.player ? cw : this.oppCardW;
-        sprite.height = playerName === context.player ? ch : this.oppCardH;
+        const deckCardW = Math.round(this.oppCardW * 0.65);
+        const deckCardH = Math.round(this.oppCardH * 0.65);
+        const sprite = new Sprite(this.cardBackTexture!);
+        sprite.width = deckCardW;
+        sprite.height = deckCardH;
         sprite.anchor.set(0.5, 0.5);
         sprite.x = deckX;
         sprite.y = deckY;
@@ -1191,9 +1227,9 @@ export class HeartsGameHandler {
           new Promise<void>((resolve) => {
             window.setTimeout(() => {
               playDealSound();
-              void this.animateCard(sprite, deckX, deckY, destX, destY, FLIGHT_MS).then(
-                resolve,
-              );
+              void this.animateDealCard(
+                sprite, deckX, deckY, destX, destY, targetW, targetH, FLIGHT_MS,
+              ).then(resolve);
             }, delay);
           }),
         );
