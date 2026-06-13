@@ -185,6 +185,10 @@ const BASE_CARD_H = 112;
 const BASE_ARC_RADIUS = 1800;
 const ANGLE_STEP = Math.PI / 80; // ~2.25° between adjacent cards
 
+const OPP_BASE_CARD_W = 44;
+const OPP_BASE_CARD_H = 62;
+const OPP_BASE_ARC_RADIUS = 600;
+
 // ── HeartsGameHandler ────────────────────────────────────────────────────────
 
 export class HeartsGameHandler {
@@ -253,6 +257,18 @@ export class HeartsGameHandler {
 
   private get arcRadius(): number {
     return Math.round(BASE_ARC_RADIUS * this.cardScale);
+  }
+
+  private get oppCardW(): number {
+    return Math.round(OPP_BASE_CARD_W * this.cardScale);
+  }
+
+  private get oppCardH(): number {
+    return Math.round(OPP_BASE_CARD_H * this.cardScale);
+  }
+
+  private get oppArcRadius(): number {
+    return Math.round(OPP_BASE_ARC_RADIUS * this.cardScale);
   }
 
   private setupResizeHandler() {
@@ -595,36 +611,84 @@ export class HeartsGameHandler {
     const positions = this.compassPositions(myIdx, state.players);
     const round = state.rounds[state.rounds.length - 1];
 
-    const style = new TextStyle({
-      fontFamily: "Arial",
-      fontSize: 16,
-      fill: "#ccffcc",
-    });
-
     for (const { name, pos } of positions) {
       if (name === context.player) continue;
       const handSize = this.getOpponentHandSize(name, round);
-      const label = new Text({ text: `${name} (${handSize})`, style });
-
-      switch (pos) {
-        case "N":
-          label.anchor.set(0.5, 0);
-          label.x = this.app.screen.width / 2;
-          label.y = 16;
-          break;
-        case "W":
-          label.anchor.set(0, 0.5);
-          label.x = 16;
-          label.y = this.app.screen.height / 2;
-          break;
-        case "E":
-          label.anchor.set(1, 0.5);
-          label.x = this.app.screen.width - 16;
-          label.y = this.app.screen.height / 2;
-          break;
-      }
-      this.app.stage.addChild(label);
+      this.renderOpponentArc(name, pos as "N" | "W" | "E", handSize);
     }
+  }
+
+  private renderOpponentArc(name: string, pos: "N" | "W" | "E", cardCount: number) {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const ocw = this.oppCardW;
+    const och = this.oppCardH;
+    const R = this.oppArcRadius;
+    const TOP_MARGIN = 50;
+    const SIDE_MARGIN = 16;
+
+    if (this.cardBackTexture && cardCount > 0) {
+      const container = new Container();
+      container.filters = [
+        new DropShadowFilter({ alpha: 0.5, blur: 3, distance: 3, padding: 20 }),
+      ];
+
+      for (let i = 0; i < cardCount; i++) {
+        const θ = (i - (cardCount - 1) / 2) * ANGLE_STEP;
+        const sprite = new Sprite(this.cardBackTexture);
+        sprite.width = ocw;
+        sprite.height = och;
+        sprite.anchor.set(0.5, 0.5);
+
+        switch (pos) {
+          case "N": {
+            const arcCenterY = TOP_MARGIN + och / 2 - R;
+            sprite.x = sw / 2 + R * Math.sin(θ);
+            sprite.y = arcCenterY + R * Math.cos(θ);
+            sprite.rotation = -θ;
+            break;
+          }
+          case "W": {
+            const arcCenterX = SIDE_MARGIN + ocw / 2 - R;
+            sprite.x = arcCenterX + R * Math.cos(θ);
+            sprite.y = sh / 2 + R * Math.sin(θ);
+            sprite.rotation = θ - Math.PI / 2;
+            break;
+          }
+          case "E": {
+            const arcCenterX = sw - SIDE_MARGIN - ocw / 2 + R;
+            sprite.x = arcCenterX - R * Math.cos(θ);
+            sprite.y = sh / 2 + R * Math.sin(θ);
+            sprite.rotation = Math.PI / 2 - θ;
+            break;
+          }
+        }
+        container.addChild(sprite);
+      }
+      this.app.stage.addChild(container);
+    }
+
+    const style = new TextStyle({ fontFamily: "Arial", fontSize: 14, fill: "#ccffcc" });
+    const label = new Text({ text: name, style });
+
+    switch (pos) {
+      case "N":
+        label.anchor.set(0.5, 0);
+        label.x = sw / 2;
+        label.y = TOP_MARGIN + och + 4;
+        break;
+      case "W":
+        label.anchor.set(0, 0.5);
+        label.x = SIDE_MARGIN + ocw / 2 + och / 2 + 6;
+        label.y = sh / 2;
+        break;
+      case "E":
+        label.anchor.set(1, 0.5);
+        label.x = sw - SIDE_MARGIN - ocw / 2 - och / 2 - 6;
+        label.y = sh / 2;
+        break;
+    }
+    this.app.stage.addChild(label);
   }
 
   private getOpponentHandSize(player: string, round: RoundState): number {
@@ -1048,7 +1112,6 @@ export class HeartsGameHandler {
     this.clearScene();
     this.renderScoreTable(context, state);
     this.renderStatus(this.buildStatusText(context, state, round));
-    this.renderOpponents(context, state);
 
     const myIdx = state.players.indexOf(context.player);
     const positions = this.compassPositions(myIdx, state.players);
@@ -1064,19 +1127,23 @@ export class HeartsGameHandler {
       return [arcCenterX + ar * Math.sin(angle), arcCenterY - ar * Math.cos(angle)];
     });
 
-    // Opponent cards land near their label (face-down), partially visible at edges
+    // Opponent cards land at the center of their arc (face-down)
+    const ocw = this.oppCardW;
+    const och = this.oppCardH;
+    const OPP_TOP = 50;
+    const OPP_SIDE = 16;
     const opponentDests: Record<string, [number, number]> = {};
     for (const { name, pos } of positions) {
       if (name === context.player) continue;
       switch (pos) {
         case "N":
-          opponentDests[name] = [sw / 2, ch / 2 + 8];
+          opponentDests[name] = [sw / 2, OPP_TOP + och / 2];
           break;
         case "W":
-          opponentDests[name] = [cw / 2 + 8, sh / 2];
+          opponentDests[name] = [OPP_SIDE + ocw / 2, sh / 2];
           break;
         case "E":
-          opponentDests[name] = [sw - cw / 2 - 8, sh / 2];
+          opponentDests[name] = [sw - OPP_SIDE - ocw / 2, sh / 2];
           break;
       }
     }
@@ -1104,19 +1171,17 @@ export class HeartsGameHandler {
         const delay = seqIdx * STAGGER_MS;
 
         let destX: number, destY: number;
-        let texture: Texture;
         if (playerName === context.player) {
           const idx = playerCardIdx++;
           [destX, destY] = playerDests[idx];
-          texture = this.getTexture(sortedHand[idx])!;
         } else {
           [destX, destY] = opponentDests[playerName] ?? [sw / 2, sh / 2];
-          texture = this.cardBackTexture!;
         }
+        const texture = this.cardBackTexture!;
 
         const sprite = new Sprite(texture);
-        sprite.width = cw;
-        sprite.height = ch;
+        sprite.width = playerName === context.player ? cw : this.oppCardW;
+        sprite.height = playerName === context.player ? ch : this.oppCardH;
         sprite.anchor.set(0.5, 0.5);
         sprite.x = deckX;
         sprite.y = deckY;
