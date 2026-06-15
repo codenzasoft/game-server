@@ -2,6 +2,7 @@ package com.codenzasoft.games.kingshand;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A playable card. Carries its play requirements ({@code staffRequirement}, {@code
@@ -13,16 +14,73 @@ import java.util.List;
  *
  * <p>The effects list is defensively copied at construction so callers can't mutate it after the
  * fact.
+ *
+ * <p><b>Great Work cards</b> carry additional fields that describe their multi-season construction
+ * lifecycle. A {@code constructionPeriod > 0} identifies a card as a Great Work under construction.
+ * {@link #completedCard()} is the permanent card that replaces it once construction finishes. For
+ * regular cards all of these fields default to their zero/null/empty values and the card simply
+ * returns itself from {@link #resolvedCompletedCard()}.
  */
 public record Card(
     String name,
     double staffRequirement,
     double productionRequirement,
     FrequencyType frequencyType,
-    List<Effect> effects) {
+    List<Effect> effects,
+    /** Number of successful construction seasons required to complete; 0 for normal cards. */
+    int constructionPeriod,
+    /**
+     * The card that permanently replaces this one when construction completes. {@code null} for
+     * normal cards — {@link #resolvedCompletedCard()} returns {@code this} in that case.
+     */
+    Card completedCard,
+    /** Resource types unlocked when this Great Work completes; empty for most cards. */
+    Set<ResourceTarget> unlocksResources,
+    /** {@code true} for the four seasonal win-condition Great Works. */
+    boolean winCondition,
+    /** Which season's table this Great Work belongs to; {@code null} for normal cards. */
+    Season tableSlot) {
 
   public Card {
     effects = effects == null ? List.of() : List.copyOf(effects);
+    unlocksResources = unlocksResources == null ? Set.of() : Set.copyOf(unlocksResources);
+    constructionPeriod = Math.max(0, constructionPeriod);
+  }
+
+  /**
+   * Convenience constructor for regular (non-great-work) cards. All Great Work fields default to
+   * their zero/null/empty values.
+   */
+  public Card(
+      String name,
+      double staffRequirement,
+      double productionRequirement,
+      FrequencyType frequencyType,
+      List<Effect> effects) {
+    this(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        effects,
+        0,
+        null,
+        Set.of(),
+        false,
+        null);
+  }
+
+  /** Returns {@code true} if this is a Great Work under-construction card. */
+  public boolean isGreatWork() {
+    return constructionPeriod > 0;
+  }
+
+  /**
+   * The card that replaces this one when construction completes. For regular cards (where {@link
+   * #completedCard()} is {@code null}), returns {@code this} — normal cards resolve to themselves.
+   */
+  public Card resolvedCompletedCard() {
+    return completedCard != null ? completedCard : this;
   }
 
   /**
@@ -43,7 +101,17 @@ public record Card(
                         ? new Effect(e.target(), e.modifier() + delta, e.valueType())
                         : e)
             .toList();
-    return new Card(name, staffRequirement, productionRequirement, frequencyType, boosted);
+    return new Card(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        boosted,
+        constructionPeriod,
+        completedCard,
+        unlocksResources,
+        winCondition,
+        tableSlot);
   }
 
   /**
@@ -56,7 +124,16 @@ public record Card(
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
     return new Card(
-        upgradedName, staffRequirement, productionRequirement, frequencyType, amplified);
+        upgradedName,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        amplified,
+        constructionPeriod,
+        completedCard,
+        unlocksResources,
+        winCondition,
+        tableSlot);
   }
 
   /**
@@ -67,6 +144,25 @@ public record Card(
    *
    * @param other the hand card being played onto this table card
    */
+  /**
+   * Returns a new {@link Card} identical to this one but with {@link #constructionPeriod()} set to
+   * {@code period}. Used by the engine during {@link Phase#PLAY} resolution to track per-season
+   * construction progress in-place on the table card.
+   */
+  public Card withConstructionPeriod(int period) {
+    return new Card(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        effects,
+        Math.max(0, period),
+        completedCard,
+        unlocksResources,
+        winCondition,
+        tableSlot);
+  }
+
   public Card mergeWith(Card other) {
     List<Effect> merged = new ArrayList<>(effects.size());
     for (int i = 0; i < effects.size(); i++) {
@@ -80,6 +176,16 @@ public record Card(
       }
     }
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
-    return new Card(upgradedName, staffRequirement, productionRequirement, frequencyType, merged);
+    return new Card(
+        upgradedName,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        merged,
+        constructionPeriod,
+        completedCard,
+        unlocksResources,
+        winCondition,
+        tableSlot);
   }
 }

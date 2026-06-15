@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.LinkedHashMap;
 
 /**
  * Pure data carrier for a King's Hand game. All rule-based mutations live in {@link GameEngine};
@@ -42,8 +41,6 @@ public class GameState {
   private List<CardStaffing> tableStaffing;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
-  // great work tracking
-  private Map<String, GreatWorkState> greatWorkStates;
   // new resource types — both start locked at 0
   private double gold;
   private double strength;
@@ -72,7 +69,6 @@ public class GameState {
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
-    this.greatWorkStates = b.greatWorkStates;
     this.gold = b.gold;
     this.strength = b.strength;
     this.goldUnlocked = b.goldUnlocked;
@@ -331,17 +327,6 @@ public class GameState {
     this.resolutionLog = log == null ? List.of() : List.copyOf(log);
   }
 
-  // ----- Great Work state -----
-
-  /**
-   * Mutable map from Great Work name to its per-game {@link GreatWorkState}. Populated as the
-   * player commissions Great Works; never {@code null} but may be empty.
-   */
-  @JsonProperty("greatWorkStates")
-  public Map<String, GreatWorkState> getGreatWorkStates() {
-    return greatWorkStates;
-  }
-
   @JsonProperty("gold")
   public double getGold() {
     return gold;
@@ -390,8 +375,8 @@ public class GameState {
 
   /**
    * Events emitted during the most recent {@link Phase#PLAY} resolution relating to Great Works
-   * (e.g. {@code "TREASURY_COMPLETED"}, {@code "THE_GREAT_GRANARY_PERIOD_DECREMENTED:5"}).
-   * Empty between seasons. Cleared at the start of each {@code endAndRun}.
+   * (e.g. {@code "TREASURY_COMPLETED"}, {@code "THE_GREAT_RESERVOIR_PERIOD_DECREMENTED:5"}). Empty
+   * between seasons. Cleared at the start of each {@code endAndRun}.
    */
   @JsonProperty("greatWorkLog")
   public List<String> getGreatWorkLog() {
@@ -422,7 +407,6 @@ public class GameState {
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
-    private Map<String, GreatWorkState> greatWorkStates = new LinkedHashMap<>();
     private double gold = 0.0;
     private double strength = 0.0;
     private boolean goldUnlocked = false;
@@ -522,12 +506,6 @@ public class GameState {
 
     public Builder resolutionLog(List<ResolutionStep> resolutionLog) {
       this.resolutionLog = resolutionLog == null ? List.of() : new ArrayList<>(resolutionLog);
-      return this;
-    }
-
-    public Builder greatWorkStates(Map<String, GreatWorkState> greatWorkStates) {
-      this.greatWorkStates =
-          greatWorkStates == null ? new LinkedHashMap<>() : new LinkedHashMap<>(greatWorkStates);
       return this;
     }
 

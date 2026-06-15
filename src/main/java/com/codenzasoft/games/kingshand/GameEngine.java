@@ -8,10 +8,9 @@ import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhNotification;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -57,7 +56,6 @@ public class GameEngine implements Game<GameEngine> {
     private GameState state;
     private CardCatalog cardCatalog;
     private EventCatalog eventCatalog;
-    private GreatWorkCatalog greatWorkCatalog;
     private Random rng;
     private final List<KhObserver> listeners = new ArrayList<>();
     private Executor executor;
@@ -87,11 +85,6 @@ public class GameEngine implements Game<GameEngine> {
       return this;
     }
 
-    public Builder withGreatWorkCatalog(final GreatWorkCatalog greatWorkCatalog) {
-      this.greatWorkCatalog = greatWorkCatalog;
-      return this;
-    }
-
     public Builder withRng(final Random rng) {
       this.rng = rng;
       return this;
@@ -114,7 +107,6 @@ public class GameEngine implements Game<GameEngine> {
           state,
           cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
           eventCatalog != null ? eventCatalog : EventCatalog.defaultCatalog(),
-          greatWorkCatalog != null ? greatWorkCatalog : GreatWorkCatalog.defaultCatalog(),
           rng != null ? rng : new Random(),
           listeners,
           executor != null ? executor : Runnable::run);
@@ -126,24 +118,13 @@ public class GameEngine implements Game<GameEngine> {
   private final GameState state;
   private final CardCatalog cardCatalog;
   private final EventCatalog eventCatalog;
-  private final GreatWorkCatalog greatWorkCatalog;
   private final Random rng;
   private final List<KhObserver> listeners;
   private final Executor executor;
 
-  /**
-   * Primary constructor — all fields injected. Prefer this form in tests so that the random
-   * selection is reproducible via a seeded {@link Random}.
-   */
+  /** Convenience constructor for tests: injects state, event catalog, and RNG. */
   public GameEngine(GameState state, EventCatalog eventCatalog, Random rng) {
-    this(
-        null,
-        null,
-        state,
-        CardCatalog.defaultCatalog(),
-        eventCatalog,
-        GreatWorkCatalog.defaultCatalog(),
-        rng);
+    this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, rng);
   }
 
   /** Constructor for restoring a persisted game with its id and player. */
@@ -154,7 +135,6 @@ public class GameEngine implements Game<GameEngine> {
         state,
         CardCatalog.defaultCatalog(),
         EventCatalog.defaultCatalog(),
-        GreatWorkCatalog.defaultCatalog(),
         new Random());
   }
 
@@ -166,28 +146,7 @@ public class GameEngine implements Game<GameEngine> {
       CardCatalog cardCatalog,
       EventCatalog eventCatalog,
       Random rng) {
-    this(
-        id,
-        player,
-        state,
-        cardCatalog,
-        eventCatalog,
-        GreatWorkCatalog.defaultCatalog(),
-        rng,
-        List.of(),
-        Runnable::run);
-  }
-
-  /** Full constructor with all dependencies injected, including great works, no listeners. */
-  GameEngine(
-      UUID id,
-      Player player,
-      GameState state,
-      CardCatalog cardCatalog,
-      EventCatalog eventCatalog,
-      GreatWorkCatalog greatWorkCatalog,
-      Random rng) {
-    this(id, player, state, cardCatalog, eventCatalog, greatWorkCatalog, rng, List.of(), Runnable::run);
+    this(id, player, state, cardCatalog, eventCatalog, rng, List.of(), Runnable::run);
   }
 
   /** Full constructor with all dependencies injected, including listeners and an executor. */
@@ -197,31 +156,18 @@ public class GameEngine implements Game<GameEngine> {
       GameState state,
       CardCatalog cardCatalog,
       EventCatalog eventCatalog,
-      GreatWorkCatalog greatWorkCatalog,
       Random rng,
       List<KhObserver> listeners,
       Executor executor) {
-    if (state == null) {
-      throw new IllegalArgumentException("state cannot be null");
-    }
-    if (cardCatalog == null) {
-      throw new IllegalArgumentException("catalog cannot be null");
-    }
-    if (eventCatalog == null) {
-      throw new IllegalArgumentException("catalog cannot be null");
-    }
-    if (greatWorkCatalog == null) {
-      throw new IllegalArgumentException("greatWorkCatalog cannot be null");
-    }
-    if (rng == null) {
-      throw new IllegalArgumentException("rng cannot be null");
-    }
+    if (state == null) throw new IllegalArgumentException("state cannot be null");
+    if (cardCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
+    if (eventCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
+    if (rng == null) throw new IllegalArgumentException("rng cannot be null");
     this.id = id;
     this.player = player;
     this.state = state;
     this.cardCatalog = cardCatalog;
     this.eventCatalog = eventCatalog;
-    this.greatWorkCatalog = greatWorkCatalog;
     this.rng = rng;
     this.listeners = listeners == null ? List.of() : List.copyOf(listeners);
     this.executor = executor != null ? executor : Runnable::run;
@@ -551,21 +497,14 @@ public class GameEngine implements Game<GameEngine> {
       Card card = snapshot.get(i);
       StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
 
-      // ── Check whether this slot holds a Great Work under-construction card ──
-      GreatWork gw = greatWorkCatalog.findByConstructionCardName(card.name());
-      GreatWorkState gwState =
-          (gw != null) ? state.getGreatWorkStates().get(gw.name()) : null;
-      boolean isGreatWorkConstruction =
-          gwState != null && gwState.isCommissioned() && !gwState.isCompleted();
-
       double popBefore = state.getPopulation();
       double prodBefore = state.getProduction();
       double foodBefore = state.getFood();
       double capBefore = state.getPopulationCap();
 
-      if (isGreatWorkConstruction) {
-        // Great-work construction cards are never discarded from the table and never run normal
-        // effects. They only attempt to progress construction when fully staffed.
+      if (card.isGreatWork()) {
+        // Construction cards are never discarded and never run normal effects.
+        // They only progress when fully staffed and all construction costs are affordable.
         if (tier == StaffingTier.FULL && canAffordConstructionCosts(card.effects())) {
           // Apply the per-season construction costs.
           for (Effect effect : card.effects()) {
@@ -575,42 +514,38 @@ public class GameEngine implements Game<GameEngine> {
                 case FOOD -> applyFood(effect.apply(state.getFood()));
                 case GOLD -> applyGold(effect.apply(state.getGold()));
                 case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-                default -> {} // POPULATION / POPULATION_CAP not used as construction costs
+                default -> {}
               }
             }
           }
-          gwState.decrementPeriod();
 
-          if (gwState.getRemainingPeriod() == 0) {
-            // ── Great Work COMPLETED ─────────────────────────────────────────
-            gwState.setCompleted(true);
-            // Replace the under-construction card with the completed card in both
-            // the snapshot (so subsequent engine passes see it) and the live table.
-            Card completedCard = gw.completedCard();
+          int newPeriod = card.constructionPeriod() - 1;
+          if (newPeriod == 0) {
+            // ── Construction COMPLETE — swap for the completed card ──────────
+            Card completedCard = card.completedCard();
             snapshot.set(i, completedCard);
             liveTable.set(i - discardedCount, completedCard);
-
             // Unlock any new resource types.
-            for (ResourceTarget resource : gw.unlocksResources()) {
+            for (ResourceTarget resource : card.unlocksResources()) {
               if (resource == ResourceTarget.GOLD && !state.isGoldUnlocked()) {
                 state.setGoldUnlocked(true);
-                gwLog.add(gw.name() + "_UNLOCKED_GOLD");
+                gwLog.add(card.name() + "_UNLOCKED_GOLD");
               } else if (resource == ResourceTarget.STRENGTH && !state.isStrengthUnlocked()) {
                 state.setStrengthUnlocked(true);
-                gwLog.add(gw.name() + "_UNLOCKED_STRENGTH");
+                gwLog.add(card.name() + "_UNLOCKED_STRENGTH");
               }
             }
-            gwLog.add(gw.name() + "_COMPLETED");
-
-            // Check win condition after every completion.
+            gwLog.add(card.name() + "_COMPLETED");
             checkWinCondition();
           } else {
-            gwLog.add(
-                gw.name() + "_PERIOD_DECREMENTED:" + gwState.getRemainingPeriod());
+            // Decrement: replace the card on the table with the same card minus one period.
+            Card decremented = card.withConstructionPeriod(newPeriod);
+            snapshot.set(i, decremented);
+            liveTable.set(i - discardedCount, decremented);
+            gwLog.add(card.name() + "_PERIOD_DECREMENTED:" + newPeriod);
           }
         } else {
-          // Understaffed or cannot afford — no progress, no resource drain.
-          gwLog.add(gw.name() + "_CONSTRUCTION_STALLED");
+          gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
         }
 
         log.add(
@@ -909,9 +844,9 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Returns {@code true} if any of the card's effects target a resource that has not yet been
-   * unlocked ({@link ResourceTarget#GOLD} before TREASURY completion, or
-   * {@link ResourceTarget#STRENGTH} before BARRACKS completion). Such cards are suppressed from
-   * the ADD-phase offer until the corresponding Great Work is finished.
+   * unlocked ({@link ResourceTarget#GOLD} before TREASURY completion, or {@link
+   * ResourceTarget#STRENGTH} before BARRACKS completion). Such cards are suppressed from the
+   * ADD-phase offer until the corresponding Great Work is finished.
    */
   private boolean cardRequiresLockedResource(Card card) {
     for (Effect effect : card.effects()) {
@@ -1236,8 +1171,8 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void commissionGreatWork(String name) {
     requirePhase(Phase.PLAY, "commissionGreatWork");
 
-    GreatWork gw = greatWorkCatalog.get(name);
-    if (gw == null) {
+    Card gw = cardCatalog.getByName(name);
+    if (gw == null || !gw.isGreatWork()) {
       throw new IllegalArgumentException("no great work with name: " + name);
     }
 
@@ -1252,23 +1187,24 @@ public class GameEngine implements Game<GameEngine> {
               + " table");
     }
 
-    Map<String, GreatWorkState> gwStates = state.getGreatWorkStates();
-    GreatWorkState existing = gwStates.get(name);
-    if (existing != null && existing.isCommissioned()) {
-      throw new IllegalStateException(
-          "great work already "
-              + (existing.isCompleted() ? "completed" : "under construction")
-              + ": "
-              + name);
+    // Already commissioned (construction card on table) or already completed (completed card on
+    // table).
+    List<Card> targetTable = state.getBoard().get(gw.tableSlot());
+    Set<String> tableNames = new java.util.HashSet<>();
+    for (Card c : targetTable) tableNames.add(c.name());
+    boolean alreadyPresent =
+        tableNames.contains(gw.name())
+            || (gw.completedCard() != null && tableNames.contains(gw.completedCard().name()));
+    if (alreadyPresent) {
+      throw new IllegalStateException("great work already commissioned or completed: " + name);
     }
 
-    List<Card> table = state.getCurrentTable();
-    if (table.size() >= MAX_TABLE_SIZE) {
-      throw new IllegalStateException(state.getCurSeason() + " table is full");
+    if (targetTable.size() >= MAX_TABLE_SIZE) {
+      throw new IllegalStateException(gw.tableSlot() + " table is full");
     }
 
     // Win-condition Great Works require both GOLD and STRENGTH to be unlocked first.
-    if (gw.isWinCondition() && (!state.isGoldUnlocked() || !state.isStrengthUnlocked())) {
+    if (gw.winCondition() && (!state.isGoldUnlocked() || !state.isStrengthUnlocked())) {
       throw new IllegalStateException(
           "commissioning "
               + name
@@ -1276,7 +1212,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // Pay the one-time commission cost.
-    double cost = gw.underConstructionCard().productionRequirement();
+    double cost = gw.productionRequirement();
     if (state.getProduction() < cost) {
       throw new IllegalStateException(
           "not enough production to commission "
@@ -1288,14 +1224,7 @@ public class GameEngine implements Game<GameEngine> {
     }
     applyProduction(state.getProduction() - cost);
 
-    // Place the under-construction card on the table.
-    state.addToTable(gw.underConstructionCard());
-
-    // Create and register the Great Work state.
-    GreatWorkState gwState = new GreatWorkState(name, gw.initialPeriod());
-    gwState.setCommissioned(true);
-    gwStates.put(name, gwState);
-
+    targetTable.add(gw);
     computeAndSetStaffing();
   }
 
@@ -1331,40 +1260,49 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Checks whether all four win-condition {@link GreatWork}s are completed and, if so, sets
-   * {@link GameState#setGameWon(boolean)} to {@code true}. Called after every Great Work completes.
+   * Checks whether all four win-condition {@link GreatWork}s are completed and, if so, sets {@link
+   * GameState#setGameWon(boolean)} to {@code true}. Called after every Great Work completes.
+   */
+  /**
+   * Sets {@link GameState#setGameWon(boolean)} to {@code true} when every win-condition card has
+   * completed. A completed win-condition card is identified by {@link Card#winCondition()} {@code
+   * == true} and {@link Card#isGreatWork()} {@code == false} (meaning it is the permanent completed
+   * version, not the construction card).
    */
   private void checkWinCondition() {
-    boolean allDone =
-        greatWorkCatalog.all().stream()
-            .filter(GreatWork::isWinCondition)
-            .allMatch(
-                gw -> {
-                  GreatWorkState s = state.getGreatWorkStates().get(gw.name());
-                  return s != null && s.isCompleted();
-                });
-    if (allDone) {
+    long completedWinConditions =
+        state.getBoard().values().stream()
+            .flatMap(List::stream)
+            .filter(c -> c.winCondition() && !c.isGreatWork())
+            .count();
+    if (completedWinConditions
+        >= CardCatalog.ALL_GREAT_WORKS.stream().filter(Card::winCondition).count()) {
       state.setGameWon(true);
     }
   }
 
   /**
-   * Returns all {@link GreatWork}s from the catalog whose {@link GreatWork#tableSlot()} matches
-   * the given season and that have not yet been commissioned. Used by clients to populate the
-   * Great Works commissioning menu.
+   * Returns all {@link GreatWork}s from the catalog whose {@link GreatWork#tableSlot()} matches the
+   * given season and that have not yet been commissioned. Used by clients to populate the Great
+   * Works commissioning menu.
    *
    * @param season the season whose available Great Works to list
    * @return Great Works available for commissioning in {@code season}
    */
-  public synchronized List<GreatWork> availableGreatWorks(Season season) {
-    Map<String, GreatWorkState> gwStates = state.getGreatWorkStates();
-    return greatWorkCatalog.all().stream()
-        .filter(gw -> gw.tableSlot() == season)
+  /**
+   * Returns Great Work construction cards available for commissioning on {@code season}'s table —
+   * i.e. cards that aren't already under construction or completed there.
+   */
+  public synchronized List<Card> availableGreatWorks(Season season) {
+    List<Card> table = state.getBoard().get(season);
+    Set<String> tableNames = new java.util.HashSet<>();
+    for (Card c : table) tableNames.add(c.name());
+    return cardCatalog.greatWorksForSeason(season).stream()
         .filter(
-            gw -> {
-              GreatWorkState s = gwStates.get(gw.name());
-              return s == null || !s.isCommissioned();
-            })
+            gw ->
+                !tableNames.contains(gw.name())
+                    && (gw.completedCard() == null
+                        || !tableNames.contains(gw.completedCard().name())))
         .toList();
   }
 
