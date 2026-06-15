@@ -79,3 +79,9 @@ export function playSlideCardSound(): void {
 export function playPassSound(): void {
   void playWav(swooshCache, "/audio/hearts/swoosh.wav");
 }
+
+const applauseCache = { buf: null as AudioBuffer | null };
+
+export function playApplauseSound(): void {
+  void playWav(applauseCache, "/audio/hearts/lightapplause.mp3");
+}

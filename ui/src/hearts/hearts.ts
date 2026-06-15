@@ -10,7 +10,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
-import { playDealSound, playCardPlaySound, playSlideCardSound, playPassSound } from "./sounds";
+import { playDealSound, playCardPlaySound, playSlideCardSound, playPassSound, playApplauseSound } from "./sounds";
 import { renderLobbyOverlay } from "../shared/lobby";
 
 const wsUrl =
@@ -524,6 +524,7 @@ export class HeartsGameHandler {
     this.renderHand(context, state, round);
     this.renderPassOverlay(context, round);
     await this.renderTrick(context, state, round, prevMessage);
+    await this.maybeShowMoonShoot(prevMessage, message);
   }
 
   private clearScene() {
@@ -942,6 +943,47 @@ export class HeartsGameHandler {
         this.animateCard(sprite, sprite.x, sprite.y, targetX, targetY, 400),
       ),
     );
+  }
+
+  // ── Moon shoot banner ────────────────────────────────────────────────────
+
+  private async maybeShowMoonShoot(
+    prevMessage: HeartsMessage | null,
+    message: HeartsMessage,
+  ): Promise<void> {
+    if (!prevMessage) return;
+    const prevRound = prevMessage.state.rounds[prevMessage.state.rounds.length - 1];
+    const curRound = message.state.rounds[message.state.rounds.length - 1];
+    if (!curRound?.complete || prevRound?.complete || !curRound.score) return;
+
+    const scores = Object.entries(curRound.score);
+    const shooter = scores.find(([, v]) => v === 0 && scores.some(([, w]) => w === 26))?.[0];
+    if (!shooter) return;
+
+    playApplauseSound();
+
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const banner = new Text({
+      text: `${shooter} shoots the moon!`,
+      style: new TextStyle({
+        fontFamily: "Arial",
+        fontSize: Math.round(28 * this.cardScale),
+        fontWeight: "bold",
+        fill: "#ffffff",
+        stroke: { color: "#000000", width: 4 },
+        dropShadow: { alpha: 0.7, blur: 6, distance: 4 },
+      }),
+    });
+    banner.anchor.set(0.5, 0.5);
+    banner.x = sw / 2;
+    banner.y = sh / 2;
+    this.app.stage.addChild(banner);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 2500));
+
+    this.app.stage.removeChild(banner);
+    banner.destroy();
   }
 
   // ── Pass received animation ───────────────────────────────────────────────
