@@ -15,13 +15,13 @@ import java.util.stream.Collectors;
  * @param players The players in clockwise order, identified by username.
  * @param rounds The state of played rounds.
  * @param isOver Whether the hearts game is over.
- * @param isQuit Whether a player has quit the game (before it was over).
+ * @param quitBy The name of the player who quit, or {@code null} if no one has quit.
  */
 public record HeartsState(
     @JsonProperty("players") List<String> players,
     @JsonProperty("rounds") List<RoundState> rounds,
     @JsonProperty("over") boolean isOver,
-    @JsonProperty("quit") boolean isQuit) {
+    @JsonInclude(JsonInclude.Include.NON_NULL) @JsonProperty("quitBy") String quitBy) {
 
   private static class IseSupplier implements Supplier<IllegalStateException> {
 
@@ -37,8 +37,13 @@ public record HeartsState(
     }
   }
 
+  @JsonProperty("quit")
+  public boolean isQuit() {
+    return quitBy() != null;
+  }
+
   public static HeartsState with(final List<String> players) {
-    return new HeartsState(players, List.of(), false, false);
+    return new HeartsState(players, List.of(), false, null);
   }
 
   public String getPlayerRelativeTo(final String player, final Pass pass) {
@@ -51,11 +56,11 @@ public record HeartsState(
   }
 
   public HeartsState setOver() {
-    return new HeartsState(players(), rounds(), true, false);
+    return new HeartsState(players(), rounds(), true, null);
   }
 
-  public HeartsState setQuit() {
-    return new HeartsState(players(), rounds(), false, true);
+  public HeartsState setQuit(final String quitter) {
+    return new HeartsState(players(), rounds(), false, quitter);
   }
 
   HeartsState startNewRound(final String dealer, final Map<String, List<Card>> deal) {
@@ -81,7 +86,7 @@ public record HeartsState(
         RoundState.with(rounds().size() + 1, nextPass, dealer, immutableDeal);
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.add(nextRound);
-    return new HeartsState(players(), nextRounds, isOver(), isQuit());
+    return new HeartsState(players(), nextRounds, isOver(), quitBy());
   }
 
   @JsonIgnore
@@ -154,7 +159,7 @@ public record HeartsState(
     final List<RoundState> nextRounds = new ArrayList<>(rounds);
     nextRounds.remove(nextRounds.size() - 1);
     nextRounds.add(replacement);
-    return new HeartsState(players(), nextRounds, isOver(), isQuit());
+    return new HeartsState(players(), nextRounds, isOver(), quitBy());
   }
 
   @JsonIgnore

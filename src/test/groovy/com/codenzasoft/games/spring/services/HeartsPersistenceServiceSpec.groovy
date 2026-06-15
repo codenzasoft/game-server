@@ -116,7 +116,7 @@ class HeartsPersistenceServiceSpec extends Specification {
         def deal = buildDeal(playerNames)
         def trick = new TrickState(1, playerNames[0], [])
         def round = new RoundState(1, Pass.LEFT, playerNames[0], deal, [:], true, [trick], deal)
-        def state = new HeartsState(playerNames, [round], false, false)
+        def state = new HeartsState(playerNames, [round], false, null)
         def player = entity.players[0].toPlayer()
         def card = deal[playerNames[0]][0]
 
@@ -189,7 +189,7 @@ class HeartsPersistenceServiceSpec extends Specification {
         def trick = new TrickState(1, playerNames[0], playedCards)
         def stateAfterTrick = new HeartsState(playerNames, [
             new RoundState(1, Pass.LEFT, playerNames[0], deal, [:], true, [trick], deal)
-        ], false, false)
+        ], false, null)
 
         playerNames.eachWithIndex { name, i ->
             def player = entity.players.find { it.username == name }.toPlayer()
@@ -221,7 +221,7 @@ class HeartsPersistenceServiceSpec extends Specification {
                 def completedTricks = buildCompletedTricks(playerNames, deal)
                 def completedRound = new RoundState(roundNum, expectedPass, playerNames[(roundNum - 1) % 4],
                     deal, [:], true, completedTricks, emptyHands(playerNames))
-                def completedState = new HeartsState(playerNames, [completedRound], false, false)
+                def completedState = new HeartsState(playerNames, [completedRound], false, null)
                 heartsPersistenceService.roundStarted(game, completedState)
                 completedTricks.each { trick ->
                     trick.cards().each { pc ->
@@ -253,7 +253,7 @@ class HeartsPersistenceServiceSpec extends Specification {
     private HeartsGame dummyGame(def entity) {
         def players = entity.players.collect { it.toPlayer() }
         def playerNames = players*.name()
-        def emptyState = new HeartsState(playerNames, [], false, false)
+        def emptyState = new HeartsState(playerNames, [], false, null)
         return new HeartsGame.Builder()
             .withId(entity.id)
             .withPlayers(players)
@@ -266,7 +266,7 @@ class HeartsPersistenceServiceSpec extends Specification {
                                        int roundNumber, Pass pass) {
         def round = new RoundState(roundNumber, pass, playerNames[(roundNumber - 1) % playerNames.size()],
             deal, [:], false, [], deal)
-        return new HeartsState(playerNames, [round], false, false)
+        return new HeartsState(playerNames, [round], false, null)
     }
 
     /** Deals all 52 cards evenly across the given players. */

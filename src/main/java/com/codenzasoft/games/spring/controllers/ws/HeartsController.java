@@ -97,13 +97,26 @@ public class HeartsController {
     game.get().playCard(user.get().toPlayer(), card);
   }
 
+  @MessageMapping("/hearts/{gameId}/again")
+  public void again(@DestinationVariable String gameId, Principal principal) {
+    final UUID id = UUID.fromString(gameId);
+    final Optional<HeartsGame> game = gameService.getOrBuildHeartsGame(id);
+    if (game.isEmpty()) return;
+    if (!game.get().getGameState().isOver()) {
+      log.warn("again: game {} is not over", id);
+      return;
+    }
+    final HeartsGameEntity nextGame = gameService.createNextHeartsGame(game.get());
+    heartsBroadcastService.playAgain(game.get(), game.get().getGameState(), nextGame.getId());
+  }
+
   @MessageMapping("/hearts/{gameId}/quit")
   public void quit(@DestinationVariable String gameId, Principal principal) {
     final UUID id = UUID.fromString(gameId);
     final Optional<HeartsGame> game = gameService.getOrBuildHeartsGame(id);
     final Optional<UserEntity> user = findUser(principal);
     if (game.isEmpty() || user.isEmpty()) return;
-    game.get().quit();
+    game.get().quit(user.get().toPlayer().name());
     try {
       gameService.quitGame(id, user.get());
     } catch (IllegalStateException e) {

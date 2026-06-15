@@ -109,6 +109,10 @@ public class HeartsBroadcastService implements HeartsListener {
     notifyUsers(game, state, null);
   }
 
+  public void playAgain(final HeartsGame game, final HeartsState state, final UUID nextGameId) {
+    notifyUsers(game, state, nextGameId);
+  }
+
   @Override
   public void gameOver(final HeartsGame game, final HeartsState state) {
     notifyUsers(game, state, null);

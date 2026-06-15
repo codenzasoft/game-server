@@ -127,7 +127,15 @@ public class HeartsPersistenceService implements HeartsListener {
   }
 
   @Override
-  public void gameQuit(final HeartsGame game, final HeartsState state) {}
+  @Transactional
+  public void gameQuit(final HeartsGame game, final HeartsState state) {
+    final Optional<HeartsGameEntity> maybeGame = heartsGameRepository.findById(game.getId());
+    if (maybeGame.isPresent()) {
+      final HeartsGameEntity gameEntity = maybeGame.get();
+      gameEntity.setQuitAt(new Date());
+      heartsGameRepository.save(gameEntity);
+    }
+  }
 
   @Override
   public void roundEnded(final HeartsGame game, final HeartsState state) {}
@@ -166,7 +174,7 @@ public class HeartsPersistenceService implements HeartsListener {
 
     log.debug("Reconstructed {} rounds for game {}", rounds.size(), gameId);
     return Optional.of(
-        new HeartsState(playerNames, Collections.unmodifiableList(rounds), false, false));
+        new HeartsState(playerNames, Collections.unmodifiableList(rounds), false, null));
   }
 
   private RoundState buildRoundState(

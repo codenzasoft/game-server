@@ -147,6 +147,7 @@ const HeartsStateSchema = z.object({
   rounds: z.array(RoundStateSchema),
   over: z.boolean(),
   quit: z.boolean(),
+  quitBy: z.string().optional(),
   score: z.record(z.string(), z.number()).optional(),
   winner: z.string().nullish(),
   tied: z.array(z.string()).optional(),
@@ -184,6 +185,10 @@ const BASE_CARD_H = 112;
 const BASE_ARC_RADIUS = 1800;
 const ANGLE_STEP = Math.PI / 80; // ~2.25° between adjacent cards
 
+const OPP_BASE_CARD_W = 44;
+const OPP_BASE_CARD_H = 62;
+const OPP_BASE_ARC_RADIUS = 600;
+
 // ── HeartsGameHandler ────────────────────────────────────────────────────────
 
 export class HeartsGameHandler {
@@ -218,6 +223,10 @@ export class HeartsGameHandler {
   // HTML overlay for lobby waiting room
   private lobbyOverlay: HTMLDivElement | null = null;
 
+  // HTML overlay for in-game menu dropdown
+  private menuOverlay: HTMLDivElement | null = null;
+  private menuOutsideClickHandler: ((e: PointerEvent) => void) | null = null;
+
   // Trick container retained across renders to support the win animation
   private trickContainer: Container | null = null;
 
@@ -248,6 +257,18 @@ export class HeartsGameHandler {
 
   private get arcRadius(): number {
     return Math.round(BASE_ARC_RADIUS * this.cardScale);
+  }
+
+  private get oppCardW(): number {
+    return Math.round(OPP_BASE_CARD_W * this.cardScale);
+  }
+
+  private get oppCardH(): number {
+    return Math.round(OPP_BASE_CARD_H * this.cardScale);
+  }
+
+  private get oppArcRadius(): number {
+    return Math.round(OPP_BASE_ARC_RADIUS * this.cardScale);
   }
 
   private setupResizeHandler() {
@@ -422,6 +443,13 @@ export class HeartsGameHandler {
     });
   }
 
+  private sendAgain() {
+    this.stompClient.publish({
+      destination: `/games/hearts/${this.gameId}/again`,
+      body: "",
+    });
+  }
+
   private sendStart() {
     this.stompClient.publish({
       destination: `/games/hearts/${this.gameId}/start`,
@@ -462,6 +490,11 @@ export class HeartsGameHandler {
     const prevMessage = this.lastMessage;
     this.lastMessage = message;
 
+    if (context.nextGameId) {
+      window.location.href = `/games/hearts/${context.nextGameId}`;
+      return;
+    }
+
     // If pass phase ended, clear any stale pass selections
     if (!context.passingRequired) {
       this.selectedPassCards = [];
@@ -498,6 +531,7 @@ export class HeartsGameHandler {
     this.removePassOverlay();
     this.removeScoreOverlay();
     this.removeLobbyOverlay();
+    this.removeMenuOverlay();
     this.trickContainer = null;
   }
 
@@ -514,30 +548,21 @@ export class HeartsGameHandler {
     label.y = 12;
     this.app.stage.addChild(label);
 
-    const btnStyle = (color: string) =>
-      new TextStyle({ fontFamily: "Arial", fontSize: 18, fill: color, fontWeight: "bold" });
-
-    // Exit button — navigate home; game stays active for later resumption
-    const exit = new Text({ text: "Exit", style: btnStyle("#aaccff") });
-    exit.anchor.set(1, 0);
-    exit.x = this.app.screen.width - 16;
-    exit.y = 14;
-    exit.eventMode = "static";
-    exit.cursor = "pointer";
-    exit.on("pointerdown", () => {
-      window.location.href = "/";
+    const menuBtnStyle = new TextStyle({
+      fontFamily: "Arial",
+      fontSize: 18,
+      fill: "#ffffff",
+      fontWeight: "bold",
     });
-    this.app.stage.addChild(exit);
 
-    // Quit button — permanently forfeit the game
-    const quit = new Text({ text: "Quit", style: btnStyle("#ffaaaa") });
-    quit.anchor.set(1, 0);
-    quit.x = exit.x - exit.width - 12;
-    quit.y = 14;
-    quit.eventMode = "static";
-    quit.cursor = "pointer";
-    quit.on("pointerdown", () => this.sendQuit());
-    this.app.stage.addChild(quit);
+    const menuBtn = new Text({ text: "Menu ▾", style: menuBtnStyle });
+    menuBtn.anchor.set(1, 0);
+    menuBtn.x = this.app.screen.width - 16;
+    menuBtn.y = 14;
+    menuBtn.eventMode = "static";
+    menuBtn.cursor = "pointer";
+    menuBtn.on("pointerdown", () => this.toggleMenuOverlay());
+    this.app.stage.addChild(menuBtn);
   }
 
   private buildStatusText(
@@ -586,36 +611,84 @@ export class HeartsGameHandler {
     const positions = this.compassPositions(myIdx, state.players);
     const round = state.rounds[state.rounds.length - 1];
 
-    const style = new TextStyle({
-      fontFamily: "Arial",
-      fontSize: 16,
-      fill: "#ccffcc",
-    });
-
     for (const { name, pos } of positions) {
       if (name === context.player) continue;
       const handSize = this.getOpponentHandSize(name, round);
-      const label = new Text({ text: `${name} (${handSize})`, style });
-
-      switch (pos) {
-        case "N":
-          label.anchor.set(0.5, 0);
-          label.x = this.app.screen.width / 2;
-          label.y = 16;
-          break;
-        case "W":
-          label.anchor.set(0, 0.5);
-          label.x = 16;
-          label.y = this.app.screen.height / 2;
-          break;
-        case "E":
-          label.anchor.set(1, 0.5);
-          label.x = this.app.screen.width - 16;
-          label.y = this.app.screen.height / 2;
-          break;
-      }
-      this.app.stage.addChild(label);
+      this.renderOpponentArc(name, pos as "N" | "W" | "E", handSize);
     }
+  }
+
+  private renderOpponentArc(name: string, pos: "N" | "W" | "E", cardCount: number) {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const ocw = this.oppCardW;
+    const och = this.oppCardH;
+    const R = this.oppArcRadius;
+    const TOP_MARGIN = 50;
+    const SIDE_MARGIN = 16;
+
+    if (this.cardBackTexture && cardCount > 0) {
+      const container = new Container();
+      container.filters = [
+        new DropShadowFilter({ alpha: 0.5, blur: 3, distance: 3, padding: 20 }),
+      ];
+
+      for (let i = 0; i < cardCount; i++) {
+        const θ = (i - (cardCount - 1) / 2) * ANGLE_STEP;
+        const sprite = new Sprite(this.cardBackTexture);
+        sprite.width = ocw;
+        sprite.height = och;
+        sprite.anchor.set(0.5, 0.5);
+
+        switch (pos) {
+          case "N": {
+            const arcCenterY = TOP_MARGIN + och / 2 - R;
+            sprite.x = sw / 2 + R * Math.sin(θ);
+            sprite.y = arcCenterY + R * Math.cos(θ);
+            sprite.rotation = -θ;
+            break;
+          }
+          case "W": {
+            const arcCenterX = SIDE_MARGIN + ocw / 2 - R;
+            sprite.x = arcCenterX + R * Math.cos(θ);
+            sprite.y = sh / 2 + R * Math.sin(θ);
+            sprite.rotation = θ - Math.PI / 2;
+            break;
+          }
+          case "E": {
+            const arcCenterX = sw - SIDE_MARGIN - ocw / 2 + R;
+            sprite.x = arcCenterX - R * Math.cos(θ);
+            sprite.y = sh / 2 + R * Math.sin(θ);
+            sprite.rotation = Math.PI / 2 - θ;
+            break;
+          }
+        }
+        container.addChild(sprite);
+      }
+      this.app.stage.addChild(container);
+    }
+
+    const style = new TextStyle({ fontFamily: "Arial", fontSize: 14, fill: "#ccffcc" });
+    const label = new Text({ text: name, style });
+
+    switch (pos) {
+      case "N":
+        label.anchor.set(0.5, 0);
+        label.x = sw / 2;
+        label.y = TOP_MARGIN + och + 4;
+        break;
+      case "W":
+        label.anchor.set(0, 0.5);
+        label.x = SIDE_MARGIN + ocw / 2 + och / 2 + 6;
+        label.y = sh / 2;
+        break;
+      case "E":
+        label.anchor.set(1, 0.5);
+        label.x = sw - SIDE_MARGIN - ocw / 2 - och / 2 - 6;
+        label.y = sh / 2;
+        break;
+    }
+    this.app.stage.addChild(label);
   }
 
   private getOpponentHandSize(player: string, round: RoundState): number {
@@ -772,6 +845,36 @@ export class HeartsGameHandler {
         sprite.x = fromX + (toX - fromX) * ease;
         sprite.y = fromY + (toY - fromY) * ease;
         sprite.rotation = startRotation * (1 - ease);
+        if (t >= 1) {
+          this.app.ticker.remove(tick);
+          resolve();
+        }
+      };
+      this.app.ticker.add(tick);
+    });
+  }
+
+  private animateDealCard(
+    sprite: Sprite,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    toW: number,
+    toH: number,
+    duration: number,
+  ): Promise<void> {
+    const fromW = sprite.width;
+    const fromH = sprite.height;
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+      const tick = () => {
+        const t = Math.min((performance.now() - startTime) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        sprite.x = fromX + (toX - fromX) * ease;
+        sprite.y = fromY + (toY - fromY) * ease;
+        sprite.width = fromW + (toW - fromW) * ease;
+        sprite.height = fromH + (toH - fromH) * ease;
         if (t >= 1) {
           this.app.ticker.remove(tick);
           resolve();
@@ -1039,7 +1142,6 @@ export class HeartsGameHandler {
     this.clearScene();
     this.renderScoreTable(context, state);
     this.renderStatus(this.buildStatusText(context, state, round));
-    this.renderOpponents(context, state);
 
     const myIdx = state.players.indexOf(context.player);
     const positions = this.compassPositions(myIdx, state.players);
@@ -1055,19 +1157,23 @@ export class HeartsGameHandler {
       return [arcCenterX + ar * Math.sin(angle), arcCenterY - ar * Math.cos(angle)];
     });
 
-    // Opponent cards land near their label (face-down), partially visible at edges
+    // Opponent cards land at the center of their arc (face-down)
+    const ocw = this.oppCardW;
+    const och = this.oppCardH;
+    const OPP_TOP = 50;
+    const OPP_SIDE = 16;
     const opponentDests: Record<string, [number, number]> = {};
     for (const { name, pos } of positions) {
       if (name === context.player) continue;
       switch (pos) {
         case "N":
-          opponentDests[name] = [sw / 2, ch / 2 + 8];
+          opponentDests[name] = [sw / 2, OPP_TOP + och / 2];
           break;
         case "W":
-          opponentDests[name] = [cw / 2 + 8, sh / 2];
+          opponentDests[name] = [OPP_SIDE + ocw / 2, sh / 2];
           break;
         case "E":
-          opponentDests[name] = [sw - cw / 2 - 8, sh / 2];
+          opponentDests[name] = [sw - OPP_SIDE - ocw / 2, sh / 2];
           break;
       }
     }
@@ -1095,19 +1201,23 @@ export class HeartsGameHandler {
         const delay = seqIdx * STAGGER_MS;
 
         let destX: number, destY: number;
-        let texture: Texture;
+        let targetW: number, targetH: number;
         if (playerName === context.player) {
           const idx = playerCardIdx++;
           [destX, destY] = playerDests[idx];
-          texture = this.getTexture(sortedHand[idx])!;
+          targetW = cw;
+          targetH = ch;
         } else {
           [destX, destY] = opponentDests[playerName] ?? [sw / 2, sh / 2];
-          texture = this.cardBackTexture!;
+          targetW = this.oppCardW;
+          targetH = this.oppCardH;
         }
 
-        const sprite = new Sprite(texture);
-        sprite.width = cw;
-        sprite.height = ch;
+        const deckCardW = Math.round(this.oppCardW * 0.65);
+        const deckCardH = Math.round(this.oppCardH * 0.65);
+        const sprite = new Sprite(this.cardBackTexture!);
+        sprite.width = deckCardW;
+        sprite.height = deckCardH;
         sprite.anchor.set(0.5, 0.5);
         sprite.x = deckX;
         sprite.y = deckY;
@@ -1117,9 +1227,9 @@ export class HeartsGameHandler {
           new Promise<void>((resolve) => {
             window.setTimeout(() => {
               playDealSound();
-              void this.animateCard(sprite, deckX, deckY, destX, destY, FLIGHT_MS).then(
-                resolve,
-              );
+              void this.animateDealCard(
+                sprite, deckX, deckY, destX, destY, targetW, targetH, FLIGHT_MS,
+              ).then(resolve);
             }, delay);
           }),
         );
@@ -1259,6 +1369,102 @@ export class HeartsGameHandler {
     if (this.lastMessage) void this.render(this.lastMessage);
   }
 
+  // ── Menu overlay (HTML) ──────────────────────────────────────────────────
+
+  private toggleMenuOverlay() {
+    if (this.menuOverlay) {
+      this.removeMenuOverlay();
+    } else {
+      this.renderMenuOverlay();
+    }
+  }
+
+  private renderMenuOverlay() {
+    this.injectMenuStyles();
+
+    const overlay = document.createElement("div");
+    overlay.id = "hearts-menu-overlay";
+
+    const items: { label: string; action: () => void }[] = [
+      { label: "Save and Exit", action: () => { window.location.href = "/"; } },
+      { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
+    ];
+
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.className = "hearts-menu-item";
+      btn.textContent = item.label;
+      btn.addEventListener("click", item.action);
+      overlay.appendChild(btn);
+    }
+
+    document.getElementById("app")!.appendChild(overlay);
+    this.menuOverlay = overlay;
+
+    // Defer so the opening click doesn't immediately trigger the outside-click handler
+    setTimeout(() => {
+      if (!this.menuOverlay) return; // menu was already closed before timeout fired
+      const onOutsideClick = (e: PointerEvent) => {
+        if (this.menuOverlay && !this.menuOverlay.contains(e.target as Node)) {
+          this.removeMenuOverlay();
+        }
+      };
+      this.menuOutsideClickHandler = onOutsideClick;
+      document.addEventListener("pointerdown", onOutsideClick);
+    }, 0);
+  }
+
+  private removeMenuOverlay() {
+    if (this.menuOutsideClickHandler) {
+      document.removeEventListener("pointerdown", this.menuOutsideClickHandler);
+      this.menuOutsideClickHandler = null;
+    }
+    if (this.menuOverlay) {
+      this.menuOverlay.remove();
+      this.menuOverlay = null;
+    }
+  }
+
+  private injectMenuStyles() {
+    if (document.getElementById("hearts-menu-styles")) return;
+    const style = document.createElement("style");
+    style.id = "hearts-menu-styles";
+    style.textContent = `
+      #hearts-menu-overlay {
+        position: fixed;
+        top: 44px;
+        right: 16px;
+        display: flex;
+        flex-direction: column;
+        background: rgba(20,20,20,0.96);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 20;
+        min-width: 160px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      }
+      .hearts-menu-item {
+        background: transparent;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        font-family: Arial, sans-serif;
+        font-size: 15px;
+        text-align: left;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .hearts-menu-item:hover {
+        background: rgba(255,255,255,0.1);
+      }
+      .hearts-menu-item:last-child {
+        color: #ffaaaa;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   // ── Pass overlay (HTML) ───────────────────────────────────────────────────
 
   private renderPassOverlay(context: HeartsContext, round: RoundState) {
@@ -1359,38 +1565,57 @@ export class HeartsGameHandler {
   private renderScoreTable(context: HeartsContext, state: HeartsState) {
     this.injectScoreStyles();
 
+    const isGameOver = state.over;
+    const showAllRounds = isGameOver || this.scoreExpanded;
     const { players } = state;
     const totalScore = state.score ?? {};
-    const completedRounds = this.scoreExpanded
+    const completedRounds = showAllRounds
       ? state.rounds.filter((r) => r.complete && r.score)
       : [];
 
     const overlay = document.createElement("div");
     overlay.id = "hearts-score-overlay";
+    if (isGameOver) overlay.classList.add("hearts-score-gameover");
+
+    // Winner / tie line shown only on game over
+    if (isGameOver) {
+      const winnerDiv = document.createElement("div");
+      winnerDiv.className = "hearts-score-winner-line";
+      if (state.tied && state.tied.length > 1) {
+        winnerDiv.textContent = `Tie: ${state.tied.join(", ")}`;
+      } else if (state.winner) {
+        winnerDiv.textContent =
+          state.winner === context.player ? "You win!" : `${state.winner} wins!`;
+      }
+      overlay.appendChild(winnerDiv);
+    }
 
     const table = document.createElement("table");
     table.className = "hearts-score-table";
 
-    // Header row — toggle button in first column, player names in the rest
+    // Header row — toggle button in first column (hidden on game over), player names in the rest
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
 
     const toggleTh = document.createElement("th");
-    const toggleBtn = document.createElement("button");
-    toggleBtn.className = "hearts-score-toggle";
-    toggleBtn.textContent = this.scoreExpanded ? "▾" : "▸";
-    toggleBtn.addEventListener("click", () => {
-      this.scoreExpanded = !this.scoreExpanded;
-      this.removeScoreOverlay();
-      this.renderScoreTable(context, state);
-    });
-    toggleTh.appendChild(toggleBtn);
+    if (!isGameOver) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.className = "hearts-score-toggle";
+      toggleBtn.textContent = this.scoreExpanded ? "▾" : "▸";
+      toggleBtn.addEventListener("click", () => {
+        this.scoreExpanded = !this.scoreExpanded;
+        this.removeScoreOverlay();
+        this.renderScoreTable(context, state);
+      });
+      toggleTh.appendChild(toggleBtn);
+    }
     headerRow.appendChild(toggleTh);
 
     for (const player of players) {
       const th = document.createElement("th");
       th.textContent = player;
       if (player === context.player) th.classList.add("hearts-score-me");
+      if (isGameOver && player === state.winner) th.classList.add("hearts-score-winner-col");
       headerRow.appendChild(th);
     }
     thead.appendChild(headerRow);
@@ -1398,8 +1623,8 @@ export class HeartsGameHandler {
 
     const tbody = document.createElement("tbody");
 
-    // One row per completed round when expanded
-    if (this.scoreExpanded) {
+    // One row per completed round when expanded or on game over
+    if (showAllRounds) {
       for (const round of completedRounds) {
         const row = document.createElement("tr");
         const labelTd = document.createElement("td");
@@ -1408,24 +1633,25 @@ export class HeartsGameHandler {
         for (const player of players) {
           const td = document.createElement("td");
           td.textContent = String(round.score?.[player] ?? 0);
-          if (player === context.player)
-            td.classList.add("hearts-score-me-val");
+          if (player === context.player) td.classList.add("hearts-score-me-val");
+          if (isGameOver && player === state.winner) td.classList.add("hearts-score-winner-val");
           row.appendChild(td);
         }
         tbody.appendChild(row);
       }
     }
 
-    // Summary row — totals (labelled "Total" when expanded, blank when collapsed)
+    // Summary row — totals (labelled "Total" when expanded/game-over, blank when collapsed)
     const totalRow = document.createElement("tr");
-    if (this.scoreExpanded) totalRow.className = "hearts-score-total";
+    if (showAllRounds) totalRow.className = "hearts-score-total";
     const totalLabel = document.createElement("td");
-    totalLabel.textContent = this.scoreExpanded ? "Total" : "";
+    totalLabel.textContent = showAllRounds ? "Total" : "";
     totalRow.appendChild(totalLabel);
     for (const player of players) {
       const td = document.createElement("td");
       td.textContent = String(totalScore[player] ?? 0);
       if (player === context.player) td.classList.add("hearts-score-me-val");
+      if (isGameOver && player === state.winner) td.classList.add("hearts-score-winner-val");
       totalRow.appendChild(td);
     }
     tbody.appendChild(totalRow);
@@ -1502,6 +1728,26 @@ export class HeartsGameHandler {
       .hearts-score-toggle:hover {
         color: #fff;
       }
+      #hearts-score-overlay.hearts-score-gameover {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 16px 24px;
+      }
+      .hearts-score-winner-line {
+        font-family: Arial, sans-serif;
+        font-size: 22px;
+        font-weight: bold;
+        color: #ffd700;
+        text-align: center;
+        margin-bottom: 12px;
+      }
+      .hearts-score-winner-col {
+        color: #ffd700;
+      }
+      .hearts-score-winner-val {
+        color: #ffd700;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -1509,6 +1755,12 @@ export class HeartsGameHandler {
   // ── Game over ──────────────────────────────────────────────────────────────
 
   private renderGameOver(context: HeartsContext, state: HeartsState) {
+    // If this player quit, navigate home now that the server has confirmed the quit
+    // and persisted quitAt — so the index page won't show a stale active game.
+    if (state.quit && state.quitBy === context.player) {
+      window.location.href = "/";
+      return;
+    }
     const style = new TextStyle({
       fontFamily: "Arial",
       fontSize: 56,
@@ -1533,24 +1785,37 @@ export class HeartsGameHandler {
       },
     });
 
-    const title = new Text({
-      text: state.quit ? "Game Quit" : "Game Over",
-      style,
-    });
-    title.anchor.set(0.5);
+    const isQuit = state.quit;
+
+    const titleText = isQuit
+      ? (state.quitBy ? `${state.quitBy} quit the game` : "Game Quit")
+      : "Game Over";
+    const title = new Text({ text: titleText, style });
+    title.anchor.set(0.5, isQuit ? 0.5 : 0);
     title.x = this.app.screen.width / 2;
-    title.y = this.app.screen.height / 2 - 60;
+    title.y = isQuit ? this.app.screen.height / 2 - 60 : 20;
     this.app.stage.addChild(title);
 
     const exitBtn = new Text({ text: "Exit", style: subStyle });
-    exitBtn.anchor.set(0.5);
-    exitBtn.x = this.app.screen.width / 2;
-    exitBtn.y = this.app.screen.height / 2 + 60;
+    exitBtn.anchor.set(0.5, isQuit ? 0.5 : 1);
+    exitBtn.x = isQuit ? this.app.screen.width / 2 : this.app.screen.width / 2 + 80;
+    exitBtn.y = isQuit ? this.app.screen.height / 2 + 60 : this.app.screen.height - 20;
     exitBtn.eventMode = "static";
     exitBtn.cursor = "pointer";
     exitBtn.on("pointerdown", () => {
       window.location.href = "/";
     });
     this.app.stage.addChild(exitBtn);
+
+    if (!isQuit) {
+      const againBtn = new Text({ text: "Play Again", style: subStyle });
+      againBtn.anchor.set(0.5, 1);
+      againBtn.x = this.app.screen.width / 2 - 80;
+      againBtn.y = this.app.screen.height - 20;
+      againBtn.eventMode = "static";
+      againBtn.cursor = "pointer";
+      againBtn.on("pointerdown", () => this.sendAgain());
+      this.app.stage.addChild(againBtn);
+    }
   }
 }

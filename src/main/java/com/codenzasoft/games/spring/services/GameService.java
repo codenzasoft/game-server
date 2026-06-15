@@ -12,11 +12,11 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity;
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoGameEntity;
 import com.codenzasoft.games.spring.entities.xo.XoPieceEntity;
-import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.repositories.GamePlayersRepository;
 import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
@@ -195,6 +195,19 @@ public class GameService {
     return game;
   }
 
+  @Transactional
+  public HeartsGameEntity createNextHeartsGame(final HeartsGame currentGame) {
+    final List<UserEntity> players =
+        currentGame.getPlayers().stream()
+            .map(player -> usersRepository.findById(player.id()).orElseThrow())
+            .toList();
+    players.stream().filter(u -> !u.isBot()).forEach(this::enforceGameLimit);
+    final HeartsGameEntity game = new HeartsGameEntity(UUID.randomUUID());
+    game.setPlayers(players);
+    heartsGameRepository.save(game);
+    return game;
+  }
+
   /**
    * Creates a new game with assigned {@link Piece}s. Must specify at least a single {@link
    * UserEntity}. A bot will be added as needed.
@@ -315,8 +328,8 @@ public class GameService {
     if (!game.isComplete()) {
       game.setQuitAt(new Date());
       gamesRepository.save(game);
-      gameCache.removeGame(gameId);
     }
+    gameCache.removeGame(gameId);
   }
 
   /**
@@ -498,8 +511,8 @@ public class GameService {
             .withId(entity.getId())
             .withPlayers(players)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
-            .addListener(heartsBroadcastService)
-            .addListener(heartsPersistenceService);
+            .addListener(heartsPersistenceService)
+            .addListener(heartsBroadcastService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
@@ -518,8 +531,8 @@ public class GameService {
             .withPlayers(players)
             .withRestoredState(state)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
-            .addListener(heartsBroadcastService)
-            .addListener(heartsPersistenceService);
+            .addListener(heartsPersistenceService)
+            .addListener(heartsBroadcastService);
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
@@ -544,8 +557,8 @@ public class GameService {
   }
 
   /**
-   * Inserts or incrementally updates the games-played summary for the given user and game type.
-   * If no record exists yet, a new one is created. Otherwise the existing record's win/loss/draw
+   * Inserts or incrementally updates the games-played summary for the given user and game type. If
+   * no record exists yet, a new one is created. Otherwise the existing record's win/loss/draw
    * counts are incremented and {@code last_played_at} is refreshed.
    *
    * @param user The user who played.
@@ -578,8 +591,8 @@ public class GameService {
   }
 
   /**
-   * Returns the games-played summary for the given user and game type, or {@code empty} if the
-   * user has not yet played that type of game.
+   * Returns the games-played summary for the given user and game type, or {@code empty} if the user
+   * has not yet played that type of game.
    *
    * @param user The user.
    * @param gameType The game type.
