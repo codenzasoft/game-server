@@ -342,6 +342,72 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(ResourceTarget.FOOD.integer(30), ResourceTarget.POPULATION.integer(-10)));
 
+  // ----- Gold & Strength resource cards (unlocked by TREASURY / BARRACKS great works) -----
+
+  // Spring: one gold, one strength
+  public static final Card GOLD_MARKET =
+      new Card(
+          "GOLD_MARKET",
+          10.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(8), ResourceTarget.PRODUCTION.integer(5)));
+  public static final Card TRAINING_GROUNDS =
+      new Card(
+          "TRAINING_GROUNDS",
+          12.0,
+          90.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(10)));
+
+  // Summer: one gold, one strength
+  public static final Card TRADE_CONVOY =
+      new Card(
+          "TRADE_CONVOY",
+          15.0,
+          100.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(12), ResourceTarget.PRODUCTION.integer(8)));
+  public static final Card GUARD_POST =
+      new Card(
+          "GUARD_POST",
+          14.0,
+          85.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(8), ResourceTarget.FOOD.integer(-5)));
+
+  // Fall: one gold, one strength
+  public static final Card GOLD_MINE =
+      new Card(
+          "GOLD_MINE",
+          18.0,
+          140.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(20)));
+  public static final Card ARMORY =
+      new Card(
+          "ARMORY",
+          16.0,
+          120.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(15)));
+
+  // Winter: one gold, one strength
+  public static final Card MINT =
+      new Card(
+          "MINT",
+          20.0,
+          160.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(25)));
+  public static final Card FORTRESS_WALL =
+      new Card(
+          "FORTRESS_WALL",
+          18.0,
+          130.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(18)));
+
   // ----- Default catalog factory -----
 
   /**
@@ -372,7 +438,10 @@ public class CardCatalog {
             SETTLERS,
             LUMBER_YARD,
             COMMUNITY_WELL,
-            IRRIGATION));
+            IRRIGATION,
+            GOLD_MARKET,       // available only when GOLD unlocked
+            TRAINING_GROUNDS   // available only when STRENGTH unlocked
+            ));
 
     seasonal.put(
         Season.SUMMER,
@@ -391,7 +460,10 @@ public class CardCatalog {
             CARAVAN,
             TOWN_FAIR,
             STONE_QUARRY,
-            MERCHANT_GUILD));
+            MERCHANT_GUILD,
+            TRADE_CONVOY,  // available only when GOLD unlocked
+            GUARD_POST     // available only when STRENGTH unlocked
+            ));
 
     seasonal.put(
         Season.FALL,
@@ -405,7 +477,10 @@ public class CardCatalog {
             BARN,
             MASON_GUILD,
             METALWORKING,
-            BLACKSMITH));
+            BLACKSMITH,
+            GOLD_MINE,  // available only when GOLD unlocked
+            ARMORY      // available only when STRENGTH unlocked
+            ));
 
     seasonal.put(
         Season.WINTER,
@@ -417,7 +492,10 @@ public class CardCatalog {
             STOCKPILE,
             CHAPEL,
             PRAY,
-            DESPERATE_TIMES));
+            DESPERATE_TIMES,
+            MINT,          // available only when GOLD unlocked
+            FORTRESS_WALL  // available only when STRENGTH unlocked
+            ));
 
     return new CardCatalog(seasonal);
   }

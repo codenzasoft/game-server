@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * Pure data carrier for a King's Hand game. All rule-based mutations live in {@link GameEngine};
@@ -41,6 +42,17 @@ public class GameState {
   private List<CardStaffing> tableStaffing;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
+  // great work tracking
+  private Map<String, GreatWorkState> greatWorkStates;
+  // new resource types — both start locked at 0
+  private double gold;
+  private double strength;
+  private boolean goldUnlocked;
+  private boolean strengthUnlocked;
+  // true once all four win-condition great works are completed
+  private boolean gameWon;
+  // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
+  private List<String> greatWorkLog;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -60,6 +72,13 @@ public class GameState {
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
+    this.greatWorkStates = b.greatWorkStates;
+    this.gold = b.gold;
+    this.strength = b.strength;
+    this.goldUnlocked = b.goldUnlocked;
+    this.strengthUnlocked = b.strengthUnlocked;
+    this.gameWon = b.gameWon;
+    this.greatWorkLog = b.greatWorkLog;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -312,6 +331,77 @@ public class GameState {
     this.resolutionLog = log == null ? List.of() : List.copyOf(log);
   }
 
+  // ----- Great Work state -----
+
+  /**
+   * Mutable map from Great Work name to its per-game {@link GreatWorkState}. Populated as the
+   * player commissions Great Works; never {@code null} but may be empty.
+   */
+  @JsonProperty("greatWorkStates")
+  public Map<String, GreatWorkState> getGreatWorkStates() {
+    return greatWorkStates;
+  }
+
+  @JsonProperty("gold")
+  public double getGold() {
+    return gold;
+  }
+
+  public void setGold(double gold) {
+    this.gold = gold;
+  }
+
+  @JsonProperty("strength")
+  public double getStrength() {
+    return strength;
+  }
+
+  public void setStrength(double strength) {
+    this.strength = strength;
+  }
+
+  @JsonProperty("goldUnlocked")
+  public boolean isGoldUnlocked() {
+    return goldUnlocked;
+  }
+
+  public void setGoldUnlocked(boolean goldUnlocked) {
+    this.goldUnlocked = goldUnlocked;
+  }
+
+  @JsonProperty("strengthUnlocked")
+  public boolean isStrengthUnlocked() {
+    return strengthUnlocked;
+  }
+
+  public void setStrengthUnlocked(boolean strengthUnlocked) {
+    this.strengthUnlocked = strengthUnlocked;
+  }
+
+  /** {@code true} once all four win-condition Great Works are completed. */
+  @JsonProperty("gameWon")
+  public boolean isGameWon() {
+    return gameWon;
+  }
+
+  public void setGameWon(boolean gameWon) {
+    this.gameWon = gameWon;
+  }
+
+  /**
+   * Events emitted during the most recent {@link Phase#PLAY} resolution relating to Great Works
+   * (e.g. {@code "TREASURY_COMPLETED"}, {@code "THE_GREAT_GRANARY_PERIOD_DECREMENTED:5"}).
+   * Empty between seasons. Cleared at the start of each {@code endAndRun}.
+   */
+  @JsonProperty("greatWorkLog")
+  public List<String> getGreatWorkLog() {
+    return greatWorkLog == null ? List.of() : greatWorkLog;
+  }
+
+  public void setGreatWorkLog(List<String> log) {
+    this.greatWorkLog = log == null ? List.of() : List.copyOf(log);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -332,6 +422,13 @@ public class GameState {
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
+    private Map<String, GreatWorkState> greatWorkStates = new LinkedHashMap<>();
+    private double gold = 0.0;
+    private double strength = 0.0;
+    private boolean goldUnlocked = false;
+    private boolean strengthUnlocked = false;
+    private boolean gameWon = false;
+    private List<String> greatWorkLog = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -425,6 +522,42 @@ public class GameState {
 
     public Builder resolutionLog(List<ResolutionStep> resolutionLog) {
       this.resolutionLog = resolutionLog == null ? List.of() : new ArrayList<>(resolutionLog);
+      return this;
+    }
+
+    public Builder greatWorkStates(Map<String, GreatWorkState> greatWorkStates) {
+      this.greatWorkStates =
+          greatWorkStates == null ? new LinkedHashMap<>() : new LinkedHashMap<>(greatWorkStates);
+      return this;
+    }
+
+    public Builder gold(double gold) {
+      this.gold = gold;
+      return this;
+    }
+
+    public Builder strength(double strength) {
+      this.strength = strength;
+      return this;
+    }
+
+    public Builder goldUnlocked(boolean goldUnlocked) {
+      this.goldUnlocked = goldUnlocked;
+      return this;
+    }
+
+    public Builder strengthUnlocked(boolean strengthUnlocked) {
+      this.strengthUnlocked = strengthUnlocked;
+      return this;
+    }
+
+    public Builder gameWon(boolean gameWon) {
+      this.gameWon = gameWon;
+      return this;
+    }
+
+    public Builder greatWorkLog(List<String> greatWorkLog) {
+      this.greatWorkLog = greatWorkLog == null ? List.of() : new ArrayList<>(greatWorkLog);
       return this;
     }
 
