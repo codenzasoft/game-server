@@ -49,3 +49,33 @@ export function playDealSound(): void {
 export function playCardPlaySound(): void {
   playNoise("bandpass", 1000, 22, 0.09, 0.45);
 }
+
+let slideCardBuffer: AudioBuffer | null = null;
+let swooshBuffer: AudioBuffer | null = null;
+
+async function playWav(
+  cache: { buf: AudioBuffer | null },
+  url: string,
+): Promise<void> {
+  const ctx = getCtx();
+  if (!ctx) return;
+  if (!cache.buf) {
+    const resp = await fetch(url);
+    cache.buf = await ctx.decodeAudioData(await resp.arrayBuffer());
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = cache.buf;
+  src.connect(ctx.destination);
+  src.start();
+}
+
+const slideCache = { buf: slideCardBuffer };
+const swooshCache = { buf: swooshBuffer };
+
+export function playSlideCardSound(): void {
+  void playWav(slideCache, "/audio/hearts/slide-card.wav");
+}
+
+export function playPassSound(): void {
+  void playWav(swooshCache, "/audio/hearts/swoosh.wav");
+}

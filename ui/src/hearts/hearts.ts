@@ -10,7 +10,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
-import { playDealSound, playCardPlaySound } from "./sounds";
+import { playDealSound, playCardPlaySound, playSlideCardSound, playPassSound } from "./sounds";
 import { renderLobbyOverlay } from "../shared/lobby";
 
 const wsUrl =
@@ -1063,6 +1063,7 @@ export class HeartsGameHandler {
     await new Promise<void>((resolve) => setTimeout(resolve, 450));
 
     // Fly passed cards out
+    playPassSound();
     await Promise.all(
       passedSprites.map((sprite) =>
         this.animateCard(sprite, sprite.x, sprite.y, toX, toY, 320),
@@ -1091,6 +1092,7 @@ export class HeartsGameHandler {
       };
     });
 
+    playPassSound();
     await Promise.all(
       receivedEntries.map(({ sprite, landX }) =>
         this.animateCard(sprite, fromX, fromY, landX, showY, 400),
@@ -1363,8 +1365,10 @@ export class HeartsGameHandler {
     );
     if (idx >= 0) {
       this.selectedPassCards.splice(idx, 1);
+      playSlideCardSound();
     } else if (this.selectedPassCards.length < 3) {
       this.selectedPassCards.push(card);
+      playSlideCardSound();
     }
     if (this.lastMessage) void this.render(this.lastMessage);
   }
