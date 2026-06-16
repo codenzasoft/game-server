@@ -531,7 +531,7 @@ public class CardCatalog {
       new Card(
           "TREASURY_CONSTRUCTION",
           25.0,
-          300.0,
+          5.0,
           FrequencyType.RECURRING,
           List.of(ResourceTarget.PRODUCTION.integer(-50)),
           4,
@@ -557,7 +557,7 @@ public class CardCatalog {
       new Card(
           "THE_GREAT_RESERVOIR_CONSTRUCTION",
           20.0,
-          450.0,
+          5.0,
           FrequencyType.RECURRING,
           List.of(ResourceTarget.PRODUCTION.integer(-35), ResourceTarget.FOOD.integer(-25)),
           6,
