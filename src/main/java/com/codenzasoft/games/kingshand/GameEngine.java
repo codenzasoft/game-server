@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -787,10 +786,12 @@ public class GameEngine implements Game<GameEngine> {
       applyProduction(state.getProduction() - cost);
     }
     state.setRerollCount(state.getRerollCount() + 1);
-    // Filter out cards whose effects target locked resources (GOLD / STRENGTH).
+    // Filter out cards whose effects target locked resources (GOLD / STRENGTH), and Great Works
+    // that have already been drafted/commissioned/completed — each may only ever exist once.
     List<Card> available =
         cardCatalog.forSeason(state.getCurSeason()).stream()
             .filter(c -> !cardRequiresLockedResource(c))
+            .filter(c -> !c.isGreatWork() || !greatWorkAlreadyClaimed(c))
             .toList();
     List<Card> choices = pickRandom(available, ADD_OFFER_SIZE);
     state.setAddChoices(choices);
@@ -854,6 +855,33 @@ public class GameEngine implements Game<GameEngine> {
         if (rt == ResourceTarget.GOLD && !state.isGoldUnlocked()) return true;
         if (rt == ResourceTarget.STRENGTH && !state.isStrengthUnlocked()) return true;
       }
+    }
+    return false;
+  }
+
+  /**
+   * Returns {@code true} if Great Work {@code gw} (or its completed counterpart) already exists
+   * anywhere in the game — hand, any draw pile, any discard pile, or any season's table. Each
+   * Great Work may only ever be drafted or commissioned once, so once claimed it is suppressed
+   * from the ADD-phase offer pool and blocked from being commissioned again, no matter which path
+   * (draft-and-place, or direct commission) put it there.
+   */
+  private boolean greatWorkAlreadyClaimed(Card gw) {
+    if (cardExistsAnywhere(gw.name())) return true;
+    return gw.completedCard() != null && cardExistsAnywhere(gw.completedCard().name());
+  }
+
+  /** Returns {@code true} if a card named {@code name} exists in the hand or any pile/table. */
+  private boolean cardExistsAnywhere(String name) {
+    if (state.getHand().stream().anyMatch(c -> c.name().equals(name))) return true;
+    for (List<Card> cards : state.getBoard().values()) {
+      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
+    }
+    for (List<Card> cards : state.getDrawPile().values()) {
+      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
+    }
+    for (List<Card> cards : state.getDiscardPile().values()) {
+      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
     }
     return false;
   }
@@ -1156,12 +1184,15 @@ public class GameEngine implements Game<GameEngine> {
    * <ul>
    *   <li>Current phase is {@link Phase#PLAY}.
    *   <li>The Great Work's {@link GreatWork#tableSlot()} matches the current season.
-   *   <li>The Great Work has not already been commissioned or completed.
+   *   <li>The Great Work has not already been drafted (sitting in a draw/discard pile or hand),
+   *       commissioned, or completed — each Great Work may only ever exist once.
    *   <li>The current season's table has at least one open slot.
    *   <li>The player has enough production to cover the commission cost (the under-construction
    *       card's {@link Card#productionRequirement()}).
-   *   <li>Win-condition Great Works additionally require both {@link GameState#isGoldUnlocked()}
-   *       and {@link GameState#isStrengthUnlocked()} to be {@code true}.
+   *   <li>If the under-construction card's own effects include a {@link ResourceTarget#GOLD} or
+   *       {@link ResourceTarget#STRENGTH} cost, that resource must already be unlocked — the same
+   *       rule {@code cardRequiresLockedResource} applies to the ADD-phase offer pool. Great Works
+   *       with no such cost (e.g. THE_GREAT_RESERVOIR) are always commissionable.
    * </ul>
    *
    * @param name stable name of the Great Work (e.g. {@code "TREASURY"})
@@ -1187,28 +1218,25 @@ public class GameEngine implements Game<GameEngine> {
               + " table");
     }
 
-    // Already commissioned (construction card on table) or already completed (completed card on
-    // table).
-    List<Card> targetTable = state.getBoard().get(gw.tableSlot());
-    Set<String> tableNames = new java.util.HashSet<>();
-    for (Card c : targetTable) tableNames.add(c.name());
-    boolean alreadyPresent =
-        tableNames.contains(gw.name())
-            || (gw.completedCard() != null && tableNames.contains(gw.completedCard().name()));
-    if (alreadyPresent) {
-      throw new IllegalStateException("great work already commissioned or completed: " + name);
+    // Already drafted (sitting in a draw pile, discard pile, or hand), already commissioned
+    // (construction card on a table), or already completed (completed card on a table). A Great
+    // Work may only ever exist once, regardless of which path put it there.
+    if (greatWorkAlreadyClaimed(gw)) {
+      throw new IllegalStateException("great work already drafted, commissioned, or completed: " + name);
     }
+
+    List<Card> targetTable = state.getBoard().get(gw.tableSlot());
 
     if (targetTable.size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(gw.tableSlot() + " table is full");
     }
 
-    // Win-condition Great Works require both GOLD and STRENGTH to be unlocked first.
-    if (gw.winCondition() && (!state.isGoldUnlocked() || !state.isStrengthUnlocked())) {
+    // A Great Work can only be commissioned once any resource its own construction cost
+    // references (GOLD/STRENGTH) is unlocked — the same rule that gates the ADD-phase offer pool.
+    // Great Works with no such cost (e.g. THE_GREAT_RESERVOIR) are always commissionable.
+    if (cardRequiresLockedResource(gw)) {
       throw new IllegalStateException(
-          "commissioning "
-              + name
-              + " requires both GOLD (TREASURY) and STRENGTH (BARRACKS) to be unlocked first");
+          "commissioning " + name + " requires its locked resource(s) to be unlocked first");
     }
 
     // Pay the one-time commission cost.
@@ -1291,18 +1319,12 @@ public class GameEngine implements Game<GameEngine> {
    */
   /**
    * Returns Great Work construction cards available for commissioning on {@code season}'s table —
-   * i.e. cards that aren't already under construction or completed there.
+   * i.e. cards that haven't already been drafted, commissioned, or completed anywhere in the
+   * game. Each Great Work may only ever exist once.
    */
   public synchronized List<Card> availableGreatWorks(Season season) {
-    List<Card> table = state.getBoard().get(season);
-    Set<String> tableNames = new java.util.HashSet<>();
-    for (Card c : table) tableNames.add(c.name());
     return cardCatalog.greatWorksForSeason(season).stream()
-        .filter(
-            gw ->
-                !tableNames.contains(gw.name())
-                    && (gw.completedCard() == null
-                        || !tableNames.contains(gw.completedCard().name())))
+        .filter(gw -> !greatWorkAlreadyClaimed(gw))
         .toList();
   }
 

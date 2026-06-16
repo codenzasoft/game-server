@@ -1290,20 +1290,20 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADE_ROUTES has two recurring CardTarget effects with modifier 1.0 each
+        // TRADING_POST has two recurring CardTarget effects with modifier 1.0 each
         // staffRequirement=10, productionRequirement=40
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
                 .population(80)
                 .production(200)
-                .table(Season.SUMMER, [CardCatalog.TRADE_ROUTES])
-                .hand([CardCatalog.TRADE_ROUTES])
+                .table(Season.SUMMER, [CardCatalog.TRADING_POST])
+                .hand([CardCatalog.TRADING_POST])
                 .build()
         def engine = engine(state)
 
         when:
-        engine.placeCard(CardCatalog.TRADE_ROUTES)
+        engine.placeCard(CardCatalog.TRADING_POST)
 
         then:
         def upgraded = state.board.get(Season.SUMMER).get(0)

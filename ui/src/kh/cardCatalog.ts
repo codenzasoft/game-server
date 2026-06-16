@@ -99,8 +99,8 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A major logging operation that yields a large one-time surge in production.",
     tags: ["INDUSTRY"],
   },
-  TRADE_ROUTES: {
-    name: "Trade Routes",
+  TRADING_POST: {
+    name: "Trading Post",
     description: "Established routes that boost the output of every food and production card on the table.",
     tags: ["COMMERCE", "ENGINE"],
   },
@@ -123,11 +123,6 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     name: "Windmill",
     description: "A windmill that grinds grain and amplifies every food-producing card on the table.",
     tags: ["AGRICULTURE", "ENGINE"],
-  },
-  MARKETPLACE: {
-    name: "Marketplace",
-    description: "A busy marketplace that brings in food and production each season.",
-    tags: ["COMMERCE"],
   },
   CARAVAN: {
     name: "Caravan",
@@ -173,7 +168,7 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
   TAX_COLLECTION: {
     name: "Tax Collection",
-    description: "Levy taxes for a one-time surge in production — but the people pay the price.",
+    description: "Levy taxes for a one-time surge in gold — but the people pay the price.",
     tags: ["COMMERCE"],
   },
   STOREHOUSE: {

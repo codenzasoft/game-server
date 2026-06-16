@@ -173,9 +173,9 @@ public class CardCatalog {
           20.0,
           FrequencyType.SINGLE,
           List.of(ResourceTarget.PRODUCTION.integer(80)));
-  public static final Card TRADE_ROUTES =
+  public static final Card TRADING_POST =
       new Card(
-          "TRADE_ROUTES",
+          "TRADING_POST",
           10.0,
           40.0,
           FrequencyType.RECURRING,
@@ -212,13 +212,6 @@ public class CardCatalog {
           60.0,
           FrequencyType.RECURRING,
           List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 5.0, ValueType.INTEGER)));
-  public static final Card MARKETPLACE =
-      new Card(
-          "MARKETPLACE",
-          15.0,
-          70.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(10)));
   public static final Card CARAVAN =
       new Card(
           "CARAVAN",
@@ -291,7 +284,7 @@ public class CardCatalog {
           10.0,
           10.0,
           FrequencyType.SINGLE,
-          List.of(ResourceTarget.PRODUCTION.integer(80), ResourceTarget.POPULATION.integer(-12)));
+          List.of(ResourceTarget.GOLD.integer(80), ResourceTarget.POPULATION.integer(-12)));
   public static final Card STOREHOUSE =
       new Card(
           "STOREHOUSE",
@@ -388,9 +381,9 @@ public class CardCatalog {
   // ----- Gold & Strength resource cards (unlocked by TREASURY / BARRACKS great works) -----
 
   // Spring: one gold, one strength
-  public static final Card GOLD_MARKET =
+  public static final Card MARKETPLACE =
       new Card(
-          "GOLD_MARKET",
+          "MARKETPLACE",
           10.0,
           80.0,
           FrequencyType.RECURRING,
@@ -404,9 +397,9 @@ public class CardCatalog {
           List.of(ResourceTarget.STRENGTH.integer(10)));
 
   // Summer: one gold, one strength
-  public static final Card TRADE_CONVOY =
+  public static final Card TRADE_ROUTES =
       new Card(
-          "TRADE_CONVOY",
+          "TRADE_ROUTES",
           15.0,
           100.0,
           FrequencyType.RECURRING,
@@ -436,9 +429,13 @@ public class CardCatalog {
           List.of(ResourceTarget.STRENGTH.integer(15)));
 
   // Winter: one gold, one strength
-  public static final Card MINT =
+  public static final Card FOREIGN_AID =
       new Card(
-          "MINT", 20.0, 160.0, FrequencyType.RECURRING, List.of(ResourceTarget.GOLD.integer(25)));
+          "FOREIGN_AID",
+          20.0,
+          160.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(25)));
   public static final Card FORTRESS_WALL =
       new Card(
           "FORTRESS_WALL",
@@ -663,7 +660,7 @@ public class CardCatalog {
             LUMBER_YARD,
             COMMUNITY_WELL,
             IRRIGATION,
-            GOLD_MARKET, // available only when GOLD unlocked
+            MARKETPLACE, // available only when GOLD unlocked
             TRAINING_GROUNDS, // available only when STRENGTH unlocked
             THE_GREAT_RESERVOIR_CONSTRUCTION // no gold/strength cost — always available
             ));
@@ -676,17 +673,16 @@ public class CardCatalog {
             FARMSTEAD,
             THE_HUNT,
             LOGGING,
-            TRADE_ROUTES,
+            TRADING_POST,
             FISHING_VILLAGE,
             SCHOOL_HOUSE,
             EARLY_HARVEST,
             WINDMILL,
-            MARKETPLACE,
             CARAVAN,
             TOWN_FAIR,
             STONE_QUARRY,
             MERCHANT_GUILD,
-            TRADE_CONVOY, // available only when GOLD unlocked
+            TRADE_ROUTES, // available only when GOLD unlocked
             GUARD_POST, // available only when STRENGTH unlocked
             THE_GREAT_ROAD_CONSTRUCTION // available only when GOLD unlocked
             ));
@@ -720,7 +716,7 @@ public class CardCatalog {
             CHAPEL,
             PRAY,
             DESPERATE_TIMES,
-            MINT, // available only when GOLD unlocked
+            FOREIGN_AID, // available only when GOLD unlocked
             FORTRESS_WALL, // available only when STRENGTH unlocked
             THE_GREAT_CONQUEST_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
