@@ -534,7 +534,7 @@ public class CardCatalog {
           5.0,
           FrequencyType.RECURRING,
           List.of(ResourceTarget.PRODUCTION.integer(-50)),
-          4,
+          1,
           TREASURY_COMPLETED,
           Set.of(ResourceTarget.GOLD),
           false,
