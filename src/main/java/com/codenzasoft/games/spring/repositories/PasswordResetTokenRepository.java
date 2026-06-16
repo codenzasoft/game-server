@@ -15,11 +15,11 @@ public interface PasswordResetTokenRepository
 
   Optional<PasswordResetTokenEntity> findByTokenAndExpiresAtAfter(UUID token, Instant now);
 
-  @Modifying
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("DELETE FROM PasswordResetTokenEntity t WHERE t.userId = :userId")
   void deleteByUserId(UUID userId);
 
-  @Modifying
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("DELETE FROM PasswordResetTokenEntity t WHERE t.expiresAt < :now")
   void deleteExpiredBefore(Instant now);
 }
