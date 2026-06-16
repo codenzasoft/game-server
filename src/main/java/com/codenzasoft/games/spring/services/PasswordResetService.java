@@ -1,18 +1,20 @@
 package com.codenzasoft.games.spring.services;
 
+import com.codenzasoft.games.spring.entities.PasswordResetTokenEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.repositories.PasswordResetTokenRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -22,10 +24,6 @@ public class PasswordResetService {
 
   private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
   private static final Duration TOKEN_VALIDITY = Duration.ofMinutes(30);
-
-  private record ResetEntry(UUID userId, Instant expiry) {}
-
-  private final ConcurrentHashMap<String, ResetEntry> tokens = new ConcurrentHashMap<>();
 
   @Value("${mailgun.api-key:}")
   private String apiKey;
@@ -37,15 +35,18 @@ public class PasswordResetService {
   private String from;
 
   @Autowired private UsersRepository usersRepository;
+  @Autowired private PasswordResetTokenRepository tokenRepository;
 
   private final RestClient restClient = RestClient.create();
 
+  @Transactional
   public void initiateReset(UserEntity user, String resetBaseUrl) {
-    // Invalidate any existing tokens for this user
-    tokens.entrySet().removeIf(e -> e.getValue().userId().equals(user.getId()));
+    tokenRepository.deleteByUserId(user.getId());
+    tokenRepository.deleteExpiredBefore(Instant.now());
 
-    final String token = UUID.randomUUID().toString();
-    tokens.put(token, new ResetEntry(user.getId(), Instant.now().plus(TOKEN_VALIDITY)));
+    final UUID token = UUID.randomUUID();
+    tokenRepository.save(
+        new PasswordResetTokenEntity(token, user.getId(), Instant.now().plus(TOKEN_VALIDITY)));
 
     final String link = resetBaseUrl + "?token=" + token;
     sendEmail(
@@ -59,23 +60,23 @@ public class PasswordResetService {
 
   /** Returns the user associated with {@code token} if it is valid and not expired. */
   public Optional<UserEntity> validateToken(String token) {
-    purgeExpired();
-    final ResetEntry entry = tokens.get(token);
-    if (entry == null) return Optional.empty();
-    if (entry.expiry().isBefore(Instant.now())) {
-      tokens.remove(token);
+    UUID uuid;
+    try {
+      uuid = UUID.fromString(token);
+    } catch (IllegalArgumentException e) {
       return Optional.empty();
     }
-    return usersRepository.findById(entry.userId());
+    return tokenRepository
+        .findByTokenAndExpiresAtAfter(uuid, Instant.now())
+        .flatMap(entry -> usersRepository.findById(entry.getUserId()));
   }
 
+  @Transactional
   public void consumeToken(String token) {
-    tokens.remove(token);
-  }
-
-  private void purgeExpired() {
-    final Instant now = Instant.now();
-    tokens.entrySet().removeIf(e -> e.getValue().expiry().isBefore(now));
+    try {
+      tokenRepository.deleteById(UUID.fromString(token));
+    } catch (IllegalArgumentException ignored) {
+    }
   }
 
   private void sendEmail(String to, String subject, String text) {
