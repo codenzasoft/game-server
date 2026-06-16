@@ -861,9 +861,9 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Returns {@code true} if Great Work {@code gw} (or its completed counterpart) already exists
-   * anywhere in the game — hand, any draw pile, any discard pile, or any season's table. Each
-   * Great Work may only ever be drafted or commissioned once, so once claimed it is suppressed
-   * from the ADD-phase offer pool and blocked from being commissioned again, no matter which path
+   * anywhere in the game — hand, any draw pile, any discard pile, or any season's table. Each Great
+   * Work may only ever be drafted or commissioned once, so once claimed it is suppressed from the
+   * ADD-phase offer pool and blocked from being commissioned again, no matter which path
    * (draft-and-place, or direct commission) put it there.
    */
   private boolean greatWorkAlreadyClaimed(Card gw) {
@@ -1222,7 +1222,8 @@ public class GameEngine implements Game<GameEngine> {
     // (construction card on a table), or already completed (completed card on a table). A Great
     // Work may only ever exist once, regardless of which path put it there.
     if (greatWorkAlreadyClaimed(gw)) {
-      throw new IllegalStateException("great work already drafted, commissioned, or completed: " + name);
+      throw new IllegalStateException(
+          "great work already drafted, commissioned, or completed: " + name);
     }
 
     List<Card> targetTable = state.getBoard().get(gw.tableSlot());
@@ -1319,8 +1320,8 @@ public class GameEngine implements Game<GameEngine> {
    */
   /**
    * Returns Great Work construction cards available for commissioning on {@code season}'s table —
-   * i.e. cards that haven't already been drafted, commissioned, or completed anywhere in the
-   * game. Each Great Work may only ever exist once.
+   * i.e. cards that haven't already been drafted, commissioned, or completed anywhere in the game.
+   * Each Great Work may only ever exist once.
    */
   public synchronized List<Card> availableGreatWorks(Season season) {
     return cardCatalog.greatWorksForSeason(season).stream()

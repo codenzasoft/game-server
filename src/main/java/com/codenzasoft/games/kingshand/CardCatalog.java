@@ -42,12 +42,14 @@ public class CardCatalog {
     for (List<Card> cards : copy.values()) {
       for (Card c : cards) {
         byNameMutable.put(c.name(), c);
-        if (c.isGreatWork() && c.tableSlot() != null) {
-          gwBySeasonMutable.get(c.tableSlot()).add(c);
-        }
       }
     }
-    // Also index the standalone great-work construction cards (not in the seasonal ADD pool).
+    // Index every Great Work construction card by season and by name. ALL_GREAT_WORKS is the
+    // single authoritative list of all six Great Works, so each is indexed exactly once here —
+    // even though four of them (the win-condition Great Works) are *also* physically embedded in
+    // their season's seasonalCards list above (so they can appear in the ADD-phase draft pool).
+    // Indexing them again from that seasonal-list scan would have double-counted those four in
+    // greatWorksBySeason, so that case is intentionally skipped above.
     for (Card gw : ALL_GREAT_WORKS) {
       byNameMutable.put(gw.name(), gw);
       if (gw.tableSlot() != null) gwBySeasonMutable.get(gw.tableSlot()).add(gw);
@@ -557,9 +559,7 @@ public class CardCatalog {
           20.0,
           450.0,
           FrequencyType.RECURRING,
-          List.of(
-              ResourceTarget.PRODUCTION.integer(-35),
-              ResourceTarget.FOOD.integer(-25)),
+          List.of(ResourceTarget.PRODUCTION.integer(-35), ResourceTarget.FOOD.integer(-25)),
           6,
           THE_GREAT_RESERVOIR_COMPLETED,
           Set.of(),

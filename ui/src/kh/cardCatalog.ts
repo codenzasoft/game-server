@@ -72,6 +72,16 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A network of channels that amplifies the output of every food-producing card on the table.",
     tags: ["AGRICULTURE", "ENGINE"],
   },
+  MARKETPLACE: {
+    name: "Marketplace",
+    description: "A bustling marketplace where merchants trade in coin, drawing steady gold into your settlement.",
+    tags: ["COMMERCE", "GOLD"],
+  },
+  TRAINING_GROUNDS: {
+    name: "Training Grounds",
+    description: "A drilling yard where raw recruits are forged into a disciplined fighting force.",
+    tags: ["MILITARY", "STRENGTH"],
+  },
 
   // ── Summer ─────────────────────────────────────────────────────────────────
   BUNKHOUSE: {
@@ -144,6 +154,16 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A powerful guild that amplifies every food and production card on the table.",
     tags: ["COMMERCE", "ENGINE"],
   },
+  TRADE_ROUTES: {
+    name: "Trade Routes",
+    description: "Long-distance trade routes that fill the treasury with foreign gold.",
+    tags: ["COMMERCE", "GOLD"],
+  },
+  GUARD_POST: {
+    name: "Guard Post",
+    description: "A fortified post where soldiers stand watch and hone their strength.",
+    tags: ["MILITARY", "STRENGTH"],
+  },
 
   // ── Fall ───────────────────────────────────────────────────────────────────
   WORKSHOP: {
@@ -196,6 +216,16 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "A master blacksmith whose forge dramatically amplifies every production card on the table.",
     tags: ["INDUSTRY", "ENGINE"],
   },
+  GOLD_MINE: {
+    name: "Gold Mine",
+    description: "A rich vein of ore that pours raw gold into your coffers.",
+    tags: ["INDUSTRY", "GOLD"],
+  },
+  ARMORY: {
+    name: "Armory",
+    description: "Racks of forged steel that arm your soldiers for the trials ahead.",
+    tags: ["MILITARY", "STRENGTH"],
+  },
 
   // ── Winter ─────────────────────────────────────────────────────────────────
   FORGE: {
@@ -238,6 +268,78 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     description: "You shall be fed — but the cost to your people is steep.",
     tags: ["SURVIVAL"],
   },
+  FOREIGN_AID: {
+    name: "Foreign Aid",
+    description: "A foreign benefactor sends gold to see your settlement through the winter.",
+    tags: ["COMMERCE", "GOLD"],
+  },
+  FORTRESS_WALL: {
+    name: "Fortress Wall",
+    description: "Towering walls that harden your settlement's strength against any siege.",
+    tags: ["MILITARY", "STRENGTH"],
+  },
+
+  // ── Great Works ────────────────────────────────────────────────────────────
+  TREASURY_CONSTRUCTION: {
+    name: "Treasury (Under Construction)",
+    description: "Foundations are laid for a royal treasury that will unlock the flow of gold.",
+    tags: ["GREAT_WORK", "GOLD"],
+  },
+  TREASURY: {
+    name: "Treasury",
+    description: "A completed royal treasury, its vaults open and gold flowing freely into your settlement.",
+    tags: ["GREAT_WORK", "GOLD"],
+  },
+  BARRACKS_CONSTRUCTION: {
+    name: "Barracks (Under Construction)",
+    description: "Timber and stone rise into barracks that will unlock the strength of a standing army.",
+    tags: ["GREAT_WORK", "STRENGTH"],
+  },
+  BARRACKS: {
+    name: "Barracks",
+    description: "A completed barracks, home to a standing army that lends your settlement real strength.",
+    tags: ["GREAT_WORK", "STRENGTH"],
+  },
+  THE_GREAT_RESERVOIR_CONSTRUCTION: {
+    name: "The Great Reservoir (Under Construction)",
+    description: "A vast reservoir takes shape, promising water and plenty for generations to come.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_RESERVOIR: {
+    name: "The Great Reservoir",
+    description: "A monumental reservoir that secures your settlement's water and food for all time.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_ROAD_CONSTRUCTION: {
+    name: "The Great Road (Under Construction)",
+    description: "Stone is laid mile by mile for a road that will bind your settlement to the wider world.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_ROAD: {
+    name: "The Great Road",
+    description: "A grand road connecting your settlement to distant lands and endless trade.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_CAPITAL_CONSTRUCTION: {
+    name: "The Great Capital (Under Construction)",
+    description: "Walls and towers rise around a future capital, the seat of a growing realm.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_CAPITAL: {
+    name: "The Great Capital",
+    description: "A magnificent capital city, the beating heart of your kingdom.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_CONQUEST_CONSTRUCTION: {
+    name: "The Great Conquest (Under Construction)",
+    description: "Armies muster and march as your settlement prepares for a final campaign of conquest.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
+  THE_GREAT_CONQUEST: {
+    name: "The Great Conquest",
+    description: "Your armies have triumphed — the realm bows before your settlement's conquest.",
+    tags: ["GREAT_WORK", "WIN_CONDITION"],
+  },
 };
 
 /** Strips a roman numeral upgrade suffix from a card name, e.g. "FARM II" → "FARM". */
@@ -268,6 +370,7 @@ export function getCardDisplayInfo(card: Card): CardDisplayInfo {
 const IMAGE_NAME_OVERRIDES: Record<string, string> = {
   SCHOOL_HOUSE: "schoolhouse",  // file has no underscore
   MASON_GUILD:  "masons_guild", // file has an extra 's'
+  FORTRESS_WALL: "fortress",    // file is named fortress.png, not fortress_wall.png
 };
 
 /** Returns the public path to a card's full-art PNG, e.g. "/img/barn.png". */
