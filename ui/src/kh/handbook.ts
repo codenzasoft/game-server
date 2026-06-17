@@ -26,7 +26,9 @@ export const HANDBOOK: HandbookChapter[] = [
     sections: [
       {
         title: "Your goal",
-        body: `Keep your population alive. If it hits zero, the game ends.`,
+        body: `Keep your population alive — if it hits zero, the game ends. Win by completing
+               all four win-condition Great Works: The Great Reservoir, The Great Road, The
+               Great Capital, and The Great Conquest. See the Great Works chapter for details.`,
       },
       {
         title: "Each season",
