@@ -55,6 +55,60 @@ const getGameId = (): string | undefined => {
 
   const mountTarget = document.getElementById("pixi-container")!;
 
+  // ── Victory overlay ──────────────────────────────────────────────────────
+  // Shown whenever state.gameWon is true (all four win-condition Great Works
+  // completed), regardless of curPhase. Sits on top of everything, same as
+  // the game-over overlay below.
+
+  const showGameWon = (): void => {
+    if (currentScene) {
+      currentScene.unmount();
+      currentScene = null;
+    }
+    if (document.getElementById("kh-game-won-overlay")) return; // already shown
+
+    const style = document.createElement("style");
+    style.textContent = `
+      #kh-game-won-overlay {
+        position: fixed; inset: 0; z-index: 9000;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        background: radial-gradient(circle at 50% 35%, rgba(60,42,10,.96) 0%, rgba(10,6,2,.97) 75%);
+        font-family: 'Cinzel', serif;
+      }
+      .kh-win-crown   { font-size: 5rem; margin-bottom: 24px; }
+      .kh-win-title   { font-size: 2.6rem; font-weight: 700; color: #f5d76e;
+                         letter-spacing: 5px; text-shadow: 0 2px 18px rgba(245,215,110,.45);
+                         margin: 0 0 14px; }
+      .kh-win-sub     { font-size: 1.1rem; color: #e8d4a0; font-style: italic;
+                         margin: 0 0 48px; letter-spacing: 1px; }
+      .kh-win-btn     { padding: 14px 48px; border-radius: 10px; border: 2px solid #f5d76e;
+                         background: linear-gradient(135deg, #6a4a10 0%, #3a2406 100%);
+                         color: #fff6dc; font-family: 'Cinzel', serif; font-size: 1rem;
+                         font-weight: 700; letter-spacing: 2px; cursor: pointer;
+                         transition: all .15s; }
+      .kh-win-btn:hover { background: linear-gradient(135deg, #8a6420 0%, #5a3a10 100%);
+                           box-shadow: 0 3px 18px rgba(245,215,110,.45); }
+    `;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement("div");
+    overlay.id = "kh-game-won-overlay";
+    overlay.innerHTML = `
+      <div class="kh-win-crown">👑</div>
+      <h1 class="kh-win-title">YOUR KINGDOM HAS TRIUMPHED</h1>
+      <p class="kh-win-sub">All four Great Works stand complete. Your legacy endures.</p>
+      <button class="kh-win-btn" id="kh-win-home">Return Home</button>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById("kh-win-home")!.addEventListener("click", () => {
+      overlay.remove();
+      app.destroy(true, true);
+      window.location.href = homeUrl;
+    });
+  };
+
   // ── Game-over overlay ──────────────────────────────────────────────────────
   // Shown whenever state.gameOver is true, regardless of curPhase.
   // It sits on top of everything and lets the player return to the home screen.
@@ -115,9 +169,17 @@ const getGameId = (): string | undefined => {
 
     const { state } = message;
 
-    // Game over takes priority over phase routing — the server does not advance
-    // the phase when population hits zero, so we must check this first or the
-    // player can end up stuck on the current scene with no way forward.
+    // Victory and game-over both take priority over phase routing — the server
+    // does not advance the phase once either is true (population hits zero, or
+    // all four win-condition Great Works complete), so we must check these first
+    // or the player can end up stuck on the current scene with no way forward.
+    // Victory is checked first: in the rare case a Great Work's final-season
+    // upkeep cost also starves the population in the same turn, winning takes
+    // precedence over losing.
+    if (state.gameWon) {
+      showGameWon();
+      return;
+    }
     if (state.gameOver) {
       showGameOver();
       return;

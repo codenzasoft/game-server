@@ -309,6 +309,11 @@ export class AddPhaseScene {
               <span class="kh-cost-label">Workers</span>
               <span class="kh-cost-val kh-cost-pop">${card.staffRequirement} 👥</span>
             </div>
+            ${card.constructionPeriod > 0 ? `
+            <div class="kh-cost-item">
+              <span class="kh-cost-label">Construction</span>
+              <span class="kh-cost-val">${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"} 🏗️</span>
+            </div>` : ""}
           </div>
           <button class="kh-btn-select" data-index="${index}">
             Add to Deck

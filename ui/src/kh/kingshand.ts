@@ -84,6 +84,8 @@ interface CardData {
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
+  /** Seasons of construction remaining; 0 for normal cards and completed Great Works. */
+  constructionPeriod: number;
 }
 
 interface CardStaffingData {
@@ -198,6 +200,7 @@ export class Card {
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
+  constructionPeriod: number;
 
   constructor(data: CardData) {
     this.name = data.name;
@@ -205,6 +208,12 @@ export class Card {
     this.productionRequirement = data.productionRequirement;
     this.frequencyType = data.frequencyType;
     this.effects = data.effects;
+    this.constructionPeriod = data.constructionPeriod;
+  }
+
+  /** True for a Great Work still under construction (as opposed to a normal or completed card). */
+  isGreatWork(): boolean {
+    return this.constructionPeriod > 0;
   }
 }
 
@@ -400,6 +409,9 @@ const CardSchema = z
     productionRequirement: z.number(),
     frequencyType: z.enum(FrequencyType),
     effects: z.array(EffectSchema),
+    // > 0 while a Great Work is still under construction; 0 for normal cards and
+    // completed Great Works. Defaulted for safety, though the server always sends it.
+    constructionPeriod: z.number().int().default(0),
   })
   .transform((data) => new Card(data as CardData));
 

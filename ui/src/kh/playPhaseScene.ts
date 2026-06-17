@@ -6,6 +6,7 @@ import {
   resourceIcon,
   resourceLabel,
   resourceShortLabel,
+  WIN_CONDITION_GREAT_WORK_NAMES,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -107,6 +108,11 @@ export class PlayPhaseScene {
   private render(): void {
     const { state } = this;
 
+    if (state.gameWon) {
+      this.renderGameWon();
+      return;
+    }
+
     if (state.gameOver) {
       this.renderGameOver();
       return;
@@ -193,6 +199,63 @@ export class PlayPhaseScene {
     this.overlay.insertAdjacentHTML("beforeend", buildOptionsButton());
 
     const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-go-btn");
+    if (homeBtn) {
+      homeBtn.addEventListener("click", () => {
+        window.location.href = HOME_URL;
+      });
+    }
+
+    attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
+  }
+
+  private renderGameWon(): void {
+    const { state } = this;
+    const meta = SEASON_META[state.curSeason];
+
+    const greatWorksHTML = WIN_CONDITION_GREAT_WORK_NAMES.map((name) => {
+      const info = getCardDisplayInfo({ name } as Card);
+      return `<li class="kh-play-win-gw-item">🏛️ ${info.name}</li>`;
+    }).join("");
+
+    this.overlay.innerHTML = `
+      ${this.buildHeader(state, meta)}
+      ${this.buildResourcesBar(state)}
+      <div class="kh-play-game-won">
+        <div class="kh-play-win-icon">👑</div>
+        <h2 class="kh-play-win-title">Your Kingdom Has Triumphed</h2>
+        <p class="kh-play-win-sub">All four Great Works stand complete. Your legacy shall endure for generations.</p>
+        <div class="kh-play-win-stats">
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Years Reigned</div>
+            <div class="kh-play-win-stat-val">${state.year}</div>
+          </div>
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Great Works</div>
+            <div class="kh-play-win-stat-val">4 / 4</div>
+          </div>
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Production</div>
+            <div class="kh-play-win-stat-val">${Math.floor(state.production)} ⚒️</div>
+          </div>
+        </div>
+        <ul class="kh-play-win-gw-list">
+          ${greatWorksHTML}
+        </ul>
+        <button class="kh-play-win-btn" id="kh-play-win-btn">
+          Return to Home Screen
+        </button>
+      </div>
+    `;
+
+    // Apply season background image on the victory screen too
+    this.overlay.style.background =
+      `linear-gradient(rgba(20,14,2,.55) 0%, rgba(20,14,2,.55) 100%), url('${meta.bg}') center/cover no-repeat`;
+
+    this.overlay.insertAdjacentHTML("beforeend", buildHandbookButton());
+    this.overlay.insertAdjacentHTML("beforeend", buildOptionsButton());
+
+    const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-win-btn");
     if (homeBtn) {
       homeBtn.addEventListener("click", () => {
         window.location.href = HOME_URL;
@@ -370,6 +433,18 @@ export class PlayPhaseScene {
       ? `<div class="kh-tc-tt-staffing ${chipClass}">👥 ${staffing.workersAllocated} / ${staffing.workerCost} — ${tierLabel}</div>`
       : "";
 
+    // Construction-period chip/tooltip — only for Great Works still under construction.
+    const seasonsLeft = card.constructionPeriod;
+    const seasonWord = seasonsLeft === 1 ? "season" : "seasons";
+    const constructionChipHTML =
+      seasonsLeft > 0
+        ? `<div class="kh-tc-construction-chip">🏗️ ${seasonsLeft} ${seasonWord} left</div>`
+        : "";
+    const constructionTooltipHTML =
+      seasonsLeft > 0
+        ? `<div class="kh-tc-tt-construction">🏗️ Under construction — ${seasonsLeft} ${seasonWord} remaining</div>`
+        : "";
+
     const effectsHTML = card.effects
       .map((e) => {
         if (e.target instanceof CardTarget) {
@@ -406,6 +481,7 @@ export class PlayPhaseScene {
           <img class="kh-tc-art" src="${imgSrc}" alt="${info.name}" />
           <div class="kh-tc-freq-pip ${card.frequencyType === "RECURRING" ? "kh-tc-pip-r" : "kh-tc-pip-s"}"></div>
           ${staffChipHTML}
+          ${constructionChipHTML}
           <div class="kh-tc-name-bar">${info.name}</div>
         </div>
 
@@ -416,6 +492,7 @@ export class PlayPhaseScene {
             <span class="kh-tc-tt-fbadge ${card.frequencyType === "RECURRING" ? "kh-tc-fbadge-r" : "kh-tc-fbadge-s"}">${card.frequencyType}</span>
           </div>
           ${staffTooltipHTML}
+          ${constructionTooltipHTML}
           <div class="kh-tc-tt-effects">${effectsHTML}</div>
           <div class="kh-tc-tt-footer">
             <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
@@ -582,6 +659,11 @@ export class PlayPhaseScene {
               <span class="kh-play-hc-cost-label">👥 Pop. Req</span>
               <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.staffRequirement}</span>
             </div>
+            ${card.constructionPeriod > 0 ? `
+            <div class="kh-play-hc-cost-item">
+              <span class="kh-play-hc-cost-label">🏗️ Construction</span>
+              <span class="kh-play-hc-cost-val">${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"}</span>
+            </div>` : ""}
             ${unavailable ? `<span class="kh-play-hc-unavailable">${unavailable}</span>` : ""}
           </div>
           <button class="kh-play-btn-play ${isUpgrade ? "kh-play-btn-upgrade" : ""}"
@@ -1558,6 +1640,67 @@ export class PlayPhaseScene {
       }
       .kh-play-go-btn:hover { background: linear-gradient(135deg, #7a2818 0%, #4a1208 100%); box-shadow: 3px 6px 18px rgba(0,0,0,.5); }
 
+      /* ── Victory screen ─────────────────────────────────────────────── */
+      .kh-play-game-won {
+        max-width: 560px;
+        margin: 60px auto;
+        text-align: center;
+        background: #2a2008;
+        border: 3px solid #c49428;
+        border-radius: 20px;
+        padding: 50px 40px 44px;
+        box-shadow: 0 10px 50px rgba(0,0,0,.55);
+      }
+      .kh-play-win-icon  { font-size: 4rem; margin-bottom: 20px; filter: drop-shadow(0 4px 12px rgba(245,215,110,.55)); }
+      .kh-play-win-title { font-family: 'Cinzel', serif; font-size: 1.9rem; font-weight: 700; color: #f5d76e; letter-spacing: 3px; margin: 0 0 14px; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+      .kh-play-win-sub   { font-style: italic; color: #e0c898; font-size: 1.1rem; margin: 0 0 36px; line-height: 1.5; }
+
+      .kh-play-win-stats {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-bottom: 30px;
+        padding-bottom: 30px;
+        border-bottom: 1px solid rgba(255,255,255,.1);
+      }
+      .kh-play-win-stat       { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      .kh-play-win-stat-label { font-family: 'Cinzel', serif; font-size: .65rem; letter-spacing: 1.5px; color: #a08850; text-transform: uppercase; }
+      .kh-play-win-stat-val   { font-family: 'Cinzel', serif; font-size: 1.2rem; font-weight: 700; color: #f0dcae; }
+
+      .kh-play-win-gw-list {
+        list-style: none;
+        margin: 0 0 36px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .kh-play-win-gw-item {
+        font-family: 'Cinzel', serif;
+        font-size: .95rem;
+        color: #f5d76e;
+        background: rgba(245,215,110,.08);
+        border: 1px solid rgba(245,215,110,.25);
+        border-radius: 8px;
+        padding: 8px 14px;
+      }
+
+      .kh-play-win-btn {
+        padding: 13px 44px;
+        background: linear-gradient(135deg, #6a4a10 0%, #3a2406 100%);
+        color: #fff6dc;
+        border: 2px solid #f5d76e;
+        border-radius: 10px;
+        font-family: 'Cinzel', serif;
+        font-size: .9rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        cursor: pointer;
+        transition: all .15s;
+        box-shadow: 2px 4px 14px rgba(0,0,0,.4);
+      }
+      .kh-play-win-btn:hover { background: linear-gradient(135deg, #8a6420 0%, #5a3a10 100%); box-shadow: 0 3px 18px rgba(245,215,110,.45); }
+
       /* ── Toast ───────────────────────────────────────────────────────── */
       .kh-play-toast {
         position: fixed;
@@ -1823,6 +1966,23 @@ export class PlayPhaseScene {
       .kh-tc-chip-half { background: rgba(160,120,10,.88); color: #ffe090; }
       .kh-tc-chip-none { background: rgba(180,30,30,.88);  color: #ffd0d0; }
 
+      /* Construction-period chip — stacks below the staffing chip, top-right corner */
+      .kh-tc-construction-chip {
+        position: absolute;
+        top: 40px;
+        right: 7px;
+        font-family: 'Cinzel', serif;
+        font-size: .92rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 10px;
+        letter-spacing: .2px;
+        backdrop-filter: blur(3px);
+        background: rgba(120,80,20,.88);
+        color: #ffe8b0;
+        white-space: nowrap;
+      }
+
       /* Name bar — gradient at bottom of art */
       .kh-tc-name-bar {
         position: absolute;
@@ -1906,6 +2066,19 @@ export class PlayPhaseScene {
       .kh-tc-tt-staffing.kh-tc-chip-full { background: rgba(30,140,30,.22); color: #90e090; }
       .kh-tc-tt-staffing.kh-tc-chip-half { background: rgba(160,120,10,.28); color: #f0d060; }
       .kh-tc-tt-staffing.kh-tc-chip-none { background: rgba(180,30,30,.25);  color: #f09090; }
+
+      .kh-tc-tt-construction {
+        font-family: 'Cinzel', serif;
+        font-size: 1.08rem;
+        font-weight: 600;
+        letter-spacing: .2px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        text-align: center;
+        background: rgba(120,80,20,.22);
+        color: #f0c878;
+      }
 
       .kh-tc-tt-effects  { margin-bottom: 10px; }
       .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }

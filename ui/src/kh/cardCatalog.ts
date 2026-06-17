@@ -342,6 +342,19 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
   },
 };
 
+/**
+ * The completed-card names of the four seasonal win-condition Great Works. Mirrors
+ * Card.winCondition() == true on the server (TREASURY/BARRACKS unlock resources but
+ * are not win conditions, so they're excluded here). Used by the win-screen UI to
+ * list what the player accomplished.
+ */
+export const WIN_CONDITION_GREAT_WORK_NAMES = [
+  "THE_GREAT_RESERVOIR",
+  "THE_GREAT_ROAD",
+  "THE_GREAT_CAPITAL",
+  "THE_GREAT_CONQUEST",
+];
+
 /** Strips a roman numeral upgrade suffix from a card name, e.g. "FARM II" → "FARM". */
 function baseName(name: string): string {
   return name.replace(/ (II|III)$/, "");
