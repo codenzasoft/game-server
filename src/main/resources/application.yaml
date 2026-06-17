@@ -16,6 +16,11 @@ server:
   port: ${PORT:8082}
   shutdown: graceful
 
+mailgun:
+  api-key: ${MAILGUN_API_KEY:}
+  domain: ${MAILGUN_DOMAIN:accounts.codenzasoft.ca}
+  from: ${MAILGUN_FROM:noreply@accounts.codenzasoft.ca}
+
 management.endpoint:
   info.enabled: true
   beans.enabled: true
