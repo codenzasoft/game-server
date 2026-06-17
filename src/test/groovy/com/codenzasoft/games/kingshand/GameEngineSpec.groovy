@@ -2203,9 +2203,9 @@ class GameEngineSpec extends Specification {
 
     def "commissionGreatWork throws when production cannot cover the commission cost"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 450 production
+        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 1 production
         def state = GameState.builder()
-                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(100.0)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(0.0)
                 .build()
         def engine = engine(state)
 
@@ -2214,7 +2214,7 @@ class GameEngineSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 450, have 100"
+        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 1, have 0"
     }
 
     // ----- commissionGreatWork: success paths -----
@@ -2267,7 +2267,7 @@ class GameEngineSpec extends Specification {
         engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
 
         then:
-        state.production == 50.0   // 500 - 450 commission cost
+        state.production == 499.0   // 500 - 1 commission cost
         state.board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
     }
 
@@ -2337,11 +2337,13 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun decrements a Great Work's construction period by one when fully staffed and its costs are affordable"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=20, costs PRODUCTION -35 / FOOD -25, period starts at 6
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=1, costs PRODUCTION -1 / FOOD -1.
+        // Start at period 2 so the decrement doesn't also complete construction.
+        def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(20.0).production(100.0).food(100.0)
-                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .population(1.0).production(100.0).food(100.0)
+                .table(Season.SPRING, [inProgress])
                 .build()
         def engine = engine(state)
 
@@ -2351,16 +2353,16 @@ class GameEngineSpec extends Specification {
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR_CONSTRUCTION"
-        tableCard.constructionPeriod() == 5
-        state.production == 65.0   // 100 - 35 construction cost
+        tableCard.constructionPeriod() == 1
+        state.production == 99.0   // 100 - 1 construction cost
     }
 
     def "endAndRun does not progress a Great Work's construction when staffing is below FULL"() {
         setup:
-        // staffRequirement=20 but only 5 workers available
+        // staffRequirement=1 but no workers available
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(5.0).production(100.0).food(100.0)
+                .population(0.0).production(100.0).food(100.0)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
                 .build()
         def engine = engine(state)
@@ -2370,16 +2372,16 @@ class GameEngineSpec extends Specification {
 
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
-        tableCard.constructionPeriod() == 6   // unchanged
+        tableCard.constructionPeriod() == 1   // unchanged
         state.production == 100.0             // construction cost never applied
     }
 
     def "endAndRun does not progress a Great Work's construction when its costs cannot be afforded, even if fully staffed"() {
         setup:
-        // Fully staffed (population 20 >= staffRequirement 20) but production/food too low to cover the cost
+        // Fully staffed (population 1 >= staffRequirement 1) but production/food too low to cover the cost (need 1 each)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(20.0).production(10.0).food(10.0)
+                .population(1.0).production(0.0).food(0.0)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
                 .build()
         def engine = engine(state)
@@ -2389,8 +2391,8 @@ class GameEngineSpec extends Specification {
 
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
-        tableCard.constructionPeriod() == 6   // unchanged — costs not affordable, construction stalls
-        state.production == 10.0              // unchanged; effects never applied
+        tableCard.constructionPeriod() == 1   // unchanged — costs not affordable, construction stalls
+        state.production == 0.0               // unchanged; effects never applied
     }
 
     def "endAndRun completes a Great Work's construction and swaps in the completed card when the period reaches zero"() {
