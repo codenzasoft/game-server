@@ -10,7 +10,7 @@ import {
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
 import { Client, Frame, StompSubscription } from "@stomp/stompjs";
-import { playDealSound, playCardPlaySound, playSlideCardSound, playPassSound, playApplauseSound } from "./sounds";
+import { playDealSound, playCardPlaySound, playSlideCardSound, playPassSound, playApplauseSound, getSfxVolume, setSfxVolume } from "./sounds";
 import { renderLobbyOverlay } from "../shared/lobby";
 
 const wsUrl =
@@ -226,6 +226,9 @@ export class HeartsGameHandler {
   // HTML overlay for in-game menu dropdown
   private menuOverlay: HTMLDivElement | null = null;
   private menuOutsideClickHandler: ((e: PointerEvent) => void) | null = null;
+
+  // HTML overlay for settings modal
+  private settingsOverlay: HTMLDivElement | null = null;
 
   // Trick container retained across renders to support the win animation
   private trickContainer: Container | null = null;
@@ -1432,6 +1435,7 @@ export class HeartsGameHandler {
     overlay.id = "hearts-menu-overlay";
 
     const items: { label: string; action: () => void }[] = [
+      { label: "Settings",      action: () => { this.removeMenuOverlay(); this.renderSettingsOverlay(); } },
       { label: "Save and Exit", action: () => { window.location.href = "/"; } },
       { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
     ];
@@ -1506,6 +1510,155 @@ export class HeartsGameHandler {
       }
       .hearts-menu-item:last-child {
         color: #ffaaaa;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ── Settings overlay (HTML) ───────────────────────────────────────────────
+
+  private renderSettingsOverlay() {
+    if (this.settingsOverlay) return;
+    this.injectSettingsStyles();
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "hearts-settings-overlay";
+
+    const panel = document.createElement("div");
+    panel.id = "hearts-settings-panel";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.id = "hearts-settings-close";
+    closeBtn.textContent = "✕";
+    closeBtn.addEventListener("click", () => this.removeSettingsOverlay());
+
+    const title = document.createElement("h2");
+    title.id = "hearts-settings-title";
+    title.textContent = "Settings";
+
+    const row = document.createElement("div");
+    row.className = "hearts-settings-row";
+
+    const label = document.createElement("label");
+    label.textContent = "Sound Effects";
+    label.htmlFor = "hearts-sfx-slider";
+
+    const controlWrap = document.createElement("div");
+    controlWrap.className = "hearts-settings-control";
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.id = "hearts-sfx-slider";
+    slider.min = "0";
+    slider.max = "100";
+    slider.value = String(getSfxVolume());
+
+    const valueLabel = document.createElement("span");
+    valueLabel.id = "hearts-sfx-value";
+    valueLabel.textContent = `${getSfxVolume()}%`;
+
+    slider.addEventListener("input", () => {
+      const v = Number(slider.value);
+      setSfxVolume(v);
+      valueLabel.textContent = `${v}%`;
+    });
+
+    controlWrap.appendChild(slider);
+    controlWrap.appendChild(valueLabel);
+    row.appendChild(label);
+    row.appendChild(controlWrap);
+    panel.appendChild(closeBtn);
+    panel.appendChild(title);
+    panel.appendChild(row);
+    backdrop.appendChild(panel);
+
+    backdrop.addEventListener("pointerdown", (e) => {
+      if (e.target === backdrop) this.removeSettingsOverlay();
+    });
+
+    document.getElementById("app")!.appendChild(backdrop);
+    this.settingsOverlay = backdrop;
+  }
+
+  private removeSettingsOverlay() {
+    if (this.settingsOverlay) {
+      this.settingsOverlay.remove();
+      this.settingsOverlay = null;
+    }
+  }
+
+  private injectSettingsStyles() {
+    if (document.getElementById("hearts-settings-styles")) return;
+    const style = document.createElement("style");
+    style.id = "hearts-settings-styles";
+    style.textContent = `
+      #hearts-settings-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 30;
+      }
+      #hearts-settings-panel {
+        position: relative;
+        background: rgba(20,20,20,0.97);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 12px;
+        padding: 28px 32px 32px;
+        min-width: 320px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        font-family: Arial, sans-serif;
+        color: #fff;
+      }
+      #hearts-settings-close {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        background: transparent;
+        border: none;
+        color: rgba(255,255,255,0.5);
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+      }
+      #hearts-settings-close:hover {
+        color: #fff;
+      }
+      #hearts-settings-title {
+        margin: 0 0 24px;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+      }
+      .hearts-settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .hearts-settings-row label {
+        font-size: 15px;
+        white-space: nowrap;
+        color: rgba(255,255,255,0.85);
+      }
+      .hearts-settings-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #hearts-sfx-slider {
+        width: 130px;
+        accent-color: #7eb8f7;
+        cursor: pointer;
+      }
+      #hearts-sfx-value {
+        font-size: 14px;
+        color: rgba(255,255,255,0.6);
+        min-width: 36px;
+        text-align: right;
       }
     `;
     document.head.appendChild(style);

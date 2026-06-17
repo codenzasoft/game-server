@@ -1,3 +1,27 @@
+const STORAGE_KEY = "hearts-sfx-volume";
+const DEFAULT_VOLUME = 100;
+
+export function getSfxVolume(): number {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== null) {
+      const v = parseInt(stored, 10);
+      if (!isNaN(v) && v >= 0 && v <= 100) return v;
+    }
+  } catch {
+    // localStorage unavailable (e.g. private mode)
+  }
+  return DEFAULT_VOLUME;
+}
+
+export function setSfxVolume(volume: number): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(Math.max(0, Math.min(100, Math.round(volume)))));
+  } catch {
+    // ignore
+  }
+}
+
 let audioCtx: AudioContext | null = null;
 
 function getCtx(): AudioContext | null {
@@ -33,7 +57,7 @@ function playNoise(
   filter.type = filterType;
   filter.frequency.value = frequency;
   const gainNode = ctx.createGain();
-  gainNode.gain.value = gain;
+  gainNode.gain.value = gain * (getSfxVolume() / 100);
   source.connect(filter);
   filter.connect(gainNode);
   gainNode.connect(ctx.destination);
@@ -50,8 +74,8 @@ export function playCardPlaySound(): void {
   playNoise("bandpass", 1000, 22, 0.09, 0.45);
 }
 
-let slideCardBuffer: AudioBuffer | null = null;
-let swooshBuffer: AudioBuffer | null = null;
+const slideCache = { buf: null as AudioBuffer | null };
+const swooshCache = { buf: null as AudioBuffer | null };
 
 async function playWav(
   cache: { buf: AudioBuffer | null },
@@ -65,12 +89,12 @@ async function playWav(
   }
   const src = ctx.createBufferSource();
   src.buffer = cache.buf;
-  src.connect(ctx.destination);
+  const gainNode = ctx.createGain();
+  gainNode.gain.value = getSfxVolume() / 100;
+  src.connect(gainNode);
+  gainNode.connect(ctx.destination);
   src.start();
 }
-
-const slideCache = { buf: slideCardBuffer };
-const swooshCache = { buf: swooshBuffer };
 
 export function playSlideCardSound(): void {
   void playWav(slideCache, "/audio/hearts/slide-card.wav");
