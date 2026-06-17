@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div class="position-absolute top-50 start-50 translate-middle">
+            <img src="/img/codenza-logo.png" width="300" class="mb-5"/>
+            <h5 class="mb-3">Resend verification email</h5>
+            <div th:if="${success}" class="alert alert-success mb-3" th:text="${success}"></div>
+            <div th:unless="${success}">
+                <p class="text-muted mb-3">Enter your username or email and we'll send you a new verification link.</p>
+                <form th:action="@{/verify-email/resend}" method="post">
+                    <div class="row mb-3">
+                        <input type="text" name="identifier" placeholder="Username or email"
+                               autocomplete="username" required/>
+                    </div>
+                    <div class="row mb-3">
+                        <input class="btn btn-primary" type="submit" value="Resend verification email"/>
+                    </div>
+                </form>
+            </div>
+            <div class="row mt-3">
+                <small class="text-muted">
+                    <a th:href="@{/login}">Back to sign in</a>
+                </small>
+            </div>
+        </div>
+    </body>
+</html>

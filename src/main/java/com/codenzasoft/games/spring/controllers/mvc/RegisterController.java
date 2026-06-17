@@ -1,11 +1,13 @@
 package com.codenzasoft.games.spring.controllers.mvc;
 
+import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.RoleEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
-import com.codenzasoft.games.spring.entities.WhitelistEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.WhitelistRepository;
+import com.codenzasoft.games.spring.services.EmailVerificationService;
 import com.codenzasoft.games.spring.validation.PasswordValidator;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,12 +17,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Handles self-service account creation. Registration is gated by the whitelist: only emails that
- * an admin has whitelisted can register. The role granted to the new user is whatever role the
- * admin set on the whitelist entry. The whitelist entry is deleted on successful registration so
- * each entry is single-use.
+ * Handles self-service account creation. Whitelist code is retained but bypassed — accounts are now
+ * open to anyone with a valid email address, gated by email verification instead.
  */
 @Controller
 public class RegisterController {
@@ -30,6 +31,7 @@ public class RegisterController {
   @Autowired UsersRepository usersRepository;
   @Autowired WhitelistRepository whitelistRepository;
   @Autowired PasswordEncoder passwordEncoder;
+  @Autowired EmailVerificationService verificationService;
 
   @GetMapping("/register")
   public String showForm(Model model) {
@@ -44,6 +46,7 @@ public class RegisterController {
       @RequestParam String userName,
       @RequestParam String password,
       @RequestParam String confirmPassword,
+      HttpServletRequest request,
       RedirectAttributes redirectAttrs) {
 
     final String trimmedEmail = email == null ? "" : email.trim().toLowerCase();
@@ -73,21 +76,7 @@ public class RegisterController {
       return failed(passwordResult.getErrorMessage(), trimmedEmail, trimmedUserName, redirectAttrs);
     }
 
-    // ----- Whitelist check -----
-    final WhitelistEntity whitelistEntry = whitelistRepository.findByEmailIgnoreCase(trimmedEmail);
-    if (whitelistEntry == null) {
-      // Don't reveal whether the email is whitelisted; treat all rejections the same. The admin
-      // controls who can register, so a non-whitelisted user being told "contact your admin" is
-      // the right UX.
-      return failed(
-          "This email is not authorized to create an account. "
-              + "Please contact an administrator.",
-          trimmedEmail,
-          trimmedUserName,
-          redirectAttrs);
-    }
-
-    // ----- Uniqueness checks against existing users -----
+    // ----- Uniqueness checks -----
     if (usersRepository.findByEmail(trimmedEmail) != null) {
       return failed(
           "An account with this email already exists.",
@@ -103,23 +92,29 @@ public class RegisterController {
           redirectAttrs);
     }
 
-    // ----- Create the user -----
+    // ----- Create the user (unverified) -----
     final UserEntity user = new UserEntity();
     user.setUserName(trimmedUserName);
     user.setEmail(trimmedEmail);
-    // DelegatingPasswordEncoder.encode() already returns a prefixed string like "{bcrypt}...".
     user.setPassword(passwordEncoder.encode(password));
 
     final UserEntity saved = usersRepository.save(user);
-    saved.getRoles().add(new RoleEntity(saved.getId(), whitelistEntry.getRole()));
+    saved.getRoles().add(new RoleEntity(saved.getId(), Role.USER));
     usersRepository.save(saved);
 
-    // Consume the whitelist entry.
-    whitelistRepository.deleteByEmailIgnoreCase(trimmedEmail);
+    // ----- Send verification email -----
+    final String verifyBaseUrl =
+        ServletUriComponentsBuilder.fromContextPath(request).path("/verify-email").toUriString();
+    verificationService.sendVerification(saved, verifyBaseUrl);
 
-    redirectAttrs.addFlashAttribute(
-        "success", "Account created. You can now sign in with your username or email.");
-    return "redirect:/login";
+    redirectAttrs.addFlashAttribute("email", trimmedEmail);
+    return "redirect:/register/check-email";
+  }
+
+  @GetMapping("/register/check-email")
+  public String checkEmail(Model model) {
+    model.addAttribute(PageConstants.PAGE_TITLE, "Check your email | Codenza");
+    return "check-email";
   }
 
   private String failed(

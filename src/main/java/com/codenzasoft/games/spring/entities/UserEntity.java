@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.config.Role;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +31,9 @@ public class UserEntity {
 
   @Column(name = "password")
   String password;
+
+  @Column(name = "email_verified_at")
+  Instant emailVerifiedAt;
 
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
   @JoinColumn(name = "user_id", updatable = false)
@@ -104,6 +108,18 @@ public class UserEntity {
 
   public Player toPlayer() {
     return new Player(getId(), getUsername());
+  }
+
+  public void setEmailVerifiedAt(final Instant emailVerifiedAt) {
+    this.emailVerifiedAt = emailVerifiedAt;
+  }
+
+  public Instant getEmailVerifiedAt() {
+    return emailVerifiedAt;
+  }
+
+  public boolean isEmailVerified() {
+    return emailVerifiedAt != null;
   }
 
   public boolean isBot() {

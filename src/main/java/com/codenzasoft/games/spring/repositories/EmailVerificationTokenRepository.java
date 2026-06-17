@@ -1,0 +1,27 @@
+package com.codenzasoft.games.spring.repositories;
+
+import com.codenzasoft.games.spring.entities.EmailVerificationTokenEntity;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface EmailVerificationTokenRepository
+    extends JpaRepository<EmailVerificationTokenEntity, UUID> {
+
+  Optional<EmailVerificationTokenEntity> findByTokenAndExpiresAtAfter(UUID token, Instant now);
+
+  boolean existsByUserId(UUID userId);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("DELETE FROM EmailVerificationTokenEntity t WHERE t.userId = :userId")
+  void deleteByUserId(UUID userId);
+
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("DELETE FROM EmailVerificationTokenEntity t WHERE t.expiresAt < :now")
+  void deleteExpiredBefore(Instant now);
+}
