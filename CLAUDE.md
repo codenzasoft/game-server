@@ -81,10 +81,14 @@ Spring Boot 4 / Java 17 server-side-rendered web app using Thymeleaf. No REST AP
 
 ### Security model
 
-- Form login redirects to `/login`; public paths are `/img/**` and `/login`
-- Roles: `ADMIN`, `DEVELOPER`, `USER`, `BOT` (defined in `Role` enum)
+- Form login redirects to `/login`; public paths: `/img/**`, `/login`, `/register`, `/register/check-email`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`
+- Roles: `ADMIN`, `DEVELOPER`, `USER`, `BOT` (defined in `Role` enum); new self-registered accounts receive `USER`
+- Role hierarchy (`ADMIN > DEVELOPER > USER > BOT`) is defined in `SecurityConfig` and auto-wired into both URL and method security by Spring Security 6.3+
 - Password encoding uses `DelegatingPasswordEncoder` (default bcrypt; supports legacy PBKDF2/scrypt/Argon2)
 - `RoleEntity` uses a composite primary key (`userId` + `role`)
+- Unverified accounts (`email_verified_at IS NULL`) are blocked at login — `GamesUserDetailsService` sets `enabled=false` on the Spring Security `UserDetails` object
+- Self-service password reset: 30-minute single-use token stored in `password_reset_tokens`, delivered via Mailgun (`PasswordResetService`)
+- Rate limiting on registration endpoints: `RegistrationRateLimiter` (`HandlerInterceptor`) — 5 requests/IP/hour on `POST /register` and `POST /verify-email/resend`
 
 ### Templates
 
