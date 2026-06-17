@@ -70,6 +70,18 @@ export const HANDBOOK: HandbookChapter[] = [
                If you don't have enough food, population drops. If population drops below 1,
                the game ends.`,
       },
+      {
+        title: "Gold 💰",
+        body: `Gold is unlocked once the Treasury Great Work is completed. From then on it
+               appears in your resource bar and can be earned and spent by cards and events
+               just like any other resource.`,
+      },
+      {
+        title: "Strength ⚔️",
+        body: `Strength is unlocked once the Barracks Great Work is completed. From then on it
+               appears in your resource bar and can be earned and spent by cards and events
+               just like any other resource.`,
+      },
     ],
   },
 

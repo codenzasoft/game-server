@@ -1,8 +1,11 @@
-import { GameState, Season, Card, ResourceTarget, CardTarget } from "./kingshand.ts";
+import { GameState, Season, Card, CardTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
   formatModifier,
+  resourceIcon,
+  resourceLabel,
+  resourceShortLabel,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -172,6 +175,30 @@ export class AddPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
+    const goldHTML = state.goldUnlocked
+      ? `
+        <div class="kh-res-divider"></div>
+        <div class="kh-resource kh-gold">
+          <span class="kh-res-icon">💰</span>
+          <div>
+            <div class="kh-res-label">Gold</div>
+            <div class="kh-res-value">${Math.floor(state.gold)}</div>
+          </div>
+        </div>
+      `
+      : "";
+    const strengthHTML = state.strengthUnlocked
+      ? `
+        <div class="kh-res-divider"></div>
+        <div class="kh-resource kh-strength">
+          <span class="kh-res-icon">⚔️</span>
+          <div>
+            <div class="kh-res-label">Strength</div>
+            <div class="kh-res-value">${Math.floor(state.strength)}</div>
+          </div>
+        </div>
+      `
+      : "";
     return `
       <div class="kh-resources">
         <div class="kh-resource kh-pop">
@@ -197,6 +224,8 @@ export class AddPhaseScene {
             <div class="kh-res-value">${Math.floor(state.food)}</div>
           </div>
         </div>
+        ${goldHTML}
+        ${strengthHTML}
       </div>
     `;
   }
@@ -234,8 +263,8 @@ export class AddPhaseScene {
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const resIcon = resourceIcon(res);
+          const resLabel = resourceShortLabel(res);
           const scope = e.target.adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
           return `
             <div class="kh-effect-row">
@@ -246,11 +275,8 @@ export class AddPhaseScene {
           `;
         }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
-        const icon = e.target === ResourceTarget.FOOD ? "🌾"
-                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥"
-                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
+        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
+        const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-effect-row">
             <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
@@ -424,9 +450,11 @@ export class AddPhaseScene {
       .kh-res-icon   { font-size: 1.5rem; line-height: 1; }
       .kh-res-label  { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-res-value  { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
-      .kh-pop  .kh-res-value { color: #f09090; }
-      .kh-prod .kh-res-value { color: #f0cc60; }
-      .kh-food .kh-res-value { color: #90e060; }
+      .kh-pop      .kh-res-value { color: #f09090; }
+      .kh-prod     .kh-res-value { color: #f0cc60; }
+      .kh-food     .kh-res-value { color: #90e060; }
+      .kh-gold     .kh-res-value { color: #ffd700; }
+      .kh-strength .kh-res-value { color: #9ab0d0; }
       .kh-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
@@ -539,6 +567,8 @@ export class AddPhaseScene {
       .kh-et-production       { color: #a07010; }
       .kh-et-population       { color: #8b2020; }
       .kh-et-population_cap   { color: #4a6a9a; }
+      .kh-et-gold             { color: #b8860b; }
+      .kh-et-strength         { color: #4a5a78; }
       .kh-et-engine           { color: #7a5aaa; }
       .kh-effect-mod  { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
       .kh-effect-freq { font-size: .88rem; color: #a09070; font-style: italic; }

@@ -1,4 +1,4 @@
-import { Card } from "./kingshand.ts";
+import { Card, ResourceTarget } from "./kingshand.ts";
 
 // ─── Display metadata ─────────────────────────────────────────────────────────
 //
@@ -389,4 +389,38 @@ export function formatModifier(
   return valueType === "PERCENTAGE"
     ? `${sign}${modifier}%`
     : `${sign}${modifier}`;
+}
+
+// ─── Resource display metadata ─────────────────────────────────────────────────
+//
+// Single source of truth for how each ResourceTarget renders: its icon, its
+// effect-row label (matches the legacy raw-enum-string convention used in card
+// effect text), and its short label (used in engine-effect scope text, e.g.
+// "next food card"). Every resource bar, effect description, and resolution
+// indicator across ui/src/kh should go through these instead of hand-rolling a
+// new icon ternary — historically those ternaries were duplicated ~10+ times
+// and every copy silently dropped GOLD/STRENGTH (no icon, or the wrong icon).
+
+const RESOURCE_DISPLAY: Record<ResourceTarget, { icon: string; label: string; shortLabel: string }> = {
+  [ResourceTarget.POPULATION]:     { icon: "👥",  label: "POPULATION", shortLabel: "population" },
+  [ResourceTarget.PRODUCTION]:     { icon: "⚒️", label: "PRODUCTION", shortLabel: "prod" },
+  [ResourceTarget.FOOD]:           { icon: "🌾",  label: "FOOD",       shortLabel: "food" },
+  [ResourceTarget.POPULATION_CAP]: { icon: "🏠",  label: "POP CAP",    shortLabel: "population_cap" },
+  [ResourceTarget.GOLD]:           { icon: "💰",  label: "GOLD",       shortLabel: "gold" },
+  [ResourceTarget.STRENGTH]:       { icon: "⚔️", label: "STRENGTH",   shortLabel: "strength" },
+};
+
+/** Icon for a resource target, e.g. ResourceTarget.GOLD → "💰". Falls back to "❓" for unrecognized values. */
+export function resourceIcon(target: ResourceTarget | string): string {
+  return RESOURCE_DISPLAY[target as ResourceTarget]?.icon ?? "❓";
+}
+
+/** Effect-row label for a resource target, e.g. ResourceTarget.POPULATION_CAP → "POP CAP". Falls back to the raw string. */
+export function resourceLabel(target: ResourceTarget | string): string {
+  return RESOURCE_DISPLAY[target as ResourceTarget]?.label ?? String(target);
+}
+
+/** Lowercase short label used in engine-effect scope text, e.g. "next food card". */
+export function resourceShortLabel(target: ResourceTarget | string): string {
+  return RESOURCE_DISPLAY[target as ResourceTarget]?.shortLabel ?? String(target).toLowerCase();
 }

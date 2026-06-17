@@ -37,4 +37,6 @@ public record ResolutionStep(
     @JsonProperty("populationDelta") double populationDelta,
     @JsonProperty("productionDelta") double productionDelta,
     @JsonProperty("foodDelta") double foodDelta,
-    @JsonProperty("populationCapDelta") double populationCapDelta) {}
+    @JsonProperty("populationCapDelta") double populationCapDelta,
+    @JsonProperty("goldDelta") double goldDelta,
+    @JsonProperty("strengthDelta") double strengthDelta) {}

@@ -1,8 +1,11 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget, ResolutionStep } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
   formatModifier,
+  resourceIcon,
+  resourceLabel,
+  resourceShortLabel,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -222,6 +225,30 @@ export class PlayPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
+    const goldHTML = state.goldUnlocked
+      ? `
+        <div class="kh-play-res-divider"></div>
+        <div class="kh-play-resource kh-play-gold">
+          <span class="kh-play-res-icon">💰</span>
+          <div>
+            <div class="kh-play-res-label">Gold</div>
+            <div class="kh-play-res-value">${Math.floor(state.gold)}</div>
+          </div>
+        </div>
+      `
+      : "";
+    const strengthHTML = state.strengthUnlocked
+      ? `
+        <div class="kh-play-res-divider"></div>
+        <div class="kh-play-resource kh-play-strength">
+          <span class="kh-play-res-icon">⚔️</span>
+          <div>
+            <div class="kh-play-res-label">Strength</div>
+            <div class="kh-play-res-value">${Math.floor(state.strength)}</div>
+          </div>
+        </div>
+      `
+      : "";
     return `
       <div class="kh-play-resources">
         <div class="kh-play-resource kh-play-pop">
@@ -247,6 +274,8 @@ export class PlayPhaseScene {
             <div class="kh-play-res-value">${Math.floor(state.food)}</div>
           </div>
         </div>
+        ${goldHTML}
+        ${strengthHTML}
       </div>
     `;
   }
@@ -345,8 +374,8 @@ export class PlayPhaseScene {
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const resIcon = resourceIcon(res);
+          const resLabel = resourceShortLabel(res);
           const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
           return `
             <div class="kh-tc-tt-effect">
@@ -357,11 +386,8 @@ export class PlayPhaseScene {
           `;
         }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
-        const icon = e.target === ResourceTarget.FOOD ? "🌾"
-                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥"
-                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
+        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
+        const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-tc-tt-effect">
             <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
@@ -506,8 +532,8 @@ export class PlayPhaseScene {
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const resIcon = resourceIcon(res);
+          const resLabel = resourceShortLabel(res);
           const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
           return `
             <div class="kh-play-hc-effect-row">
@@ -518,11 +544,8 @@ export class PlayPhaseScene {
           `;
         }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
-        const icon = e.target === ResourceTarget.FOOD ? "🌾"
-                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥"
-                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
+        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
+        const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-play-hc-effect-row">
             <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
@@ -632,14 +655,13 @@ export class PlayPhaseScene {
           const effectsHTML = c.effects.map((e) => {
             if (e.target instanceof CardTarget) {
               const res = e.target.targetResource;
-              const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-              const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+              const icon = resourceIcon(res);
+              const label = resourceShortLabel(res);
               const sc = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
               return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            if (targetStr === "POPULATION_CAP") return `<span class="kh-cc-effect">🏠 POP CAP ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
-            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
@@ -868,12 +890,24 @@ export class PlayPhaseScene {
 
   // ─── Resource indicator helpers ──────────────────────────────────────────
 
-  /** Returns the three live resource-value elements (pop, prod, food). */
-  private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
+  /**
+   * Returns the live resource-value elements (pop, prod, food, gold, strength).
+   * gold/strength are null whenever the corresponding Great Work hasn't unlocked
+   * that resource yet — the bar simply doesn't render those blocks.
+   */
+  private resEls(): {
+    pop: HTMLElement | null;
+    prod: HTMLElement | null;
+    food: HTMLElement | null;
+    gold: HTMLElement | null;
+    strength: HTMLElement | null;
+  } {
     return {
-      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
-      prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
-      food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+      pop:      this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
+      prod:     this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
+      food:     this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+      gold:     this.overlay.querySelector<HTMLElement>(".kh-play-gold .kh-play-res-value"),
+      strength: this.overlay.querySelector<HTMLElement>(".kh-play-strength .kh-play-res-value"),
     };
   }
 
@@ -905,10 +939,12 @@ export class PlayPhaseScene {
    * @param preState the state that was active when End and Run was clicked
    */
   public async animateFromResolutionLog(newState: GameState, preState: GameState): Promise<void> {
-    let simPop  = preState.population;
-    let simProd = preState.production;
-    let simFood = preState.food;
-    let simCap  = preState.populationCap;
+    let simPop      = preState.population;
+    let simProd     = preState.production;
+    let simFood     = preState.food;
+    let simCap      = preState.populationCap;
+    let simGold     = preState.gold;
+    let simStrength = preState.strength;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -923,11 +959,13 @@ export class PlayPhaseScene {
       }
     };
 
-    const updateBar = (pop: number, prod: number, food: number,
-                       which: { pop: boolean; prod: boolean; food: boolean }): void => {
-      flashEl(".kh-play-pop-num",                 pop,  which.pop);
-      flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
-      flashEl(".kh-play-food .kh-play-res-value", food, which.food);
+    const updateBar = (pop: number, prod: number, food: number, gold: number, strength: number,
+                       which: { pop: boolean; prod: boolean; food: boolean; gold: boolean; strength: boolean }): void => {
+      flashEl(".kh-play-pop-num",                     pop,      which.pop);
+      flashEl(".kh-play-prod .kh-play-res-value",     prod,     which.prod);
+      flashEl(".kh-play-food .kh-play-res-value",     food,     which.food);
+      flashEl(".kh-play-gold .kh-play-res-value",     gold,     which.gold);
+      flashEl(".kh-play-strength .kh-play-res-value", strength, which.strength);
     };
 
     const updateCap = (cap: number): void => {
@@ -936,7 +974,8 @@ export class PlayPhaseScene {
     };
 
     // Initialise the bar at pre-resolution values.
-    updateBar(simPop, simProd, simFood, { pop: false, prod: false, food: false });
+    updateBar(simPop, simProd, simFood, simGold, simStrength,
+      { pop: false, prod: false, food: false, gold: false, strength: false });
     updateCap(simCap);
 
     // ── Step through the server log ───────────────────────────────────────
@@ -952,7 +991,8 @@ export class PlayPhaseScene {
         simPop  = Math.max(0, simPop);
         simFood = Math.max(0, simFood);
 
-        updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
+        updateBar(simPop, simProd, simFood, simGold, simStrength,
+          { pop: true, prod: false, food: true, gold: false, strength: false });
 
         const els = this.resEls();
         if (step.foodDelta !== 0 && els.food)
@@ -998,9 +1038,11 @@ export class PlayPhaseScene {
       const prevFood = simFood;
       let si = 0;
 
-      simPop  += step.populationDelta;
-      simProd += step.productionDelta;
-      simFood += step.foodDelta;
+      simPop      += step.populationDelta;
+      simProd     += step.productionDelta;
+      simFood     += step.foodDelta;
+      simGold     += step.goldDelta;
+      simStrength += step.strengthDelta;
       simPop  = Math.max(0, simPop);
       simProd = Math.max(0, simProd);
       simFood = Math.max(0, simFood);
@@ -1013,16 +1055,20 @@ export class PlayPhaseScene {
       }
 
       const changed = {
-        pop:  step.populationDelta  !== 0,
-        prod: step.productionDelta  !== 0,
-        food: step.foodDelta        !== 0,
+        pop:      step.populationDelta  !== 0,
+        prod:     step.productionDelta  !== 0,
+        food:     step.foodDelta        !== 0,
+        gold:     step.goldDelta        !== 0,
+        strength: step.strengthDelta    !== 0,
       };
-      updateBar(simPop, simProd, simFood, changed);
+      updateBar(simPop, simProd, simFood, simGold, simStrength, changed);
 
       const els = this.resEls();
-      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  step.populationDelta,  "👥", si++);
-      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, step.productionDelta, "⚒️", si++);
-      if (changed.food && els.food) spawnResourceIndicator(els.food, step.foodDelta,       "🌾", si++);
+      if (changed.pop      && els.pop)      spawnResourceIndicator(els.pop,      step.populationDelta, "👥", si++);
+      if (changed.prod     && els.prod)     spawnResourceIndicator(els.prod,     step.productionDelta, "⚒️", si++);
+      if (changed.food     && els.food)     spawnResourceIndicator(els.food,     step.foodDelta,       "🌾", si++);
+      if (changed.gold     && els.gold)     spawnResourceIndicator(els.gold,     step.goldDelta,       "💰", si++);
+      if (changed.strength && els.strength) spawnResourceIndicator(els.strength, step.strengthDelta,   "⚔️", si++);
 
       const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
       this.showToast(`${info.name} fires…${freqLabel}`);
@@ -1124,9 +1170,11 @@ export class PlayPhaseScene {
       .kh-play-res-icon    { font-size: 1.5rem; line-height: 1; }
       .kh-play-res-label   { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-play-res-value   { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
-      .kh-play-pop  .kh-play-res-value { color: #f09090; }
-      .kh-play-prod .kh-play-res-value { color: #f0cc60; }
-      .kh-play-food .kh-play-res-value { color: #90e060; }
+      .kh-play-pop      .kh-play-res-value { color: #f09090; }
+      .kh-play-prod     .kh-play-res-value { color: #f0cc60; }
+      .kh-play-food     .kh-play-res-value { color: #90e060; }
+      .kh-play-gold     .kh-play-res-value { color: #ffd700; }
+      .kh-play-strength .kh-play-res-value { color: #9ab0d0; }
       .kh-play-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-play-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
@@ -1866,6 +1914,8 @@ export class PlayPhaseScene {
       .kh-tc-tt-et-production       { color: #f0c060; }
       .kh-tc-tt-et-population       { color: #f09090; }
       .kh-tc-tt-et-population_cap   { color: #7aace0; }
+      .kh-tc-tt-et-gold             { color: #ffd700; }
+      .kh-tc-tt-et-strength         { color: #9ab0d0; }
       .kh-tc-tt-et-engine           { color: #c090f0; }
       .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
       .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }

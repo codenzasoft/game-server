@@ -530,10 +530,10 @@ public class CardCatalog {
   public static final Card TREASURY_CONSTRUCTION =
       new Card(
           "TREASURY_CONSTRUCTION",
-          25.0,
+          5.0,
           5.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(-50)),
+          List.of(ResourceTarget.PRODUCTION.integer(-5)),
           1,
           TREASURY_COMPLETED,
           Set.of(ResourceTarget.GOLD),

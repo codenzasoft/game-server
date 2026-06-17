@@ -500,6 +500,8 @@ public class GameEngine implements Game<GameEngine> {
       double prodBefore = state.getProduction();
       double foodBefore = state.getFood();
       double capBefore = state.getPopulationCap();
+      double goldBefore = state.getGold();
+      double strengthBefore = state.getStrength();
 
       if (card.isGreatWork()) {
         // Construction cards are never discarded and never run normal effects.
@@ -555,7 +557,9 @@ public class GameEngine implements Game<GameEngine> {
                 state.getPopulation() - popBefore,
                 state.getProduction() - prodBefore,
                 state.getFood() - foodBefore,
-                state.getPopulationCap() - capBefore));
+                state.getPopulationCap() - capBefore,
+                state.getGold() - goldBefore,
+                state.getStrength() - strengthBefore));
         // Great-work construction/completed cards are NEVER discarded by the engine.
         continue;
       }
@@ -610,7 +614,9 @@ public class GameEngine implements Game<GameEngine> {
               state.getPopulation() - popBefore,
               state.getProduction() - prodBefore,
               state.getFood() - foodBefore,
-              state.getPopulationCap() - capBefore));
+              state.getPopulationCap() - capBefore,
+              state.getGold() - goldBefore,
+              state.getStrength() - strengthBefore));
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
@@ -630,6 +636,8 @@ public class GameEngine implements Game<GameEngine> {
             state.getPopulation() - popBefore,
             0,
             state.getFood() - foodBefore,
+            0,
+            0,
             0));
 
     state.setResolutionLog(log);

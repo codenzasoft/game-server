@@ -1,5 +1,5 @@
 import { GameState, Season, KhEvent, EventOption, Effect, ResourceTarget } from "./kingshand.ts";
-import { formatModifier } from "./cardCatalog.ts";
+import { formatModifier, resourceIcon, resourceLabel } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
   buildDeckIndicator,
@@ -123,6 +123,24 @@ export class RandomEventScene {
   }
 
   private buildResourcesBar(state: GameState): string {
+    const goldHTML = state.goldUnlocked ? `
+        <div class="kh-re-res-divider"></div>
+        <div class="kh-re-resource kh-re-gold">
+          <span class="kh-re-res-icon">💰</span>
+          <div>
+            <div class="kh-re-res-label">Gold</div>
+            <div class="kh-re-res-value">${Math.floor(state.gold)}</div>
+          </div>
+        </div>` : "";
+    const strengthHTML = state.strengthUnlocked ? `
+        <div class="kh-re-res-divider"></div>
+        <div class="kh-re-resource kh-re-strength">
+          <span class="kh-re-res-icon">⚔️</span>
+          <div>
+            <div class="kh-re-res-label">Strength</div>
+            <div class="kh-re-res-value">${Math.floor(state.strength)}</div>
+          </div>
+        </div>` : "";
     return `
       <div class="kh-re-resources">
         <div class="kh-re-resource kh-re-pop">
@@ -148,6 +166,8 @@ export class RandomEventScene {
             <div class="kh-re-res-value">${Math.floor(state.food)}</div>
           </div>
         </div>
+        ${goldHTML}
+        ${strengthHTML}
       </div>
     `;
   }
@@ -224,10 +244,12 @@ export class RandomEventScene {
           // the floating indicators and what GameEngine.scaleForSeason() will apply.
           const scaledModifier = Math.round(e.modifier * multiplier);
           const isNegative     = scaledModifier < 0;
+          const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
+          const label = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
           return `
             <div class="kh-re-effect-row">
               <span class="kh-re-effect-target kh-re-et-${targetStr.toLowerCase()}">
-                ${e.target === ResourceTarget.FOOD ? "🌾" : e.target === ResourceTarget.PRODUCTION ? "⚒️" : e.target === ResourceTarget.POPULATION ? "👥" : ""} ${targetStr}
+                ${icon} ${label}
               </span>
               <span class="kh-re-effect-mod ${isNegative ? "kh-re-mod-neg" : "kh-re-mod-pos"}">
                 ${formatModifier(scaledModifier, e.valueType)}
@@ -288,13 +310,15 @@ export class RandomEventScene {
       for (const eff of option.effects) {
         if (typeof eff.target !== "string") continue;
         const delta = eff.modifier * this.computeScaleMultiplier(state.curSeason, year);
-        const sel =
-          eff.target === ResourceTarget.POPULATION ? ".kh-re-pop  .kh-re-res-value" :
-          eff.target === ResourceTarget.PRODUCTION  ? ".kh-re-prod .kh-re-res-value" :
-                                                      ".kh-re-food .kh-re-res-value";
-        const icon =
-          eff.target === ResourceTarget.POPULATION ? "👥" :
-          eff.target === ResourceTarget.PRODUCTION  ? "⚒️" : "🌾";
+        const selMap: Partial<Record<ResourceTarget, string>> = {
+          [ResourceTarget.POPULATION]: ".kh-re-pop .kh-re-res-value",
+          [ResourceTarget.PRODUCTION]: ".kh-re-prod .kh-re-res-value",
+          [ResourceTarget.FOOD]: ".kh-re-food .kh-re-res-value",
+          [ResourceTarget.GOLD]: ".kh-re-gold .kh-re-res-value",
+          [ResourceTarget.STRENGTH]: ".kh-re-strength .kh-re-res-value",
+        };
+        const sel = selMap[eff.target as ResourceTarget] ?? ".kh-re-food .kh-re-res-value";
+        const icon = resourceIcon(eff.target);
         const anchor = this.overlay.querySelector<HTMLElement>(sel);
         if (anchor) spawnResourceIndicator(anchor, delta, icon, si++);
       }
@@ -481,6 +505,8 @@ export class RandomEventScene {
       .kh-re-pop  .kh-re-res-value { color: #f09090; }
       .kh-re-prod .kh-re-res-value { color: #f0cc60; }
       .kh-re-food .kh-re-res-value { color: #90e060; }
+      .kh-re-gold .kh-re-res-value { color: #ffd700; }
+      .kh-re-strength .kh-re-res-value { color: #9ab0d0; }
       .kh-re-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-re-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
@@ -641,6 +667,9 @@ export class RandomEventScene {
       .kh-re-et-food       { color: #3a7020; }
       .kh-re-et-production { color: #a07010; }
       .kh-re-et-population { color: #8b2020; }
+      .kh-re-et-population_cap { color: #5a4a30; }
+      .kh-re-et-gold       { color: #b8860b; }
+      .kh-re-et-strength   { color: #4a5a78; }
       .kh-re-effect-mod    { font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700; }
       .kh-re-mod-pos       { color: #3d6b46; }
       .kh-re-mod-neg       { color: #8b2020; }
