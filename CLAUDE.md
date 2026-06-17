@@ -115,6 +115,24 @@ STOMP over WebSocket. Connection endpoint: `/games/connect` (`WebSocketConfig.ja
 |---|---|---|
 | `/user/queue/games/{gameId}` | `convertAndSendToUser(...)` | Per-player game state updates |
 
+### Account creation flow
+
+Registration is open to anyone with a valid email address. The admin whitelist (`whitelist` table / `WhitelistRepository`) is retained in code but bypassed.
+
+1. User submits the registration form (`POST /register`) — `RegisterController` validates input, checks email/username uniqueness, creates the `UserEntity` with `email_verified_at = NULL` and the `USER` role, then calls `EmailVerificationService.sendVerification()`.
+2. `EmailVerificationService` (extends `MailgunEmailService`) stores a 24-hour UUID token in `email_verification_tokens` and sends an email via the Mailgun HTTP API. In local development, when `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` are not set, the verification URL is logged at WARN level instead.
+3. The user is redirected to `/register/check-email`. Clicking the emailed link hits `GET /verify-email?token=…` — `VerifyEmailController` validates the token, sets `email_verified_at` on the user, and redirects to `/login`.
+4. `GamesUserDetailsService` passes `user.isEmailVerified()` as the `enabled` flag when building the Spring Security `UserDetails` object, so unverified accounts are rejected at login with a disabled-account error.
+5. Users who never received the email can request a new link at `/verify-email/resend` (linked from the login page). The resend endpoint is anti-enumeration: it always returns a generic success message regardless of whether the account exists.
+
+**Rate limiting:** A `RegistrationRateLimiter` (`HandlerInterceptor`) applies a per-IP sliding-window limit of 5 requests/hour to `POST /register` and `POST /verify-email/resend`. The limiter is per-instance (no shared state across Cloud Run replicas), which is acceptable because email verification is still required to activate any account created through it.
+
+**Mailgun configuration** (`application.yaml`):
+```
+MAILGUN_API_KEY, MAILGUN_DOMAIN, MAILGUN_FROM
+```
+Both `EmailVerificationService` and `PasswordResetService` extend `MailgunEmailService`, which holds the shared Mailgun config fields and `sendEmail()` implementation.
+
 ### Schema management
 
 JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).
