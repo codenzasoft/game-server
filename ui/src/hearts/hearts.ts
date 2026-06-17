@@ -313,10 +313,13 @@ export class HeartsGameHandler {
 
   // ── Pre-load all 52 card SVGs ──────────────────────────────────────────────
 
-  async preloadTextures() {
+  async preloadTextures(onProgress?: (loaded: number, total: number) => void) {
     const suits = Object.values(Suit);
     const ranks = Object.values(Rank);
     const resolution = window.devicePixelRatio || 1;
+    const total = suits.length * ranks.length + 1;
+    let loaded = 0;
+    const tick = () => onProgress?.(++loaded, total);
     await Promise.all([
       ...suits.flatMap((suit) =>
         ranks.map(async (rank) => {
@@ -326,10 +329,11 @@ export class HeartsGameHandler {
             data: { resolution },
           });
           this.textures.set(key, texture);
+          tick();
         }),
       ),
       Assets.load<Texture>({ src: "/assets/backs/blue.svg", data: { resolution } }).then(
-        (t) => (this.cardBackTexture = t),
+        (t) => { this.cardBackTexture = t; tick(); },
       ),
     ]);
   }
