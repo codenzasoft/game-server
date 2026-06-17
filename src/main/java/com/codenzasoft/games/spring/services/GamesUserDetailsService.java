@@ -37,7 +37,13 @@ public class GamesUserDetailsService implements UserDetailsService {
             .map(r -> new SimpleGrantedAuthority(r.getRole().name()))
             .toList();
     return new org.springframework.security.core.userdetails.User(
-        entity.getUsername(), entity.getPassword(), roles);
+        entity.getUsername(),
+        entity.getPassword(),
+        entity.isEmailVerified(),
+        true,
+        true,
+        true,
+        roles);
   }
 
   public Optional<UserEntity> getUserByUsernameOrEmail(final String name) {

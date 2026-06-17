@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+    <head th:replace="~{fragments/links :: head-js-css}"></head>
+    <body>
+        <div class="position-absolute top-50 start-50 translate-middle text-center">
+            <img src="/img/codenza-logo.png" width="300" class="mb-5"/>
+            <h5 class="mb-3">Check your email</h5>
+            <p class="text-muted mb-3">
+                We've sent a verification link to
+                <span th:if="${email}" th:text="${email}" class="fw-semibold"></span><span th:unless="${email}">your email address</span>.
+                Click the link to activate your account.
+            </p>
+            <p class="text-muted small">
+                Didn't receive it?
+                <a th:href="@{/verify-email/resend}">Resend the verification email</a>
+            </p>
+            <div class="row mt-4">
+                <small class="text-muted">
+                    <a th:href="@{/login}">Back to sign in</a>
+                </small>
+            </div>
+        </div>
+    </body>
+</html>
