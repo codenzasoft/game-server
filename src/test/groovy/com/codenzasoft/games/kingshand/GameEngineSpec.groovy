@@ -2203,7 +2203,7 @@ class GameEngineSpec extends Specification {
 
     def "commissionGreatWork throws when production cannot cover the commission cost"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 1 production
+        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 120 production
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(0.0)
                 .build()
@@ -2214,7 +2214,7 @@ class GameEngineSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 1, have 0"
+        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 120, have 0"
     }
 
     // ----- commissionGreatWork: success paths -----
@@ -2267,7 +2267,7 @@ class GameEngineSpec extends Specification {
         engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
 
         then:
-        state.production == 499.0   // 500 - 1 commission cost
+        state.production == 380.0   // 500 - 120 commission cost
         state.board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
     }
 
@@ -2337,12 +2337,12 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun decrements a Great Work's construction period by one when fully staffed and its costs are affordable"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=1, costs PRODUCTION -1 / FOOD -1.
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, costs PRODUCTION -50 / FOOD -30.
         // Start at period 2 so the decrement doesn't also complete construction.
         def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(1.0).production(100.0).food(100.0)
+                .population(40.0).production(100.0).food(100.0)
                 .table(Season.SPRING, [inProgress])
                 .build()
         def engine = engine(state)
@@ -2354,12 +2354,12 @@ class GameEngineSpec extends Specification {
         def tableCard = state.board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR_CONSTRUCTION"
         tableCard.constructionPeriod() == 1
-        state.production == 99.0   // 100 - 1 construction cost
+        state.production == 50.0   // 100 - 50 construction cost
     }
 
     def "endAndRun does not progress a Great Work's construction when staffing is below FULL"() {
         setup:
-        // staffRequirement=1 but no workers available
+        // staffRequirement=40 but no workers available
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
                 .population(0.0).production(100.0).food(100.0)
@@ -2372,16 +2372,16 @@ class GameEngineSpec extends Specification {
 
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
-        tableCard.constructionPeriod() == 1   // unchanged
+        tableCard.constructionPeriod() == 6   // unchanged (catalog default)
         state.production == 100.0             // construction cost never applied
     }
 
     def "endAndRun does not progress a Great Work's construction when its costs cannot be afforded, even if fully staffed"() {
         setup:
-        // Fully staffed (population 1 >= staffRequirement 1) but production/food too low to cover the cost (need 1 each)
+        // Fully staffed (population 40 >= staffRequirement 40) but production/food too low to cover the cost (need 50/30)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(1.0).production(0.0).food(0.0)
+                .population(40.0).production(0.0).food(0.0)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
                 .build()
         def engine = engine(state)
@@ -2391,7 +2391,7 @@ class GameEngineSpec extends Specification {
 
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
-        tableCard.constructionPeriod() == 1   // unchanged — costs not affordable, construction stalls
+        tableCard.constructionPeriod() == 6   // unchanged (catalog default) — costs not affordable, construction stalls
         state.production == 0.0               // unchanged; effects never applied
     }
 
@@ -2400,7 +2400,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(20.0).production(100.0).food(100.0)
+                .population(40.0).production(100.0).food(100.0)
                 .table(Season.SPRING, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2415,12 +2415,78 @@ class GameEngineSpec extends Specification {
         tableCard.winCondition() == true
     }
 
+    // ----- endAndRun: Great Work construction POPULATION / POPULATION_CAP effects -----
+
+    def "endAndRun applies THE_GREAT_RESERVOIR_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
+        setup:
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, effects include POPULATION_CAP +5.
+        def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).populationCap(20.0)
+                .production(100.0).food(100.0)
+                .table(Season.SPRING, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.populationCap == 25.0   // 20 + 5
+    }
+
+    def "endAndRun applies THE_GREAT_ROAD_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
+        setup:
+        // THE_GREAT_ROAD_CONSTRUCTION: staffRequirement=60, costs PRODUCTION -65 / FOOD -45 / GOLD -30,
+        // effects include POPULATION_CAP +8. GOLD must be unlocked for the GOLD cost to be deducted
+        // (and therefore affordable), so this test unlocks it explicitly.
+        def inProgress = CardCatalog.THE_GREAT_ROAD_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
+                .population(60.0).populationCap(20.0)
+                .production(200.0).food(150.0)
+                .gold(100.0).goldUnlocked(true)
+                .table(Season.SUMMER, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.populationCap == 28.0   // 20 + 8
+    }
+
+    def "endAndRun applies BARRACKS_CONSTRUCTION's POPULATION effect, reducing population"() {
+        setup:
+        // BARRACKS_CONSTRUCTION: staffRequirement=30, costs PRODUCTION -30 / FOOD -15 / POPULATION -1.
+        // Food is set to 44 so that, after the -15 construction cost (food=29) and the POPULATION -1
+        // effect (population=29), end-of-phase food consumption (29 population x 1/season in FALL)
+        // exactly zeroes food with no surplus growth and no starvation deficit — isolating the
+        // construction effect's impact on population from the unrelated consumption/growth mechanics.
+        def inProgress = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(30.0).populationCap(50.0)
+                .production(100.0).food(44.0)
+                .table(Season.FALL, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.population == 29.0   // 30 - 1 construction cost; consumption/growth net to zero by design
+    }
+
     def "completing a win-condition Great Work does not unlock GOLD or STRENGTH and does not win the game alone"() {
         setup:
         def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(20.0).production(100.0).food(100.0)
+                .population(40.0).production(100.0).food(100.0)
                 .table(Season.SPRING, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2457,7 +2523,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.FALL)
-                .population(22.0).production(100.0).food(100.0)
+                .population(30.0).production(100.0).food(100.0)
                 .table(Season.FALL, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2475,7 +2541,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.THE_GREAT_CONQUEST_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.WINTER)
-                .population(40.0).production(1000.0).food(1000.0).gold(1000.0).strength(1000.0)
+                .population(200.0).production(1000.0).food(1000.0).gold(1000.0).strength(1000.0)
                 .goldUnlocked(true).strengthUnlocked(true)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_COMPLETED])
                 .table(Season.SUMMER, [CardCatalog.THE_GREAT_ROAD_COMPLETED])

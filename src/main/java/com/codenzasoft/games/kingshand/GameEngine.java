@@ -511,11 +511,13 @@ public class GameEngine implements Game<GameEngine> {
           for (Effect effect : card.effects()) {
             if (effect.target() instanceof ResourceTarget rt) {
               switch (rt) {
+                case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
                 case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
                 case FOOD -> applyFood(effect.apply(state.getFood()));
+                case POPULATION_CAP ->
+                    state.setPopulationCap(state.getPopulationCap() + effect.modifier());
                 case GOLD -> applyGold(effect.apply(state.getGold()));
                 case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-                default -> {}
               }
             }
           }

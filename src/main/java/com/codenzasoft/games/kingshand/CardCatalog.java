@@ -459,7 +459,7 @@ public class CardCatalog {
           15.0,
           0.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.STRENGTH.integer(20), ResourceTarget.FOOD.integer(10)));
+          List.of(ResourceTarget.STRENGTH.integer(20), ResourceTarget.PRODUCTION.integer(25)));
 
   // Win-condition completed cards carry winCondition=true so the engine can detect victory by
   // scanning tables for cards that are (winCondition && !isGreatWork()).
@@ -484,8 +484,8 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(
               ResourceTarget.FOOD.integer(100),
-              ResourceTarget.PRODUCTION.integer(80),
-              ResourceTarget.GOLD.integer(50)),
+              ResourceTarget.PRODUCTION.integer(85),
+              ResourceTarget.GOLD.integer(60)),
           0,
           null,
           Set.of(),
@@ -501,8 +501,8 @@ public class CardCatalog {
           List.of(
               ResourceTarget.FOOD.integer(200),
               ResourceTarget.PRODUCTION.integer(120),
-              ResourceTarget.GOLD.integer(80),
-              ResourceTarget.STRENGTH.integer(20)),
+              ResourceTarget.GOLD.integer(90),
+              ResourceTarget.STRENGTH.integer(50)),
           0,
           null,
           Set.of(),
@@ -516,10 +516,10 @@ public class CardCatalog {
           0.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.FOOD.integer(300),
-              ResourceTarget.PRODUCTION.integer(200),
+              ResourceTarget.FOOD.integer(400),
+              ResourceTarget.PRODUCTION.integer(300),
               ResourceTarget.GOLD.integer(200),
-              ResourceTarget.STRENGTH.integer(100)),
+              ResourceTarget.STRENGTH.integer(200)),
           0,
           null,
           Set.of(),
@@ -530,11 +530,11 @@ public class CardCatalog {
   public static final Card TREASURY_CONSTRUCTION =
       new Card(
           "TREASURY_CONSTRUCTION",
-          5.0,
-          5.0,
+          20.0,
+          80.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(-1)),
-          1,
+          List.of(ResourceTarget.PRODUCTION.integer(-35)),
+          3,
           TREASURY_COMPLETED,
           Set.of(ResourceTarget.GOLD),
           false,
@@ -543,11 +543,11 @@ public class CardCatalog {
   public static final Card BARRACKS_CONSTRUCTION =
       new Card(
           "BARRACKS_CONSTRUCTION",
-          1.0,
-          1.0,
+          30.0,
+          100.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(-1), ResourceTarget.FOOD.integer(-1)),
-          1,
+          List.of(ResourceTarget.PRODUCTION.integer(-30), ResourceTarget.FOOD.integer(-15), ResourceTarget.POPULATION.integer(-1)),
+          4,
           BARRACKS_COMPLETED,
           Set.of(ResourceTarget.STRENGTH),
           false,
@@ -556,11 +556,11 @@ public class CardCatalog {
   public static final Card THE_GREAT_RESERVOIR_CONSTRUCTION =
       new Card(
           "THE_GREAT_RESERVOIR_CONSTRUCTION",
-          1.0,
-          1.0,
+          40.0,
+          120.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(-1), ResourceTarget.FOOD.integer(-1)),
-          1,
+          List.of(ResourceTarget.PRODUCTION.integer(-50), ResourceTarget.FOOD.integer(-30), ResourceTarget.POPULATION_CAP.integer(5)),
+          6,
           THE_GREAT_RESERVOIR_COMPLETED,
           Set.of(),
           true,
@@ -569,14 +569,15 @@ public class CardCatalog {
   public static final Card THE_GREAT_ROAD_CONSTRUCTION =
       new Card(
           "THE_GREAT_ROAD_CONSTRUCTION",
-          1.0,
-          1.0,
+          60.0,
+          150,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.PRODUCTION.integer(-1),
-              ResourceTarget.FOOD.integer(-1),
-              ResourceTarget.GOLD.integer(-1)),
-          1,
+              ResourceTarget.PRODUCTION.integer(-65),
+              ResourceTarget.FOOD.integer(-45),
+              ResourceTarget.GOLD.integer(-30),
+                  ResourceTarget.POPULATION_CAP.integer(8)),
+          6,
           THE_GREAT_ROAD_COMPLETED,
           Set.of(),
           true,
@@ -585,15 +586,15 @@ public class CardCatalog {
   public static final Card THE_GREAT_CAPITAL_CONSTRUCTION =
       new Card(
           "THE_GREAT_CAPITAL_CONSTRUCTION",
-          1.0,
-          1.0,
+          100.0,
+          300.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.PRODUCTION.integer(-1),
-              ResourceTarget.FOOD.integer(-1),
-              ResourceTarget.GOLD.integer(-1),
-              ResourceTarget.STRENGTH.integer(-1)),
-          1,
+              ResourceTarget.PRODUCTION.integer(-70),
+              ResourceTarget.FOOD.integer(-100),
+              ResourceTarget.GOLD.integer(-50),
+              ResourceTarget.STRENGTH.integer(-25)),
+          10,
           THE_GREAT_CAPITAL_COMPLETED,
           Set.of(),
           true,
@@ -602,15 +603,15 @@ public class CardCatalog {
   public static final Card THE_GREAT_CONQUEST_CONSTRUCTION =
       new Card(
           "THE_GREAT_CONQUEST_CONSTRUCTION",
-          1.0,
-          1.0,
+          200.0,
+          600.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.PRODUCTION.integer(-1),
-              ResourceTarget.FOOD.integer(-1),
-              ResourceTarget.GOLD.integer(-1),
-              ResourceTarget.STRENGTH.integer(-1)),
-          1,
+              ResourceTarget.PRODUCTION.integer(-100),
+              ResourceTarget.FOOD.integer(-200),
+              ResourceTarget.GOLD.integer(-150),
+              ResourceTarget.STRENGTH.integer(-100)),
+          10,
           THE_GREAT_CONQUEST_COMPLETED,
           Set.of(),
           true,
