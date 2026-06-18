@@ -261,6 +261,7 @@ public class KhController {
       return;
     }
     final UUID id = UUID.fromString(gameId);
+    gameService.getOrBuildKhGame(id).ifPresent(GameEngine::quit);
     try {
       gameService.quitGame(id, userEntity.get());
     } catch (final IllegalStateException e) {
