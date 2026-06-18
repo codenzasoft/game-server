@@ -52,7 +52,7 @@ public class CardCatalog {
     // greatWorksBySeason, so that case is intentionally skipped above.
     for (Card gw : ALL_GREAT_WORKS) {
       byNameMutable.put(gw.name(), gw);
-      if (gw.tableSlot() != null) gwBySeasonMutable.get(gw.tableSlot()).add(gw);
+      if (gw.season() != null) gwBySeasonMutable.get(gw.season()).add(gw);
     }
     for (Season s : Season.values()) {
       gwBySeasonMutable.put(s, Collections.unmodifiableList(gwBySeasonMutable.get(s)));
@@ -461,8 +461,8 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(ResourceTarget.STRENGTH.integer(20), ResourceTarget.PRODUCTION.integer(25)));
 
-  // Win-condition completed cards carry winCondition=true so the engine can detect victory by
-  // scanning tables for cards that are (winCondition && !isGreatWork()).
+  // Win-condition completed cards carry victory=true so the engine can detect victory by
+  // scanning tables for cards that are (victory && !isGreatWork()).
   public static final Card THE_GREAT_RESERVOIR_COMPLETED =
       new Card(
           "THE_GREAT_RESERVOIR",

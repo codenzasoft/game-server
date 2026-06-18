@@ -344,7 +344,7 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
 
 /**
  * The completed-card names of the four seasonal win-condition Great Works. Mirrors
- * Card.winCondition() == true on the server (TREASURY/BARRACKS unlock resources but
+ * Card.victory() == true on the server (TREASURY/BARRACKS unlock resources but
  * are not win conditions, so they're excluded here). Used by the win-screen UI to
  * list what the player accomplished.
  */

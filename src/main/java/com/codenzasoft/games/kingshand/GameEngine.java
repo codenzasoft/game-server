@@ -224,7 +224,7 @@ public class GameEngine implements Game<GameEngine> {
   // ----- Phase / season progression -----
 
   public synchronized void advancePhase() {
-    if (state.isGameOver() || state.isGameWon()) {
+    if (state.isGameOver() || state.isVictoryComplete()) {
       return;
     }
     // if play phase ends, move to the next season
@@ -506,7 +506,7 @@ public class GameEngine implements Game<GameEngine> {
       if (card.isGreatWork()) {
         // Construction cards are never discarded and never run normal effects.
         // They only progress when fully staffed and all construction costs are affordable.
-        if (tier == StaffingTier.FULL && canAffordConstructionCosts(card.effects())) {
+        if (tier == StaffingTier.FULL && state.canAfford(card.effects())) {
           // Apply the per-season construction costs.
           for (Effect effect : card.effects()) {
             if (effect.target() instanceof ResourceTarget rt) {
@@ -529,7 +529,7 @@ public class GameEngine implements Game<GameEngine> {
             snapshot.set(i, completedCard);
             liveTable.set(i - discardedCount, completedCard);
             // Unlock any new resource types.
-            for (ResourceTarget resource : card.unlocksResources()) {
+            for (ResourceTarget resource : card.unlockedResources()) {
               if (resource == ResourceTarget.GOLD && !state.isGoldUnlocked()) {
                 state.setGoldUnlocked(true);
                 gwLog.add(card.name() + "_UNLOCKED_GOLD");
@@ -539,7 +539,6 @@ public class GameEngine implements Game<GameEngine> {
               }
             }
             gwLog.add(card.name() + "_COMPLETED");
-            checkWinCondition();
           } else {
             // Decrement: replace the card on the table with the same card minus one period.
             Card decremented = card.withConstructionPeriod(newPeriod);
@@ -646,7 +645,7 @@ public class GameEngine implements Game<GameEngine> {
     state.setGreatWorkLog(gwLog);
 
     // 6. Advance to the next phase (ADD for next season, or stay put if game is over / won).
-    if (!state.isGameWon()) {
+    if (!state.isVictoryComplete()) {
       advancePhase();
     }
   }
@@ -800,7 +799,7 @@ public class GameEngine implements Game<GameEngine> {
     // that have already been drafted/commissioned/completed — each may only ever exist once.
     List<Card> available =
         cardCatalog.forSeason(state.getCurSeason()).stream()
-            .filter(c -> !cardRequiresLockedResource(c))
+            .filter(state::areRequiredResourcesUnlocked)
             .filter(c -> !c.isGreatWork() || !greatWorkAlreadyClaimed(c))
             .toList();
     List<Card> choices = pickRandom(available, ADD_OFFER_SIZE);
@@ -854,22 +853,6 @@ public class GameEngine implements Game<GameEngine> {
   // ----- ADD helpers -----
 
   /**
-   * Returns {@code true} if any of the card's effects target a resource that has not yet been
-   * unlocked ({@link ResourceTarget#GOLD} before TREASURY completion, or {@link
-   * ResourceTarget#STRENGTH} before BARRACKS completion). Such cards are suppressed from the
-   * ADD-phase offer until the corresponding Great Work is finished.
-   */
-  private boolean cardRequiresLockedResource(Card card) {
-    for (Effect effect : card.effects()) {
-      if (effect.target() instanceof ResourceTarget rt) {
-        if (rt == ResourceTarget.GOLD && !state.isGoldUnlocked()) return true;
-        if (rt == ResourceTarget.STRENGTH && !state.isStrengthUnlocked()) return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * Returns {@code true} if Great Work {@code gw} (or its completed counterpart) already exists
    * anywhere in the game — hand, any draw pile, any discard pile, or any season's table. Each Great
    * Work may only ever be drafted or commissioned once, so once claimed it is suppressed from the
@@ -877,23 +860,8 @@ public class GameEngine implements Game<GameEngine> {
    * (draft-and-place, or direct commission) put it there.
    */
   private boolean greatWorkAlreadyClaimed(Card gw) {
-    if (cardExistsAnywhere(gw.name())) return true;
-    return gw.completedCard() != null && cardExistsAnywhere(gw.completedCard().name());
-  }
-
-  /** Returns {@code true} if a card named {@code name} exists in the hand or any pile/table. */
-  private boolean cardExistsAnywhere(String name) {
-    if (state.getHand().stream().anyMatch(c -> c.name().equals(name))) return true;
-    for (List<Card> cards : state.getBoard().values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    for (List<Card> cards : state.getDrawPile().values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    for (List<Card> cards : state.getDiscardPile().values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    return false;
+    if (state.isCardInPlay(gw)) return true;
+    return gw.completedCard() != null && state.isCardInPlay(gw.completedCard());
   }
 
   private void requirePhase(Phase required, String operation) {
@@ -1193,7 +1161,7 @@ public class GameEngine implements Game<GameEngine> {
    *
    * <ul>
    *   <li>Current phase is {@link Phase#PLAY}.
-   *   <li>The Great Work's {@link GreatWork#tableSlot()} matches the current season.
+   *   <li>The Great Work's {@link Card#season()} matches the current season.
    *   <li>The Great Work has not already been drafted (sitting in a draw/discard pile or hand),
    *       commissioned, or completed — each Great Work may only ever exist once.
    *   <li>The current season's table has at least one open slot.
@@ -1201,8 +1169,8 @@ public class GameEngine implements Game<GameEngine> {
    *       card's {@link Card#productionRequirement()}).
    *   <li>If the under-construction card's own effects include a {@link ResourceTarget#GOLD} or
    *       {@link ResourceTarget#STRENGTH} cost, that resource must already be unlocked — the same
-   *       rule {@code cardRequiresLockedResource} applies to the ADD-phase offer pool. Great Works
-   *       with no such cost (e.g. THE_GREAT_RESERVOIR) are always commissionable.
+   *       rule {@code state.areRequiredResourcesUnlocked} applies to the ADD-phase offer pool.
+   *       Great Works with no such cost (e.g. THE_GREAT_RESERVOIR) are always commissionable.
    * </ul>
    *
    * @param name stable name of the Great Work (e.g. {@code "TREASURY"})
@@ -1217,14 +1185,14 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalArgumentException("no great work with name: " + name);
     }
 
-    if (gw.tableSlot() != state.getCurSeason()) {
+    if (gw.season() != state.getCurSeason()) {
       throw new IllegalStateException(
           "cannot commission "
               + name
               + " during "
               + state.getCurSeason()
               + " — it belongs on the "
-              + gw.tableSlot()
+              + gw.season()
               + " table");
     }
 
@@ -1236,16 +1204,16 @@ public class GameEngine implements Game<GameEngine> {
           "great work already drafted, commissioned, or completed: " + name);
     }
 
-    List<Card> targetTable = state.getBoard().get(gw.tableSlot());
+    List<Card> targetTable = state.getBoard().get(gw.season());
 
     if (targetTable.size() >= MAX_TABLE_SIZE) {
-      throw new IllegalStateException(gw.tableSlot() + " table is full");
+      throw new IllegalStateException(gw.season() + " table is full");
     }
 
     // A Great Work can only be commissioned once any resource its own construction cost
     // references (GOLD/STRENGTH) is unlocked — the same rule that gates the ADD-phase offer pool.
     // Great Works with no such cost (e.g. THE_GREAT_RESERVOIR) are always commissionable.
-    if (cardRequiresLockedResource(gw)) {
+    if (!state.areRequiredResourcesUnlocked(gw)) {
       throw new IllegalStateException(
           "commissioning " + name + " requires its locked resource(s) to be unlocked first");
     }
@@ -1270,60 +1238,9 @@ public class GameEngine implements Game<GameEngine> {
   // ----- Great Work helpers -----
 
   /**
-   * Simulates whether the player can currently afford all construction-cost effects without any
-   * resource going below zero. Returns {@code true} if every resource would remain {@code >= 0}
-   * after applying every effect.
-   *
-   * <p>Only {@link ResourceTarget} effects are evaluated here; {@link CardTarget} effects are
-   * ignored (they don't appear on construction cards).
-   */
-  private boolean canAffordConstructionCosts(List<Effect> effects) {
-    double simProd = state.getProduction();
-    double simFood = state.getFood();
-    double simGold = state.getGold();
-    double simStrength = state.getStrength();
-
-    for (Effect e : effects) {
-      if (e.target() instanceof ResourceTarget rt) {
-        switch (rt) {
-          case PRODUCTION -> simProd = e.apply(simProd);
-          case FOOD -> simFood = e.apply(simFood);
-          case GOLD -> simGold = e.apply(simGold);
-          case STRENGTH -> simStrength = e.apply(simStrength);
-          default -> {} // POPULATION / POPULATION_CAP are not construction costs
-        }
-      }
-    }
-
-    return simProd >= 0 && simFood >= 0 && simGold >= 0 && simStrength >= 0;
-  }
-
-  /**
-   * Checks whether all four win-condition {@link GreatWork}s are completed and, if so, sets {@link
-   * GameState#setGameWon(boolean)} to {@code true}. Called after every Great Work completes.
-   */
-  /**
-   * Sets {@link GameState#setGameWon(boolean)} to {@code true} when every win-condition card has
-   * completed. A completed win-condition card is identified by {@link Card#winCondition()} {@code
-   * == true} and {@link Card#isGreatWork()} {@code == false} (meaning it is the permanent completed
-   * version, not the construction card).
-   */
-  private void checkWinCondition() {
-    long completedWinConditions =
-        state.getBoard().values().stream()
-            .flatMap(List::stream)
-            .filter(c -> c.winCondition() && !c.isGreatWork())
-            .count();
-    if (completedWinConditions
-        >= CardCatalog.ALL_GREAT_WORKS.stream().filter(Card::winCondition).count()) {
-      state.setGameWon(true);
-    }
-  }
-
-  /**
-   * Returns all {@link GreatWork}s from the catalog whose {@link GreatWork#tableSlot()} matches the
-   * given season and that have not yet been commissioned. Used by clients to populate the Great
-   * Works commissioning menu.
+   * Returns all great work cards from the catalog whose {@link Card#season()} matches the given
+   * season and that have not yet been commissioned. Used by clients to populate the Great Works
+   * commissioning menu.
    *
    * @param season the season whose available Great Works to list
    * @return Great Works available for commissioning in {@code season}

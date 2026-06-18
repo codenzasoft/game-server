@@ -2412,7 +2412,7 @@ class GameEngineSpec extends Specification {
         def tableCard = state.board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR"
         tableCard.isGreatWork() == false
-        tableCard.winCondition() == true
+        tableCard.victory() == true
     }
 
     // ----- endAndRun: Great Work construction POPULATION / POPULATION_CAP effects -----

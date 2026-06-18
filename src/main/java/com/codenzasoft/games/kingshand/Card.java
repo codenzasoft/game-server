@@ -3,6 +3,7 @@ package com.codenzasoft.games.kingshand;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A playable card. Carries its play requirements ({@code staffRequirement}, {@code
@@ -35,15 +36,15 @@ public record Card(
      */
     Card completedCard,
     /** Resource types unlocked when this Great Work completes; empty for most cards. */
-    Set<ResourceTarget> unlocksResources,
+    Set<ResourceTarget> unlockedResources,
     /** {@code true} for the four seasonal win-condition Great Works. */
-    boolean winCondition,
-    /** Which season's table this Great Work belongs to; {@code null} for normal cards. */
-    Season tableSlot) {
+    boolean victory,
+    /** The season this Great Work belongs to; {@code null} for normal cards. */
+    Season season) {
 
   public Card {
     effects = effects == null ? List.of() : List.copyOf(effects);
-    unlocksResources = unlocksResources == null ? Set.of() : Set.copyOf(unlocksResources);
+    unlockedResources = unlockedResources == null ? Set.of() : Set.copyOf(unlockedResources);
     constructionPeriod = Math.max(0, constructionPeriod);
   }
 
@@ -73,6 +74,20 @@ public record Card(
   /** Returns {@code true} if this is a Great Work under-construction card. */
   public boolean isGreatWork() {
     return constructionPeriod > 0;
+  }
+
+  /**
+   * Returns the set of {@link ResourceTarget}s referenced by this card's effects. Used by {@link
+   * GameState#areRequiredResourcesUnlocked(Card)} to determine whether this card can currently be
+   * offered, drafted, or commissioned — a card naturally "requires" any resource it reads or writes
+   * via its effects, regardless of whether that resource is locked by default.
+   */
+  public Set<ResourceTarget> requiredResources() {
+    return effects.stream()
+        .map(Effect::target)
+        .filter(target -> target instanceof ResourceTarget)
+        .map(target -> (ResourceTarget) target)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
@@ -109,9 +124,9 @@ public record Card(
         boosted,
         constructionPeriod,
         completedCard,
-        unlocksResources,
-        winCondition,
-        tableSlot);
+        unlockedResources,
+        victory,
+        season);
   }
 
   /**
@@ -131,9 +146,9 @@ public record Card(
         amplified,
         constructionPeriod,
         completedCard,
-        unlocksResources,
-        winCondition,
-        tableSlot);
+        unlockedResources,
+        victory,
+        season);
   }
 
   /**
@@ -158,9 +173,9 @@ public record Card(
         effects,
         Math.max(0, period),
         completedCard,
-        unlocksResources,
-        winCondition,
-        tableSlot);
+        unlockedResources,
+        victory,
+        season);
   }
 
   public Card mergeWith(Card other) {
@@ -184,8 +199,8 @@ public record Card(
         merged,
         constructionPeriod,
         completedCard,
-        unlocksResources,
-        winCondition,
-        tableSlot);
+        unlockedResources,
+        victory,
+        season);
   }
 }
