@@ -46,9 +46,9 @@ public class GameState {
   // new resource types — both start locked at 0
   private double gold;
   private double strength;
-  // resources currently usable; population/production/food are always present, gold/strength are
-  // added once TREASURY/BARRACKS complete. A set (rather than one boolean per resource) so future
-  // unlockable resources don't need a new field.
+  // resources currently usable; population/production/food/populationCap are always present,
+  // gold/strength are added once TREASURY/BARRACKS complete. A set (rather than one boolean per
+  // resource) so future unlockable resources don't need a new field.
   private Set<ResourceTarget> unlockedResources;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
   private List<String> greatWorkLog;
@@ -510,7 +510,11 @@ public class GameState {
     private double gold = 0.0;
     private double strength = 0.0;
     private Set<ResourceTarget> unlockedResources =
-        EnumSet.of(ResourceTarget.POPULATION, ResourceTarget.PRODUCTION, ResourceTarget.FOOD);
+        EnumSet.of(
+            ResourceTarget.POPULATION,
+            ResourceTarget.PRODUCTION,
+            ResourceTarget.FOOD,
+            ResourceTarget.POPULATION_CAP);
     private List<String> greatWorkLog = List.of();
 
     // fill similar data types with seasons
