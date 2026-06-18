@@ -172,7 +172,10 @@ class XoGameLifecycleObserverSpec extends Specification {
                 .build()
 
         then:
-        1 * xoListener.gameStarted(game, _)
+        // The mocked game instance doesn't exist yet when this interaction is registered (Spock
+        // wires up "then:" interactions before the "when:" block runs), so match the started
+        // notification by wildcard rather than by the as-yet-undeclared `game` reference.
+        1 * xoListener.gameStarted(_, _)
         1 * lifecycleObserver.gameStarted(_)
     }
 }
