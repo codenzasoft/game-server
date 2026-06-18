@@ -10,7 +10,7 @@ const getGameId = (): string => {
 };
 
 function createLoadingOverlay(): {
-  update: (loaded: number, total: number) => void;
+  update: (progress: number) => void;
   remove: () => void;
 } {
   const overlay = document.createElement("div");
@@ -34,7 +34,7 @@ function createLoadingOverlay(): {
   const bar = document.createElement("div");
   bar.style.cssText = [
     "height:100%", "width:0%", "background:rgba(255,255,255,0.65)",
-    "border-radius:2px", "transition:width 0.1s ease",
+    "border-radius:2px", "transition:width 0.15s ease",
   ].join(";");
 
   track.appendChild(bar);
@@ -43,8 +43,8 @@ function createLoadingOverlay(): {
   document.body.appendChild(overlay);
 
   return {
-    update(loaded: number, total: number) {
-      bar.style.width = `${Math.round((loaded / total) * 100)}%`;
+    update(progress: number) {
+      bar.style.width = `${Math.round(progress * 100)}%`;
     },
     remove() {
       overlay.remove();
@@ -72,7 +72,7 @@ function createLoadingOverlay(): {
 
   const loading = createLoadingOverlay();
   const handler = new HeartsGameHandler(app);
-  await handler.preloadTextures((loaded, total) => loading.update(loaded, total));
+  await handler.preloadTextures((progress) => loading.update(progress));
   loading.remove();
   handler.connect(gameId);
 })();

@@ -1,0 +1,966 @@
+{
+  "frames": {
+    "CLUBS-TWO": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-THREE": {
+      "frame": {
+        "x": 160,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-FOUR": {
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-FIVE": {
+      "frame": {
+        "x": 480,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-SIX": {
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-SEVEN": {
+      "frame": {
+        "x": 800,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-EIGHT": {
+      "frame": {
+        "x": 960,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-NINE": {
+      "frame": {
+        "x": 1120,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-TEN": {
+      "frame": {
+        "x": 1280,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-JACK": {
+      "frame": {
+        "x": 0,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-QUEEN": {
+      "frame": {
+        "x": 160,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-KING": {
+      "frame": {
+        "x": 320,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "CLUBS-ACE": {
+      "frame": {
+        "x": 480,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-TWO": {
+      "frame": {
+        "x": 640,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-THREE": {
+      "frame": {
+        "x": 800,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-FOUR": {
+      "frame": {
+        "x": 960,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-FIVE": {
+      "frame": {
+        "x": 1120,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-SIX": {
+      "frame": {
+        "x": 1280,
+        "y": 224,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-SEVEN": {
+      "frame": {
+        "x": 0,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-EIGHT": {
+      "frame": {
+        "x": 160,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-NINE": {
+      "frame": {
+        "x": 320,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-TEN": {
+      "frame": {
+        "x": 480,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-JACK": {
+      "frame": {
+        "x": 640,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-QUEEN": {
+      "frame": {
+        "x": 800,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-KING": {
+      "frame": {
+        "x": 960,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "DIAMONDS-ACE": {
+      "frame": {
+        "x": 1120,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-TWO": {
+      "frame": {
+        "x": 1280,
+        "y": 448,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-THREE": {
+      "frame": {
+        "x": 0,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-FOUR": {
+      "frame": {
+        "x": 160,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-FIVE": {
+      "frame": {
+        "x": 320,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-SIX": {
+      "frame": {
+        "x": 480,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-SEVEN": {
+      "frame": {
+        "x": 640,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-EIGHT": {
+      "frame": {
+        "x": 800,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-NINE": {
+      "frame": {
+        "x": 960,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-TEN": {
+      "frame": {
+        "x": 1120,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-JACK": {
+      "frame": {
+        "x": 1280,
+        "y": 672,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-QUEEN": {
+      "frame": {
+        "x": 0,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-KING": {
+      "frame": {
+        "x": 160,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "SPADES-ACE": {
+      "frame": {
+        "x": 320,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-TWO": {
+      "frame": {
+        "x": 480,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-THREE": {
+      "frame": {
+        "x": 640,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-FOUR": {
+      "frame": {
+        "x": 800,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-FIVE": {
+      "frame": {
+        "x": 960,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-SIX": {
+      "frame": {
+        "x": 1120,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-SEVEN": {
+      "frame": {
+        "x": 1280,
+        "y": 896,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-EIGHT": {
+      "frame": {
+        "x": 0,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-NINE": {
+      "frame": {
+        "x": 160,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-TEN": {
+      "frame": {
+        "x": 320,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-JACK": {
+      "frame": {
+        "x": 480,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-QUEEN": {
+      "frame": {
+        "x": 640,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-KING": {
+      "frame": {
+        "x": 800,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "HEARTS-ACE": {
+      "frame": {
+        "x": 960,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    },
+    "back": {
+      "frame": {
+        "x": 1120,
+        "y": 1120,
+        "w": 160,
+        "h": 224
+      },
+      "sourceSize": {
+        "w": 160,
+        "h": 224
+      },
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 160,
+        "h": 224
+      }
+    }
+  },
+  "meta": {
+    "image": "cards.png",
+    "size": {
+      "w": 1440,
+      "h": 1344
+    },
+    "scale": "0.5"
+  }
+}
