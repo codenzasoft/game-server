@@ -2,7 +2,9 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light" th:fragment="header">
-        <a class="navbar-brand" href="/">CodenzaSoft</a>
+        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+            <img src="/img/codenza-tech-banner.png" height="28" alt="Codenza" class="ms-2"/>
+        </a>
         <div class="collapse navbar-collapse d-flex flex-row justify-content-end" id="navbarSupportedContent">
             <ul class="navbar-nav mr-auto">
                 <li th:if="${helper.isAdmin(user)}" class="nav-item dropdown">
