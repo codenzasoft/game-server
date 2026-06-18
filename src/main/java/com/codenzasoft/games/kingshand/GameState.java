@@ -3,10 +3,13 @@ package com.codenzasoft.games.kingshand;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Pure data carrier for a King's Hand game. All rule-based mutations live in {@link GameEngine};
@@ -41,6 +44,15 @@ public class GameState {
   private List<CardStaffing> tableStaffing;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
+  // new resource types — both start locked at 0
+  private double gold;
+  private double strength;
+  // resources currently usable; population/production/food/populationCap are always present,
+  // gold/strength are added once TREASURY/BARRACKS complete. A set (rather than one boolean per
+  // resource) so future unlockable resources don't need a new field.
+  private Set<ResourceTarget> unlockedResources;
+  // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
+  private List<String> greatWorkLog;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -60,6 +72,10 @@ public class GameState {
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
+    this.gold = b.gold;
+    this.strength = b.strength;
+    this.unlockedResources = b.unlockedResources;
+    this.greatWorkLog = b.greatWorkLog;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -168,6 +184,31 @@ public class GameState {
   @JsonProperty("hand")
   public List<Card> getHand() {
     return hand;
+  }
+
+  /**
+   * Returns {@code true} if a card named {@code name} exists anywhere in the game — the hand, any
+   * season's table, draw pile, or discard pile. Used to detect whether a Great Work has already
+   * been drafted, commissioned, or completed, since each Great Work may only ever exist once.
+   */
+  public boolean isCardInPlay(String name) {
+    return isCardInPlay(
+        name, List.of(hand), board.values(), drawPile.values(), discardPile.values());
+  }
+
+  /** Returns {@code true} if {@code card} (matched by name) exists anywhere in the game. */
+  public boolean isCardInPlay(Card card) {
+    return isCardInPlay(card.name());
+  }
+
+  @SafeVarargs
+  private boolean isCardInPlay(final String name, final Collection<List<Card>>... collections) {
+    for (Collection<List<Card>> lists : collections) {
+      for (List<Card> list : lists) {
+        if (list.stream().anyMatch(c -> c.name().equals(name))) return true;
+      }
+    }
+    return false;
   }
 
   @JsonProperty("population")
@@ -312,6 +353,126 @@ public class GameState {
     this.resolutionLog = log == null ? List.of() : List.copyOf(log);
   }
 
+  @JsonProperty("gold")
+  public double getGold() {
+    return gold;
+  }
+
+  public void setGold(double gold) {
+    this.gold = gold;
+  }
+
+  @JsonProperty("strength")
+  public double getStrength() {
+    return strength;
+  }
+
+  public void setStrength(double strength) {
+    this.strength = strength;
+  }
+
+  /**
+   * The set of resources currently usable. Population, production, and food are always present;
+   * gold and strength are added once the TREASURY/BARRACKS Great Works complete, respectively.
+   */
+  @JsonProperty("unlockedResources")
+  public Set<ResourceTarget> getUnlockedResources() {
+    return unlockedResources;
+  }
+
+  /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
+  public void unlock(Card card) {
+    unlockedResources.addAll(card.unlockedResources());
+  }
+
+  /**
+   * Returns {@code true} if every {@link ResourceTarget} referenced by {@code card}'s effects is
+   * currently unlocked. Used to gate the ADD-phase offer pool and Great Work commissioning.
+   */
+  public boolean areRequiredResourcesUnlocked(Card card) {
+    return unlockedResources.containsAll(card.requiredResources());
+  }
+
+  /**
+   * Returns {@code true} if applying every {@link ResourceTarget} effect in {@code effects} would
+   * leave production, food, gold, and strength all {@code >= 0}. Used to check whether a Great
+   * Work's per-season construction cost is currently affordable.
+   *
+   * <p>Only {@link ResourceTarget} effects are evaluated here; {@link CardTarget} effects are
+   * ignored (they don't appear on construction cards), as are POPULATION/POPULATION_CAP effects
+   * (not construction costs).
+   */
+  public boolean canAfford(List<Effect> effects) {
+    double simProd = production;
+    double simFood = food;
+    double simGold = gold;
+    double simStrength = strength;
+
+    for (Effect e : effects) {
+      if (e.target() instanceof ResourceTarget rt) {
+        switch (rt) {
+          case PRODUCTION -> simProd = e.apply(simProd);
+          case FOOD -> simFood = e.apply(simFood);
+          case GOLD -> simGold = e.apply(simGold);
+          case STRENGTH -> simStrength = e.apply(simStrength);
+          default -> {} // POPULATION / POPULATION_CAP are not construction costs
+        }
+      }
+    }
+
+    return simProd >= 0 && simFood >= 0 && simGold >= 0 && simStrength >= 0;
+  }
+
+  @JsonProperty("goldUnlocked")
+  public boolean isGoldUnlocked() {
+    return unlockedResources.contains(ResourceTarget.GOLD);
+  }
+
+  @JsonProperty("strengthUnlocked")
+  public boolean isStrengthUnlocked() {
+    return unlockedResources.contains(ResourceTarget.STRENGTH);
+  }
+
+  /**
+   * Returns {@code true} once every win-condition Great Work has completed — i.e. the board
+   * contains a completed (non-under-construction) card with {@link Card#victory()} {@code == true}
+   * for each of the four seasonal win conditions. Computed dynamically from the board rather than
+   * cached, since a completed Great Work's presence there is itself the source of truth.
+   */
+  public boolean isVictoryComplete() {
+    long completedVictoryCards =
+        board.values().stream()
+            .flatMap(List::stream)
+            .filter(c -> c.victory() && !c.isGreatWork())
+            .count();
+    long totalVictoryCards = CardCatalog.ALL_GREAT_WORKS.stream().filter(Card::victory).count();
+    return completedVictoryCards >= totalVictoryCards;
+  }
+
+  /**
+   * {@code true} once all four win-condition Great Works are completed. Alias for {@link
+   * #isVictoryComplete()} kept under this name for the {@code gameWon} JSON wire property and
+   * existing call sites.
+   */
+  @JsonProperty("gameWon")
+  public boolean isGameWon() {
+    return isVictoryComplete();
+  }
+
+  /**
+   * Events emitted during the most recent {@link Phase#PLAY} resolution relating to Great Works
+   * (e.g. {@code "TREASURY_COMPLETED"}, {@code "THE_GREAT_RESERVOIR_PERIOD_DECREMENTED:5"}). Empty
+   * between seasons. Cleared at the start of each {@code endAndRun}.
+   */
+  @JsonProperty("greatWorkLog")
+  public List<String> getGreatWorkLog() {
+    return greatWorkLog == null ? List.of() : greatWorkLog;
+  }
+
+  public void setGreatWorkLog(List<String> log) {
+    this.greatWorkLog = log == null ? List.of() : List.copyOf(log);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -332,6 +493,15 @@ public class GameState {
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
+    private double gold = 0.0;
+    private double strength = 0.0;
+    private Set<ResourceTarget> unlockedResources =
+        EnumSet.of(
+            ResourceTarget.POPULATION,
+            ResourceTarget.PRODUCTION,
+            ResourceTarget.FOOD,
+            ResourceTarget.POPULATION_CAP);
+    private List<String> greatWorkLog = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -425,6 +595,47 @@ public class GameState {
 
     public Builder resolutionLog(List<ResolutionStep> resolutionLog) {
       this.resolutionLog = resolutionLog == null ? List.of() : new ArrayList<>(resolutionLog);
+      return this;
+    }
+
+    public Builder gold(double gold) {
+      this.gold = gold;
+      return this;
+    }
+
+    public Builder strength(double strength) {
+      this.strength = strength;
+      return this;
+    }
+
+    public Builder goldUnlocked(boolean goldUnlocked) {
+      if (goldUnlocked) {
+        this.unlockedResources.add(ResourceTarget.GOLD);
+      } else {
+        this.unlockedResources.remove(ResourceTarget.GOLD);
+      }
+      return this;
+    }
+
+    public Builder strengthUnlocked(boolean strengthUnlocked) {
+      if (strengthUnlocked) {
+        this.unlockedResources.add(ResourceTarget.STRENGTH);
+      } else {
+        this.unlockedResources.remove(ResourceTarget.STRENGTH);
+      }
+      return this;
+    }
+
+    public Builder unlockedResources(Set<ResourceTarget> unlockedResources) {
+      this.unlockedResources =
+          unlockedResources == null
+              ? EnumSet.noneOf(ResourceTarget.class)
+              : EnumSet.copyOf(unlockedResources);
+      return this;
+    }
+
+    public Builder greatWorkLog(List<String> greatWorkLog) {
+      this.greatWorkLog = greatWorkLog == null ? List.of() : new ArrayList<>(greatWorkLog);
       return this;
     }
 

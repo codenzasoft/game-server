@@ -14,7 +14,17 @@ public enum ResourceTarget implements EffectTarget {
    * Expands the maximum population allowed. Derived passively from board cards; never fired as an
    * accumulated effect.
    */
-  POPULATION_CAP;
+  POPULATION_CAP,
+  /**
+   * Economic resource unlocked when the TREASURY great work is completed. Cards and great work
+   * construction costs referencing this resource are hidden from the ADD phase until unlocked.
+   */
+  GOLD,
+  /**
+   * Military resource unlocked when the BARRACKS great work is completed. Cards and great work
+   * construction costs referencing this resource are hidden from the ADD phase until unlocked.
+   */
+  STRENGTH;
 
   /** Creates an additive (flat integer) effect targeting this resource. */
   public Effect integer(int value) {

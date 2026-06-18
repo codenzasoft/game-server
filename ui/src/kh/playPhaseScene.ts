@@ -1,8 +1,12 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, ResourceTarget, CardTarget, ResolutionStep } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
   formatModifier,
+  resourceIcon,
+  resourceLabel,
+  resourceShortLabel,
+  WIN_CONDITION_GREAT_WORK_NAMES,
 } from "./cardCatalog.ts";
 import {
   injectSharedStyles,
@@ -104,6 +108,11 @@ export class PlayPhaseScene {
   private render(): void {
     const { state } = this;
 
+    if (state.gameWon) {
+      this.renderGameWon();
+      return;
+    }
+
     if (state.gameOver) {
       this.renderGameOver();
       return;
@@ -200,6 +209,63 @@ export class PlayPhaseScene {
     attachOptionsListeners(this.overlay);
   }
 
+  private renderGameWon(): void {
+    const { state } = this;
+    const meta = SEASON_META[state.curSeason];
+
+    const greatWorksHTML = WIN_CONDITION_GREAT_WORK_NAMES.map((name) => {
+      const info = getCardDisplayInfo({ name } as Card);
+      return `<li class="kh-play-win-gw-item">🏛️ ${info.name}</li>`;
+    }).join("");
+
+    this.overlay.innerHTML = `
+      ${this.buildHeader(state, meta)}
+      ${this.buildResourcesBar(state)}
+      <div class="kh-play-game-won">
+        <div class="kh-play-win-icon">👑</div>
+        <h2 class="kh-play-win-title">Your Kingdom Has Triumphed</h2>
+        <p class="kh-play-win-sub">All four Great Works stand complete. Your legacy shall endure for generations.</p>
+        <div class="kh-play-win-stats">
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Years Reigned</div>
+            <div class="kh-play-win-stat-val">${state.year}</div>
+          </div>
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Great Works</div>
+            <div class="kh-play-win-stat-val">4 / 4</div>
+          </div>
+          <div class="kh-play-win-stat">
+            <div class="kh-play-win-stat-label">Production</div>
+            <div class="kh-play-win-stat-val">${Math.floor(state.production)} ⚒️</div>
+          </div>
+        </div>
+        <ul class="kh-play-win-gw-list">
+          ${greatWorksHTML}
+        </ul>
+        <button class="kh-play-win-btn" id="kh-play-win-btn">
+          Return to Home Screen
+        </button>
+      </div>
+    `;
+
+    // Apply season background image on the victory screen too
+    this.overlay.style.background =
+      `linear-gradient(rgba(20,14,2,.55) 0%, rgba(20,14,2,.55) 100%), url('${meta.bg}') center/cover no-repeat`;
+
+    this.overlay.insertAdjacentHTML("beforeend", buildHandbookButton());
+    this.overlay.insertAdjacentHTML("beforeend", buildOptionsButton());
+
+    const homeBtn = this.overlay.querySelector<HTMLButtonElement>("#kh-play-win-btn");
+    if (homeBtn) {
+      homeBtn.addEventListener("click", () => {
+        window.location.href = HOME_URL;
+      });
+    }
+
+    attachHandbookListeners(this.overlay);
+    attachOptionsListeners(this.overlay);
+  }
+
   // ─── Section builders ───────────────────────────────────────────────────
 
   private buildHeader(state: GameState, meta: (typeof SEASON_META)[Season]): string {
@@ -222,6 +288,30 @@ export class PlayPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
+    const goldHTML = state.goldUnlocked
+      ? `
+        <div class="kh-play-res-divider"></div>
+        <div class="kh-play-resource kh-play-gold">
+          <span class="kh-play-res-icon">💰</span>
+          <div>
+            <div class="kh-play-res-label">Gold</div>
+            <div class="kh-play-res-value">${Math.floor(state.gold)}</div>
+          </div>
+        </div>
+      `
+      : "";
+    const strengthHTML = state.strengthUnlocked
+      ? `
+        <div class="kh-play-res-divider"></div>
+        <div class="kh-play-resource kh-play-strength">
+          <span class="kh-play-res-icon">⚔️</span>
+          <div>
+            <div class="kh-play-res-label">Strength</div>
+            <div class="kh-play-res-value">${Math.floor(state.strength)}</div>
+          </div>
+        </div>
+      `
+      : "";
     return `
       <div class="kh-play-resources">
         <div class="kh-play-resource kh-play-pop">
@@ -247,6 +337,8 @@ export class PlayPhaseScene {
             <div class="kh-play-res-value">${Math.floor(state.food)}</div>
           </div>
         </div>
+        ${goldHTML}
+        ${strengthHTML}
       </div>
     `;
   }
@@ -341,12 +433,24 @@ export class PlayPhaseScene {
       ? `<div class="kh-tc-tt-staffing ${chipClass}">👥 ${staffing.workersAllocated} / ${staffing.workerCost} — ${tierLabel}</div>`
       : "";
 
+    // Construction-period chip/tooltip — only for Great Works still under construction.
+    const seasonsLeft = card.constructionPeriod;
+    const seasonWord = seasonsLeft === 1 ? "season" : "seasons";
+    const constructionChipHTML =
+      seasonsLeft > 0
+        ? `<div class="kh-tc-construction-chip">🏗️ ${seasonsLeft} ${seasonWord} left</div>`
+        : "";
+    const constructionTooltipHTML =
+      seasonsLeft > 0
+        ? `<div class="kh-tc-tt-construction">🏗️ Under construction — ${seasonsLeft} ${seasonWord} remaining</div>`
+        : "";
+
     const effectsHTML = card.effects
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const resIcon = resourceIcon(res);
+          const resLabel = resourceShortLabel(res);
           const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
           return `
             <div class="kh-tc-tt-effect">
@@ -357,11 +461,8 @@ export class PlayPhaseScene {
           `;
         }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
-        const icon = e.target === ResourceTarget.FOOD ? "🌾"
-                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥"
-                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
+        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
+        const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-tc-tt-effect">
             <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
@@ -380,6 +481,7 @@ export class PlayPhaseScene {
           <img class="kh-tc-art" src="${imgSrc}" alt="${info.name}" />
           <div class="kh-tc-freq-pip ${card.frequencyType === "RECURRING" ? "kh-tc-pip-r" : "kh-tc-pip-s"}"></div>
           ${staffChipHTML}
+          ${constructionChipHTML}
           <div class="kh-tc-name-bar">${info.name}</div>
         </div>
 
@@ -390,6 +492,7 @@ export class PlayPhaseScene {
             <span class="kh-tc-tt-fbadge ${card.frequencyType === "RECURRING" ? "kh-tc-fbadge-r" : "kh-tc-fbadge-s"}">${card.frequencyType}</span>
           </div>
           ${staffTooltipHTML}
+          ${constructionTooltipHTML}
           <div class="kh-tc-tt-effects">${effectsHTML}</div>
           <div class="kh-tc-tt-footer">
             <button class="kh-play-btn-demolish" data-slot="${slot}" ${!canDemolish ? "disabled" : ""}>
@@ -506,8 +609,8 @@ export class PlayPhaseScene {
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-          const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+          const resIcon = resourceIcon(res);
+          const resLabel = resourceShortLabel(res);
           const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
           return `
             <div class="kh-play-hc-effect-row">
@@ -518,11 +621,8 @@ export class PlayPhaseScene {
           `;
         }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = targetStr === "POPULATION_CAP" ? "POP CAP" : targetStr;
-        const icon = e.target === ResourceTarget.FOOD ? "🌾"
-                   : e.target === ResourceTarget.PRODUCTION ? "⚒️"
-                   : e.target === ResourceTarget.POPULATION ? "👥"
-                   : e.target === ResourceTarget.POPULATION_CAP ? "🏠" : "";
+        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
+        const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-play-hc-effect-row">
             <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
@@ -559,6 +659,11 @@ export class PlayPhaseScene {
               <span class="kh-play-hc-cost-label">👥 Pop. Req</span>
               <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.staffRequirement}</span>
             </div>
+            ${card.constructionPeriod > 0 ? `
+            <div class="kh-play-hc-cost-item">
+              <span class="kh-play-hc-cost-label">🏗️ Construction</span>
+              <span class="kh-play-hc-cost-val">${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"}</span>
+            </div>` : ""}
             ${unavailable ? `<span class="kh-play-hc-unavailable">${unavailable}</span>` : ""}
           </div>
           <button class="kh-play-btn-play ${isUpgrade ? "kh-play-btn-upgrade" : ""}"
@@ -632,14 +737,13 @@ export class PlayPhaseScene {
           const effectsHTML = c.effects.map((e) => {
             if (e.target instanceof CardTarget) {
               const res = e.target.targetResource;
-              const icon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-              const label = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
+              const icon = resourceIcon(res);
+              const label = resourceShortLabel(res);
               const sc = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
               return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            if (targetStr === "POPULATION_CAP") return `<span class="kh-cc-effect">🏠 POP CAP ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
-            return `<span class="kh-cc-effect">${targetStr} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
@@ -868,12 +972,24 @@ export class PlayPhaseScene {
 
   // ─── Resource indicator helpers ──────────────────────────────────────────
 
-  /** Returns the three live resource-value elements (pop, prod, food). */
-  private resEls(): { pop: HTMLElement | null; prod: HTMLElement | null; food: HTMLElement | null } {
+  /**
+   * Returns the live resource-value elements (pop, prod, food, gold, strength).
+   * gold/strength are null whenever the corresponding Great Work hasn't unlocked
+   * that resource yet — the bar simply doesn't render those blocks.
+   */
+  private resEls(): {
+    pop: HTMLElement | null;
+    prod: HTMLElement | null;
+    food: HTMLElement | null;
+    gold: HTMLElement | null;
+    strength: HTMLElement | null;
+  } {
     return {
-      pop:  this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
-      prod: this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
-      food: this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+      pop:      this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
+      prod:     this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
+      food:     this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
+      gold:     this.overlay.querySelector<HTMLElement>(".kh-play-gold .kh-play-res-value"),
+      strength: this.overlay.querySelector<HTMLElement>(".kh-play-strength .kh-play-res-value"),
     };
   }
 
@@ -905,10 +1021,12 @@ export class PlayPhaseScene {
    * @param preState the state that was active when End and Run was clicked
    */
   public async animateFromResolutionLog(newState: GameState, preState: GameState): Promise<void> {
-    let simPop  = preState.population;
-    let simProd = preState.production;
-    let simFood = preState.food;
-    let simCap  = preState.populationCap;
+    let simPop      = preState.population;
+    let simProd     = preState.production;
+    let simFood     = preState.food;
+    let simCap      = preState.populationCap;
+    let simGold     = preState.gold;
+    let simStrength = preState.strength;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -923,11 +1041,13 @@ export class PlayPhaseScene {
       }
     };
 
-    const updateBar = (pop: number, prod: number, food: number,
-                       which: { pop: boolean; prod: boolean; food: boolean }): void => {
-      flashEl(".kh-play-pop-num",                 pop,  which.pop);
-      flashEl(".kh-play-prod .kh-play-res-value", prod, which.prod);
-      flashEl(".kh-play-food .kh-play-res-value", food, which.food);
+    const updateBar = (pop: number, prod: number, food: number, gold: number, strength: number,
+                       which: { pop: boolean; prod: boolean; food: boolean; gold: boolean; strength: boolean }): void => {
+      flashEl(".kh-play-pop-num",                     pop,      which.pop);
+      flashEl(".kh-play-prod .kh-play-res-value",     prod,     which.prod);
+      flashEl(".kh-play-food .kh-play-res-value",     food,     which.food);
+      flashEl(".kh-play-gold .kh-play-res-value",     gold,     which.gold);
+      flashEl(".kh-play-strength .kh-play-res-value", strength, which.strength);
     };
 
     const updateCap = (cap: number): void => {
@@ -936,7 +1056,8 @@ export class PlayPhaseScene {
     };
 
     // Initialise the bar at pre-resolution values.
-    updateBar(simPop, simProd, simFood, { pop: false, prod: false, food: false });
+    updateBar(simPop, simProd, simFood, simGold, simStrength,
+      { pop: false, prod: false, food: false, gold: false, strength: false });
     updateCap(simCap);
 
     // ── Step through the server log ───────────────────────────────────────
@@ -952,7 +1073,8 @@ export class PlayPhaseScene {
         simPop  = Math.max(0, simPop);
         simFood = Math.max(0, simFood);
 
-        updateBar(simPop, simProd, simFood, { pop: true, prod: false, food: true });
+        updateBar(simPop, simProd, simFood, simGold, simStrength,
+          { pop: true, prod: false, food: true, gold: false, strength: false });
 
         const els = this.resEls();
         if (step.foodDelta !== 0 && els.food)
@@ -998,9 +1120,11 @@ export class PlayPhaseScene {
       const prevFood = simFood;
       let si = 0;
 
-      simPop  += step.populationDelta;
-      simProd += step.productionDelta;
-      simFood += step.foodDelta;
+      simPop      += step.populationDelta;
+      simProd     += step.productionDelta;
+      simFood     += step.foodDelta;
+      simGold     += step.goldDelta;
+      simStrength += step.strengthDelta;
       simPop  = Math.max(0, simPop);
       simProd = Math.max(0, simProd);
       simFood = Math.max(0, simFood);
@@ -1013,16 +1137,20 @@ export class PlayPhaseScene {
       }
 
       const changed = {
-        pop:  step.populationDelta  !== 0,
-        prod: step.productionDelta  !== 0,
-        food: step.foodDelta        !== 0,
+        pop:      step.populationDelta  !== 0,
+        prod:     step.productionDelta  !== 0,
+        food:     step.foodDelta        !== 0,
+        gold:     step.goldDelta        !== 0,
+        strength: step.strengthDelta    !== 0,
       };
-      updateBar(simPop, simProd, simFood, changed);
+      updateBar(simPop, simProd, simFood, simGold, simStrength, changed);
 
       const els = this.resEls();
-      if (changed.pop  && els.pop)  spawnResourceIndicator(els.pop,  step.populationDelta,  "👥", si++);
-      if (changed.prod && els.prod) spawnResourceIndicator(els.prod, step.productionDelta, "⚒️", si++);
-      if (changed.food && els.food) spawnResourceIndicator(els.food, step.foodDelta,       "🌾", si++);
+      if (changed.pop      && els.pop)      spawnResourceIndicator(els.pop,      step.populationDelta, "👥", si++);
+      if (changed.prod     && els.prod)     spawnResourceIndicator(els.prod,     step.productionDelta, "⚒️", si++);
+      if (changed.food     && els.food)     spawnResourceIndicator(els.food,     step.foodDelta,       "🌾", si++);
+      if (changed.gold     && els.gold)     spawnResourceIndicator(els.gold,     step.goldDelta,       "💰", si++);
+      if (changed.strength && els.strength) spawnResourceIndicator(els.strength, step.strengthDelta,   "⚔️", si++);
 
       const freqLabel = step.staffingTier === StaffingTier.HALF ? " ⚠ half output" : "";
       this.showToast(`${info.name} fires…${freqLabel}`);
@@ -1124,9 +1252,11 @@ export class PlayPhaseScene {
       .kh-play-res-icon    { font-size: 1.5rem; line-height: 1; }
       .kh-play-res-label   { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-play-res-value   { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
-      .kh-play-pop  .kh-play-res-value { color: #f09090; }
-      .kh-play-prod .kh-play-res-value { color: #f0cc60; }
-      .kh-play-food .kh-play-res-value { color: #90e060; }
+      .kh-play-pop      .kh-play-res-value { color: #f09090; }
+      .kh-play-prod     .kh-play-res-value { color: #f0cc60; }
+      .kh-play-food     .kh-play-res-value { color: #90e060; }
+      .kh-play-gold     .kh-play-res-value { color: #ffd700; }
+      .kh-play-strength .kh-play-res-value { color: #9ab0d0; }
       .kh-play-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-play-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
@@ -1510,6 +1640,67 @@ export class PlayPhaseScene {
       }
       .kh-play-go-btn:hover { background: linear-gradient(135deg, #7a2818 0%, #4a1208 100%); box-shadow: 3px 6px 18px rgba(0,0,0,.5); }
 
+      /* ── Victory screen ─────────────────────────────────────────────── */
+      .kh-play-game-won {
+        max-width: 560px;
+        margin: 60px auto;
+        text-align: center;
+        background: #2a2008;
+        border: 3px solid #c49428;
+        border-radius: 20px;
+        padding: 50px 40px 44px;
+        box-shadow: 0 10px 50px rgba(0,0,0,.55);
+      }
+      .kh-play-win-icon  { font-size: 4rem; margin-bottom: 20px; filter: drop-shadow(0 4px 12px rgba(245,215,110,.55)); }
+      .kh-play-win-title { font-family: 'Cinzel', serif; font-size: 1.9rem; font-weight: 700; color: #f5d76e; letter-spacing: 3px; margin: 0 0 14px; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+      .kh-play-win-sub   { font-style: italic; color: #e0c898; font-size: 1.1rem; margin: 0 0 36px; line-height: 1.5; }
+
+      .kh-play-win-stats {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        margin-bottom: 30px;
+        padding-bottom: 30px;
+        border-bottom: 1px solid rgba(255,255,255,.1);
+      }
+      .kh-play-win-stat       { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      .kh-play-win-stat-label { font-family: 'Cinzel', serif; font-size: .65rem; letter-spacing: 1.5px; color: #a08850; text-transform: uppercase; }
+      .kh-play-win-stat-val   { font-family: 'Cinzel', serif; font-size: 1.2rem; font-weight: 700; color: #f0dcae; }
+
+      .kh-play-win-gw-list {
+        list-style: none;
+        margin: 0 0 36px;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .kh-play-win-gw-item {
+        font-family: 'Cinzel', serif;
+        font-size: .95rem;
+        color: #f5d76e;
+        background: rgba(245,215,110,.08);
+        border: 1px solid rgba(245,215,110,.25);
+        border-radius: 8px;
+        padding: 8px 14px;
+      }
+
+      .kh-play-win-btn {
+        padding: 13px 44px;
+        background: linear-gradient(135deg, #6a4a10 0%, #3a2406 100%);
+        color: #fff6dc;
+        border: 2px solid #f5d76e;
+        border-radius: 10px;
+        font-family: 'Cinzel', serif;
+        font-size: .9rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        cursor: pointer;
+        transition: all .15s;
+        box-shadow: 2px 4px 14px rgba(0,0,0,.4);
+      }
+      .kh-play-win-btn:hover { background: linear-gradient(135deg, #8a6420 0%, #5a3a10 100%); box-shadow: 0 3px 18px rgba(245,215,110,.45); }
+
       /* ── Toast ───────────────────────────────────────────────────────── */
       .kh-play-toast {
         position: fixed;
@@ -1775,6 +1966,23 @@ export class PlayPhaseScene {
       .kh-tc-chip-half { background: rgba(160,120,10,.88); color: #ffe090; }
       .kh-tc-chip-none { background: rgba(180,30,30,.88);  color: #ffd0d0; }
 
+      /* Construction-period chip — stacks below the staffing chip, top-right corner */
+      .kh-tc-construction-chip {
+        position: absolute;
+        top: 40px;
+        right: 7px;
+        font-family: 'Cinzel', serif;
+        font-size: .92rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 10px;
+        letter-spacing: .2px;
+        backdrop-filter: blur(3px);
+        background: rgba(120,80,20,.88);
+        color: #ffe8b0;
+        white-space: nowrap;
+      }
+
       /* Name bar — gradient at bottom of art */
       .kh-tc-name-bar {
         position: absolute;
@@ -1859,6 +2067,19 @@ export class PlayPhaseScene {
       .kh-tc-tt-staffing.kh-tc-chip-half { background: rgba(160,120,10,.28); color: #f0d060; }
       .kh-tc-tt-staffing.kh-tc-chip-none { background: rgba(180,30,30,.25);  color: #f09090; }
 
+      .kh-tc-tt-construction {
+        font-family: 'Cinzel', serif;
+        font-size: 1.08rem;
+        font-weight: 600;
+        letter-spacing: .2px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        text-align: center;
+        background: rgba(120,80,20,.22);
+        color: #f0c878;
+      }
+
       .kh-tc-tt-effects  { margin-bottom: 10px; }
       .kh-tc-tt-effect   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.6rem; }
       .kh-tc-tt-et       { font-family: 'Cinzel', serif; font-size: 1.16rem; font-weight: 600; letter-spacing: .5px; min-width: 120px; display: flex; align-items: center; gap: 4px; }
@@ -1866,6 +2087,8 @@ export class PlayPhaseScene {
       .kh-tc-tt-et-production       { color: #f0c060; }
       .kh-tc-tt-et-population       { color: #f09090; }
       .kh-tc-tt-et-population_cap   { color: #7aace0; }
+      .kh-tc-tt-et-gold             { color: #ffd700; }
+      .kh-tc-tt-et-strength         { color: #9ab0d0; }
       .kh-tc-tt-et-engine           { color: #c090f0; }
       .kh-tc-tt-mod  { font-weight: 700; font-size: 1.76rem; color: #90e090; }
       .kh-tc-tt-freq { font-size: 1.36rem; color: #a09070; font-style: italic; }

@@ -1290,20 +1290,20 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADE_ROUTES has two recurring CardTarget effects with modifier 1.0 each
+        // TRADING_POST has two recurring CardTarget effects with modifier 1.0 each
         // staffRequirement=10, productionRequirement=40
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
                 .population(80)
                 .production(200)
-                .table(Season.SUMMER, [CardCatalog.TRADE_ROUTES])
-                .hand([CardCatalog.TRADE_ROUTES])
+                .table(Season.SUMMER, [CardCatalog.TRADING_POST])
+                .hand([CardCatalog.TRADING_POST])
                 .build()
         def engine = engine(state)
 
         when:
-        engine.placeCard(CardCatalog.TRADE_ROUTES)
+        engine.placeCard(CardCatalog.TRADING_POST)
 
         then:
         def upgraded = state.board.get(Season.SUMMER).get(0)
@@ -2013,5 +2013,587 @@ class GameEngineSpec extends Specification {
         state.curPhase   == Phase.ADD   // endAndRun advances phase internally
         state.gameOver   == false
         state.population == 6.0    // 5.0 * 1.2 after 20% surplus growth cap
+    }
+
+    // ----- CardCatalog: Great Work indexing -----
+
+    def "greatWorksForSeason indexes every Great Work exactly once, even ones embedded in the seasonal ADD pool"() {
+        setup:
+        def catalog = CardCatalog.defaultCatalog()
+
+        expect:
+        catalog.greatWorksForSeason(season).count { it.name() == name } == 1
+
+        where:
+        season         | name
+        Season.SPRING  | "THE_GREAT_RESERVOIR_CONSTRUCTION"
+        Season.SUMMER  | "THE_GREAT_ROAD_CONSTRUCTION"
+        Season.SUMMER  | "TREASURY_CONSTRUCTION"
+        Season.FALL    | "THE_GREAT_CAPITAL_CONSTRUCTION"
+        Season.FALL    | "BARRACKS_CONSTRUCTION"
+        Season.WINTER  | "THE_GREAT_CONQUEST_CONSTRUCTION"
+    }
+
+    // ----- commissionGreatWork: preconditions -----
+
+    def "commissionGreatWork throws when the current phase is not PLAY"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("commissionGreatWork")
+    }
+
+    def "commissionGreatWork throws for a name that does not exist in the catalog"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(Season.SPRING).build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("NOT_A_REAL_CARD")
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "no great work with name: NOT_A_REAL_CARD"
+    }
+
+    def "commissionGreatWork throws for a card that exists but is not a Great Work"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(Season.SPRING).build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("FARM")
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "no great work with name: FARM"
+    }
+
+    def "commissionGreatWork throws when the current season does not match the Great Work's table slot"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(Season.SUMMER).build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("belongs on the SPRING table")
+    }
+
+    def "commissionGreatWork throws when the Great Work is already sitting in the hand"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .hand([CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "great work already drafted, commissioned, or completed: THE_GREAT_RESERVOIR_CONSTRUCTION"
+    }
+
+    def "commissionGreatWork throws when the Great Work is already in a draw pile"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .drawPile(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "commissionGreatWork throws when the Great Work is already in a discard pile"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .discardPile(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "commissionGreatWork throws when the Great Work's construction card is already on a table"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "commissionGreatWork throws when the Great Work's completed card is already on a table"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_COMPLETED])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "great work already drafted, commissioned, or completed: THE_GREAT_RESERVOIR_CONSTRUCTION"
+    }
+
+    def "commissionGreatWork throws when the target table is full"() {
+        setup:
+        def filler = new Card("FILLER", 0, 0, FrequencyType.RECURRING, [])
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .table(Season.SPRING, (1..GameEngine.MAX_TABLE_SIZE).collect { filler })
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "SPRING table is full"
+    }
+
+    def "commissionGreatWork throws when its construction cost references a resource not yet unlocked"() {
+        setup:
+        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(season).build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork(name)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "commissioning " + name + " requires its locked resource(s) to be unlocked first"
+
+        where:
+        name                                | season
+        "THE_GREAT_ROAD_CONSTRUCTION"        | Season.SUMMER
+        "THE_GREAT_CAPITAL_CONSTRUCTION"     | Season.FALL
+        "THE_GREAT_CONQUEST_CONSTRUCTION"    | Season.WINTER
+    }
+
+    def "commissionGreatWork throws when production cannot cover the commission cost"() {
+        setup:
+        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 120 production
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(0.0)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 120, have 0"
+    }
+
+    // ----- commissionGreatWork: success paths -----
+
+    def "commissionGreatWork succeeds for Great Works whose construction cost never references GOLD or STRENGTH, even when neither resource is unlocked"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(season).production(2000.0)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork(name)
+
+        then:
+        notThrown(IllegalStateException)
+        state.board.get(season).any { it.name() == name }
+
+        where:
+        name                                | season
+        "TREASURY_CONSTRUCTION"             | Season.SUMMER
+        "BARRACKS_CONSTRUCTION"             | Season.FALL
+        "THE_GREAT_RESERVOIR_CONSTRUCTION"  | Season.SPRING
+    }
+
+    def "commissionGreatWork succeeds once its construction cost's resource has been unlocked"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER).production(2000.0)
+                .goldUnlocked(true)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_ROAD_CONSTRUCTION")
+
+        then:
+        notThrown(IllegalStateException)
+        state.board.get(Season.SUMMER).any { it.name() == "THE_GREAT_ROAD_CONSTRUCTION" }
+    }
+
+    def "commissionGreatWork deducts the commission cost and places the construction card on the season's table"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(500.0)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
+
+        then:
+        state.production == 380.0   // 500 - 120 commission cost
+        state.board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
+    }
+
+    // ----- availableGreatWorks -----
+
+    def "availableGreatWorks returns the season's Great Work when it is unclaimed"() {
+        setup:
+        def state = GameState.newState()
+        def engine = engine(state)
+
+        expect:
+        engine.availableGreatWorks(Season.SPRING)*.name() == ["THE_GREAT_RESERVOIR_CONSTRUCTION"]
+    }
+
+    def "availableGreatWorks excludes a Great Work that has already been claimed anywhere — hand, draw pile, discard pile, or any table"() {
+        setup:
+        def builder = GameState.builder()
+        location(builder)
+        def state = builder.build()
+        def engine = engine(state)
+
+        expect:
+        engine.availableGreatWorks(Season.SPRING).isEmpty()
+
+        where:
+        location << [
+                { b -> b.hand([CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]) },
+                { b -> b.drawPile(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]) },
+                { b -> b.discardPile(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]) },
+                { b -> b.table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]) },
+                { b -> b.table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_COMPLETED]) },
+        ]
+    }
+
+    // ----- offerAddChoices: Great Work dedup -----
+
+    def "offerAddChoices includes an unclaimed Great Work from the season's catalog"() {
+        setup:
+        def catalog = new CardCatalog([(Season.SPRING): [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]])
+        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
+        def engine = engine(state, catalog)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        choices == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
+    }
+
+    def "offerAddChoices excludes a Great Work that has already been claimed, even when it is the only card in the season's pool"() {
+        setup:
+        def catalog = new CardCatalog([(Season.SPRING): [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]])
+        def state = GameState.builder()
+                .curPhase(Phase.ADD).curSeason(Season.SPRING)
+                .hand([CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state, catalog)
+
+        when:
+        def choices = engine.offerAddChoices()
+
+        then:
+        choices.isEmpty()
+    }
+
+    // ----- endAndRun: Great Work construction progress -----
+
+    def "endAndRun decrements a Great Work's construction period by one when fully staffed and its costs are affordable"() {
+        setup:
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, costs PRODUCTION -50 / FOOD -30.
+        // Start at period 2 so the decrement doesn't also complete construction.
+        def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).production(100.0).food(100.0)
+                .table(Season.SPRING, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def tableCard = state.board.get(Season.SPRING)[0]
+        tableCard.name() == "THE_GREAT_RESERVOIR_CONSTRUCTION"
+        tableCard.constructionPeriod() == 1
+        state.production == 50.0   // 100 - 50 construction cost
+    }
+
+    def "endAndRun does not progress a Great Work's construction when staffing is below FULL"() {
+        setup:
+        // staffRequirement=40 but no workers available
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(0.0).production(100.0).food(100.0)
+                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def tableCard = state.board.get(Season.SPRING)[0]
+        tableCard.constructionPeriod() == 6   // unchanged (catalog default)
+        state.production == 100.0             // construction cost never applied
+    }
+
+    def "endAndRun does not progress a Great Work's construction when its costs cannot be afforded, even if fully staffed"() {
+        setup:
+        // Fully staffed (population 40 >= staffRequirement 40) but production/food too low to cover the cost (need 50/30)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).production(0.0).food(0.0)
+                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def tableCard = state.board.get(Season.SPRING)[0]
+        tableCard.constructionPeriod() == 6   // unchanged (catalog default) — costs not affordable, construction stalls
+        state.production == 0.0               // unchanged; effects never applied
+    }
+
+    def "endAndRun completes a Great Work's construction and swaps in the completed card when the period reaches zero"() {
+        setup:
+        def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).production(100.0).food(100.0)
+                .table(Season.SPRING, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def tableCard = state.board.get(Season.SPRING)[0]
+        tableCard.name() == "THE_GREAT_RESERVOIR"
+        tableCard.isGreatWork() == false
+        tableCard.victory() == true
+    }
+
+    // ----- endAndRun: Great Work construction POPULATION / POPULATION_CAP effects -----
+
+    def "endAndRun applies THE_GREAT_RESERVOIR_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
+        setup:
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, effects include POPULATION_CAP +5.
+        def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).populationCap(20.0)
+                .production(100.0).food(100.0)
+                .table(Season.SPRING, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.populationCap == 25.0   // 20 + 5
+    }
+
+    def "endAndRun applies THE_GREAT_ROAD_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
+        setup:
+        // THE_GREAT_ROAD_CONSTRUCTION: staffRequirement=60, costs PRODUCTION -65 / FOOD -45 / GOLD -30,
+        // effects include POPULATION_CAP +8. GOLD must be unlocked for the GOLD cost to be deducted
+        // (and therefore affordable), so this test unlocks it explicitly.
+        def inProgress = CardCatalog.THE_GREAT_ROAD_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
+                .population(60.0).populationCap(20.0)
+                .production(200.0).food(150.0)
+                .gold(100.0).goldUnlocked(true)
+                .table(Season.SUMMER, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.populationCap == 28.0   // 20 + 8
+    }
+
+    def "endAndRun applies BARRACKS_CONSTRUCTION's POPULATION effect, reducing population"() {
+        setup:
+        // BARRACKS_CONSTRUCTION: staffRequirement=30, costs PRODUCTION -30 / FOOD -15 / POPULATION -1.
+        // Food is set to 44 so that, after the -15 construction cost (food=29) and the POPULATION -1
+        // effect (population=29), end-of-phase food consumption (29 population x 1/season in FALL)
+        // exactly zeroes food with no surplus growth and no starvation deficit — isolating the
+        // construction effect's impact on population from the unrelated consumption/growth mechanics.
+        def inProgress = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(2)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(30.0).populationCap(50.0)
+                .production(100.0).food(44.0)
+                .table(Season.FALL, [inProgress])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.population == 29.0   // 30 - 1 construction cost; consumption/growth net to zero by design
+    }
+
+    def "completing a win-condition Great Work does not unlock GOLD or STRENGTH and does not win the game alone"() {
+        setup:
+        def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING)
+                .population(40.0).production(100.0).food(100.0)
+                .table(Season.SPRING, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.goldUnlocked     == false
+        state.strengthUnlocked == false
+        state.gameWon          == false
+    }
+
+    def "completing TREASURY's construction unlocks GOLD"() {
+        setup:
+        def almostDone = CardCatalog.TREASURY_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
+                .population(25.0).production(100.0)
+                .table(Season.SUMMER, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.goldUnlocked == true
+        state.board.get(Season.SUMMER)[0].name() == "TREASURY"
+    }
+
+    def "completing BARRACKS's construction unlocks STRENGTH"() {
+        setup:
+        def almostDone = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(30.0).production(100.0).food(100.0)
+                .table(Season.FALL, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.strengthUnlocked == true
+        state.board.get(Season.FALL)[0].name() == "BARRACKS"
+    }
+
+    def "completing the fourth and final win-condition Great Work sets gameWon to true"() {
+        setup:
+        def almostDone = CardCatalog.THE_GREAT_CONQUEST_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.WINTER)
+                .population(200.0).production(1000.0).food(1000.0).gold(1000.0).strength(1000.0)
+                .goldUnlocked(true).strengthUnlocked(true)
+                .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_COMPLETED])
+                .table(Season.SUMMER, [CardCatalog.THE_GREAT_ROAD_COMPLETED])
+                .table(Season.FALL, [CardCatalog.THE_GREAT_CAPITAL_COMPLETED])
+                .table(Season.WINTER, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.gameWon == true
+    }
+
+    // ----- TAX_COLLECTION: gold effect -----
+
+    def "TAX_COLLECTION's effect increases GOLD (not PRODUCTION) and applies its POPULATION penalty"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(30.0).populationCap(40.0).production(50.0).gold(0.0)
+                .goldUnlocked(true)
+                .table(Season.FALL, [CardCatalog.TAX_COLLECTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.gold       == 80.0   // TAX_COLLECTION: GOLD +80
+        state.production == 50.0   // unaffected — no PRODUCTION effect on this card
+        // POPULATION -12 fires before food consumption/growth (30 -> 18); growth then applies on
+        // top of that, so just assert it dropped well below the 30 starting point rather than
+        // re-deriving the food-consumption/growth formula already covered by dedicated tests.
+        state.population < 25.0
+    }
+
+    def "TAX_COLLECTION does not affect GOLD when GOLD has not been unlocked yet"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(30.0).populationCap(40.0).gold(0.0)
+                .table(Season.FALL, [CardCatalog.TAX_COLLECTION])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.gold == 0.0   // applyGold no-ops while GOLD is locked
     }
 }

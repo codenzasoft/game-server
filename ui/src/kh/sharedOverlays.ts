@@ -5,9 +5,9 @@
 // and CSS injection so scenes never duplicate the logic.
 
 import { GameState, Season } from "./kingshand.ts";
-import { getCardDisplayInfo, formatModifier } from "./cardCatalog.ts";
+import { getCardDisplayInfo, formatModifier, resourceIcon, resourceLabel, resourceShortLabel } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
-import { Card, CardTarget, ResourceTarget } from "./kingshand.ts";
+import { Card, CardTarget } from "./kingshand.ts";
 import { getMusicVolume, setMusicVolume } from "./audio.ts";
 
 // ── Shared style injection ────────────────────────────────────────────────────
@@ -507,14 +507,13 @@ function buildCompactCard(card: Card): string {
     .map((e) => {
       if (e.target instanceof CardTarget) {
         const res = e.target.targetResource;
-        const resIcon = res === ResourceTarget.FOOD ? "🌾" : res === ResourceTarget.PRODUCTION ? "⚒️" : "👥";
-        const resLabel = res === ResourceTarget.FOOD ? "food" : res === ResourceTarget.PRODUCTION ? "prod" : res.toLowerCase();
-        const scope = e.target.adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
-        return `<span class="kh-cc-effect kh-cc-effect-engine">${resIcon} ${scope} +${e.modifier}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+        const icon = resourceIcon(res);
+        const label = resourceShortLabel(res);
+        const scope = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
+        return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${scope} +${e.modifier}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
       }
       const targetStr = typeof e.target === "string" ? e.target : "CARD";
-      const displayLabel = targetStr === "POPULATION_CAP" ? "🏠 POP CAP" : targetStr;
-      return `<span class="kh-cc-effect">${displayLabel} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
     })
     .join("");
 

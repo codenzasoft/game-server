@@ -210,6 +210,30 @@ public class KhController {
   }
 
   /**
+   * Commissions a Great Work by its stable name. Pays the one-time production cost, places the
+   * under-construction card on the current season's table, and registers the construction state.
+   * The server rejects the request if the player cannot afford it, the table is full, the season
+   * doesn't match, or the Great Work is already underway.
+   */
+  @MessageMapping("/kh/{gameId}/play/commission")
+  public void commissionGreatWork(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final String name = (String) body.get("name");
+              try {
+                game.commissionGreatWork(name);
+                khBroadcastService.gameLoaded(game);
+              } catch (final IllegalStateException | IllegalArgumentException e) {
+                log.error("commissionGreatWork rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
+              }
+            });
+  }
+
+  /**
    * Ends the PLAY phase: resolves table cards left-to-right, consumes seasonal food, then advances
    * to the next ADD phase (seeding card choices). {@link GameEngine#advancePhase()} is a no-op if
    * the game has ended due to starvation, so the game-over state is broadcast cleanly.

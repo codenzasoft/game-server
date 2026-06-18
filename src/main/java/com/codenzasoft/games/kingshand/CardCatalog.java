@@ -2,8 +2,10 @@ package com.codenzasoft.games.kingshand;
 
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Seasonal catalog of all {@link Card} definitions for King's Hand.
@@ -22,6 +24,8 @@ import java.util.Map;
 public class CardCatalog {
 
   private final Map<Season, List<Card>> seasonalCards;
+  private final Map<Season, List<Card>> greatWorksBySeason;
+  private final Map<String, Card> byName;
 
   public CardCatalog(Map<Season, List<Card>> seasonalCards) {
     Map<Season, List<Card>> copy = new EnumMap<>(Season.class);
@@ -30,9 +34,34 @@ public class CardCatalog {
       copy.put(s, cards == null ? List.of() : List.copyOf(cards));
     }
     this.seasonalCards = Collections.unmodifiableMap(copy);
+
+    // Index all great-work construction cards by season and by name.
+    Map<Season, List<Card>> gwBySeasonMutable = new EnumMap<>(Season.class);
+    for (Season s : Season.values()) gwBySeasonMutable.put(s, new java.util.ArrayList<>());
+    Map<String, Card> byNameMutable = new HashMap<>();
+    for (List<Card> cards : copy.values()) {
+      for (Card c : cards) {
+        byNameMutable.put(c.name(), c);
+      }
+    }
+    // Index every Great Work construction card by season and by name. ALL_GREAT_WORKS is the
+    // single authoritative list of all six Great Works, so each is indexed exactly once here —
+    // even though four of them (the win-condition Great Works) are *also* physically embedded in
+    // their season's seasonalCards list above (so they can appear in the ADD-phase draft pool).
+    // Indexing them again from that seasonal-list scan would have double-counted those four in
+    // greatWorksBySeason, so that case is intentionally skipped above.
+    for (Card gw : ALL_GREAT_WORKS) {
+      byNameMutable.put(gw.name(), gw);
+      if (gw.season() != null) gwBySeasonMutable.get(gw.season()).add(gw);
+    }
+    for (Season s : Season.values()) {
+      gwBySeasonMutable.put(s, Collections.unmodifiableList(gwBySeasonMutable.get(s)));
+    }
+    this.greatWorksBySeason = Collections.unmodifiableMap(gwBySeasonMutable);
+    this.byName = Collections.unmodifiableMap(byNameMutable);
   }
 
-  /** All cards available for offer during {@code season}. */
+  /** All cards available for offer during {@code season} (non-great-work cards only). */
   public List<Card> forSeason(Season season) {
     if (season == null) {
       throw new IllegalArgumentException("season cannot be null");
@@ -40,9 +69,25 @@ public class CardCatalog {
     return seasonalCards.get(season);
   }
 
-  /** Flat list of every card across all seasons, in season order (SPRING → WINTER). */
+  /** Flat list of every seasonal card across all seasons, in season order (SPRING → WINTER). */
   public List<Card> all() {
     return seasonalCards.values().stream().flatMap(List::stream).toList();
+  }
+
+  /**
+   * All Great Work under-construction cards for {@code season} (i.e. cards that can be commissioned
+   * when the current season matches {@code season}).
+   */
+  public List<Card> greatWorksForSeason(Season season) {
+    return greatWorksBySeason.getOrDefault(season, List.of());
+  }
+
+  /**
+   * Finds any card — seasonal or Great Work — by its stable name. Returns {@code null} if not
+   * found.
+   */
+  public Card getByName(String name) {
+    return byName.get(name);
   }
 
   // ----- Card constants -----
@@ -130,9 +175,9 @@ public class CardCatalog {
           20.0,
           FrequencyType.SINGLE,
           List.of(ResourceTarget.PRODUCTION.integer(80)));
-  public static final Card TRADE_ROUTES =
+  public static final Card TRADING_POST =
       new Card(
-          "TRADE_ROUTES",
+          "TRADING_POST",
           10.0,
           40.0,
           FrequencyType.RECURRING,
@@ -169,13 +214,6 @@ public class CardCatalog {
           60.0,
           FrequencyType.RECURRING,
           List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 5.0, ValueType.INTEGER)));
-  public static final Card MARKETPLACE =
-      new Card(
-          "MARKETPLACE",
-          15.0,
-          70.0,
-          FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(10)));
   public static final Card CARAVAN =
       new Card(
           "CARAVAN",
@@ -248,7 +286,7 @@ public class CardCatalog {
           10.0,
           10.0,
           FrequencyType.SINGLE,
-          List.of(ResourceTarget.PRODUCTION.integer(80), ResourceTarget.POPULATION.integer(-12)));
+          List.of(ResourceTarget.GOLD.integer(80), ResourceTarget.POPULATION.integer(-12)));
   public static final Card STOREHOUSE =
       new Card(
           "STOREHOUSE",
@@ -342,6 +380,262 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(ResourceTarget.FOOD.integer(30), ResourceTarget.POPULATION.integer(-10)));
 
+  // ----- Gold & Strength resource cards (unlocked by TREASURY / BARRACKS great works) -----
+
+  // Spring: one gold, one strength
+  public static final Card MARKETPLACE =
+      new Card(
+          "MARKETPLACE",
+          10.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(8), ResourceTarget.PRODUCTION.integer(5)));
+  public static final Card TRAINING_GROUNDS =
+      new Card(
+          "TRAINING_GROUNDS",
+          12.0,
+          90.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(10)));
+
+  // Summer: one gold, one strength
+  public static final Card TRADE_ROUTES =
+      new Card(
+          "TRADE_ROUTES",
+          15.0,
+          100.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(12), ResourceTarget.PRODUCTION.integer(8)));
+  public static final Card GUARD_POST =
+      new Card(
+          "GUARD_POST",
+          14.0,
+          85.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(8), ResourceTarget.FOOD.integer(-5)));
+
+  // Fall: one gold, one strength
+  public static final Card GOLD_MINE =
+      new Card(
+          "GOLD_MINE",
+          18.0,
+          140.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(20)));
+  public static final Card ARMORY =
+      new Card(
+          "ARMORY",
+          16.0,
+          120.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(15)));
+
+  // Winter: one gold, one strength
+  public static final Card FOREIGN_AID =
+      new Card(
+          "FOREIGN_AID",
+          20.0,
+          160.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.GOLD.integer(25)));
+  public static final Card FORTRESS_WALL =
+      new Card(
+          "FORTRESS_WALL",
+          18.0,
+          130.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(18)));
+
+  // ----- Great Work cards -----
+  // Completed cards are defined first because construction cards reference them.
+
+  public static final Card TREASURY_COMPLETED =
+      new Card(
+          "TREASURY", 15.0, 0.0, FrequencyType.RECURRING, List.of(ResourceTarget.GOLD.integer(25)));
+
+  public static final Card BARRACKS_COMPLETED =
+      new Card(
+          "BARRACKS",
+          15.0,
+          0.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.STRENGTH.integer(20), ResourceTarget.PRODUCTION.integer(25)));
+
+  // Win-condition completed cards carry victory=true so the engine can detect victory by
+  // scanning tables for cards that are (victory && !isGreatWork()).
+  public static final Card THE_GREAT_RESERVOIR_COMPLETED =
+      new Card(
+          "THE_GREAT_RESERVOIR",
+          0.0,
+          0.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.FOOD.integer(100), ResourceTarget.PRODUCTION.integer(50)),
+          0,
+          null,
+          Set.of(),
+          true,
+          null);
+
+  public static final Card THE_GREAT_ROAD_COMPLETED =
+      new Card(
+          "THE_GREAT_ROAD",
+          0.0,
+          0.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.FOOD.integer(100),
+              ResourceTarget.PRODUCTION.integer(85),
+              ResourceTarget.GOLD.integer(60)),
+          0,
+          null,
+          Set.of(),
+          true,
+          null);
+
+  public static final Card THE_GREAT_CAPITAL_COMPLETED =
+      new Card(
+          "THE_GREAT_CAPITAL",
+          0.0,
+          0.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.FOOD.integer(200),
+              ResourceTarget.PRODUCTION.integer(120),
+              ResourceTarget.GOLD.integer(90),
+              ResourceTarget.STRENGTH.integer(50)),
+          0,
+          null,
+          Set.of(),
+          true,
+          null);
+
+  public static final Card THE_GREAT_CONQUEST_COMPLETED =
+      new Card(
+          "THE_GREAT_CONQUEST",
+          0.0,
+          0.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.FOOD.integer(400),
+              ResourceTarget.PRODUCTION.integer(300),
+              ResourceTarget.GOLD.integer(200),
+              ResourceTarget.STRENGTH.integer(200)),
+          0,
+          null,
+          Set.of(),
+          true,
+          null);
+
+  // Under-construction cards — carry all greatwork metadata.
+  public static final Card TREASURY_CONSTRUCTION =
+      new Card(
+          "TREASURY_CONSTRUCTION",
+          20.0,
+          80.0,
+          FrequencyType.RECURRING,
+          List.of(ResourceTarget.PRODUCTION.integer(-35)),
+          3,
+          TREASURY_COMPLETED,
+          Set.of(ResourceTarget.GOLD),
+          false,
+          Season.SUMMER);
+
+  public static final Card BARRACKS_CONSTRUCTION =
+      new Card(
+          "BARRACKS_CONSTRUCTION",
+          30.0,
+          100.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.integer(-30),
+              ResourceTarget.FOOD.integer(-15),
+              ResourceTarget.POPULATION.integer(-1)),
+          4,
+          BARRACKS_COMPLETED,
+          Set.of(ResourceTarget.STRENGTH),
+          false,
+          Season.FALL);
+
+  public static final Card THE_GREAT_RESERVOIR_CONSTRUCTION =
+      new Card(
+          "THE_GREAT_RESERVOIR_CONSTRUCTION",
+          40.0,
+          120.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.integer(-50),
+              ResourceTarget.FOOD.integer(-30),
+              ResourceTarget.POPULATION_CAP.integer(5)),
+          6,
+          THE_GREAT_RESERVOIR_COMPLETED,
+          Set.of(),
+          true,
+          Season.SPRING);
+
+  public static final Card THE_GREAT_ROAD_CONSTRUCTION =
+      new Card(
+          "THE_GREAT_ROAD_CONSTRUCTION",
+          60.0,
+          150,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.integer(-65),
+              ResourceTarget.FOOD.integer(-45),
+              ResourceTarget.GOLD.integer(-30),
+              ResourceTarget.POPULATION_CAP.integer(8)),
+          6,
+          THE_GREAT_ROAD_COMPLETED,
+          Set.of(),
+          true,
+          Season.SUMMER);
+
+  public static final Card THE_GREAT_CAPITAL_CONSTRUCTION =
+      new Card(
+          "THE_GREAT_CAPITAL_CONSTRUCTION",
+          100.0,
+          300.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.integer(-70),
+              ResourceTarget.FOOD.integer(-100),
+              ResourceTarget.GOLD.integer(-50),
+              ResourceTarget.STRENGTH.integer(-25)),
+          10,
+          THE_GREAT_CAPITAL_COMPLETED,
+          Set.of(),
+          true,
+          Season.FALL);
+
+  public static final Card THE_GREAT_CONQUEST_CONSTRUCTION =
+      new Card(
+          "THE_GREAT_CONQUEST_CONSTRUCTION",
+          200.0,
+          600.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.PRODUCTION.integer(-100),
+              ResourceTarget.FOOD.integer(-200),
+              ResourceTarget.GOLD.integer(-150),
+              ResourceTarget.STRENGTH.integer(-100)),
+          10,
+          THE_GREAT_CONQUEST_COMPLETED,
+          Set.of(),
+          true,
+          Season.WINTER);
+
+  /**
+   * All Great Work under-construction cards, in commissioning order. Used by the catalog
+   * constructor to populate the greatworks-by-season index.
+   */
+  public static final List<Card> ALL_GREAT_WORKS =
+      List.of(
+          TREASURY_CONSTRUCTION,
+          BARRACKS_CONSTRUCTION,
+          THE_GREAT_RESERVOIR_CONSTRUCTION,
+          THE_GREAT_ROAD_CONSTRUCTION,
+          THE_GREAT_CAPITAL_CONSTRUCTION,
+          THE_GREAT_CONQUEST_CONSTRUCTION);
+
   // ----- Default catalog factory -----
 
   /**
@@ -351,8 +645,8 @@ public class CardCatalog {
   public static Map<Season, List<Card>> defaultStartingDeck() {
     Map<Season, List<Card>> deck = new EnumMap<>(Season.class);
     deck.put(Season.SPRING, List.of(MINE, SEEDS, FERTILIZER));
-    deck.put(Season.SUMMER, List.of(BUNKHOUSE, EARLY_HARVEST, STONE_QUARRY));
-    deck.put(Season.FALL, List.of(WORKSHOP, HARVEST, BAKERY));
+    deck.put(Season.SUMMER, List.of(BUNKHOUSE, EARLY_HARVEST, STONE_QUARRY, TREASURY_CONSTRUCTION));
+    deck.put(Season.FALL, List.of(WORKSHOP, HARVEST, BAKERY, BARRACKS_CONSTRUCTION));
     deck.put(Season.WINTER, List.of(EMERGENCY_RATIONS, FORGE, PRAY));
     return Collections.unmodifiableMap(deck);
   }
@@ -372,7 +666,11 @@ public class CardCatalog {
             SETTLERS,
             LUMBER_YARD,
             COMMUNITY_WELL,
-            IRRIGATION));
+            IRRIGATION,
+            MARKETPLACE, // available only when GOLD unlocked
+            TRAINING_GROUNDS, // available only when STRENGTH unlocked
+            THE_GREAT_RESERVOIR_CONSTRUCTION // no gold/strength cost — always available
+            ));
 
     seasonal.put(
         Season.SUMMER,
@@ -382,16 +680,19 @@ public class CardCatalog {
             FARMSTEAD,
             THE_HUNT,
             LOGGING,
-            TRADE_ROUTES,
+            TRADING_POST,
             FISHING_VILLAGE,
             SCHOOL_HOUSE,
             EARLY_HARVEST,
             WINDMILL,
-            MARKETPLACE,
             CARAVAN,
             TOWN_FAIR,
             STONE_QUARRY,
-            MERCHANT_GUILD));
+            MERCHANT_GUILD,
+            TRADE_ROUTES, // available only when GOLD unlocked
+            GUARD_POST, // available only when STRENGTH unlocked
+            THE_GREAT_ROAD_CONSTRUCTION // available only when GOLD unlocked
+            ));
 
     seasonal.put(
         Season.FALL,
@@ -405,7 +706,11 @@ public class CardCatalog {
             BARN,
             MASON_GUILD,
             METALWORKING,
-            BLACKSMITH));
+            BLACKSMITH,
+            GOLD_MINE, // available only when GOLD unlocked
+            ARMORY, // available only when STRENGTH unlocked
+            THE_GREAT_CAPITAL_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
+            ));
 
     seasonal.put(
         Season.WINTER,
@@ -417,7 +722,11 @@ public class CardCatalog {
             STOCKPILE,
             CHAPEL,
             PRAY,
-            DESPERATE_TIMES));
+            DESPERATE_TIMES,
+            FOREIGN_AID, // available only when GOLD unlocked
+            FORTRESS_WALL, // available only when STRENGTH unlocked
+            THE_GREAT_CONQUEST_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
+            ));
 
     return new CardCatalog(seasonal);
   }

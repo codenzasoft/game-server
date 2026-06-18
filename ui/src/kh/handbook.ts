@@ -26,7 +26,9 @@ export const HANDBOOK: HandbookChapter[] = [
     sections: [
       {
         title: "Your goal",
-        body: `Keep your population alive. If it hits zero, the game ends.`,
+        body: `Keep your population alive — if it hits zero, the game ends. Win by completing
+               all four win-condition Great Works: The Great Reservoir, The Great Road, The
+               Great Capital, and The Great Conquest. See the Great Works chapter for details.`,
       },
       {
         title: "Each season",
@@ -58,6 +60,13 @@ export const HANDBOOK: HandbookChapter[] = [
                through starvation or negative events.`,
       },
       {
+        title: "Population Cap 🏠",
+        body: `Population can never grow past your population cap. It only rises when something
+               explicitly raises it — most cards never touch it, but two Great Works do: The
+               Great Reservoir and The Great Road both raise the cap a little more each season
+               their construction advances, not just once when finished.`,
+      },
+      {
         title: "Production ⚒️",
         body: `Production is spent to play cards, demolish table cards, and reroll the Add
                phase offer. It resets each season based on your table cards.`,
@@ -69,6 +78,18 @@ export const HANDBOOK: HandbookChapter[] = [
                <br><br>
                If you don't have enough food, population drops. If population drops below 1,
                the game ends.`,
+      },
+      {
+        title: "Gold 💰",
+        body: `Gold is unlocked once the Treasury Great Work is completed. From then on it
+               appears in your resource bar and can be earned and spent by cards and events
+               just like any other resource.`,
+      },
+      {
+        title: "Strength ⚔️",
+        body: `Strength is unlocked once the Barracks Great Work is completed. From then on it
+               appears in your resource bar and can be earned and spent by cards and events
+               just like any other resource.`,
       },
     ],
   },
@@ -136,6 +157,42 @@ export const HANDBOOK: HandbookChapter[] = [
         body: `Because workers fill left to right, your leftmost cards are always staffed
                first. Drag cards to reorder them — put your most important recurring cards
                on the left so they are never left without workers.`,
+      },
+    ],
+  },
+
+  // ── Great Works ────────────────────────────────────────────────────────────
+  {
+    icon: "🏛️",
+    title: "Great Works",
+    sections: [
+      {
+        title: "What are Great Works?",
+        body: `Great Works are six legendary projects offered through the Add phase like any
+               other card. Instead of firing immediately, they go "under construction" on your
+               table and need multiple seasons of progress to complete.`,
+      },
+      {
+        title: "Building one",
+        body: `Each season, a Great Work under construction only advances if it is fully
+               staffed and you can afford its listed cost (production, food, gold, and/or
+               strength). If either condition isn't met, that season's progress simply stalls —
+               nothing is lost, and it tries again next season. A 🏗️ badge shows how many
+               seasons remain.`,
+      },
+      {
+        title: "Unlocking Gold and Strength",
+        body: `Two Great Works don't count toward winning: completing the <b>Treasury</b>
+               permanently unlocks Gold 💰, and completing the <b>Barracks</b> permanently
+               unlocks Strength ⚔️. From then on they appear in your resource bar like any other
+               resource.`,
+      },
+      {
+        title: "Winning the game 👑",
+        body: `The remaining four Great Works — <b>The Great Reservoir</b>, <b>The Great
+               Road</b>, <b>The Great Capital</b>, and <b>The Great Conquest</b> — are win
+               conditions. Complete all four and your kingdom triumphs, ending the game in
+               victory.`,
       },
     ],
   },

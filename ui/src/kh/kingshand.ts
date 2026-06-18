@@ -47,6 +47,8 @@ export enum ResourceTarget {
   PRODUCTION = "PRODUCTION",
   FOOD = "FOOD",
   POPULATION_CAP = "POPULATION_CAP",
+  GOLD = "GOLD",
+  STRENGTH = "STRENGTH",
 }
 
 // StaffingTier: the result of distributing floor(population) workers left-to-right
@@ -82,6 +84,8 @@ interface CardData {
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
+  /** Seasons of construction remaining; 0 for normal cards and completed Great Works. */
+  constructionPeriod: number;
 }
 
 interface CardStaffingData {
@@ -116,6 +120,8 @@ interface ResolutionStepData {
   productionDelta: number;
   foodDelta: number;
   populationCapDelta: number;
+  goldDelta: number;
+  strengthDelta: number;
 }
 
 interface GameStateData {
@@ -136,6 +142,12 @@ interface GameStateData {
   currentEvent: KhEvent | undefined;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
+  gold: number;
+  strength: number;
+  goldUnlocked: boolean;
+  strengthUnlocked: boolean;
+  gameWon: boolean;
+  greatWorkLog: string[];
 }
 
 interface GameMessageData {
@@ -188,6 +200,7 @@ export class Card {
   productionRequirement: number;
   frequencyType: FrequencyType;
   effects: Effect[];
+  constructionPeriod: number;
 
   constructor(data: CardData) {
     this.name = data.name;
@@ -195,6 +208,12 @@ export class Card {
     this.productionRequirement = data.productionRequirement;
     this.frequencyType = data.frequencyType;
     this.effects = data.effects;
+    this.constructionPeriod = data.constructionPeriod;
+  }
+
+  /** True for a Great Work still under construction (as opposed to a normal or completed card). */
+  isGreatWork(): boolean {
+    return this.constructionPeriod > 0;
   }
 }
 
@@ -251,6 +270,8 @@ export class ResolutionStep {
   productionDelta: number;
   foodDelta: number;
   populationCapDelta: number;
+  goldDelta: number;
+  strengthDelta: number;
 
   constructor(data: ResolutionStepData) {
     this.cardName         = data.cardName;
@@ -260,6 +281,8 @@ export class ResolutionStep {
     this.productionDelta  = data.productionDelta;
     this.foodDelta        = data.foodDelta;
     this.populationCapDelta = data.populationCapDelta;
+    this.goldDelta        = data.goldDelta;
+    this.strengthDelta    = data.strengthDelta;
   }
 }
 
@@ -296,6 +319,12 @@ export class GameState {
   gameOver: boolean;
   tableStaffing: CardStaffing[];
   resolutionLog: ResolutionStep[];
+  gold: number;
+  strength: number;
+  goldUnlocked: boolean;
+  strengthUnlocked: boolean;
+  gameWon: boolean;
+  greatWorkLog: string[];
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -315,6 +344,12 @@ export class GameState {
     this.gameOver = data.gameOver;
     this.tableStaffing = data.tableStaffing;
     this.resolutionLog = data.resolutionLog;
+    this.gold = data.gold;
+    this.strength = data.strength;
+    this.goldUnlocked = data.goldUnlocked;
+    this.strengthUnlocked = data.strengthUnlocked;
+    this.gameWon = data.gameWon;
+    this.greatWorkLog = data.greatWorkLog;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -374,6 +409,9 @@ const CardSchema = z
     productionRequirement: z.number(),
     frequencyType: z.enum(FrequencyType),
     effects: z.array(EffectSchema),
+    // > 0 while a Great Work is still under construction; 0 for normal cards and
+    // completed Great Works. Defaulted for safety, though the server always sends it.
+    constructionPeriod: z.number().int().default(0),
   })
   .transform((data) => new Card(data as CardData));
 
@@ -411,6 +449,11 @@ const ResolutionStepSchema = z
     productionDelta:  z.number(),
     foodDelta:        z.number(),
     populationCapDelta: z.number(),
+    // Gold/strength deltas are absent on resolution steps recorded before this
+    // field existed server-side (shouldn't happen in practice since the log is
+    // never persisted across deploys, but defaulting to 0 keeps old messages safe).
+    goldDelta:        z.number().default(0),
+    strengthDelta:    z.number().default(0),
   })
   .transform((data) => new ResolutionStep(data as ResolutionStepData));
 
@@ -453,6 +496,17 @@ export const GameStateSchema = z
     tableStaffing: z.array(CardStaffingSchema).default([]),
     // resolutionLog is populated after endAndRun; empty between seasons.
     resolutionLog: z.array(ResolutionStepSchema).default([]),
+    // Great Work resources: both start at 0/locked until their unlocking
+    // Great Work (TREASURY / BARRACKS) completes.
+    gold: z.number().default(0),
+    strength: z.number().default(0),
+    goldUnlocked: z.boolean().default(false),
+    strengthUnlocked: z.boolean().default(false),
+    // true once all four win-condition Great Works are completed.
+    gameWon: z.boolean().default(false),
+    // Great-Work-related events emitted by the most recent endAndRun (e.g.
+    // "TREASURY_COMPLETED"); empty between seasons.
+    greatWorkLog: z.array(z.string()).default([]),
   })
   .transform((data) => new GameState(data as GameStateData));
 
@@ -673,7 +727,17 @@ export class GameEventHandler {
           return;
         }
 
-        const message = GameMessageSchema.parse(body);
+        let message: GameMessage;
+        try {
+          message = GameMessageSchema.parse(body);
+        } catch (error) {
+          // A schema mismatch here used to throw uncaught inside this STOMP
+          // callback, which silently killed all future state updates (the UI
+          // would appear to "freeze"). Log loudly and drop the malformed
+          // message instead of taking down the whole subscription.
+          console.error("Failed to parse KH message; dropping it.", error, body);
+          return;
+        }
         console.log("Received KH message:", message);
         this.processMessage(message);
       },
