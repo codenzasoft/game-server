@@ -1,6 +1,7 @@
 package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameLifecycleObserver;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
@@ -13,6 +14,7 @@ import java.util.*;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,7 @@ public class HeartsGame implements Game<HeartsGame> {
     private List<Player> players;
     private UUID id;
     private final List<HeartsListener> listeners = new ArrayList<>();
+    private final List<GameLifecycleObserver<HeartsGame>> lifecycleObservers = new ArrayList<>();
     private final Map<String, HeartsPlayerObserver> playerObservers = new HashMap<>();
     private Executor executor;
     private HeartsState restoredState;
@@ -44,6 +47,15 @@ public class HeartsGame implements Game<HeartsGame> {
 
     public Builder addListener(final HeartsListener listener) {
       listeners.add(listener);
+      return this;
+    }
+
+    /**
+     * Registers a common {@link GameLifecycleObserver}, notified of game-type-agnostic lifecycle
+     * events (started, resumed, over, quit) alongside the Hearts-specific {@link HeartsListener}s.
+     */
+    public Builder addLifecycleObserver(final GameLifecycleObserver<HeartsGame> observer) {
+      lifecycleObservers.add(observer);
       return this;
     }
 
@@ -71,7 +83,14 @@ public class HeartsGame implements Game<HeartsGame> {
               ? restoredState
               : HeartsState.with(players.stream().map(Player::name).toList());
       return new HeartsGame(
-          id, initialState, players, listeners, executor, playerObservers, restoredState != null);
+          id,
+          initialState,
+          players,
+          listeners,
+          lifecycleObservers,
+          executor,
+          playerObservers,
+          restoredState != null);
     }
   }
 
@@ -99,6 +118,7 @@ public class HeartsGame implements Game<HeartsGame> {
   private HeartsState gameState;
   private final List<Player> players;
   private final List<HeartsListener> listeners;
+  private final List<GameLifecycleObserver<HeartsGame>> lifecycleObservers;
   private final Executor executor;
   private final Map<String, HeartsPlayerObserver> playerObservers;
 
@@ -107,18 +127,26 @@ public class HeartsGame implements Game<HeartsGame> {
       final HeartsState gameState,
       final List<Player> players,
       final List<HeartsListener> listeners,
+      final List<GameLifecycleObserver<HeartsGame>> lifecycleObservers,
       final Executor executor,
       final Map<String, HeartsPlayerObserver> playerObservers,
       final boolean restored) {
     this.id = id;
     this.players = players;
     this.listeners = listeners;
+    this.lifecycleObservers =
+        lifecycleObservers == null ? List.of() : List.copyOf(lifecycleObservers);
     this.executor = executor;
     this.playerObservers = Map.copyOf(playerObservers);
     setGameState(gameState);
     if (!restored) {
       notifyListeners(GAME_STARTED_NOTIFICATION);
+      notifyLifecycleObservers(GameLifecycleObserver::gameStarted);
       startNewRound();
+    } else {
+      // Unlike XO/KH, Hearts has a reliable signal for this — the persisted state was rebuilt
+      // from storage rather than freshly dealt — so gameResumed fires precisely here.
+      notifyLifecycleObservers(GameLifecycleObserver::gameResumed);
     }
   }
 
@@ -204,6 +232,18 @@ public class HeartsGame implements Game<HeartsGame> {
     final HeartsGame game = this;
     for (final HeartsListener listener : listeners) {
       executor.execute(() -> notification.execute(game, state, listener));
+    }
+  }
+
+  /**
+   * Notifies every registered common {@link GameLifecycleObserver} via the executor. {@code call}
+   * is typically a method reference, e.g. {@code GameLifecycleObserver::gameStarted}.
+   */
+  private void notifyLifecycleObservers(
+      final BiConsumer<GameLifecycleObserver<HeartsGame>, Game<HeartsGame>> call) {
+    final Game<HeartsGame> game = this;
+    for (final GameLifecycleObserver<HeartsGame> observer : lifecycleObservers) {
+      executor.execute(() -> call.accept(observer, game));
     }
   }
 
@@ -304,6 +344,7 @@ public class HeartsGame implements Game<HeartsGame> {
         if (getGameState().isOver()) {
           log.info("[{}] game over", id);
           notifyListeners(GAME_OVER_NOTIFICATION);
+          notifyLifecycleObservers(GameLifecycleObserver::gameOver);
         } else {
           startNewRound();
         }
@@ -344,5 +385,6 @@ public class HeartsGame implements Game<HeartsGame> {
   public synchronized void quit(final String playerName) {
     setGameState(getGameState().setQuit(playerName));
     notifyListeners(GAME_QUIT_NOTIFICATION);
+    notifyLifecycleObservers(GameLifecycleObserver::gameQuit);
   }
 }
