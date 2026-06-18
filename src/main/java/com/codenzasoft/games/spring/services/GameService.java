@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameLifecycleObserver;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.hearts.HeartsGame;
@@ -26,6 +27,7 @@ import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
+import com.codenzasoft.games.xo.Line;
 import com.codenzasoft.games.xo.Piece;
 import com.codenzasoft.games.xo.Position;
 import com.codenzasoft.games.xo.XoGame;
@@ -512,7 +514,8 @@ public class GameService {
             .withPlayers(players)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
             .addListener(heartsPersistenceService)
-            .addListener(heartsBroadcastService);
+            .addListener(heartsBroadcastService)
+            .addLifecycleObserver(new GameLifecycleListener<>());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
@@ -532,7 +535,8 @@ public class GameService {
             .withRestoredState(state)
             .withNotificationExecutor(Executors.newSingleThreadExecutor())
             .addListener(heartsPersistenceService)
-            .addListener(heartsBroadcastService);
+            .addListener(heartsBroadcastService)
+            .addLifecycleObserver(new GameLifecycleListener<>());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
         builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
@@ -546,7 +550,16 @@ public class GameService {
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
     final GameState state = GameState.builder().gameOver(isOver).build();
-    final GameEngine engine = new GameEngine(entity.getId(), player, state);
+    // Built via the Builder (rather than the raw constructor) so a GameLifecycleListener can be
+    // registered; the Builder's defaults (default catalogs, a fresh Random, synchronous executor)
+    // exactly replicate the old constructor's behavior.
+    final GameEngine engine =
+        new GameEngine.Builder()
+            .withId(entity.getId())
+            .withPlayer(player)
+            .withState(state)
+            .addLifecycleObserver(new GameLifecycleListener<>())
+            .build();
     // Delegate initialization to the engine — it owns the knowledge of how a game starts.
     engine.initialize();
     return engine;
@@ -613,6 +626,112 @@ public class GameService {
     return userGamesPlayedRepository.findByUserId(user.getId());
   }
 
+  /**
+   * Common {@link GameLifecycleObserver} registered against every game type's builder (GAME-117).
+   * Keeps the {@link GameCache} in sync with each game's actual lifecycle — adding it the moment it
+   * starts or resumes, and removing it the moment it ends (quit or naturally over) — rather than
+   * relying solely on {@link GameCleanupService}'s periodic sweep. Also records games-played
+   * statistics when a game ends naturally.
+   *
+   * <p>A new instance is created at each registration site (see the {@code build*Game} methods
+   * below) rather than sharing one: {@link GameLifecycleObserver} is invariant in its type
+   * parameter, so a single instance cannot simultaneously satisfy {@code
+   * GameLifecycleObserver<XoGame>}, {@code GameLifecycleObserver<HeartsGame>}, and {@code
+   * GameLifecycleObserver<GameEngine>}.
+   *
+   * @param <T> The underlying game implementation type.
+   */
+  private class GameLifecycleListener<T> implements GameLifecycleObserver<T> {
+
+    @Override
+    public void gameStarted(final Game<T> game) {
+      gameCache.addGame(game);
+    }
+
+    @Override
+    public void gameResumed(final Game<T> game) {
+      gameCache.addGame(game);
+    }
+
+    @Override
+    public void gameOver(final Game<T> game) {
+      recordGamesPlayed(game);
+      gameCache.removeGame(game);
+    }
+
+    @Override
+    public void gameQuit(final Game<T> game) {
+      // Quitting isn't a counted result, so games-played stats are intentionally left untouched.
+      gameCache.removeGame(game);
+    }
+  }
+
+  /**
+   * Records games-played statistics (win/loss/draw) for every non-bot player in the provided game,
+   * dispatching to the correct game-type-specific outcome logic.
+   *
+   * @param game The game that just ended naturally.
+   */
+  private void recordGamesPlayed(final Game<?> game) {
+    switch (game.getGameType()) {
+      case XO -> recordXoGamesPlayed((XoGame) game.getGame());
+      case HEARTS -> recordHeartsGamesPlayed((HeartsGame) game.getGame());
+      case KH -> recordKhGamesPlayed((GameEngine) game.getGame());
+    }
+  }
+
+  private void recordXoGamesPlayed(final XoGame game) {
+    final Optional<Line> winningLine = game.getWinner();
+    for (final Player player : game.getPlayers()) {
+      findUser(player.id())
+          .filter(user -> !user.isBot())
+          .ifPresent(
+              user -> {
+                if (winningLine.isEmpty()) {
+                  updateGamesPlayed(user, GameType.XO, 0, 0, 1);
+                } else if (winningLine.get().piece().equals(game.getPiece(player))) {
+                  updateGamesPlayed(user, GameType.XO, 1, 0, 0);
+                } else {
+                  updateGamesPlayed(user, GameType.XO, 0, 1, 0);
+                }
+              });
+    }
+  }
+
+  private void recordHeartsGamesPlayed(final HeartsGame game) {
+    final HeartsState state = game.getGameState();
+    final String winner = state.getWinner();
+    final List<String> tied = state.getTied();
+    for (final Player player : game.getPlayers()) {
+      findUser(player.id())
+          .filter(user -> !user.isBot())
+          .ifPresent(
+              user -> {
+                if (player.name().equals(winner)) {
+                  updateGamesPlayed(user, GameType.HEARTS, 1, 0, 0);
+                } else if (tied.contains(player.name())) {
+                  updateGamesPlayed(user, GameType.HEARTS, 0, 0, 1);
+                } else {
+                  updateGamesPlayed(user, GameType.HEARTS, 0, 1, 0);
+                }
+              });
+    }
+  }
+
+  /**
+   * Records KH games-played outcomes. KH's only production {@code gameOver} trigger today is
+   * population reaching zero (starvation) — always a loss for the single player. Victory completion
+   * ({@code GameState#isVictoryComplete}) does not yet fire {@code gameOver}; that gap is
+   * pre-existing and out of scope for GAME-117.
+   */
+  private void recordKhGamesPlayed(final GameEngine game) {
+    for (final Player player : game.getPlayers()) {
+      findUser(player.id())
+          .filter(user -> !user.isBot())
+          .ifPresent(user -> updateGamesPlayed(user, GameType.KH, 0, 1, 0));
+    }
+  }
+
   protected <T extends GameEntity> Optional<T> findGameEntity(final UUID id, final Class<T> clazz) {
     final Optional<GameEntity> gameEntity = gamesRepository.findById(id);
     if (gameEntity.isPresent()) {
@@ -657,6 +776,7 @@ public class GameService {
     // add persistence first, broadcast second, followed by bot strategy
     builder.addListener(xoGamePersistenceService);
     builder.addListener(xoBroadcastService);
+    builder.addLifecycleObserver(new GameLifecycleListener<>());
     for (final UserEntity user : gameEntity.getPlayers()) {
       if (user.isBot()) {
         builder.addListener(

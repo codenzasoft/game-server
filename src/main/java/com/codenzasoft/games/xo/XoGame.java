@@ -1,12 +1,14 @@
 package com.codenzasoft.games.xo;
 
 import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameLifecycleObserver;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.xo.notifications.*;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +21,7 @@ public class XoGame implements Game<XoGame> {
     private final Map<Player, Piece> pieces = new HashMap<>();
     private final List<Player> players = new ArrayList<>();
     private final List<XoGameListener> listeners = new ArrayList<>();
+    private final List<GameLifecycleObserver<XoGame>> lifecycleObservers = new ArrayList<>();
     private Executor executor;
     private UUID id;
     private final Map<Player, List<Position>> plays = new HashMap<>();
@@ -60,6 +63,15 @@ public class XoGame implements Game<XoGame> {
       return this;
     }
 
+    /**
+     * Registers a common {@link GameLifecycleObserver}, notified of game-type-agnostic lifecycle
+     * events (started, resumed, over, quit) alongside the XO-specific {@link XoGameListener}s.
+     */
+    public Builder addLifecycleObserver(final GameLifecycleObserver<XoGame> observer) {
+      lifecycleObservers.add(observer);
+      return this;
+    }
+
     public XoGame build() {
       if (id == null) {
         throw new IllegalStateException("must specify a game id");
@@ -82,6 +94,7 @@ public class XoGame implements Game<XoGame> {
           players,
           pieces,
           listeners,
+          lifecycleObservers,
           executor,
           plays,
           quit);
@@ -99,6 +112,7 @@ public class XoGame implements Game<XoGame> {
   private final Map<Player, Piece> pieces;
   private final List<Player> players;
   private final List<XoGameListener> listeners = new ArrayList<>();
+  private final List<GameLifecycleObserver<XoGame>> lifecycleObservers = new ArrayList<>();
   private Board board;
   private boolean quit = false;
   private Player quitter = null;
@@ -111,6 +125,7 @@ public class XoGame implements Game<XoGame> {
       final List<Player> players,
       final Map<Player, Piece> pieces,
       final List<XoGameListener> listeners,
+      final List<GameLifecycleObserver<XoGame>> lifecycleObservers,
       final Executor executor,
       final Map<Player, List<Position>> plays,
       final boolean isQuit) {
@@ -126,8 +141,16 @@ public class XoGame implements Game<XoGame> {
     // IMPORTANT order - avoid notifications while re-creating state
     // TODO: if the game is over or quit, don't add listeners? (there are no notifications)
     this.listeners.addAll(listeners);
-    // TODO: should there be a resume notification?
+    if (lifecycleObservers != null) {
+      this.lifecycleObservers.addAll(lifecycleObservers);
+    }
+    // TODO: should there be a resume notification? XO does not persist a snapshot — every rebuild
+    // replays the full move history from scratch (see GameService.buildXoGame), so there is no
+    // reliable signal to distinguish a true resume from this first build. gameResumed() exists on
+    // GameLifecycleObserver and can be fired here once that distinction is available; for now
+    // every (re)build is treated as a fresh start (mirrors the same gap in KH's GameEngine).
     notifyListeners(STARTED_NOTIFICATION);
+    notifyLifecycleObservers(GameLifecycleObserver::gameStarted);
   }
 
   private void initializeLeader() {
@@ -181,6 +204,18 @@ public class XoGame implements Game<XoGame> {
     }
   }
 
+  /**
+   * Notifies every registered common {@link GameLifecycleObserver} via the executor. {@code call}
+   * is typically a method reference, e.g. {@code GameLifecycleObserver::gameStarted}.
+   */
+  private void notifyLifecycleObservers(
+      final BiConsumer<GameLifecycleObserver<XoGame>, Game<XoGame>> call) {
+    final Game<XoGame> game = this;
+    for (final GameLifecycleObserver<XoGame> observer : lifecycleObservers) {
+      executor.execute(() -> call.accept(observer, game));
+    }
+  }
+
   public synchronized Board getBoard() {
     return board;
   }
@@ -212,6 +247,7 @@ public class XoGame implements Game<XoGame> {
     quit = true;
     quitter = player;
     notifyListeners(QUIT_NOTIFICATION);
+    notifyLifecycleObservers(GameLifecycleObserver::gameQuit);
   }
 
   public synchronized void playPiece(final Player player, int row, int col) {
@@ -233,6 +269,7 @@ public class XoGame implements Game<XoGame> {
     log.debug("'{}' playing '{}' at ({},{})", player.name(), piece, row, col);
     if (board.getWinner().isPresent() || board.getEmptyPositions().isEmpty()) {
       notifyListeners(ENDED_NOTIFICATION);
+      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
       // TODO: clear listeners and any other cleanup
     } else {
       nextPlayerIndex++;

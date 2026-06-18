@@ -248,10 +248,10 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Ends the game because a player quit before it was otherwise over. No-ops if the game is
-   * already over. Reuses the existing {@link GameState#isGameOver()} flag rather than tracking a
-   * separate quit reason, since nothing in KH's gameplay logic needs to distinguish "ended
-   * naturally" from "ended by quit" — only that the game has ended.
+   * Ends the game because a player quit before it was otherwise over. No-ops if the game is already
+   * over. Reuses the existing {@link GameState#isGameOver()} flag rather than tracking a separate
+   * quit reason, since nothing in KH's gameplay logic needs to distinguish "ended naturally" from
+   * "ended by quit" — only that the game has ended.
    */
   public synchronized void quit() {
     if (state.isGameOver()) return;

@@ -3,9 +3,8 @@ package com.codenzasoft.games.common;
 /**
  * Common lifecycle notifications that any {@link Game} can deliver, regardless of game type. This
  * lets shared services such as the {@link com.codenzasoft.games.spring.services.GameCache} and
- * {@code GameService} react to a game's lifecycle (caching it while active, updating
- * games-played statistics when it ends, etc.) without depending on per-game-type listener
- * interfaces.
+ * {@code GameService} react to a game's lifecycle (caching it while active, updating games-played
+ * statistics when it ends, etc.) without depending on per-game-type listener interfaces.
  *
  * @param <T> The underlying game implementation type, e.g. {@code GameEngine} or {@code
  *     HeartsGame}.
