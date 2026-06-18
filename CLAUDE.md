@@ -149,6 +149,22 @@ HTTP sessions are stored in PostgreSQL via **Spring Session JDBC** (`SessionConf
 
 > **Spring Boot 4 note:** `spring.session.store-type` was removed in Spring Boot 4.0 and is silently ignored. Use `@EnableJdbcHttpSession` (or the equivalent annotation for other stores) — not the `store-type` property — to activate Spring Session.
 
+### Hearts card texture atlas
+
+Card textures for the Hearts game are served as a single PNG texture atlas (`ui/public/assets/cards.png`) rather than 53 individual SVG files. This reduces asset loading to 2 HTTP requests (JSON descriptor + PNG) and eliminates intermittent stalls caused by browser per-origin connection limits being saturated by parallel requests.
+
+**Files:**
+- `ui/public/assets/cards.png` — 9×6 grid atlas, each card at 160×224px (2× `BASE_CARD_W/H`)
+- `ui/public/assets/cards.json` — Pixi spritesheet descriptor; `"scale": "0.5"` in meta tells Pixi to report frames at 80×112 logical pixels
+
+**Regenerating the atlas** (only needed if card SVGs change):
+```bash
+cd ui && npm run build:atlas
+```
+This runs `ui/scripts/build-card-atlas.mjs`, which rasterises each card SVG via `sharp` and repacks the atlas. Commit the updated `cards.png` and `cards.json` afterward.
+
+**Source SVGs** remain in `ui/public/assets/cards/` and `ui/public/assets/backs/` as the authoritative source for regeneration.
+
 ### Schema management
 
 JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).
