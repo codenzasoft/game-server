@@ -1,6 +1,7 @@
 package com.codenzasoft.games.kingshand;
 
 import com.codenzasoft.games.common.Game;
+import com.codenzasoft.games.common.GameLifecycleObserver;
 import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
@@ -57,6 +59,7 @@ public class GameEngine implements Game<GameEngine> {
     private EventCatalog eventCatalog;
     private Random rng;
     private final List<KhObserver> listeners = new ArrayList<>();
+    private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers = new ArrayList<>();
     private Executor executor;
 
     public Builder withId(final UUID id) {
@@ -94,6 +97,15 @@ public class GameEngine implements Game<GameEngine> {
       return this;
     }
 
+    /**
+     * Registers a common {@link GameLifecycleObserver}, notified of game-type-agnostic lifecycle
+     * events (started, resumed, over, quit) alongside the KH-specific {@link KhObserver}s.
+     */
+    public Builder addLifecycleObserver(final GameLifecycleObserver<GameEngine> observer) {
+      lifecycleObservers.add(observer);
+      return this;
+    }
+
     public Builder withNotificationExecutor(final Executor executor) {
       this.executor = executor;
       return this;
@@ -108,7 +120,8 @@ public class GameEngine implements Game<GameEngine> {
           eventCatalog != null ? eventCatalog : EventCatalog.defaultCatalog(),
           rng != null ? rng : new Random(),
           listeners,
-          executor != null ? executor : Runnable::run);
+          executor != null ? executor : Runnable::run,
+          lifecycleObservers);
     }
   }
 
@@ -119,6 +132,7 @@ public class GameEngine implements Game<GameEngine> {
   private final EventCatalog eventCatalog;
   private final Random rng;
   private final List<KhObserver> listeners;
+  private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers;
   private final Executor executor;
 
   /** Convenience constructor for tests: injects state, event catalog, and RNG. */
@@ -158,6 +172,23 @@ public class GameEngine implements Game<GameEngine> {
       Random rng,
       List<KhObserver> listeners,
       Executor executor) {
+    this(id, player, state, cardCatalog, eventCatalog, rng, listeners, executor, List.of());
+  }
+
+  /**
+   * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
+   * executor, and common {@link GameLifecycleObserver}s.
+   */
+  GameEngine(
+      UUID id,
+      Player player,
+      GameState state,
+      CardCatalog cardCatalog,
+      EventCatalog eventCatalog,
+      Random rng,
+      List<KhObserver> listeners,
+      Executor executor,
+      List<GameLifecycleObserver<GameEngine>> lifecycleObservers) {
     if (state == null) throw new IllegalArgumentException("state cannot be null");
     if (cardCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
     if (eventCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
@@ -170,6 +201,8 @@ public class GameEngine implements Game<GameEngine> {
     this.rng = rng;
     this.listeners = listeners == null ? List.of() : List.copyOf(listeners);
     this.executor = executor != null ? executor : Runnable::run;
+    this.lifecycleObservers =
+        lifecycleObservers == null ? List.of() : List.copyOf(lifecycleObservers);
   }
 
   /** Notifies every registered {@link KhObserver} of the given notification via the executor. */
@@ -178,6 +211,18 @@ public class GameEngine implements Game<GameEngine> {
     final GameState currentState = state;
     for (final KhObserver listener : listeners) {
       executor.execute(() -> notification.execute(game, currentState, listener));
+    }
+  }
+
+  /**
+   * Notifies every registered common {@link GameLifecycleObserver} via the executor. {@code call}
+   * is typically a method reference, e.g. {@code GameLifecycleObserver::gameStarted}.
+   */
+  private void notifyLifecycleObservers(
+      final BiConsumer<GameLifecycleObserver<GameEngine>, Game<GameEngine>> call) {
+    final Game<GameEngine> game = this;
+    for (final GameLifecycleObserver<GameEngine> observer : lifecycleObservers) {
+      executor.execute(() -> call.accept(observer, game));
     }
   }
 
@@ -195,6 +240,23 @@ public class GameEngine implements Game<GameEngine> {
       offerAddChoices();
     }
     notifyListeners(GAME_STARTED_NOTIFICATION);
+    // TODO: KH does not yet persist mid-game state (GameService.buildKhGame always rebuilds a
+    // fresh GameState), so there is no reliable signal to distinguish a true resume from this
+    // first build. gameResumed() exists on GameLifecycleObserver and can be fired here once that
+    // persistence gap is closed; for now every (re)build is treated as a fresh start.
+    notifyLifecycleObservers(GameLifecycleObserver::gameStarted);
+  }
+
+  /**
+   * Ends the game because a player quit before it was otherwise over. No-ops if the game is
+   * already over. Reuses the existing {@link GameState#isGameOver()} flag rather than tracking a
+   * separate quit reason, since nothing in KH's gameplay logic needs to distinguish "ended
+   * naturally" from "ended by quit" — only that the game has ended.
+   */
+  public synchronized void quit() {
+    if (state.isGameOver()) return;
+    state.setGameOver(true);
+    notifyLifecycleObservers(GameLifecycleObserver::gameQuit);
   }
 
   @Override
@@ -708,6 +770,7 @@ public class GameEngine implements Game<GameEngine> {
       state.setPopulation(0.0);
       state.setGameOver(true);
       notifyListeners(GAME_OVER_NOTIFICATION);
+      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
     }
   }
 
