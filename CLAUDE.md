@@ -137,6 +137,18 @@ MAILGUN_API_KEY, MAILGUN_DOMAIN, MAILGUN_FROM
 ```
 Both `EmailVerificationService` and `PasswordResetService` extend `MailgunEmailService`, which holds the shared Mailgun config fields and `sendEmail()` implementation.
 
+### Session persistence
+
+HTTP sessions are stored in PostgreSQL via **Spring Session JDBC** (`SessionConfig.java`, `@EnableJdbcHttpSession`). This means sessions survive server restarts and are shared across Cloud Run replicas — users are not logged out on deploy.
+
+**Tables** (created by `V14__Add_spring_session.sql` in `game-database`):
+- `SPRING_SESSION` — one row per active session; tracks `LAST_ACCESS_TIME`, `EXPIRY_TIME`, and `PRINCIPAL_NAME`
+- `SPRING_SESSION_ATTRIBUTES` — serialized session attributes (e.g. Spring Security `SecurityContext`)
+
+**Expiry:** Session timeout is 30 minutes of inactivity (Spring Boot default, configurable via `server.servlet.session.timeout`). Spring Session runs a background `@Scheduled` task (default: every 60 seconds) that deletes rows where `EXPIRY_TIME < now`. Logout deletes the row immediately. Each Cloud Run replica runs this cleanup independently — the `DELETE WHERE EXPIRY_TIME < ?` is idempotent so concurrent cleanup across replicas is safe.
+
+> **Spring Boot 4 note:** `spring.session.store-type` was removed in Spring Boot 4.0 and is silently ignored. Use `@EnableJdbcHttpSession` (or the equivalent annotation for other stores) — not the `store-type` property — to activate Spring Session.
+
 ### Schema management
 
 JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).
