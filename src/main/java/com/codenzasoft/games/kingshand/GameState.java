@@ -3,6 +3,7 @@ package com.codenzasoft.games.kingshand;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -191,22 +192,23 @@ public class GameState {
    * been drafted, commissioned, or completed, since each Great Work may only ever exist once.
    */
   public boolean isCardInPlay(String name) {
-    if (hand.stream().anyMatch(c -> c.name().equals(name))) return true;
-    for (List<Card> cards : board.values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    for (List<Card> cards : drawPile.values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    for (List<Card> cards : discardPile.values()) {
-      if (cards.stream().anyMatch(c -> c.name().equals(name))) return true;
-    }
-    return false;
+    return isCardInPlay(
+        name, List.of(hand), board.values(), drawPile.values(), discardPile.values());
   }
 
   /** Returns {@code true} if {@code card} (matched by name) exists anywhere in the game. */
   public boolean isCardInPlay(Card card) {
     return isCardInPlay(card.name());
+  }
+
+  @SafeVarargs
+  private boolean isCardInPlay(final String name, final Collection<List<Card>>... collections) {
+    for (Collection<List<Card>> lists : collections) {
+      for (List<Card> list : lists) {
+        if (list.stream().anyMatch(c -> c.name().equals(name))) return true;
+      }
+    }
+    return false;
   }
 
   @JsonProperty("population")
@@ -378,9 +380,9 @@ public class GameState {
     return unlockedResources;
   }
 
-  /** Permanently adds {@code resource} to the set of currently-unlocked resources. */
-  public void unlockResource(ResourceTarget resource) {
-    unlockedResources.add(resource);
+  /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
+  public void unlock(Card card) {
+    unlockedResources.addAll(card.unlockedResources());
   }
 
   /**
@@ -426,25 +428,9 @@ public class GameState {
     return unlockedResources.contains(ResourceTarget.GOLD);
   }
 
-  public void setGoldUnlocked(boolean goldUnlocked) {
-    if (goldUnlocked) {
-      unlockedResources.add(ResourceTarget.GOLD);
-    } else {
-      unlockedResources.remove(ResourceTarget.GOLD);
-    }
-  }
-
   @JsonProperty("strengthUnlocked")
   public boolean isStrengthUnlocked() {
     return unlockedResources.contains(ResourceTarget.STRENGTH);
-  }
-
-  public void setStrengthUnlocked(boolean strengthUnlocked) {
-    if (strengthUnlocked) {
-      unlockedResources.add(ResourceTarget.STRENGTH);
-    } else {
-      unlockedResources.remove(ResourceTarget.STRENGTH);
-    }
   }
 
   /**

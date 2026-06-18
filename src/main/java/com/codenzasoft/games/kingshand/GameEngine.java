@@ -529,15 +529,7 @@ public class GameEngine implements Game<GameEngine> {
             snapshot.set(i, completedCard);
             liveTable.set(i - discardedCount, completedCard);
             // Unlock any new resource types.
-            for (ResourceTarget resource : card.unlockedResources()) {
-              if (resource == ResourceTarget.GOLD && !state.isGoldUnlocked()) {
-                state.setGoldUnlocked(true);
-                gwLog.add(card.name() + "_UNLOCKED_GOLD");
-              } else if (resource == ResourceTarget.STRENGTH && !state.isStrengthUnlocked()) {
-                state.setStrengthUnlocked(true);
-                gwLog.add(card.name() + "_UNLOCKED_STRENGTH");
-              }
-            }
+            state.unlock(card);
             gwLog.add(card.name() + "_COMPLETED");
           } else {
             // Decrement: replace the card on the table with the same card minus one period.
