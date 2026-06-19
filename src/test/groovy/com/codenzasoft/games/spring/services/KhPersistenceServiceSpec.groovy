@@ -151,7 +151,7 @@ class KhPersistenceServiceSpec extends Specification {
         def entity = gameService.createKhGame(testUser)
         def state = GameState.builder()
                 .population(12.0).production(85.0).food(40.0)
-                .curSeason(Season.AUTUMN)
+                .curSeason(Season.FALL)
                 .curPhase(Phase.PLAY)
                 .year(3)
                 .build()
@@ -166,7 +166,7 @@ class KhPersistenceServiceSpec extends Specification {
         restored.getPopulation() == 12.0
         restored.getProduction() == 85.0
         restored.getFood() == 40.0
-        restored.getCurSeason() == Season.AUTUMN
+        restored.getCurSeason() == Season.FALL
         restored.getCurPhase() == Phase.PLAY
         restored.getYear() == 3
     }

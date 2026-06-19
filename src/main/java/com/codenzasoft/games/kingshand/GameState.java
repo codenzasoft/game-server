@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
@@ -88,6 +89,72 @@ public class GameState {
     return new Builder();
   }
 
+  /**
+   * Property-based Jackson creator used by {@code KhPersistenceService} to reconstruct a {@link
+   * GameState} from its persisted JSON snapshot (GAME-81). Jackson can't use the private {@link
+   * Builder}-backed constructor above (no default constructor, no all-args constructor it can see),
+   * so this rebuilds an equivalent state through the public {@link Builder} API instead.
+   *
+   * <p>Deliberately excludes the derived, getter-only properties ({@code currentTable}, {@code
+   * victoryComplete}, {@code goldUnlocked}, {@code strengthUnlocked}, {@code gameWon}) — those are
+   * marked {@link JsonProperty.Access#READ_ONLY} on their getters below and are recomputed from the
+   * restored state rather than round-tripped.
+   */
+  @JsonCreator
+  private static GameState fromJson(
+      @JsonProperty("board") final Map<Season, List<Card>> board,
+      @JsonProperty("drawPile") final Map<Season, List<Card>> drawPile,
+      @JsonProperty("discardPile") final Map<Season, List<Card>> discardPile,
+      @JsonProperty("hand") final List<Card> hand,
+      @JsonProperty("population") final double population,
+      @JsonProperty("populationCap") final double populationCap,
+      @JsonProperty("production") final double production,
+      @JsonProperty("food") final double food,
+      @JsonProperty("curSeason") final Season curSeason,
+      @JsonProperty("curPhase") final Phase curPhase,
+      @JsonProperty("year") final int year,
+      @JsonProperty("addChoices") final List<Card> addChoices,
+      @JsonProperty("rerollCount") final int rerollCount,
+      @JsonProperty("currentEvent") final Event currentEvent,
+      @JsonProperty("gameOver") final boolean gameOver,
+      @JsonProperty("tableStaffing") final List<CardStaffing> tableStaffing,
+      @JsonProperty("resolutionLog") final List<ResolutionStep> resolutionLog,
+      @JsonProperty("gold") final double gold,
+      @JsonProperty("strength") final double strength,
+      @JsonProperty("unlockedResources") final Set<ResourceTarget> unlockedResources,
+      @JsonProperty("greatWorkLog") final List<String> greatWorkLog) {
+    final Builder b =
+        builder()
+            .population(population)
+            .populationCap(populationCap)
+            .production(production)
+            .food(food)
+            .curSeason(curSeason)
+            .curPhase(curPhase)
+            .year(year)
+            .addChoices(addChoices == null ? List.of() : addChoices)
+            .rerollCount(rerollCount)
+            .currentEvent(currentEvent)
+            .gameOver(gameOver)
+            .tableStaffing(tableStaffing)
+            .resolutionLog(resolutionLog)
+            .gold(gold)
+            .strength(strength)
+            .unlockedResources(unlockedResources)
+            .greatWorkLog(greatWorkLog)
+            .hand(hand == null ? List.of() : hand);
+    if (board != null) {
+      board.forEach(b::table);
+    }
+    if (drawPile != null) {
+      drawPile.forEach(b::drawPile);
+    }
+    if (discardPile != null) {
+      discardPile.forEach(b::discardPile);
+    }
+    return b.build();
+  }
+
   // ----- Getters -----
 
   @JsonProperty("board")
@@ -96,6 +163,7 @@ public class GameState {
   }
 
   /** Convenience accessor for the table belonging to the current season. */
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public List<Card> getCurrentTable() {
     return board.get(curSeason);
   }
@@ -423,12 +491,12 @@ public class GameState {
     return simProd >= 0 && simFood >= 0 && simGold >= 0 && simStrength >= 0;
   }
 
-  @JsonProperty("goldUnlocked")
+  @JsonProperty(value = "goldUnlocked", access = JsonProperty.Access.READ_ONLY)
   public boolean isGoldUnlocked() {
     return unlockedResources.contains(ResourceTarget.GOLD);
   }
 
-  @JsonProperty("strengthUnlocked")
+  @JsonProperty(value = "strengthUnlocked", access = JsonProperty.Access.READ_ONLY)
   public boolean isStrengthUnlocked() {
     return unlockedResources.contains(ResourceTarget.STRENGTH);
   }
@@ -439,6 +507,7 @@ public class GameState {
    * for each of the four seasonal win conditions. Computed dynamically from the board rather than
    * cached, since a completed Great Work's presence there is itself the source of truth.
    */
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isVictoryComplete() {
     long completedVictoryCards =
         board.values().stream()
@@ -454,7 +523,7 @@ public class GameState {
    * #isVictoryComplete()} kept under this name for the {@code gameWon} JSON wire property and
    * existing call sites.
    */
-  @JsonProperty("gameWon")
+  @JsonProperty(value = "gameWon", access = JsonProperty.Access.READ_ONLY)
   public boolean isGameWon() {
     return isVictoryComplete();
   }

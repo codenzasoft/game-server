@@ -33,6 +33,7 @@ dependencies {
             'org.springframework.boot:spring-boot-starter-actuator',
             'org.springframework.boot:spring-boot-starter-websocket',
             'org.springframework.session:spring-session-jdbc',
+            'com.fasterxml.jackson.core:jackson-databind',
             'org.postgresql:postgresql',
             'com.google.cloud.sql:postgres-socket-factory:1.21.0',
             'com.newrelic.agent.java:newrelic-api:9.2.0',

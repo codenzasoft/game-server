@@ -192,8 +192,8 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
-   * executor, and common {@link GameLifecycleObserver}s. Defaults {@code restored} to {@code
-   * false} — callers that need to construct a resumed engine directly (rather than via {@link
+   * executor, and common {@link GameLifecycleObserver}s. Defaults {@code restored} to {@code false}
+   * — callers that need to construct a resumed engine directly (rather than via {@link
    * Builder#withRestoredState}) should use the overload below.
    */
   GameEngine(
@@ -221,8 +221,8 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
-   * executor, common {@link GameLifecycleObserver}s, and whether this engine is being resumed
-   * from a persisted snapshot rather than newly created. See {@link #initialize()}.
+   * executor, common {@link GameLifecycleObserver}s, and whether this engine is being resumed from
+   * a persisted snapshot rather than newly created. See {@link #initialize()}.
    */
   GameEngine(
       UUID id,
@@ -279,10 +279,10 @@ public class GameEngine implements Game<GameEngine> {
    * <p>For a brand-new game (the default), seeds the starting deck, offers the first ADD choices,
    * and fires {@code gameStarted} on both the KH-specific and common lifecycle observers.
    *
-   * <p>For a game resumed from a persisted snapshot (built via {@link
-   * Builder#withRestoredState}), skips seeding/offering — the restored state already carries
-   * piles, hand, and choices from its last save — and fires only the common {@code gameResumed}
-   * observer; {@link KhObserver} has no resume-specific hook.
+   * <p>For a game resumed from a persisted snapshot (built via {@link Builder#withRestoredState}),
+   * skips seeding/offering — the restored state already carries piles, hand, and choices from its
+   * last save — and fires only the common {@code gameResumed} observer; {@link KhObserver} has no
+   * resume-specific hook.
    *
    * <p>Called by {@code GameService} after building the engine. The initialization logic lives here
    * so the engine owns all knowledge of how a game starts.

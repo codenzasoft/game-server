@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -72,6 +73,7 @@ public record Card(
   }
 
   /** Returns {@code true} if this is a Great Work under-construction card. */
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   public boolean isGreatWork() {
     return constructionPeriod > 0;
   }
