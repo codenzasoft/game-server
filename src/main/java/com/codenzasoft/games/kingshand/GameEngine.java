@@ -61,6 +61,7 @@ public class GameEngine implements Game<GameEngine> {
     private final List<KhObserver> listeners = new ArrayList<>();
     private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers = new ArrayList<>();
     private Executor executor;
+    private boolean restored;
 
     public Builder withId(final UUID id) {
       this.id = id;
@@ -74,6 +75,18 @@ public class GameEngine implements Game<GameEngine> {
 
     public Builder withState(final GameState state) {
       this.state = state;
+      return this;
+    }
+
+    /**
+     * Sets the state from a persisted snapshot and marks this engine as resumed rather than newly
+     * created: {@link #initialize()} will skip deck-seeding/offer logic and fire {@code
+     * gameResumed} instead of {@code gameStarted}. Mirrors {@code HeartsGame.Builder}'s
+     * identically-named method.
+     */
+    public Builder withRestoredState(final GameState state) {
+      this.state = state;
+      this.restored = true;
       return this;
     }
 
@@ -121,7 +134,8 @@ public class GameEngine implements Game<GameEngine> {
           rng != null ? rng : new Random(),
           listeners,
           executor != null ? executor : Runnable::run,
-          lifecycleObservers);
+          lifecycleObservers,
+          restored);
     }
   }
 
@@ -134,6 +148,7 @@ public class GameEngine implements Game<GameEngine> {
   private final List<KhObserver> listeners;
   private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers;
   private final Executor executor;
+  private final boolean restored;
 
   /** Convenience constructor for tests: injects state, event catalog, and RNG. */
   public GameEngine(GameState state, EventCatalog eventCatalog, Random rng) {
@@ -177,7 +192,9 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
-   * executor, and common {@link GameLifecycleObserver}s.
+   * executor, and common {@link GameLifecycleObserver}s. Defaults {@code restored} to {@code
+   * false} — callers that need to construct a resumed engine directly (rather than via {@link
+   * Builder#withRestoredState}) should use the overload below.
    */
   GameEngine(
       UUID id,
@@ -189,6 +206,35 @@ public class GameEngine implements Game<GameEngine> {
       List<KhObserver> listeners,
       Executor executor,
       List<GameLifecycleObserver<GameEngine>> lifecycleObservers) {
+    this(
+        id,
+        player,
+        state,
+        cardCatalog,
+        eventCatalog,
+        rng,
+        listeners,
+        executor,
+        lifecycleObservers,
+        false);
+  }
+
+  /**
+   * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
+   * executor, common {@link GameLifecycleObserver}s, and whether this engine is being resumed
+   * from a persisted snapshot rather than newly created. See {@link #initialize()}.
+   */
+  GameEngine(
+      UUID id,
+      Player player,
+      GameState state,
+      CardCatalog cardCatalog,
+      EventCatalog eventCatalog,
+      Random rng,
+      List<KhObserver> listeners,
+      Executor executor,
+      List<GameLifecycleObserver<GameEngine>> lifecycleObservers,
+      boolean restored) {
     if (state == null) throw new IllegalArgumentException("state cannot be null");
     if (cardCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
     if (eventCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
@@ -203,6 +249,7 @@ public class GameEngine implements Game<GameEngine> {
     this.executor = executor != null ? executor : Runnable::run;
     this.lifecycleObservers =
         lifecycleObservers == null ? List.of() : List.copyOf(lifecycleObservers);
+    this.restored = restored;
   }
 
   /** Notifies every registered {@link KhObserver} of the given notification via the executor. */
@@ -227,23 +274,30 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Initializes a brand-new game: seeds the starting deck and offers the first ADD choices. Must be
-   * called once after construction for a fresh game. Has no effect if the game is already over.
+   * Initializes the engine after construction. Has no effect if the game is already over.
+   *
+   * <p>For a brand-new game (the default), seeds the starting deck, offers the first ADD choices,
+   * and fires {@code gameStarted} on both the KH-specific and common lifecycle observers.
+   *
+   * <p>For a game resumed from a persisted snapshot (built via {@link
+   * Builder#withRestoredState}), skips seeding/offering — the restored state already carries
+   * piles, hand, and choices from its last save — and fires only the common {@code gameResumed}
+   * observer; {@link KhObserver} has no resume-specific hook.
    *
    * <p>Called by {@code GameService} after building the engine. The initialization logic lives here
    * so the engine owns all knowledge of how a game starts.
    */
   public synchronized void initialize() {
     if (state.isGameOver()) return;
+    if (restored) {
+      notifyLifecycleObservers(GameLifecycleObserver::gameResumed);
+      return;
+    }
     seedStartingDeck();
     if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
       offerAddChoices();
     }
     notifyListeners(GAME_STARTED_NOTIFICATION);
-    // TODO: KH does not yet persist mid-game state (GameService.buildKhGame always rebuilds a
-    // fresh GameState), so there is no reliable signal to distinguish a true resume from this
-    // first build. gameResumed() exists on GameLifecycleObserver and can be fired here once that
-    // persistence gap is closed; for now every (re)build is treated as a fresh start.
     notifyLifecycleObservers(GameLifecycleObserver::gameStarted);
   }
 

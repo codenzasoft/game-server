@@ -25,6 +25,7 @@ import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
+import com.codenzasoft.games.spring.services.kh.KhPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Line;
@@ -57,6 +58,7 @@ public class GameService {
   @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
   @Autowired private HeartsPersistenceService heartsPersistenceService;
+  @Autowired private KhPersistenceService khPersistenceService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
   @Autowired private GameCache gameCache;
@@ -378,12 +380,18 @@ public class GameService {
       return cached.map(Game::getGame);
     }
     final Optional<KhGameEntity> persisted = findGameEntity(id, KhGameEntity.class);
-    if (persisted.isPresent()) {
-      final GameEngine game = buildKhGame(persisted.get());
-      gameCache.addGame(game);
-      return Optional.of(game);
+    if (persisted.isEmpty()) return Optional.empty();
+    final KhGameEntity entity = persisted.get();
+    final Optional<GameState> restoredState = khPersistenceService.reconstructState(id);
+    final GameEngine game;
+    if (restoredState.isPresent()) {
+      log.info("getOrBuildKhGame: restoring game {} from persisted state", id);
+      game = buildRestoredKhGame(entity, restoredState.get());
+    } else {
+      game = buildKhGame(entity);
     }
-    return Optional.empty();
+    gameCache.addGame(game);
+    return Optional.of(game);
   }
 
   /**
@@ -558,6 +566,24 @@ public class GameService {
             .withId(entity.getId())
             .withPlayer(player)
             .withState(state)
+            .addListener(khPersistenceService)
+            .addLifecycleObserver(new GameLifecycleListener<>())
+            .build();
+    // Delegate initialization to the engine — it owns the knowledge of how a game starts.
+    engine.initialize();
+    return engine;
+  }
+
+  protected synchronized GameEngine buildRestoredKhGame(
+      final KhGameEntity entity, final GameState state) {
+    log.debug("Restoring KH game {} from persisted state", entity.getId());
+    final Player player = entity.getPlayers().get(0).toPlayer();
+    final GameEngine engine =
+        new GameEngine.Builder()
+            .withId(entity.getId())
+            .withPlayer(player)
+            .withRestoredState(state)
+            .addListener(khPersistenceService)
             .addLifecycleObserver(new GameLifecycleListener<>())
             .build();
     // Delegate initialization to the engine — it owns the knowledge of how a game starts.

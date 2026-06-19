@@ -15,12 +15,24 @@ class GameEngineLifecycleObserverSpec extends Specification {
 
     private static final Player TEST_PLAYER = new Player(UUID.randomUUID(), "test")
 
-    /** Builds an engine wired with the given common lifecycle observers and a synchronous executor. */
+    /** Builds a fresh (non-restored) engine wired with the given common lifecycle observers and a synchronous executor. */
     private static GameEngine engineWith(GameState state, GameLifecycleObserver<GameEngine>... observers) {
         def builder = new GameEngine.Builder()
                 .withId(UUID.randomUUID())
                 .withPlayer(TEST_PLAYER)
                 .withState(state)
+                .withEventCatalog(new EventCatalog([:]))
+                .withNotificationExecutor({ it.run() } as Executor)
+        observers.each { builder.addLifecycleObserver(it) }
+        builder.build()
+    }
+
+    /** Builds an engine restored from a persisted state, wired with the given common lifecycle observers and a synchronous executor. */
+    private static GameEngine restoredEngineWith(GameState state, GameLifecycleObserver<GameEngine>... observers) {
+        def builder = new GameEngine.Builder()
+                .withId(UUID.randomUUID())
+                .withPlayer(TEST_PLAYER)
+                .withRestoredState(state)
                 .withEventCatalog(new EventCatalog([:]))
                 .withNotificationExecutor({ it.run() } as Executor)
         observers.each { builder.addLifecycleObserver(it) }
@@ -53,7 +65,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
         0 * observer.gameStarted(_)
     }
 
-    def "initialize never fires gameResumed"() {
+    def "initialize never fires gameResumed for a fresh game"() {
         setup:
         def observer = Mock(GameLifecycleObserver)
         def state = GameState.newState()
@@ -64,6 +76,60 @@ class GameEngineLifecycleObserverSpec extends Specification {
 
         then:
         0 * observer.gameResumed(_)
+    }
+
+    def "initialize fires gameResumed, not gameStarted, when built with a restored state"() {
+        setup:
+        def observer = Mock(GameLifecycleObserver)
+        def state = GameState.newState()
+        def engine = restoredEngineWith(state, observer)
+
+        when:
+        engine.initialize()
+
+        then:
+        1 * observer.gameResumed(engine)
+        0 * observer.gameStarted(_)
+    }
+
+    def "initialize on a restored engine does not reseed the starting deck or re-offer ADD choices"() {
+        setup:
+        // A snapshot saved mid-game: draw piles already seeded, an ADD choice already offered.
+        def offeredChoice = CardCatalog.defaultCatalog().forSeason(Season.SPRING).first()
+        def state = GameState.builder()
+                .curPhase(Phase.ADD)
+                .addChoices([offeredChoice])
+                .build()
+        def engine = restoredEngineWith(state)
+
+        when:
+        engine.initialize()
+
+        then:
+        // Untouched: seedStartingDeck() would have populated the draw piles; it must not run again.
+        Season.values().every { engine.state.getDrawPile().get(it).isEmpty() }
+        // Untouched: offerAddChoices() would have replaced this with a new random offer.
+        engine.state.getAddChoices() == [offeredChoice]
+    }
+
+    def "initialize on a restored engine does not notify the legacy KhObserver"() {
+        setup:
+        def khObserver = Mock(KhObserver)
+        def state = GameState.newState()
+        def builder = new GameEngine.Builder()
+                .withId(UUID.randomUUID())
+                .withPlayer(TEST_PLAYER)
+                .withRestoredState(state)
+                .withEventCatalog(new EventCatalog([:]))
+                .withNotificationExecutor({ it.run() } as Executor)
+                .addListener(khObserver)
+        def engine = builder.build()
+
+        when:
+        engine.initialize()
+
+        then:
+        0 * khObserver.gameStarted(_, _)
     }
 
     def "population dropping to zero via an event option fires gameOver"() {

@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhPersistenceService;
 import com.newrelic.api.agent.NewRelic;
 import java.security.Principal;
 import java.util.List;
@@ -26,6 +27,7 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
+  @Autowired private KhPersistenceService khPersistenceService;
 
   /**
    * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
@@ -50,6 +52,7 @@ public class KhController {
             game -> {
               try {
                 game.offerAddChoices();
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("addOffer rejected for game {}: {}", gameId, e.getMessage());
@@ -71,6 +74,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.pickCardByName(name);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("addPick rejected for game {}: {}", gameId, e.getMessage());
@@ -91,6 +95,7 @@ public class KhController {
             game -> {
               try {
                 game.skipAdd();
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("addSkip rejected for game {}: {}", gameId, e.getMessage());
@@ -112,6 +117,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.applyEventOptionByName(name);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("eventPick rejected for game {}: {}", gameId, e.getMessage());
@@ -133,6 +139,7 @@ public class KhController {
             game -> {
               try {
                 game.advancePhase();
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("eventSkip rejected for game {}: {}", gameId, e.getMessage());
@@ -157,6 +164,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.placeCardByName(name);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("playCard rejected for game {}: {}", gameId, e.getMessage());
@@ -178,6 +186,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.demolishCardByName(name);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("demolishCard rejected for game {}: {}", gameId, e.getMessage());
@@ -201,6 +210,7 @@ public class KhController {
               final List<String> names = (List<String>) body.get("names");
               try {
                 game.reorderTable(names);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("reorderTable rejected for game {}: {}", gameId, e.getMessage());
@@ -225,6 +235,7 @@ public class KhController {
               final String name = (String) body.get("name");
               try {
                 game.commissionGreatWork(name);
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException | IllegalArgumentException e) {
                 log.error("commissionGreatWork rejected for game {}: {}", gameId, e.getMessage());
@@ -246,6 +257,7 @@ public class KhController {
             game -> {
               try {
                 game.endAndRun();
+                khPersistenceService.save(game);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
                 log.error("endAndRun rejected for game {}: {}", gameId, e.getMessage());
@@ -261,7 +273,13 @@ public class KhController {
       return;
     }
     final UUID id = UUID.fromString(gameId);
-    gameService.getOrBuildKhGame(id).ifPresent(GameEngine::quit);
+    gameService
+        .getOrBuildKhGame(id)
+        .ifPresent(
+            game -> {
+              game.quit();
+              khPersistenceService.save(game);
+            });
     try {
       gameService.quitGame(id, userEntity.get());
     } catch (final IllegalStateException e) {
