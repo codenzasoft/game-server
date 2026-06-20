@@ -39,7 +39,7 @@ public class GameEngine implements Game<GameEngine> {
 
   public static final int MAX_TABLE_SIZE = 5;
   public static final int MAX_HAND_SIZE = 3;
-  public static final int REROLL_COST_STEP = 10;
+  public static final int REROLL_COST_STEP = 50;
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
 
@@ -829,8 +829,8 @@ public class GameEngine implements Game<GameEngine> {
    *
    * <p>The <em>first</em> call each ADD phase is free. Every subsequent call within the same phase
    * is a paid reroll: the cost of the <em>n</em>-th reroll (1-indexed) is {@code n × }{@value
-   * #REROLL_COST_STEP} production, so costs escalate as 10, 20, 30, … The offer counter is reset to
-   * zero by {@link #pickCard(Card)} and {@link #skipAdd()}, so it is always phase-scoped.
+   * #REROLL_COST_STEP} production, so costs escalate as 50, 100, 150, … The offer counter is reset
+   * to zero by {@link #pickCard(Card)} and {@link #skipAdd()}, so it is always phase-scoped.
    *
    * @return the three offered cards
    * @throws IllegalStateException if the current phase is not {@link Phase#ADD}, or if this is a

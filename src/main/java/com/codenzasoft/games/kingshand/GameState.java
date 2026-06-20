@@ -217,7 +217,7 @@ public class GameState {
   }
 
   /**
-   * The maximum population allowed. Starts at 20 and is permanently raised whenever a housing card
+   * The maximum population allowed. Starts at 100 and is permanently raised whenever a housing card
    * (e.g. BUNKHOUSE, MANOR) fires its {@link ResourceTarget#POPULATION_CAP} effect during {@link
    * Phase#PLAY} resolution.
    */
@@ -480,10 +480,10 @@ public class GameState {
     private Map<Season, List<Card>> discardPile = new HashMap<>();
     private Map<Season, List<Card>> drawPile = new HashMap<>();
     private List<Card> hand = new ArrayList<>();
-    private double population = 20.0;
-    private double populationCap = 20.0;
-    private double production = 200.0;
-    private double food = 150.0;
+    private double population = 100.0;
+    private double populationCap = 100.0;
+    private double production = 1000.0;
+    private double food = 750.0;
     private Season curSeason = Season.SPRING;
     private Phase curPhase = Phase.ADD;
     private int year = 1;

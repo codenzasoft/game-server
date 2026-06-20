@@ -159,9 +159,9 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 20    // 20 pop cap
-        state.production == 220   // 200 + 20 from RECURRING card
-        state.food       == 150   // unchanged — SINGLE card did not fire
+        state.population == 100   // 100 pop cap
+        state.production == 1020  // 1000 + 20 from RECURRING card
+        state.food       == 750   // unchanged — SINGLE card did not fire
     }
 
     def "card with recurring effects on all three resources fires every one of them"() {
@@ -182,9 +182,9 @@ class GameEngineSpec extends Specification {
         engine.triggerCurrentSeasonTable()
 
         then:
-        state.population == 20    // 20 pop cap
-        state.production == 205   // 200 + 5
-        state.food == 153         // 150 + 3
+        state.population == 100   // 100 pop cap
+        state.production == 1005  // 1000 + 5
+        state.food == 753         // 750 + 3
     }
 
     def "single-frequency effects do not fire on the season trigger"() {
@@ -201,7 +201,7 @@ class GameEngineSpec extends Specification {
         engine.advanceSeason()
 
         then:
-        state.food == 150   // unchanged because the effect is SINGLE
+        state.food == 750   // unchanged because the effect is SINGLE
     }
 
     // ----- table mutations -----
@@ -513,9 +513,9 @@ class GameEngineSpec extends Specification {
         state.production  == 100.0   // no charge on first call
     }
 
-    def "second call costs 10 production (first reroll)"() {
+    def "second call costs 50 production (first reroll)"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.ADD).production(100.0).build()
+        def state = GameState.builder().curPhase(Phase.ADD).production(1000.0).build()
         def engine = engine(state)
         engine.offerAddChoices()   // free first call
 
@@ -523,52 +523,52 @@ class GameEngineSpec extends Specification {
         engine.offerAddChoices()   // first paid reroll
 
         then:
-        state.production == 90.0
+        state.production == 950.0
         state.rerollCount == 2
     }
 
     def "reroll cost escalates with each subsequent call within the same ADD phase"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.ADD).production(200.0).build()
+        def state = GameState.builder().curPhase(Phase.ADD).production(1000.0).build()
         def engine = engine(state)
 
         when: "free first offer"
         engine.offerAddChoices()
 
         then:
-        state.production == 200.0
+        state.production == 1000.0
         state.rerollCount == 1
 
-        when: "first reroll costs 10"
+        when: "first reroll costs 50"
         engine.offerAddChoices()
 
         then:
-        state.production == 190.0
+        state.production == 950.0
         state.rerollCount == 2
 
-        when: "second reroll costs 20"
+        when: "second reroll costs 100"
         engine.offerAddChoices()
 
         then:
-        state.production == 170.0
+        state.production == 850.0
         state.rerollCount == 3
 
-        when: "third reroll costs 30"
+        when: "third reroll costs 150"
         engine.offerAddChoices()
 
         then:
-        state.production == 140.0
+        state.production == 700.0
         state.rerollCount == 4
     }
 
     def "offerAddChoices throws when player cannot afford a reroll"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
+        def state = GameState.builder().curPhase(Phase.ADD).production(25.0).build()
         def engine = engine(state)
         engine.offerAddChoices()   // free first call; rerollCount is now 1
 
         when:
-        engine.offerAddChoices()   // would cost 10, but only 5 available
+        engine.offerAddChoices()   // would cost 50, but only 25 available
 
         then:
         def e = thrown(IllegalStateException)
@@ -577,16 +577,16 @@ class GameEngineSpec extends Specification {
 
     def "offerAddChoices does not charge or advance reroll count when player can't afford"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.ADD).production(5.0).build()
+        def state = GameState.builder().curPhase(Phase.ADD).production(25.0).build()
         def engine = engine(state)
         engine.offerAddChoices()   // free; rerollCount == 1
 
         when:
-        engine.offerAddChoices()   // would cost 10
+        engine.offerAddChoices()   // would cost 50
 
         then:
         thrown(IllegalStateException)
-        state.production  == 5.0   // unchanged
+        state.production  == 25.0  // unchanged
         state.rerollCount == 1     // unchanged
     }
 
@@ -840,9 +840,9 @@ class GameEngineSpec extends Specification {
 
         then:
         state.curPhase == Phase.PLAY
-        state.food       == 150.0 // unchanged
-        state.production == 200.0 // unchanged
-        state.population == 20.0  // unchanged
+        state.food       == 750.0  // unchanged
+        state.production == 1000.0 // unchanged
+        state.population == 100.0  // unchanged
     }
 
     def "applyEventOption throws when option is null"() {
@@ -1143,8 +1143,8 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(10)
-                .production(200)
+                .population(50)
+                .production(1000)
                 .table(Season.SPRING, (1..GameEngine.MAX_TABLE_SIZE).collect { filler })
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1160,12 +1160,12 @@ class GameEngineSpec extends Specification {
 
     def "placeCard throws when the player cannot afford the production cost"() {
         setup:
-        // FARM costs 30 production; give the player only 10
+        // FARM costs 90 production; give the player only 50
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(10)
-                .production(10)
+                .population(50)
+                .production(50)
                 .hand([CardCatalog.FARM])
                 .build()
         def engine = engine(state)
@@ -1176,18 +1176,18 @@ class GameEngineSpec extends Specification {
         then:
         def e = thrown(IllegalStateException)
         e.message.contains("not enough production to place card")
-        e.message.contains("30")   // cost
-        e.message.contains("10")   // have
+        e.message.contains("90")   // cost
+        e.message.contains("50")   // have
     }
 
     def "placeCard succeeds regardless of population — staffing is evaluated at End and Run, not at placement"() {
         setup:
-        // FARM has staffRequirement=5 but cards can be placed regardless of population
+        // FARM has staffRequirement=25 but cards can be placed regardless of population
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
                 .population(1)
-                .production(100)
+                .production(500)
                 .hand([CardCatalog.FARM])
                 .build()
         def engine = engine(state)
@@ -1221,12 +1221,12 @@ class GameEngineSpec extends Specification {
 
     def "placeCard moves the card from hand to the current season's table and deducts production"() {
         setup:
-        // FARM: staffRequirement=5, productionRequirement=30
+        // FARM: staffRequirement=25, productionRequirement=90
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(5)
-                .production(100)
+                .population(25)
+                .production(500)
                 .hand([CardCatalog.FARM])
                 .build()
         def engine = engine(state)
@@ -1237,7 +1237,7 @@ class GameEngineSpec extends Specification {
         then:
         state.hand.isEmpty()
         state.board.get(Season.SPRING) == [CardCatalog.FARM]
-        state.production == 70.0    // 100 - 30
+        state.production == 410.0   // 500 - 90
     }
 
     def "placeCard is allowed when the table is full but the card is a duplicate of another on the board, for upgrading"() {
@@ -1248,8 +1248,8 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(5)
-                .production(100)
+                .population(25)
+                .production(500)
                 .table(Season.SPRING, tableCards)
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1261,19 +1261,19 @@ class GameEngineSpec extends Specification {
         then:
         state.hand.isEmpty()
         state.board.get(Season.SPRING).size() == GameEngine.MAX_TABLE_SIZE  // no new slot
-        state.production == 70.0
+        state.production == 410.0   // 500 - 90
     }
 
     // ----- PLAY phase: placeCard — upgrade by duplicate -----
 
     def "placing a duplicate doubles every effect's modifier on the existing table card"() {
         setup:
-        // FARM has one recurring FOOD effect with modifier 10
+        // FARM has one recurring FOOD effect with modifier 50
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(5)
-                .production(100)
+                .population(25)
+                .production(500)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1285,18 +1285,18 @@ class GameEngineSpec extends Specification {
         then:
         def upgraded = state.board.get(Season.SPRING).get(0)
         upgraded.effects().size() == 1
-        upgraded.effects().get(0).modifier() == 20.0    // doubled from 10
+        upgraded.effects().get(0).modifier() == 100.0   // doubled from 50
     }
 
     def "placing a duplicate doubles all effects when the card carries multiple effects"() {
         setup:
-        // TRADING_POST has two recurring CardTarget effects with modifier 1.0 each
-        // staffRequirement=10, productionRequirement=40
+        // TRADING_POST has two recurring CardTarget effects with modifier 5.0 each
+        // staffRequirement=50, productionRequirement=200
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SUMMER)
-                .population(80)
-                .production(200)
+                .population(400)
+                .production(1000)
                 .table(Season.SUMMER, [CardCatalog.TRADING_POST])
                 .hand([CardCatalog.TRADING_POST])
                 .build()
@@ -1308,7 +1308,7 @@ class GameEngineSpec extends Specification {
         then:
         def upgraded = state.board.get(Season.SUMMER).get(0)
         upgraded.effects().size() == 2
-        upgraded.effects().every { it.modifier() == 2.0 }   // table(1) + hand(1)
+        upgraded.effects().every { it.modifier() == 10.0 }   // table(5)+hand(5)
     }
 
     def "upgrade does not add a new slot — table size stays the same after placing a duplicate"() {
@@ -1316,8 +1316,8 @@ class GameEngineSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(5)
-                .production(100)
+                .population(25)
+                .production(500)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1333,13 +1333,13 @@ class GameEngineSpec extends Specification {
 
     def "placing a duplicate onto an engine-boosted table card merges modifiers rather than doubling the hand card"() {
         setup:
-        // Simulate a Farm that has been boosted by an engine-builder from 10 → 14.
-        def boostedFarm = CardCatalog.FARM.boostEffect(ResourceTarget.FOOD, 4)
+        // Simulate a Farm that has been boosted by an engine-builder from 50 → 70.
+        def boostedFarm = CardCatalog.FARM.boostEffect(ResourceTarget.FOOD, 20)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .population(5)
-                .production(100)
+                .population(25)
+                .production(500)
                 .table(Season.SPRING, [boostedFarm])
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1352,7 +1352,7 @@ class GameEngineSpec extends Specification {
         def upgraded = state.board.get(Season.SPRING).get(0)
         upgraded.name() == "FARM II"
         upgraded.effects().size() == 1
-        upgraded.effects().get(0).modifier() == 24.0   // boosted(14) + base(10)
+        upgraded.effects().get(0).modifier() == 120.0   // boosted(70) + base(50)
     }
 
     // ----- PLAY phase: reorderCard -----
@@ -1566,11 +1566,11 @@ class GameEngineSpec extends Specification {
 
     def "demolishCard removes the card at the given slot and charges 20% of its production cost"() {
         setup:
-        // FARM: productionRequirement=30 → demolish cost = 6
+        // FARM: productionRequirement=90 → demolish cost = 18
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .production(100)
+                .production(500)
                 .table(Season.SPRING, [CardCatalog.FARM])
                 .build()
         def engine = engine(state)
@@ -1580,16 +1580,16 @@ class GameEngineSpec extends Specification {
 
         then:
         state.board.get(Season.SPRING).isEmpty()
-        state.production == 94.0    // 100 - 6
+        state.production == 482.0   // 500 - 18
     }
 
     def "demolishCard removes the correct card when multiple cards are on the table"() {
         setup:
-        // Slot 1 is SEEDS (productionRequirement=10 → cost=2)
+        // Slot 1 is SEEDS (productionRequirement=50 → cost=10)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .production(100)
+                .production(500)
                 .table(Season.SPRING, [CardCatalog.FARM, CardCatalog.SEEDS, CardCatalog.FERTILIZER])
                 .build()
         def engine = engine(state)
@@ -1603,7 +1603,7 @@ class GameEngineSpec extends Specification {
         table.contains(CardCatalog.FARM)
         !table.contains(CardCatalog.SEEDS)
         table.contains(CardCatalog.FERTILIZER)
-        state.production == 98.0    // 100 - 2
+        state.production == 490.0   // 500 - 10
     }
 
     def "demolishCard throws when the slot index is out of range"() {
@@ -1629,11 +1629,11 @@ class GameEngineSpec extends Specification {
 
     def "demolishCard throws when the player cannot afford the demolition cost"() {
         setup:
-        // MINE: productionRequirement=60 → demolish cost=12; give player only 5
+        // MINE: productionRequirement=300 → demolish cost=60; give player only 25
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
-                .production(5)
+                .production(25)
                 .table(Season.SPRING, [CardCatalog.MINE])
                 .build()
         def engine = engine(state)
@@ -2203,7 +2203,7 @@ class GameEngineSpec extends Specification {
 
     def "commissionGreatWork throws when production cannot cover the commission cost"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 120 production
+        // THE_GREAT_RESERVOIR_CONSTRUCTION costs 600 production
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(0.0)
                 .build()
@@ -2214,7 +2214,7 @@ class GameEngineSpec extends Specification {
 
         then:
         def e = thrown(IllegalStateException)
-        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 120, have 0"
+        e.message == "not enough production to commission THE_GREAT_RESERVOIR_CONSTRUCTION: need 600, have 0"
     }
 
     // ----- commissionGreatWork: success paths -----
@@ -2222,7 +2222,7 @@ class GameEngineSpec extends Specification {
     def "commissionGreatWork succeeds for Great Works whose construction cost never references GOLD or STRENGTH, even when neither resource is unlocked"() {
         setup:
         def state = GameState.builder()
-                .curPhase(Phase.PLAY).curSeason(season).production(2000.0)
+                .curPhase(Phase.PLAY).curSeason(season).production(10000.0)
                 .build()
         def engine = engine(state)
 
@@ -2243,7 +2243,7 @@ class GameEngineSpec extends Specification {
     def "commissionGreatWork succeeds once its construction cost's resource has been unlocked"() {
         setup:
         def state = GameState.builder()
-                .curPhase(Phase.PLAY).curSeason(Season.SUMMER).production(2000.0)
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER).production(10000.0)
                 .goldUnlocked(true)
                 .build()
         def engine = engine(state)
@@ -2259,7 +2259,7 @@ class GameEngineSpec extends Specification {
     def "commissionGreatWork deducts the commission cost and places the construction card on the season's table"() {
         setup:
         def state = GameState.builder()
-                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(500.0)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).production(2500.0)
                 .build()
         def engine = engine(state)
 
@@ -2267,7 +2267,7 @@ class GameEngineSpec extends Specification {
         engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
 
         then:
-        state.production == 380.0   // 500 - 120 commission cost
+        state.production == 1900.0   // 2500 - 600 commission cost
         state.board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
     }
 
@@ -2337,12 +2337,12 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun decrements a Great Work's construction period by one when fully staffed and its costs are affordable"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, costs PRODUCTION -50 / FOOD -30.
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=200, costs PRODUCTION -250 / FOOD -150.
         // Start at period 2 so the decrement doesn't also complete construction.
         def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(40.0).production(100.0).food(100.0)
+                .population(200.0).production(500.0).food(500.0)
                 .table(Season.SPRING, [inProgress])
                 .build()
         def engine = engine(state)
@@ -2354,15 +2354,15 @@ class GameEngineSpec extends Specification {
         def tableCard = state.board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR_CONSTRUCTION"
         tableCard.constructionPeriod() == 1
-        state.production == 50.0   // 100 - 50 construction cost
+        state.production == 250.0   // 500 - 250 construction cost
     }
 
     def "endAndRun does not progress a Great Work's construction when staffing is below FULL"() {
         setup:
-        // staffRequirement=40 but no workers available
+        // staffRequirement=200 but no workers available
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(0.0).production(100.0).food(100.0)
+                .population(0.0).production(500.0).food(500.0)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
                 .build()
         def engine = engine(state)
@@ -2373,15 +2373,15 @@ class GameEngineSpec extends Specification {
         then:
         def tableCard = state.board.get(Season.SPRING)[0]
         tableCard.constructionPeriod() == 6   // unchanged (catalog default)
-        state.production == 100.0             // construction cost never applied
+        state.production == 500.0             // construction cost never applied
     }
 
     def "endAndRun does not progress a Great Work's construction when its costs cannot be afforded, even if fully staffed"() {
         setup:
-        // Fully staffed (population 40 >= staffRequirement 40) but production/food too low to cover the cost (need 50/30)
+        // Fully staffed (population 200 >= staffRequirement 200) but production/food too low to cover the cost (need 250/150)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(40.0).production(0.0).food(0.0)
+                .population(200.0).production(0.0).food(0.0)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION])
                 .build()
         def engine = engine(state)
@@ -2400,7 +2400,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(40.0).production(100.0).food(100.0)
+                .population(200.0).production(500.0).food(500.0)
                 .table(Season.SPRING, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2419,12 +2419,12 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun applies THE_GREAT_RESERVOIR_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
         setup:
-        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=40, effects include POPULATION_CAP +5.
+        // THE_GREAT_RESERVOIR_CONSTRUCTION: staffRequirement=200, effects include POPULATION_CAP +25.
         def inProgress = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(40.0).populationCap(20.0)
-                .production(100.0).food(100.0)
+                .population(200.0).populationCap(100.0)
+                .production(500.0).food(500.0)
                 .table(Season.SPRING, [inProgress])
                 .build()
         def engine = engine(state)
@@ -2433,20 +2433,20 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.populationCap == 25.0   // 20 + 5
+        state.populationCap == 125.0   // 100 + 25
     }
 
     def "endAndRun applies THE_GREAT_ROAD_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
         setup:
-        // THE_GREAT_ROAD_CONSTRUCTION: staffRequirement=60, costs PRODUCTION -65 / FOOD -45 / GOLD -30,
-        // effects include POPULATION_CAP +8. GOLD must be unlocked for the GOLD cost to be deducted
+        // THE_GREAT_ROAD_CONSTRUCTION: staffRequirement=300, costs PRODUCTION -325 / FOOD -225 / GOLD -150,
+        // effects include POPULATION_CAP +40. GOLD must be unlocked for the GOLD cost to be deducted
         // (and therefore affordable), so this test unlocks it explicitly.
         def inProgress = CardCatalog.THE_GREAT_ROAD_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
-                .population(60.0).populationCap(20.0)
-                .production(200.0).food(150.0)
-                .gold(100.0).goldUnlocked(true)
+                .population(300.0).populationCap(100.0)
+                .production(1000.0).food(750.0)
+                .gold(500.0).goldUnlocked(true)
                 .table(Season.SUMMER, [inProgress])
                 .build()
         def engine = engine(state)
@@ -2455,21 +2455,21 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.populationCap == 28.0   // 20 + 8
+        state.populationCap == 140.0   // 100 + 40
     }
 
     def "endAndRun applies BARRACKS_CONSTRUCTION's POPULATION effect, reducing population"() {
         setup:
-        // BARRACKS_CONSTRUCTION: staffRequirement=30, costs PRODUCTION -30 / FOOD -15 / POPULATION -1.
-        // Food is set to 44 so that, after the -15 construction cost (food=29) and the POPULATION -1
-        // effect (population=29), end-of-phase food consumption (29 population x 1/season in FALL)
+        // BARRACKS_CONSTRUCTION: staffRequirement=150, costs PRODUCTION -150 / FOOD -75 / POPULATION -5.
+        // Food is set to 220 so that, after the -75 construction cost (food=145) and the POPULATION -5
+        // effect (population=145), end-of-phase food consumption (145 population x 1/season in FALL)
         // exactly zeroes food with no surplus growth and no starvation deficit — isolating the
         // construction effect's impact on population from the unrelated consumption/growth mechanics.
         def inProgress = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(2)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.FALL)
-                .population(30.0).populationCap(50.0)
-                .production(100.0).food(44.0)
+                .population(150.0).populationCap(250.0)
+                .production(500.0).food(220.0)
                 .table(Season.FALL, [inProgress])
                 .build()
         def engine = engine(state)
@@ -2478,7 +2478,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.population == 29.0   // 30 - 1 construction cost; consumption/growth net to zero by design
+        state.population == 145.0   // 150 - 5 construction cost; consumption/growth net to zero by design
     }
 
     def "completing a win-condition Great Work does not unlock GOLD or STRENGTH and does not win the game alone"() {
@@ -2486,7 +2486,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING)
-                .population(40.0).production(100.0).food(100.0)
+                .population(200.0).production(500.0).food(500.0)
                 .table(Season.SPRING, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2505,7 +2505,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.TREASURY_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
-                .population(25.0).production(100.0)
+                .population(125.0).production(500.0)
                 .table(Season.SUMMER, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2523,7 +2523,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.FALL)
-                .population(30.0).production(100.0).food(100.0)
+                .population(150.0).production(500.0).food(500.0)
                 .table(Season.FALL, [almostDone])
                 .build()
         def engine = engine(state)
@@ -2541,7 +2541,7 @@ class GameEngineSpec extends Specification {
         def almostDone = CardCatalog.THE_GREAT_CONQUEST_CONSTRUCTION.withConstructionPeriod(1)
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.WINTER)
-                .population(200.0).production(1000.0).food(1000.0).gold(1000.0).strength(1000.0)
+                .population(1000.0).production(5000.0).food(5000.0).gold(5000.0).strength(5000.0)
                 .goldUnlocked(true).strengthUnlocked(true)
                 .table(Season.SPRING, [CardCatalog.THE_GREAT_RESERVOIR_COMPLETED])
                 .table(Season.SUMMER, [CardCatalog.THE_GREAT_ROAD_COMPLETED])
@@ -2563,7 +2563,7 @@ class GameEngineSpec extends Specification {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.FALL)
-                .population(30.0).populationCap(40.0).production(50.0).gold(0.0)
+                .population(150.0).populationCap(200.0).production(250.0).gold(0.0)
                 .goldUnlocked(true)
                 .table(Season.FALL, [CardCatalog.TAX_COLLECTION])
                 .build()
@@ -2573,19 +2573,19 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.gold       == 80.0   // TAX_COLLECTION: GOLD +80
-        state.production == 50.0   // unaffected — no PRODUCTION effect on this card
-        // POPULATION -12 fires before food consumption/growth (30 -> 18); growth then applies on
-        // top of that, so just assert it dropped well below the 30 starting point rather than
+        state.gold       == 400.0   // TAX_COLLECTION: GOLD +400
+        state.production == 250.0   // unaffected — no PRODUCTION effect on this card
+        // POPULATION -60 fires before food consumption/growth (150 -> 90); growth then applies on
+        // top of that, so just assert it dropped well below the 150 starting point rather than
         // re-deriving the food-consumption/growth formula already covered by dedicated tests.
-        state.population < 25.0
+        state.population < 125.0
     }
 
     def "TAX_COLLECTION does not affect GOLD when GOLD has not been unlocked yet"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.FALL)
-                .population(30.0).populationCap(40.0).gold(0.0)
+                .population(150.0).populationCap(200.0).gold(0.0)
                 .table(Season.FALL, [CardCatalog.TAX_COLLECTION])
                 .build()
         def engine = engine(state)
