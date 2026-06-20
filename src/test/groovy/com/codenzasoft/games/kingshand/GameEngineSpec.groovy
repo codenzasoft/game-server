@@ -1160,7 +1160,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard throws when the player cannot afford the production cost"() {
         setup:
-        // FARM costs 150 production; give the player only 50
+        // FARM costs 90 production; give the player only 50
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1176,7 +1176,7 @@ class GameEngineSpec extends Specification {
         then:
         def e = thrown(IllegalStateException)
         e.message.contains("not enough production to place card")
-        e.message.contains("150")  // cost
+        e.message.contains("90")   // cost
         e.message.contains("50")   // have
     }
 
@@ -1221,7 +1221,7 @@ class GameEngineSpec extends Specification {
 
     def "placeCard moves the card from hand to the current season's table and deducts production"() {
         setup:
-        // FARM: staffRequirement=25, productionRequirement=150
+        // FARM: staffRequirement=25, productionRequirement=90
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1237,7 +1237,7 @@ class GameEngineSpec extends Specification {
         then:
         state.hand.isEmpty()
         state.board.get(Season.SPRING) == [CardCatalog.FARM]
-        state.production == 350.0   // 500 - 150
+        state.production == 410.0   // 500 - 90
     }
 
     def "placeCard is allowed when the table is full but the card is a duplicate of another on the board, for upgrading"() {
@@ -1261,7 +1261,7 @@ class GameEngineSpec extends Specification {
         then:
         state.hand.isEmpty()
         state.board.get(Season.SPRING).size() == GameEngine.MAX_TABLE_SIZE  // no new slot
-        state.production == 350.0
+        state.production == 410.0   // 500 - 90
     }
 
     // ----- PLAY phase: placeCard — upgrade by duplicate -----
@@ -1566,7 +1566,7 @@ class GameEngineSpec extends Specification {
 
     def "demolishCard removes the card at the given slot and charges 20% of its production cost"() {
         setup:
-        // FARM: productionRequirement=150 → demolish cost = 30
+        // FARM: productionRequirement=90 → demolish cost = 18
         def state = GameState.builder()
                 .curPhase(Phase.PLAY)
                 .curSeason(Season.SPRING)
@@ -1580,7 +1580,7 @@ class GameEngineSpec extends Specification {
 
         then:
         state.board.get(Season.SPRING).isEmpty()
-        state.production == 470.0   // 500 - 30
+        state.production == 482.0   // 500 - 18
     }
 
     def "demolishCard removes the correct card when multiple cards are on the table"() {

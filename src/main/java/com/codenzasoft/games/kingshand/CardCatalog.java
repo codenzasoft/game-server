@@ -102,7 +102,7 @@ public class CardCatalog {
           List.of(ResourceTarget.POPULATION_CAP.integer(25)));
   public static final Card FARM =
       new Card(
-          "FARM", 25.0, 150.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(50)));
+          "FARM", 25.0, 90.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(50)));
   public static final Card SEEDS =
       new Card("SEEDS", 15.0, 50.0, FrequencyType.SINGLE, List.of(ResourceTarget.FOOD.integer(75)));
   public static final Card FERTILIZER =
@@ -252,7 +252,7 @@ public class CardCatalog {
           40.0,
           200.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(75)));
+          List.of(ResourceTarget.PRODUCTION.integer(90)));
   public static final Card MANOR =
       new Card(
           "MANOR",
@@ -461,7 +461,7 @@ public class CardCatalog {
           75.0,
           0.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.GOLD.integer(125)));
+          List.of(ResourceTarget.GOLD.integer(125), ResourceTarget.PRODUCTION.integer(150)));
 
   public static final Card BARRACKS_COMPLETED =
       new Card(
@@ -469,7 +469,7 @@ public class CardCatalog {
           75.0,
           0.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.STRENGTH.integer(100), ResourceTarget.PRODUCTION.integer(125)));
+          List.of(ResourceTarget.STRENGTH.integer(100), ResourceTarget.PRODUCTION.integer(250)));
 
   // Win-condition completed cards carry victory=true so the engine can detect victory by
   // scanning tables for cards that are (victory && !isGreatWork()).
@@ -479,7 +479,7 @@ public class CardCatalog {
           0.0,
           0.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.FOOD.integer(500), ResourceTarget.PRODUCTION.integer(250)),
+          List.of(ResourceTarget.FOOD.integer(1200), ResourceTarget.PRODUCTION.integer(700)),
           0,
           null,
           Set.of(),
@@ -493,9 +493,9 @@ public class CardCatalog {
           0.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.FOOD.integer(500),
-              ResourceTarget.PRODUCTION.integer(425),
-              ResourceTarget.GOLD.integer(300)),
+              ResourceTarget.FOOD.integer(1200),
+              ResourceTarget.PRODUCTION.integer(1000),
+              ResourceTarget.GOLD.integer(600)),
           0,
           null,
           Set.of(),
@@ -509,10 +509,10 @@ public class CardCatalog {
           0.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.FOOD.integer(1000),
-              ResourceTarget.PRODUCTION.integer(600),
-              ResourceTarget.GOLD.integer(450),
-              ResourceTarget.STRENGTH.integer(250)),
+              ResourceTarget.FOOD.integer(2500),
+              ResourceTarget.PRODUCTION.integer(1500),
+              ResourceTarget.GOLD.integer(1000),
+              ResourceTarget.STRENGTH.integer(600)),
           0,
           null,
           Set.of(),
@@ -526,10 +526,10 @@ public class CardCatalog {
           0.0,
           FrequencyType.RECURRING,
           List.of(
-              ResourceTarget.FOOD.integer(2000),
-              ResourceTarget.PRODUCTION.integer(1500),
-              ResourceTarget.GOLD.integer(1000),
-              ResourceTarget.STRENGTH.integer(1000)),
+              ResourceTarget.FOOD.integer(6000),
+              ResourceTarget.PRODUCTION.integer(4000),
+              ResourceTarget.GOLD.integer(3000),
+              ResourceTarget.STRENGTH.integer(3000)),
           0,
           null,
           Set.of(),
