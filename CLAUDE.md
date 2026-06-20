@@ -165,6 +165,16 @@ This runs `ui/scripts/build-card-atlas.mjs`, which rasterises each card SVG via 
 
 **Source SVGs** remain in `ui/public/assets/cards/` and `ui/public/assets/backs/` as the authoritative source for regeneration.
 
+### Hearts felt background
+
+The Hearts game background is a seamlessly-tileable green felt texture (`ui/public/assets/felt-tile.png`) rendered as a Pixi `TilingSprite` pinned at stage index 0. It is loaded in `preloadTextures()` alongside the card atlas and re-added to the stage after every `clearScene()` call.
+
+**Regenerating the tile** (only needed if the colour or texture needs adjustment):
+```bash
+cd ui && npm run build:felt
+```
+This runs `ui/scripts/build-felt-tile.mjs`, which renders an SVG `feTurbulence` filter via `sharp` to produce a 256×256 PNG. Tweak the `baseFrequency`, `slope`/`intercept`, blend `mode`, or base fill colour in the script to adjust the look, then commit the updated `felt-tile.png`.
+
 ### Schema management
 
 JPA is configured with `hibernate.ddl-auto: none`. Schema migrations are managed by Flyway in the companion repo [codenzasoft/game-database](https://github.com/codenzasoft/game-database).

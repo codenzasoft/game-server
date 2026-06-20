@@ -7,6 +7,7 @@ import {
   Text,
   TextStyle,
   Texture,
+  TilingSprite,
 } from "pixi.js";
 import { DropShadowFilter } from "pixi-filters";
 import { z } from "zod";
@@ -201,6 +202,9 @@ export class HeartsGameHandler {
   private messageQueue: HeartsMessage[] = [];
   private isProcessing = false;
 
+  // Felt background — created in preloadTextures, re-added at index 0 by clearScene.
+  private felt: TilingSprite | null = null;
+
   // Loaded card textures (key = "SUIT-RANK")
   private textures = new Map<string, Texture>();
   private cardBackTexture: Texture | null = null;
@@ -315,7 +319,10 @@ export class HeartsGameHandler {
   // ── Pre-load all 52 card SVGs ──────────────────────────────────────────────
 
   async preloadTextures(onProgress?: (progress: number) => void) {
-    const sheet = await Assets.load<Spritesheet>("/assets/cards.json", onProgress);
+    const [sheet, feltTexture] = await Promise.all([
+      Assets.load<Spritesheet>("/assets/cards.json", onProgress),
+      Assets.load("/assets/felt-tile.png"),
+    ]);
     for (const suit of Object.values(Suit)) {
       for (const rank of Object.values(Rank)) {
         const key = cardKey(suit, rank);
@@ -323,6 +330,17 @@ export class HeartsGameHandler {
       }
     }
     this.cardBackTexture = sheet.textures["back"];
+    this.felt = new TilingSprite({
+      texture: feltTexture,
+      width: this.app.screen.width,
+      height: this.app.screen.height,
+    });
+    this.app.renderer.on("resize", (w: number, h: number) => {
+      if (this.felt) {
+        this.felt.width = w;
+        this.felt.height = h;
+      }
+    });
   }
 
   private getTexture(card: Card) {
@@ -523,6 +541,7 @@ export class HeartsGameHandler {
 
   private clearScene() {
     this.app.stage.removeChildren();
+    if (this.felt) this.app.stage.addChildAt(this.felt, 0);
     this.removePassOverlay();
     this.removeScoreOverlay();
     this.removeLobbyOverlay();

@@ -8,6 +8,7 @@
     "build": "npm run lint && tsc && vite build",
     "build:gradle": "vite build",
     "build:atlas": "node scripts/build-card-atlas.mjs",
+    "build:felt": "node scripts/build-felt-tile.mjs",
     "lint": "eslint .",
     "dev": "vite"
   },
