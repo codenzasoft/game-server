@@ -517,7 +517,6 @@ export class HeartsGameHandler {
     await this.maybeAnimatePassReceived(prevMessage, message);
 
     this.clearScene();
-    this.renderScoreTable(context, state);
 
     if (state.over || state.quit) {
       // If the last trick completed in this same message (4th card + game-over
@@ -537,11 +536,15 @@ export class HeartsGameHandler {
         const dirs = ["S", "W", "N", "E"] as const;
         await this.animateTrickWon(dirs[(winnerIdx - myIdx + 4) % 4]);
         this.clearScene();
-        this.renderScoreTable(context, state);
       }
+      // Render score table only after any trick animation so the game-over
+      // score overlay doesn't appear on top of the last trick.
+      this.renderScoreTable(context, state);
       this.renderGameOver(context, state);
       return;
     }
+
+    this.renderScoreTable(context, state);
 
     if (state.rounds.length === 0) {
       this.renderStatus("Starting game...");
