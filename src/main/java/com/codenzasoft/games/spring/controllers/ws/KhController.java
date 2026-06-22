@@ -60,7 +60,7 @@ public class KhController {
 
   /**
    * Picks one of the offered ADD-phase cards by stable card name. Shuffles the chosen card into the
-   * season's draw pile and advances to the RANDOM_EVENT phase.
+   * season's draw pile and advances to the PLAY phase.
    */
   @MessageMapping("/kh/{gameId}/add/pick")
   public void addPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
@@ -81,7 +81,7 @@ public class KhController {
 
   /**
    * Skips the ADD phase without picking a card. Advances the phase to {@link
-   * com.codenzasoft.games.kingshand.Phase#RANDOM_EVENT}.
+   * com.codenzasoft.games.kingshand.Phase#PLAY}.
    */
   @MessageMapping("/kh/{gameId}/add/skip")
   public void addSkip(@DestinationVariable String gameId) {
@@ -99,43 +99,88 @@ public class KhController {
             });
   }
 
+  // ── COUNCIL_ADD / COUNCIL_MEETING phase actions ─────────────────────────────
+
   /**
-   * Applies the chosen event option by its stable option name, then draws the player's hand to
-   * start the PLAY phase.
+   * Hires an advisor offered this COUNCIL_ADD round by their stable catalog id, deducting their
+   * hiring cost in gold and seating them on the council. Advances the phase to {@link
+   * com.codenzasoft.games.kingshand.Phase#COUNCIL_MEETING} and seeds that year's single rotating
+   * project proposal.
    */
-  @MessageMapping("/kh/{gameId}/event/pick")
-  public void eventPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
+  @MessageMapping("/kh/{gameId}/council/hire")
+  public void councilHire(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
     gameService
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final String name = (String) body.get("name");
+              final String id = (String) body.get("id");
               try {
-                game.applyEventOptionByName(name);
+                game.hireAdvisorById(id);
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
-                log.error("eventPick rejected for game {}: {}", gameId, e.getMessage());
+                log.error("councilHire rejected for game {}: {}", gameId, e.getMessage());
                 NewRelic.noticeError(e);
               }
             });
   }
 
   /**
-   * Skips the RANDOM_EVENT phase when no eligible event was rolled (i.e. {@code currentEvent} is
-   * {@code null}). Delegates to {@link GameEngine#advancePhase()}, which transitions to {@link
-   * com.codenzasoft.games.kingshand.Phase#PLAY} and draws the player's hand in one step.
+   * Declines to hire anyone this year. Advances the phase to {@link
+   * com.codenzasoft.games.kingshand.Phase#COUNCIL_MEETING} and seeds that year's single rotating
+   * project proposal.
    */
-  @MessageMapping("/kh/{gameId}/event/skip")
-  public void eventSkip(@DestinationVariable String gameId) {
+  @MessageMapping("/kh/{gameId}/council/skip")
+  public void councilSkip(@DestinationVariable String gameId) {
     gameService
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
               try {
-                game.advancePhase();
+                game.skipCouncilAdd();
                 khBroadcastService.gameLoaded(game);
               } catch (final IllegalStateException e) {
-                log.error("eventSkip rejected for game {}: {}", gameId, e.getMessage());
+                log.error("councilSkip rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
+              }
+            });
+  }
+
+  /**
+   * Accepts the current COUNCIL_MEETING proposal (a Reform or Decree from one seated advisor),
+   * applying its effect. Advances the phase to {@link
+   * com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
+   */
+  @MessageMapping("/kh/{gameId}/council/accept")
+  public void councilAccept(@DestinationVariable String gameId) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              try {
+                game.acceptCouncilProposal();
+                khBroadcastService.gameLoaded(game);
+              } catch (final IllegalStateException e) {
+                log.error("councilAccept rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
+              }
+            });
+  }
+
+  /**
+   * Passes on the current COUNCIL_MEETING proposal without applying it. Advances the phase to
+   * {@link com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
+   */
+  @MessageMapping("/kh/{gameId}/council/pass")
+  public void councilPass(@DestinationVariable String gameId) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              try {
+                game.passCouncilProposal();
+                khBroadcastService.gameLoaded(game);
+              } catch (final IllegalStateException e) {
+                log.error("councilPass rejected for game {}: {}", gameId, e.getMessage());
                 NewRelic.noticeError(e);
               }
             });

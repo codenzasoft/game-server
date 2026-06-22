@@ -1,7 +1,7 @@
 import { Application } from "pixi.js";
 import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
-import { RandomEventScene } from "./randomEventScene.ts";
+import { CouncilScene } from "./councilScene.ts";
 import { PlayPhaseScene } from "./playPhaseScene.ts";
 import { initMusic, unlockMusicOnFirstInteraction } from "./audio.ts";
 
@@ -51,7 +51,7 @@ const getGameId = (): string | undefined => {
   // Only one scene is live at a time.  onMessage replaces it whenever the
   // server sends a state update that changes the current phase.
 
-  let currentScene: AddPhaseScene | RandomEventScene | PlayPhaseScene | null = null;
+  let currentScene: AddPhaseScene | CouncilScene | PlayPhaseScene | null = null;
 
   const mountTarget = document.getElementById("pixi-container")!;
 
@@ -221,19 +221,24 @@ const getGameId = (): string | undefined => {
         break;
       }
 
-      case Phase.RANDOM_EVENT: {
-        if (currentScene instanceof RandomEventScene) {
-          // Same phase, same scene type — just refresh content.
+      case Phase.COUNCIL_ADD:
+      case Phase.COUNCIL_MEETING: {
+        if (currentScene instanceof CouncilScene) {
+          // Same scene type — covers a same-phase refresh (e.g. after hireAdvisor)
+          // and the COUNCIL_ADD → COUNCIL_MEETING transition within one council
+          // turn, so the roster panel never flickers between the two steps.
           currentScene.update(state);
         } else {
-          // Either a fresh mount or switching from ADD: tear down the old scene first.
+          // Either a fresh mount or switching from ADD/PLAY: tear down the old scene first.
           if (currentScene) {
             currentScene.unmount();
             currentScene = null;
           }
-          currentScene = new RandomEventScene(state, {
-            pickEventOption: (name) => handler.pickEventOption(name),
-            skipEvent:       () => handler.skipEvent(),
+          currentScene = new CouncilScene(state, {
+            hireAdvisor:           (id) => handler.hireAdvisor(id),
+            skipCouncilAdd:        ()   => handler.skipCouncilAdd(),
+            acceptCouncilProposal: ()   => handler.acceptCouncilProposal(),
+            passCouncilProposal:   ()   => handler.passCouncilProposal(),
           });
           currentScene.mount(mountTarget);
         }

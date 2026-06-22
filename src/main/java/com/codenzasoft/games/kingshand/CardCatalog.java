@@ -461,7 +461,7 @@ public class CardCatalog {
           75.0,
           0.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.GOLD.integer(125), ResourceTarget.PRODUCTION.integer(150)));
+          List.of(ResourceTarget.GOLD.integer(40), ResourceTarget.PRODUCTION.integer(150)));
 
   public static final Card BARRACKS_COMPLETED =
       new Card(
@@ -540,11 +540,11 @@ public class CardCatalog {
   public static final Card TREASURY_CONSTRUCTION =
       new Card(
           "TREASURY_CONSTRUCTION",
-          100.0,
-          400.0,
+          35.0,
+          250.0,
           FrequencyType.RECURRING,
-          List.of(ResourceTarget.PRODUCTION.integer(-175)),
-          3,
+          List.of(ResourceTarget.PRODUCTION.integer(-75)),
+          1,
           TREASURY_COMPLETED,
           Set.of(ResourceTarget.GOLD),
           false,

@@ -25,8 +25,40 @@ export enum Season {
 
 export enum Phase {
   ADD = "ADD",
-  RANDOM_EVENT = "RANDOM_EVENT",
   PLAY = "PLAY",
+  COUNCIL_ADD = "COUNCIL_ADD",
+  COUNCIL_MEETING = "COUNCIL_MEETING",
+}
+
+// AdvisorGate: when an Advisor becomes eligible to appear in the COUNCIL_ADD offer pool.
+export enum AdvisorGate {
+  NONE = "NONE",
+  BARRACKS_COMPLETED = "BARRACKS_COMPLETED",
+  ANY_GREAT_WORK_COMMISSIONED = "ANY_GREAT_WORK_COMMISSIONED",
+  GREAT_ROAD_COMMISSIONED = "GREAT_ROAD_COMMISSIONED",
+}
+
+// ProposalKind: whether a CouncilProposal is a repeatable Reform or a one-time Decree.
+export enum ProposalKind {
+  REFORM = "REFORM",
+  DECREE = "DECREE",
+}
+
+// DecreeType: what kind of one-time effect a Decree applies when accepted.
+export enum DecreeType {
+  PASSIVE_BOOST = "PASSIVE_BOOST",
+  GREAT_WORK_BOOST = "GREAT_WORK_BOOST",
+  POPULATION_CAP_BOOST = "POPULATION_CAP_BOOST",
+  GREAT_WORK_ACCELERATE = "GREAT_WORK_ACCELERATE",
+  FREE_REROLL = "FREE_REROLL",
+}
+
+// ReformBenefitType: what kind of benefit a Reform stack grants.
+export enum ReformBenefitType {
+  CARD_EFFECT = "CARD_EFFECT",
+  FREE_REROLL = "FREE_REROLL",
+  EXTRA_ADD_CANDIDATE = "EXTRA_ADD_CANDIDATE",
+  CROSS_TABLE_BOOST = "CROSS_TABLE_BOOST",
 }
 
 export enum FrequencyType {
@@ -94,17 +126,57 @@ interface CardStaffingData {
   tier: StaffingTier;
 }
 
-interface EventOptionData {
-  description: string;
-  effects: Effect[];
+interface ReformData {
+  name: string;
+  maxStacks: number;
+  benefitType: ReformBenefitType;
+  benefitResource: ResourceTarget | undefined;
+  benefitPerStack: number;
+  costResource: ResourceTarget;
+  costPerStack: number;
 }
 
-interface KhEventData {
+interface DecreeData {
+  name: string;
+  type: DecreeType;
+  targetGreatWorkName: string | undefined;
+  effectResource: ResourceTarget | undefined;
+  effectAmount: number;
+}
+
+interface AdvisorData {
   id: string;
-  season: Season;
-  minYear: number;
-  description: string;
-  options: EventOption[];
+  displayName: string;
+  title: string;
+  specialtyDescription: string;
+  hiringCost: number;
+  baseCard: Card;
+  gate: AdvisorGate;
+  reform: Reform;
+  decree: Decree;
+  crossTableBoostAmount: number;
+  freeRerollsWhileSeated: number;
+  extraAddCandidatesWhileSeated: number;
+  ringColor: string;
+  portraitPlaceholderId: string;
+}
+
+interface SeatedAdvisorData {
+  advisorId: string;
+  card: Card;
+  reformStacksTaken: number;
+  decreeTaken: boolean;
+  lastProposalYear: number;
+  bonusFreeRerolls: number;
+  bonusExtraAddCandidates: number;
+  bonusCrossTableBoost: number;
+  hiredYear: number;
+}
+
+interface CouncilProposalData {
+  advisorId: string;
+  kind: ProposalKind;
+  name: string;
 }
 
 interface GameContextData {
@@ -139,7 +211,6 @@ interface GameStateData {
   year: number;
   addChoices: Card[];
   rerollCount: number;
-  currentEvent: KhEvent | undefined;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
   gold: number;
@@ -148,6 +219,9 @@ interface GameStateData {
   strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
+  council: SeatedAdvisor[];
+  councilOfferChoices: Advisor[];
+  currentProposal: CouncilProposal | undefined;
 }
 
 interface GameMessageData {
@@ -179,7 +253,7 @@ export class CardTarget {
 // what a card effect actually acts upon.
 export type EffectTarget = ResourceTarget | CardTarget;
 
-// Effect: a single numeric modifier on a Card or EventOption.
+// Effect: a single numeric modifier on a Card.
 export class Effect {
   target: EffectTarget;
   modifier: number;
@@ -231,32 +305,118 @@ export class CardStaffing {
   }
 }
 
-// EventOption: one choice offered to the player when a random event fires.
-export class EventOption {
-  description: string;
-  effects: Effect[];
+// Reform: a repeatable self-enhancement an advisor can propose during COUNCIL_MEETING.
+export class Reform {
+  name: string;
+  maxStacks: number;
+  benefitType: ReformBenefitType;
+  benefitResource: ResourceTarget | undefined;
+  benefitPerStack: number;
+  costResource: ResourceTarget;
+  costPerStack: number;
 
-  constructor(data: EventOptionData) {
-    this.description = data.description;
-    this.effects = data.effects;
+  constructor(data: ReformData) {
+    this.name = data.name;
+    this.maxStacks = data.maxStacks;
+    this.benefitType = data.benefitType;
+    this.benefitResource = data.benefitResource;
+    this.benefitPerStack = data.benefitPerStack;
+    this.costResource = data.costResource;
+    this.costPerStack = data.costPerStack;
   }
 }
 
-// KhEvent: a random event rolled during the RANDOM_EVENT phase.
-// Prefixed "Kh" to avoid shadowing the browser's built-in Event interface.
-export class KhEvent {
-  id: string;
-  season: Season;
-  minYear: number;
-  description: string;
-  options: EventOption[];
+// Decree: a one-time civic project an advisor can propose during COUNCIL_MEETING.
+export class Decree {
+  name: string;
+  type: DecreeType;
+  targetGreatWorkName: string | undefined;
+  effectResource: ResourceTarget | undefined;
+  effectAmount: number;
 
-  constructor(data: KhEventData) {
+  constructor(data: DecreeData) {
+    this.name = data.name;
+    this.type = data.type;
+    this.targetGreatWorkName = data.targetGreatWorkName;
+    this.effectResource = data.effectResource;
+    this.effectAmount = data.effectAmount;
+  }
+}
+
+// Advisor: catalog definition of one of the 15 King's Hand advisors (static data,
+// not yet hired). portraitPlaceholderId/ringColor drive the placeholder portrait
+// rendering until real per-advisor art is dropped in.
+export class Advisor {
+  id: string;
+  displayName: string;
+  title: string;
+  specialtyDescription: string;
+  hiringCost: number;
+  baseCard: Card;
+  gate: AdvisorGate;
+  reform: Reform;
+  decree: Decree;
+  crossTableBoostAmount: number;
+  freeRerollsWhileSeated: number;
+  extraAddCandidatesWhileSeated: number;
+  ringColor: string;
+  portraitPlaceholderId: string;
+
+  constructor(data: AdvisorData) {
     this.id = data.id;
-    this.season = data.season;
-    this.minYear = data.minYear;
-    this.description = data.description;
-    this.options = data.options;
+    this.displayName = data.displayName;
+    this.title = data.title;
+    this.specialtyDescription = data.specialtyDescription;
+    this.hiringCost = data.hiringCost;
+    this.baseCard = data.baseCard;
+    this.gate = data.gate;
+    this.reform = data.reform;
+    this.decree = data.decree;
+    this.crossTableBoostAmount = data.crossTableBoostAmount;
+    this.freeRerollsWhileSeated = data.freeRerollsWhileSeated;
+    this.extraAddCandidatesWhileSeated = data.extraAddCandidatesWhileSeated;
+    this.ringColor = data.ringColor;
+    this.portraitPlaceholderId = data.portraitPlaceholderId;
+  }
+}
+
+// SeatedAdvisor: runtime state for an Advisor who has actually been hired onto the
+// council. card accumulates Reform/Decree boosts over the life of the run.
+export class SeatedAdvisor {
+  advisorId: string;
+  card: Card;
+  reformStacksTaken: number;
+  decreeTaken: boolean;
+  lastProposalYear: number;
+  bonusFreeRerolls: number;
+  bonusExtraAddCandidates: number;
+  bonusCrossTableBoost: number;
+  hiredYear: number;
+
+  constructor(data: SeatedAdvisorData) {
+    this.advisorId = data.advisorId;
+    this.card = data.card;
+    this.reformStacksTaken = data.reformStacksTaken;
+    this.decreeTaken = data.decreeTaken;
+    this.lastProposalYear = data.lastProposalYear;
+    this.bonusFreeRerolls = data.bonusFreeRerolls;
+    this.bonusExtraAddCandidates = data.bonusExtraAddCandidates;
+    this.bonusCrossTableBoost = data.bonusCrossTableBoost;
+    this.hiredYear = data.hiredYear;
+  }
+}
+
+// CouncilProposal: the single rotating Reform/Decree proposal presented during a
+// COUNCIL_MEETING phase.
+export class CouncilProposal {
+  advisorId: string;
+  kind: ProposalKind;
+  name: string;
+
+  constructor(data: CouncilProposalData) {
+    this.advisorId = data.advisorId;
+    this.kind = data.kind;
+    this.name = data.name;
   }
 }
 
@@ -315,7 +475,6 @@ export class GameState {
   year: number;
   addChoices: Card[];
   rerollCount: number;
-  currentEvent: KhEvent | undefined;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
   resolutionLog: ResolutionStep[];
@@ -325,6 +484,9 @@ export class GameState {
   strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
+  council: SeatedAdvisor[];
+  councilOfferChoices: Advisor[];
+  currentProposal: CouncilProposal | undefined;
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -340,7 +502,6 @@ export class GameState {
     this.year = data.year;
     this.addChoices = data.addChoices;
     this.rerollCount = data.rerollCount;
-    this.currentEvent = data.currentEvent;
     this.gameOver = data.gameOver;
     this.tableStaffing = data.tableStaffing;
     this.resolutionLog = data.resolutionLog;
@@ -350,6 +511,9 @@ export class GameState {
     this.strengthUnlocked = data.strengthUnlocked;
     this.gameWon = data.gameWon;
     this.greatWorkLog = data.greatWorkLog;
+    this.council = data.council;
+    this.councilOfferChoices = data.councilOfferChoices;
+    this.currentProposal = data.currentProposal;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -423,22 +587,68 @@ const CardStaffingSchema = z
   })
   .transform((data) => new CardStaffing(data as CardStaffingData));
 
-const EventOptionSchema = z
+const ReformSchema = z
   .object({
-    description: z.string(),
-    effects: z.array(EffectSchema),
+    name: z.string(),
+    maxStacks: z.number().int(),
+    benefitType: z.enum(ReformBenefitType),
+    benefitResource: z.enum(ResourceTarget).optional(),
+    benefitPerStack: z.number(),
+    costResource: z.enum(ResourceTarget),
+    costPerStack: z.number(),
   })
-  .transform((data) => new EventOption(data as EventOptionData));
+  .transform((data) => new Reform(data as ReformData));
 
-const KhEventSchema = z
+const DecreeSchema = z
+  .object({
+    name: z.string(),
+    type: z.enum(DecreeType),
+    targetGreatWorkName: z.string().optional(),
+    effectResource: z.enum(ResourceTarget).optional(),
+    effectAmount: z.number(),
+  })
+  .transform((data) => new Decree(data as DecreeData));
+
+const AdvisorSchema = z
   .object({
     id: z.string(),
-    season: z.enum(Season),
-    minYear: z.number().int(),
-    description: z.string(),
-    options: z.array(EventOptionSchema),
+    displayName: z.string(),
+    title: z.string(),
+    specialtyDescription: z.string(),
+    hiringCost: z.number().int(),
+    baseCard: CardSchema,
+    gate: z.enum(AdvisorGate),
+    reform: ReformSchema,
+    decree: DecreeSchema,
+    crossTableBoostAmount: z.number(),
+    freeRerollsWhileSeated: z.number().int(),
+    extraAddCandidatesWhileSeated: z.number().int(),
+    ringColor: z.string(),
+    portraitPlaceholderId: z.string(),
   })
-  .transform((data) => new KhEvent(data as KhEventData));
+  .transform((data) => new Advisor(data as AdvisorData));
+
+const SeatedAdvisorSchema = z
+  .object({
+    advisorId: z.string(),
+    card: CardSchema,
+    reformStacksTaken: z.number().int(),
+    decreeTaken: z.boolean(),
+    lastProposalYear: z.number().int(),
+    bonusFreeRerolls: z.number().int(),
+    bonusExtraAddCandidates: z.number().int(),
+    bonusCrossTableBoost: z.number(),
+    hiredYear: z.number().int(),
+  })
+  .transform((data) => new SeatedAdvisor(data as SeatedAdvisorData));
+
+const CouncilProposalSchema = z
+  .object({
+    advisorId: z.string(),
+    kind: z.enum(ProposalKind),
+    name: z.string(),
+  })
+  .transform((data) => new CouncilProposal(data as CouncilProposalData));
 
 const ResolutionStepSchema = z
   .object({
@@ -488,9 +698,6 @@ export const GameStateSchema = z
     year: z.number().int(),
     addChoices: z.array(CardSchema),
     rerollCount: z.number().int(),
-    // currentEvent is absent between RANDOM_EVENT phases: the server omits it
-    // entirely thanks to @JsonInclude(NON_NULL), so .optional() is correct.
-    currentEvent: KhEventSchema.optional(),
     gameOver: z.boolean(),
     // tableStaffing is only populated during the PLAY phase; empty array otherwise.
     tableStaffing: z.array(CardStaffingSchema).default([]),
@@ -507,6 +714,13 @@ export const GameStateSchema = z
     // Great-Work-related events emitted by the most recent endAndRun (e.g.
     // "TREASURY_COMPLETED"); empty between seasons.
     greatWorkLog: z.array(z.string()).default([]),
+    // Advisors currently seated on the council; never more than MAX_COUNCIL_SIZE (3).
+    council: z.array(SeatedAdvisorSchema).default([]),
+    // Candidate advisors offered during the current COUNCIL_ADD phase; empty outside it.
+    councilOfferChoices: z.array(AdvisorSchema).default([]),
+    // The single rotating Reform/Decree proposal for the current COUNCIL_MEETING phase;
+    // omitted from JSON (and thus absent here) if no seated advisor has anything to propose.
+    currentProposal: CouncilProposalSchema.optional(),
   })
   .transform((data) => new GameState(data as GameStateData));
 
@@ -609,7 +823,7 @@ export class GameEventHandler {
 
   /**
    * Picks the offered ADD-phase card by its stable card name and shuffles it into the season's
-   * draw pile.  Advances the phase to RANDOM_EVENT.
+   * draw pile.  Advances the phase to PLAY.
    *
    * @param name The stable {@code Card.name} of the chosen card.
    */
@@ -621,8 +835,7 @@ export class GameEventHandler {
   }
 
   /**
-   * Skips the ADD phase without picking a card.  Advances the phase to
-   * RANDOM_EVENT.
+   * Skips the ADD phase without picking a card.  Advances the phase to PLAY.
    */
   public skipAdd(): void {
     this.stompClient.publish({
@@ -630,27 +843,49 @@ export class GameEventHandler {
     });
   }
 
-  // ── RANDOM_EVENT phase actions ────────────────────────────────────────────
+  // ── COUNCIL_ADD / COUNCIL_MEETING phase actions ───────────────────────────
 
   /**
-   * Applies the chosen event option by its stable option name and advances the phase to PLAY.
+   * Hires an advisor offered this COUNCIL_ADD round by their stable catalog id, deducting their
+   * hiring cost in gold.  Advances the phase to COUNCIL_MEETING and seeds that year's single
+   * rotating project proposal.
    *
-   * @param name The {@code EventOption.description} of the chosen option.
+   * @param id The stable {@code Advisor.id} of the chosen advisor.
    */
-  public pickEventOption(name: string): void {
+  public hireAdvisor(id: string): void {
     this.stompClient.publish({
-      destination: `/games/kh/${this.gameId}/event/pick`,
-      body: JSON.stringify({ name }),
+      destination: `/games/kh/${this.gameId}/council/hire`,
+      body: JSON.stringify({ id }),
     });
   }
 
   /**
-   * Skips the RANDOM_EVENT phase when no event was rolled (i.e. {@code currentEvent} is
-   * absent).  Advances the phase to PLAY and draws the hand.
+   * Declines to hire anyone this year.  Advances the phase to COUNCIL_MEETING and seeds that
+   * year's single rotating project proposal.
    */
-  public skipEvent(): void {
+  public skipCouncilAdd(): void {
     this.stompClient.publish({
-      destination: `/games/kh/${this.gameId}/event/skip`,
+      destination: `/games/kh/${this.gameId}/council/skip`,
+    });
+  }
+
+  /**
+   * Accepts the current COUNCIL_MEETING proposal (a Reform or Decree from one seated advisor),
+   * applying its effect.  Advances the phase to ADD and seeds the next ADD-phase offer.
+   */
+  public acceptCouncilProposal(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/council/accept`,
+    });
+  }
+
+  /**
+   * Passes on the current COUNCIL_MEETING proposal without applying it.  Advances the phase to
+   * ADD and seeds the next ADD-phase offer.
+   */
+  public passCouncilProposal(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/council/pass`,
     });
   }
 

@@ -238,11 +238,11 @@ export class AddPhaseScene {
         </div>
         <span class="kh-phase-arrow">→</span>
         <div class="kh-phase-step">
-          <span class="kh-phase-dot"></span>II. RANDOM EVENT
+          <span class="kh-phase-dot"></span>II. PLAY
         </div>
         <span class="kh-phase-arrow">→</span>
         <div class="kh-phase-step">
-          <span class="kh-phase-dot"></span>III. PLAY
+          <span class="kh-phase-dot"></span>III. COUNCIL
         </div>
       </div>
     `;

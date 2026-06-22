@@ -1,8 +1,8 @@
 // ─── Shared overlay components ────────────────────────────────────────────────
 //
 // Handbook and Deck indicator are rendered identically in every scene (ADD,
-// RANDOM_EVENT, PLAY).  This module owns their HTML builders, listener wiring,
-// and CSS injection so scenes never duplicate the logic.
+// COUNCIL_ADD, COUNCIL_MEETING, PLAY).  This module owns their HTML builders,
+// listener wiring, and CSS injection so scenes never duplicate the logic.
 
 import { GameState, Season } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier, resourceIcon, resourceLabel, resourceShortLabel } from "./cardCatalog.ts";

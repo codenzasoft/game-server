@@ -17,23 +17,31 @@ import java.util.function.BiConsumer;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
- * the per-season card-trigger pass, draw/discard/hand pile mutations, and random-event resolution.
- * {@code GameState} is a passive data carrier; this engine is the only place that should mutate it.
+ * the per-season card-trigger pass, draw/discard/hand pile mutations, and the Council/Advisors
+ * system. {@code GameState} is a passive data carrier; this engine is the only place that should
+ * mutate it.
  *
- * <p><b>RANDOM_EVENT phase flow:</b>
+ * <p><b>Phase flow.</b> There is no generic phase cycle — see {@link Phase}'s javadoc. The Council
+ * is inserted once per year, immediately after Winter's {@link Phase#PLAY} ends, but only once GOLD
+ * has been unlocked (TREASURY completed):
  *
  * <ol>
- *   <li>{@link #advancePhase()} transitions into {@link Phase#RANDOM_EVENT} and immediately rolls
- *       one eligible event via the injected {@link EventCatalog}, storing it on the state.
- *   <li>The caller reads the rolled event with {@link #currentEvent()}.
- *   <li>The player picks an {@link EventOption}; the caller passes it to {@link
- *       #applyEventOption(EventOption)}, which applies its effects and advances the phase to {@link
- *       Phase#PLAY}.
+ *   <li>{@link Phase#ADD} → {@link Phase#PLAY} via {@link #pickCard(Card)} / {@link #skipAdd()}.
+ *   <li>{@link Phase#PLAY} ends → {@link #endAndRun()} calls {@link #advancePhase()}, which enters
+ *       {@link Phase#COUNCIL_ADD} (if Winter just ended and GOLD is unlocked) or goes straight to
+ *       {@link Phase#ADD} otherwise.
+ *   <li>{@link Phase#COUNCIL_ADD} → {@link Phase#COUNCIL_MEETING} via {@link #hireAdvisor(Advisor)}
+ *       / {@link #hireAdvisorById(String)} / {@link #skipCouncilAdd()}.
+ *   <li>{@link Phase#COUNCIL_MEETING} → {@link Phase#ADD} via {@link #acceptCouncilProposal()} /
+ *       {@link #passCouncilProposal()}.
  * </ol>
  *
- * <p><b>Winter scaling (KH-6):</b> when the current season is {@link Season#WINTER}, each effect's
- * numeric modifier is multiplied by the current year before it is applied, so winters grow
- * progressively harsher as the run extends.
+ * <p><b>Advisors</b> deliberately bypass the worker-staffing system: once seated (see {@link
+ * #hireAdvisor(Advisor)}), a {@link SeatedAdvisor}'s card effects fire unconditionally and in full
+ * every season as part of {@link #endAndRun()} — their "cost" is the upfront hiring fee, not
+ * population staffing. See {@link Advisor}/{@link AdvisorCatalog} for the roster and {@link Reform}/
+ * {@link Decree} for the two project types proposed once a year during {@link
+ * Phase#COUNCIL_MEETING}.
  */
 public class GameEngine implements Game<GameEngine> {
 
@@ -42,6 +50,9 @@ public class GameEngine implements Game<GameEngine> {
   public static final int REROLL_COST_STEP = 50;
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
+  /** Maximum number of advisors that may be seated on the council at once. */
+  public static final int MAX_COUNCIL_SIZE = 3;
+  static final int COUNCIL_OFFER_SIZE = 3;
 
   private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
       new KhGameStartedNotification();
@@ -56,7 +67,6 @@ public class GameEngine implements Game<GameEngine> {
     private Player player;
     private GameState state;
     private CardCatalog cardCatalog;
-    private EventCatalog eventCatalog;
     private Random rng;
     private final List<KhObserver> listeners = new ArrayList<>();
     private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers = new ArrayList<>();
@@ -79,11 +89,6 @@ public class GameEngine implements Game<GameEngine> {
 
     public Builder withCardCatalog(final CardCatalog cardCatalog) {
       this.cardCatalog = cardCatalog;
-      return this;
-    }
-
-    public Builder withEventCatalog(final EventCatalog eventCatalog) {
-      this.eventCatalog = eventCatalog;
       return this;
     }
 
@@ -117,7 +122,6 @@ public class GameEngine implements Game<GameEngine> {
           player,
           state,
           cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
-          eventCatalog != null ? eventCatalog : EventCatalog.defaultCatalog(),
           rng != null ? rng : new Random(),
           listeners,
           executor != null ? executor : Runnable::run,
@@ -129,37 +133,25 @@ public class GameEngine implements Game<GameEngine> {
   private final Player player;
   private final GameState state;
   private final CardCatalog cardCatalog;
-  private final EventCatalog eventCatalog;
   private final Random rng;
   private final List<KhObserver> listeners;
   private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers;
   private final Executor executor;
 
-  /** Convenience constructor for tests: injects state, event catalog, and RNG. */
-  public GameEngine(GameState state, EventCatalog eventCatalog, Random rng) {
-    this(null, null, state, CardCatalog.defaultCatalog(), eventCatalog, rng);
+  /** Convenience constructor for tests: injects state and RNG. */
+  public GameEngine(GameState state, Random rng) {
+    this(null, null, state, CardCatalog.defaultCatalog(), rng);
   }
 
   /** Constructor for restoring a persisted game with its id and player. */
   public GameEngine(UUID id, Player player, GameState state) {
-    this(
-        id,
-        player,
-        state,
-        CardCatalog.defaultCatalog(),
-        EventCatalog.defaultCatalog(),
-        new Random());
+    this(id, player, state, CardCatalog.defaultCatalog(), new Random());
   }
 
   /** Full constructor with all dependencies injected, no listeners. */
   GameEngine(
-      UUID id,
-      Player player,
-      GameState state,
-      CardCatalog cardCatalog,
-      EventCatalog eventCatalog,
-      Random rng) {
-    this(id, player, state, cardCatalog, eventCatalog, rng, List.of(), Runnable::run);
+      UUID id, Player player, GameState state, CardCatalog cardCatalog, Random rng) {
+    this(id, player, state, cardCatalog, rng, List.of(), Runnable::run);
   }
 
   /** Full constructor with all dependencies injected, including listeners and an executor. */
@@ -168,11 +160,10 @@ public class GameEngine implements Game<GameEngine> {
       Player player,
       GameState state,
       CardCatalog cardCatalog,
-      EventCatalog eventCatalog,
       Random rng,
       List<KhObserver> listeners,
       Executor executor) {
-    this(id, player, state, cardCatalog, eventCatalog, rng, listeners, executor, List.of());
+    this(id, player, state, cardCatalog, rng, listeners, executor, List.of());
   }
 
   /**
@@ -184,20 +175,17 @@ public class GameEngine implements Game<GameEngine> {
       Player player,
       GameState state,
       CardCatalog cardCatalog,
-      EventCatalog eventCatalog,
       Random rng,
       List<KhObserver> listeners,
       Executor executor,
       List<GameLifecycleObserver<GameEngine>> lifecycleObservers) {
     if (state == null) throw new IllegalArgumentException("state cannot be null");
     if (cardCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
-    if (eventCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
     if (rng == null) throw new IllegalArgumentException("rng cannot be null");
     this.id = id;
     this.player = player;
     this.state = state;
     this.cardCatalog = cardCatalog;
-    this.eventCatalog = eventCatalog;
     this.rng = rng;
     this.listeners = listeners == null ? List.of() : List.copyOf(listeners);
     this.executor = executor != null ? executor : Runnable::run;
@@ -285,161 +273,27 @@ public class GameEngine implements Game<GameEngine> {
 
   // ----- Phase / season progression -----
 
+  /**
+   * Called when {@link Phase#PLAY} ends (from {@link #endAndRun()}). Advances the season/year, then
+   * either opens the Council (after Winter, once GOLD is unlocked) or goes straight back to {@link
+   * Phase#ADD}. No-ops outside of {@link Phase#PLAY}, and never does anything once the game is over
+   * or won.
+   */
   public synchronized void advancePhase() {
     if (state.isGameOver() || state.isVictoryComplete()) {
       return;
     }
-    // if play phase ends, move to the next season
-    if (state.getCurPhase() == Phase.PLAY) {
-      advanceSeason();
+    if (state.getCurPhase() != Phase.PLAY) {
+      return;
     }
-
-    state.setCurPhase(state.getCurPhase().next());
-
-    switch (state.getCurPhase()) {
-      case ADD -> offerAddChoices();
-      case RANDOM_EVENT -> rollEvent();
-      case PLAY -> startPlay();
-    }
-  }
-
-  // ----- RANDOM_EVENT resolution -----
-
-  /**
-   * Randomly selects one eligible event for the current season and year and stores it on the state.
-   * If no events are eligible the stored event is set to {@code null}.
-   */
-  private synchronized void rollEvent() {
-    List<Event> eligible = eventCatalog.eligibleEvents(state.getCurSeason(), state.getYear());
-    state.setCurrentEvent(eligible.isEmpty() ? null : eligible.get(rng.nextInt(eligible.size())));
-  }
-
-  /**
-   * Returns the event rolled at the start of the current {@link Phase#RANDOM_EVENT} turn, or {@code
-   * null} if no eligible events existed (or if the engine has not yet entered that phase).
-   */
-  public synchronized Event currentEvent() {
-    return state.getCurrentEvent();
-  }
-
-  /**
-   * Applies the effect list of the chosen {@link EventOption} to the current game state, then
-   * advances the phase to {@link Phase#PLAY}.
-   *
-   * <p>Winter scaling applies: each effect modifier is multiplied by {@link GameState#getYear()}
-   * when the current season is {@link Season#WINTER}.
-   *
-   * @param option the option chosen by the player; must not be {@code null}
-   * @throws IllegalArgumentException if {@code option} is {@code null}
-   */
-  public synchronized void applyEventOption(EventOption option) {
-    if (option == null) {
-      throw new IllegalArgumentException("option cannot be null");
-    }
-
-    // Validate that the player can afford the production cost before applying anything.
-    // Simulate production effects (with winter scaling) to check the final value would
-    // not go below zero — mirroring the same guard in placeCard().
-    double simulatedProduction = state.getProduction();
-    for (Effect effect : option.effects()) {
-      if (effect.target() instanceof ResourceTarget rt && rt == ResourceTarget.PRODUCTION) {
-        simulatedProduction = scaleForSeason(effect).apply(simulatedProduction);
-      }
-    }
-    if (simulatedProduction < 0) {
-      throw new IllegalStateException(
-          "not enough production to choose this option: have "
-              + (int) state.getProduction()
-              + " but option requires "
-              + (int) -simulatedProduction
-              + " more");
-    }
-
-    for (Effect effect : option.effects()) {
-      if (effect.target() instanceof ResourceTarget rt) {
-        Effect scaled = scaleForSeason(effect);
-        switch (rt) {
-          case POPULATION -> applyPopulation(scaled.apply(state.getPopulation()));
-          case PRODUCTION -> applyProduction(scaled.apply(state.getProduction()));
-          case FOOD -> applyFood(scaled.apply(state.getFood()));
-          case POPULATION_CAP -> {} // passive — not applied via events
-          case GOLD -> applyGold(scaled.apply(state.getGold()));
-          case STRENGTH -> applyStrength(scaled.apply(state.getStrength()));
-        }
-      }
-      // CardTarget effects are not yet handled here — same deferral as triggerCurrentSeasonTable
-    }
-
-    // Only advance to PLAY if the game is still running (population may have hit zero above).
-    if (!state.isGameOver()) {
-      state.setCurPhase(Phase.PLAY);
-      startPlay();
-    }
-  }
-
-  /**
-   * Applies the {@link EventOption} whose {@link EventOption#description()} matches {@code name}
-   * (case-sensitive). Delegates to {@link #applyEventOption(EventOption)} after locating the
-   * option.
-   *
-   * @throws IllegalStateException if no current event exists or no option matches the given name
-   */
-  public synchronized void applyEventOptionByName(String name) {
-    Event event = state.getCurrentEvent();
-    if (event == null) {
-      throw new IllegalStateException("no current event to pick an option from");
-    }
-    EventOption option =
-        event.options().stream()
-            .filter(o -> o.description().equals(name))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("no event option with name: " + name));
-    applyEventOption(option);
-  }
-
-  /**
-   * Returns a scaled copy of {@code effect} whose modifier is multiplied by the season-and-year
-   * multiplier from {@link #computeScaleMultiplier(Season, int)}. If the multiplier is exactly
-   * {@code 1.0} the original effect is returned unchanged to avoid unnecessary allocation.
-   *
-   * <p>Replaces the old KH-6 linear winter-only rule ({@code modifier × year}).
-   */
-  private Effect scaleForSeason(Effect effect) {
-    double multiplier = computeScaleMultiplier(state.getCurSeason(), state.getYear());
-    if (multiplier == 1.0) return effect;
-    return new Effect(effect.target(), effect.modifier() * multiplier, effect.valueType());
-  }
-
-  /**
-   * Computes the event-effect scaling multiplier for the given season and year.
-   *
-   * <p><b>Winter</b> uses a piecewise accelerating curve so early winters are survivable but late
-   * winters become genuinely threatening:
-   *
-   * <ul>
-   *   <li>Years 1–5: linear ramp {@code 1.0 + (year − 1) × 0.15} → 1.00 / 1.15 / 1.30 / 1.45 / 1.60
-   *   <li>Years 6+: exponential {@code 1.6 × 1.25^(year − 5)}, capped at {@code 20.0} (~year 16)
-   * </ul>
-   *
-   * <p><b>Spring, Summer, Fall</b> use a slow linear crawl so non-winter events gradually tighten
-   * but never dominate: {@code 1.0 + (year − 1) × 0.05} → ~2.0× at year 21.
-   *
-   * @param season the season in which the event fires
-   * @param year the current game year (1-indexed)
-   * @return the multiplier to apply to each effect modifier
-   */
-  double computeScaleMultiplier(Season season, int year) {
-    if (season == Season.WINTER) {
-      if (year <= 4) {
-        // Linear ramp: 1.0 → 2.0 over years 1–4 (doubles by year 4).
-        return 1.0 + (year - 1) * (1.0 / 3.0);
-      } else {
-        // Exponential from 2.0 at year 5, capped at 20× (~year 13).
-        double raw = 2.0 * Math.pow(1.30, year - 4);
-        return Math.min(raw, 20.0);
-      }
+    Season endedSeason = state.getCurSeason();
+    advanceSeason();
+    if (endedSeason == Season.WINTER && state.isGoldUnlocked()) {
+      state.setCurPhase(Phase.COUNCIL_ADD);
+      offerCouncilChoices();
     } else {
-      return 1.0 + (year - 1) * 0.05;
+      state.setCurPhase(Phase.ADD);
+      offerAddChoices();
     }
   }
 
@@ -679,6 +533,65 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
 
+    // 4.5. Seated council resolution — advisors bypass staffing entirely: every seated advisor's
+    // card effects fire unconditionally, at full value, every season. See class javadoc.
+    for (SeatedAdvisor seated : state.getCouncil()) {
+      Card card = seated.getCard();
+      double popBefore2 = state.getPopulation();
+      double prodBefore2 = state.getProduction();
+      double foodBefore2 = state.getFood();
+      double capBefore2 = state.getPopulationCap();
+      double goldBefore2 = state.getGold();
+      double strengthBefore2 = state.getStrength();
+
+      for (Effect effect : card.effects()) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          switch (rt) {
+            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
+            case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
+            case FOOD -> applyFood(effect.apply(state.getFood()));
+            case POPULATION_CAP ->
+                state.setPopulationCap(state.getPopulationCap() + effect.modifier());
+            case GOLD -> applyGold(effect.apply(state.getGold()));
+            case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
+          }
+        }
+      }
+
+      log.add(
+          new ResolutionStep(
+              card.name(),
+              StaffingTier.FULL,
+              false,
+              state.getPopulation() - popBefore2,
+              state.getProduction() - prodBefore2,
+              state.getFood() - foodBefore2,
+              state.getPopulationCap() - capBefore2,
+              state.getGold() - goldBefore2,
+              state.getStrength() - strengthBefore2));
+    }
+
+    // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
+    // matching Production card on the season table that is just about to resolve next time around.
+    double crossTableBoost = seatedCrossTableBoost();
+    if (crossTableBoost > 0) {
+      List<Card> currentTable = state.getCurrentTable();
+      for (int j = 0; j < currentTable.size(); j++) {
+        Card target = currentTable.get(j);
+        boolean hasMatch =
+            target.effects().stream()
+                .anyMatch(
+                    e -> e.target() == ResourceTarget.PRODUCTION && e.valueType() == ValueType.INTEGER);
+        if (hasMatch) {
+          currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
+          log.add(
+              new ResolutionStep(
+                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true, 0, 0, 0, 0, 0, 0));
+          break;
+        }
+      }
+    }
+
     // 5. Food consumption / starvation / growth — captured as a tail step.
     double popBefore = state.getPopulation();
     double foodBefore = state.getFood();
@@ -838,8 +751,11 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized List<Card> offerAddChoices() {
     requirePhase(Phase.ADD, "offerAddChoices");
-    if (state.getRerollCount() > 0) {
-      int cost = state.getRerollCount() * REROLL_COST_STEP;
+    // The first (1 + permanent + seated-bonus) calls each ADD phase are free; every call after that
+    // is a paid reroll, escalating by REROLL_COST_STEP per paid call.
+    int freeCalls = 1 + state.getPermanentFreeRerolls() + seatedFreeRerollBonus();
+    if (state.getRerollCount() >= freeCalls) {
+      int cost = (state.getRerollCount() - freeCalls + 1) * REROLL_COST_STEP;
       if (state.getProduction() < cost) {
         throw new IllegalStateException(
             "not enough production to reroll: need "
@@ -857,14 +773,16 @@ public class GameEngine implements Game<GameEngine> {
             .filter(state::areRequiredResourcesUnlocked)
             .filter(c -> !c.isGreatWork() || !greatWorkAlreadyClaimed(c))
             .toList();
-    List<Card> choices = pickRandom(available, ADD_OFFER_SIZE);
+    // Lady Iseult Varn (and any future advisor with this trait) reveals extra candidates.
+    int offerSize = ADD_OFFER_SIZE + seatedExtraAddCandidates();
+    List<Card> choices = pickRandom(available, offerSize);
     state.setAddChoices(choices);
     return choices;
   }
 
   /**
    * Shuffles {@code card} into the current season's draw pile and advances the phase to {@link
-   * Phase#RANDOM_EVENT}. Clears the offer list and resets the reroll counter.
+   * Phase#PLAY}. Clears the offer list and resets the reroll counter.
    *
    * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
    */
@@ -872,9 +790,8 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
-    state.setCurrentEvent(null);
-    state.setCurPhase(Phase.RANDOM_EVENT);
-    rollEvent();
+    state.setCurPhase(Phase.PLAY);
+    startPlay();
   }
 
   /**
@@ -893,16 +810,15 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Skips the ADD phase without adding a card, advancing the phase to {@link Phase#RANDOM_EVENT}.
+   * Skips the ADD phase without adding a card, advancing the phase to {@link Phase#PLAY}.
    *
    * @throws IllegalStateException if the current phase is not {@link Phase#ADD}
    */
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
-    state.setCurrentEvent(null);
-    state.setCurPhase(Phase.RANDOM_EVENT);
-    rollEvent();
+    state.setCurPhase(Phase.PLAY);
+    startPlay();
   }
 
   // ----- ADD helpers -----
@@ -1329,5 +1245,380 @@ public class GameEngine implements Game<GameEngine> {
   private void applyStrength(double value) {
     if (!state.isStrengthUnlocked()) return;
     state.setStrength(Math.max(0.0, value));
+  }
+
+  // ----- COUNCIL_ADD: advisor offer / hire / skip -----
+
+  /**
+   * Offers up to {@value #COUNCIL_OFFER_SIZE} random advisors drawn from {@link
+   * AdvisorCatalog#ALL}, excluding any already seated and any whose {@link AdvisorGate} is not yet
+   * open (see {@link #isAdvisorGateOpen(Advisor)}).
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_ADD}
+   */
+  public synchronized List<Advisor> offerCouncilChoices() {
+    requirePhase(Phase.COUNCIL_ADD, "offerCouncilChoices");
+    List<Advisor> eligible =
+        AdvisorCatalog.ALL.stream()
+            .filter(a -> state.findSeatedAdvisor(a.id()) == null)
+            .filter(this::isAdvisorGateOpen)
+            .toList();
+    List<Advisor> choices = pickRandomAdvisors(eligible, COUNCIL_OFFER_SIZE);
+    state.setCouncilOfferChoices(choices);
+    return choices;
+  }
+
+  /**
+   * Hires {@code advisor} onto the council: deducts {@link Advisor#hiringCost()} gold, seats a new
+   * {@link SeatedAdvisor}, then advances the phase to {@link Phase#COUNCIL_MEETING} and offers that
+   * year's single rotating project proposal.
+   *
+   * @throws IllegalArgumentException if {@code advisor} is {@code null}
+   * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_ADD}, the
+   *     council is full, {@code advisor} was not part of this round's offer, {@code advisor} is
+   *     already seated, or gold is insufficient
+   */
+  public synchronized void hireAdvisor(Advisor advisor) {
+    requirePhase(Phase.COUNCIL_ADD, "hireAdvisor");
+    if (advisor == null) {
+      throw new IllegalArgumentException("advisor cannot be null");
+    }
+    if (state.getCouncil().size() >= MAX_COUNCIL_SIZE) {
+      throw new IllegalStateException("council is full");
+    }
+    if (!state.getCouncilOfferChoices().contains(advisor)) {
+      throw new IllegalStateException("advisor was not offered this round: " + advisor.id());
+    }
+    if (state.findSeatedAdvisor(advisor.id()) != null) {
+      throw new IllegalStateException("advisor is already seated: " + advisor.id());
+    }
+    if (state.getGold() < advisor.hiringCost()) {
+      throw new IllegalStateException(
+          "not enough gold to hire "
+              + advisor.displayName()
+              + ": need "
+              + advisor.hiringCost()
+              + ", have "
+              + (int) state.getGold());
+    }
+    state.setGold(state.getGold() - advisor.hiringCost());
+    state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getYear()));
+    clearCouncilAddState();
+    state.setCurPhase(Phase.COUNCIL_MEETING);
+    offerCouncilProposal();
+  }
+
+  /**
+   * Hires the advisor whose {@link Advisor#id()} matches {@code advisorId}. Delegates to {@link
+   * #hireAdvisor(Advisor)} after looking it up in {@link AdvisorCatalog}.
+   *
+   * @throws IllegalStateException if no advisor with {@code advisorId} exists in the catalog
+   */
+  public synchronized void hireAdvisorById(String advisorId) {
+    Advisor advisor = AdvisorCatalog.byId(advisorId);
+    if (advisor == null) {
+      throw new IllegalStateException("no advisor with id: " + advisorId);
+    }
+    hireAdvisor(advisor);
+  }
+
+  /**
+   * Declines to hire anyone this year, advancing the phase to {@link Phase#COUNCIL_MEETING} and
+   * offering that year's single rotating project proposal.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_ADD}
+   */
+  public synchronized void skipCouncilAdd() {
+    requirePhase(Phase.COUNCIL_ADD, "skipCouncilAdd");
+    clearCouncilAddState();
+    state.setCurPhase(Phase.COUNCIL_MEETING);
+    offerCouncilProposal();
+  }
+
+  private void clearCouncilAddState() {
+    state.setCouncilOfferChoices(List.of());
+  }
+
+  /**
+   * Returns {@code true} if {@code advisor}'s {@link AdvisorGate} is currently satisfied. {@link
+   * AdvisorGate#ANY_GREAT_WORK_COMMISSIONED} / {@link AdvisorGate#GREAT_ROAD_COMMISSIONED} are
+   * evaluated by scanning the board directly (see {@link #isGreatWorkCommissioned(Card)}) rather
+   * than {@code GameState#isCardInPlay}, because the starting deck seeds TREASURY_CONSTRUCTION and
+   * BARRACKS_CONSTRUCTION directly into draw piles — sitting in a draw pile is not "commissioned".
+   */
+  private boolean isAdvisorGateOpen(Advisor advisor) {
+    return switch (advisor.gate()) {
+      case NONE -> true;
+      case BARRACKS_COMPLETED -> state.isStrengthUnlocked();
+      case ANY_GREAT_WORK_COMMISSIONED ->
+          CardCatalog.ALL_GREAT_WORKS.stream().anyMatch(this::isGreatWorkCommissioned);
+      case GREAT_ROAD_COMMISSIONED ->
+          isGreatWorkCommissioned(CardCatalog.THE_GREAT_ROAD_CONSTRUCTION);
+    };
+  }
+
+  /**
+   * Returns {@code true} if {@code constructionCard} (or its completed counterpart) is currently
+   * sitting on any season's table — i.e. construction has at least started, whether or not it has
+   * since finished.
+   */
+  private boolean isGreatWorkCommissioned(Card constructionCard) {
+    if (findCardOnBoard(constructionCard.name()) != null) return true;
+    Card completed = constructionCard.completedCard();
+    return completed != null && findCardOnBoard(completed.name()) != null;
+  }
+
+  /** Returns {@code count} distinct advisors chosen uniformly at random from {@code source}. */
+  private List<Advisor> pickRandomAdvisors(List<Advisor> source, int count) {
+    List<Advisor> pool = new ArrayList<>(source);
+    Collections.shuffle(pool, rng);
+    return List.copyOf(pool.subList(0, Math.min(count, pool.size())));
+  }
+
+  // ----- COUNCIL_MEETING: project proposal, accept / pass -----
+
+  /**
+   * Chooses one seated advisor with something left to propose — the one with the smallest {@link
+   * SeatedAdvisor#getLastProposalYear()} (ties broken by council order; freshly hired advisors
+   * default to {@code -1} so they are always proposed first) — and stores their single available
+   * project as {@link GameState#getCurrentProposal()}. If no seated advisor currently has anything
+   * available, the current proposal is set to {@code null}.
+   *
+   * <p>When an advisor has both an available Reform and an available Decree, the Decree takes
+   * priority (a simple, deterministic tie-break; the design doc does not specify an order).
+   */
+  private void offerCouncilProposal() {
+    SeatedAdvisor chosen = null;
+    Advisor chosenAdvisor = null;
+    for (SeatedAdvisor seated : state.getCouncil()) {
+      Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+      if (!hasAnyProposalAvailable(seated, advisor)) continue;
+      if (chosen == null || seated.getLastProposalYear() < chosen.getLastProposalYear()) {
+        chosen = seated;
+        chosenAdvisor = advisor;
+      }
+    }
+    if (chosen == null) {
+      state.setCurrentProposal(null);
+      return;
+    }
+    if (isDecreeAvailable(chosen, chosenAdvisor.decree())) {
+      state.setCurrentProposal(
+          new CouncilProposal(
+              chosen.getAdvisorId(), ProposalKind.DECREE, chosenAdvisor.decree().name()));
+    } else {
+      state.setCurrentProposal(
+          new CouncilProposal(
+              chosen.getAdvisorId(), ProposalKind.REFORM, chosenAdvisor.reform().name()));
+    }
+  }
+
+  /**
+   * Accepts the current rotating proposal: applies its Reform or Decree, marks the proposing
+   * advisor's rotation timestamp, clears the proposal, then advances the phase to {@link
+   * Phase#ADD}.
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_MEETING}, if
+   *     there is no current proposal, or if the proposing advisor is no longer seated
+   */
+  public synchronized void acceptCouncilProposal() {
+    requirePhase(Phase.COUNCIL_MEETING, "acceptCouncilProposal");
+    CouncilProposal proposal = state.getCurrentProposal();
+    if (proposal == null) {
+      throw new IllegalStateException("no current proposal to accept");
+    }
+    SeatedAdvisor seated = state.findSeatedAdvisor(proposal.advisorId());
+    if (seated == null) {
+      throw new IllegalStateException(
+          "proposing advisor is no longer seated: " + proposal.advisorId());
+    }
+    Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+    if (proposal.kind() == ProposalKind.DECREE) {
+      applyDecree(seated, advisor.decree());
+      seated.setDecreeTaken(true);
+    } else {
+      applyReform(seated, advisor.reform());
+    }
+    seated.setLastProposalYear(state.getYear());
+    state.setCurrentProposal(null);
+    state.setCurPhase(Phase.ADD);
+    offerAddChoices();
+  }
+
+  /**
+   * Passes on the current rotating proposal without applying it. The proposing advisor's rotation
+   * timestamp is still updated (so the rotation moves on to a different advisor next year), then the
+   * phase advances to {@link Phase#ADD}. No-ops gracefully if there is no current proposal (every
+   * seated advisor was already out of projects to propose).
+   *
+   * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_MEETING}
+   */
+  public synchronized void passCouncilProposal() {
+    requirePhase(Phase.COUNCIL_MEETING, "passCouncilProposal");
+    CouncilProposal proposal = state.getCurrentProposal();
+    if (proposal != null) {
+      SeatedAdvisor seated = state.findSeatedAdvisor(proposal.advisorId());
+      if (seated != null) {
+        seated.setLastProposalYear(state.getYear());
+      }
+    }
+    state.setCurrentProposal(null);
+    state.setCurPhase(Phase.ADD);
+    offerAddChoices();
+  }
+
+  /** Returns {@code true} if {@code seated} currently has an available Reform stack or Decree. */
+  private boolean hasAnyProposalAvailable(SeatedAdvisor seated, Advisor advisor) {
+    return isDecreeAvailable(seated, advisor.decree()) || isReformAvailable(seated, advisor.reform());
+  }
+
+  /** Returns {@code true} if {@code seated} has not yet taken their Decree and it is available. */
+  private boolean isDecreeAvailable(SeatedAdvisor seated, Decree decree) {
+    if (seated.isDecreeTaken()) return false;
+    return switch (decree.type()) {
+      case PASSIVE_BOOST, POPULATION_CAP_BOOST, FREE_REROLL -> true;
+      case GREAT_WORK_BOOST -> findCardOnBoard(decree.targetGreatWorkName()) != null;
+      case GREAT_WORK_ACCELERATE -> findAcceleratableGreatWork() != null;
+    };
+  }
+
+  /** Returns {@code true} if {@code seated} has not yet exhausted this Reform's max stacks. */
+  private boolean isReformAvailable(SeatedAdvisor seated, Reform reform) {
+    return seated.getReformStacksTaken() < reform.maxStacks();
+  }
+
+  /**
+   * Applies one stack of {@code reform} to {@code seated}: grants the benefit described by {@link
+   * Reform#benefitType()}, then always drains {@link Reform#costResource()} on the advisor's own
+   * card by {@link Reform#costPerStack()} (a negative magnitude), then increments the stack counter.
+   */
+  private void applyReform(SeatedAdvisor seated, Reform reform) {
+    switch (reform.benefitType()) {
+      case CARD_EFFECT ->
+          seated.setCard(
+              seated.getCard().withEffectBoostOrAdd(reform.benefitResource(), reform.benefitPerStack()));
+      case FREE_REROLL -> seated.addBonusFreeRerolls((int) reform.benefitPerStack());
+      case EXTRA_ADD_CANDIDATE -> seated.addBonusExtraAddCandidates((int) reform.benefitPerStack());
+      case CROSS_TABLE_BOOST -> seated.addBonusCrossTableBoost(reform.benefitPerStack());
+    }
+    seated.setCard(seated.getCard().withEffectBoostOrAdd(reform.costResource(), reform.costPerStack()));
+    seated.incrementReformStacksTaken();
+  }
+
+  /** Applies the one-time effect of {@code decree} to {@code seated} / the board. */
+  private void applyDecree(SeatedAdvisor seated, Decree decree) {
+    switch (decree.type()) {
+      case PASSIVE_BOOST ->
+          seated.setCard(
+              seated.getCard().withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
+      case GREAT_WORK_BOOST -> {
+        Card target = findCardOnBoard(decree.targetGreatWorkName());
+        if (target != null) {
+          replaceCardOnBoard(
+              target, target.withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
+        }
+      }
+      case POPULATION_CAP_BOOST ->
+          state.setPopulationCap(state.getPopulationCap() + decree.effectAmount());
+      case GREAT_WORK_ACCELERATE -> accelerateOneGreatWork();
+      case FREE_REROLL -> state.incrementPermanentFreeRerolls((int) decree.effectAmount());
+    }
+  }
+
+  /**
+   * Advances the first not-yet-accelerated Great Work currently under construction (anywhere on the
+   * board) by one season, skipping its per-season cost entirely. Completes it (swapping in the
+   * completed card and unlocking any resources it grants) if this was its last remaining period.
+   * Marks the Great Work as accelerated either way, so Tomas Ferro's Decree can't be reused on the
+   * same one. No-ops if no eligible Great Work exists.
+   */
+  private void accelerateOneGreatWork() {
+    Card target = findAcceleratableGreatWork();
+    if (target == null) return;
+
+    int newPeriod = target.constructionPeriod() - 1;
+    List<String> gwLog = new ArrayList<>(state.getGreatWorkLog());
+    if (newPeriod <= 0) {
+      Card completed = target.completedCard();
+      replaceCardOnBoard(target, completed);
+      state.unlock(target);
+      gwLog.add(target.name() + "_COMPLETED");
+    } else {
+      Card decremented = target.withConstructionPeriod(newPeriod);
+      replaceCardOnBoard(target, decremented);
+      gwLog.add(target.name() + "_PERIOD_DECREMENTED:" + newPeriod);
+    }
+    state.setGreatWorkLog(gwLog);
+    state.markGreatWorkAccelerated(target.name());
+  }
+
+  /**
+   * Returns the first Great Work currently under construction anywhere on the board that has not
+   * already received Tomas Ferro's acceleration, or {@code null} if none qualifies.
+   */
+  private Card findAcceleratableGreatWork() {
+    for (List<Card> table : state.getBoard().values()) {
+      for (Card c : table) {
+        if (c.isGreatWork() && !state.getAcceleratedGreatWorkNames().contains(c.name())) {
+          return c;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ----- Cross-board lookup helpers (Council Decrees can target a card on any season's table) -----
+
+  /** Scans every season's table for a card named {@code name}, returning the first match found. */
+  private Card findCardOnBoard(String name) {
+    for (List<Card> table : state.getBoard().values()) {
+      for (Card c : table) {
+        if (c.name().equals(name)) return c;
+      }
+    }
+    return null;
+  }
+
+  /** Replaces {@code oldCard} with {@code newCard} on whichever season's table currently holds it. */
+  private void replaceCardOnBoard(Card oldCard, Card newCard) {
+    for (List<Card> table : state.getBoard().values()) {
+      int idx = table.indexOf(oldCard);
+      if (idx != -1) {
+        table.set(idx, newCard);
+        return;
+      }
+    }
+  }
+
+  // ----- Seated-advisor meta-mechanic totals (Joric / Varn / Ostlar) -----
+
+  /** Total extra free ADD-phase rerolls granted by every seated advisor's base trait + Reforms. */
+  private int seatedFreeRerollBonus() {
+    int total = 0;
+    for (SeatedAdvisor seated : state.getCouncil()) {
+      Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+      total += advisor.freeRerollsWhileSeated() + seated.getBonusFreeRerolls();
+    }
+    return total;
+  }
+
+  /** Total extra ADD-phase offer candidates granted by every seated advisor's base trait + Reforms. */
+  private int seatedExtraAddCandidates() {
+    int total = 0;
+    for (SeatedAdvisor seated : state.getCouncil()) {
+      Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+      total += advisor.extraAddCandidatesWhileSeated() + seated.getBonusExtraAddCandidates();
+    }
+    return total;
+  }
+
+  /** Total cross-table Production boost granted by every seated advisor's base trait + Reforms. */
+  private double seatedCrossTableBoost() {
+    double total = 0;
+    for (SeatedAdvisor seated : state.getCouncil()) {
+      Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+      total += advisor.crossTableBoostAmount() + seated.getBonusCrossTableBoost();
+    }
+    return total;
   }
 }

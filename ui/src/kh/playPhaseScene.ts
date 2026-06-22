@@ -350,12 +350,12 @@ export class PlayPhaseScene {
           <span class="kh-play-phase-dot"></span>I. ADD
         </div>
         <span class="kh-play-phase-arrow">→</span>
-        <div class="kh-play-phase-step">
-          <span class="kh-play-phase-dot"></span>II. RANDOM EVENT
+        <div class="kh-play-phase-step kh-play-phase-active">
+          <span class="kh-play-phase-dot"></span>II. PLAY
         </div>
         <span class="kh-play-phase-arrow">→</span>
-        <div class="kh-play-phase-step kh-play-phase-active">
-          <span class="kh-play-phase-dot"></span>III. PLAY
+        <div class="kh-play-phase-step">
+          <span class="kh-play-phase-dot"></span>III. COUNCIL
         </div>
       </div>
     `;
