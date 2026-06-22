@@ -520,6 +520,25 @@ export class HeartsGameHandler {
     this.renderScoreTable(context, state);
 
     if (state.over || state.quit) {
+      // If the last trick completed in this same message (4th card + game-over
+      // arrived together), renderTrick was never called for it — show and
+      // animate it now before revealing the game-over screen.
+      const round = state.rounds[state.rounds.length - 1];
+      const lastTrick = round?.tricks[round.tricks.length - 1];
+      const prevRound = prevMessage?.state.rounds[prevMessage.state.rounds.length - 1];
+      const prevCount =
+        prevRound?.tricks.find((t) => t.number === lastTrick?.number)
+          ?.playedCards.length ?? 0;
+      if (lastTrick?.winner && prevCount < 4) {
+        await this.renderTrick(context, state, round!, prevMessage);
+        const winner = lastTrick.winner.player;
+        const myIdx = state.players.indexOf(context.player);
+        const winnerIdx = state.players.indexOf(winner);
+        const dirs = ["S", "W", "N", "E"] as const;
+        await this.animateTrickWon(dirs[(winnerIdx - myIdx + 4) % 4]);
+        this.clearScene();
+        this.renderScoreTable(context, state);
+      }
       this.renderGameOver(context, state);
       return;
     }
@@ -914,9 +933,13 @@ export class HeartsGameHandler {
     // Skip if the current message still shows the same complete trick — the
     // server emits separate card-played and trick-ended broadcasts that both
     // carry the same 4-card state; only animate on the transition away from it.
+    // Exception: when the game is over we are genuinely transitioning away from
+    // the last trick, so the animation must run even if the trick data is unchanged.
+    const gameOver = message.state.over || message.state.quit;
     const curRound = message.state.rounds[message.state.rounds.length - 1];
     const curTrick = curRound?.tricks[curRound.tricks.length - 1];
     if (
+      !gameOver &&
       curTrick?.number === prevTrick.number &&
       curTrick?.playedCards.length === 4
     )
