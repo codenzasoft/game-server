@@ -592,7 +592,11 @@ const ReformSchema = z
     name: z.string(),
     maxStacks: z.number().int(),
     benefitType: z.enum(ReformBenefitType),
-    benefitResource: z.enum(ResourceTarget).optional(),
+    // Server (Jackson) sends an explicit JSON `null` for advisors whose Reform benefit
+    // isn't resource-typed (e.g. FREE_REROLL/EXTRA_ADD_CANDIDATE/CROSS_TABLE_BOOST), not a
+    // missing key. `.optional()` alone only accepts `undefined`, not `null`, and Zod throws
+    // on the mismatch — `.nullish()` + normalize keeps the parsed type `ResourceTarget | undefined`.
+    benefitResource: z.enum(ResourceTarget).nullish().transform((v) => v ?? undefined),
     benefitPerStack: z.number(),
     costResource: z.enum(ResourceTarget),
     costPerStack: z.number(),
@@ -603,8 +607,10 @@ const DecreeSchema = z
   .object({
     name: z.string(),
     type: z.enum(DecreeType),
-    targetGreatWorkName: z.string().optional(),
-    effectResource: z.enum(ResourceTarget).optional(),
+    // Same null-vs-undefined issue as Reform.benefitResource above: Jackson sends explicit
+    // JSON `null` for the advisors whose Decree doesn't target a Great Work / resource.
+    targetGreatWorkName: z.string().nullish().transform((v) => v ?? undefined),
+    effectResource: z.enum(ResourceTarget).nullish().transform((v) => v ?? undefined),
     effectAmount: z.number(),
   })
   .transform((data) => new Decree(data as DecreeData));
@@ -720,7 +726,9 @@ export const GameStateSchema = z
     councilOfferChoices: z.array(AdvisorSchema).default([]),
     // The single rotating Reform/Decree proposal for the current COUNCIL_MEETING phase;
     // omitted from JSON (and thus absent here) if no seated advisor has anything to propose.
-    currentProposal: CouncilProposalSchema.optional(),
+    // Same null-vs-undefined issue: Jackson sends explicit JSON `null` when no seated
+    // advisor currently has anything left to propose, not a missing key.
+    currentProposal: CouncilProposalSchema.nullish().transform((v) => v ?? undefined),
   })
   .transform((data) => new GameState(data as GameStateData));
 

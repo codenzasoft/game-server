@@ -1692,11 +1692,14 @@ class GameEngineSpec extends Specification {
 
     def "GAME_OVER is not set when population stays above zero after resolution"() {
         setup:
+        // card drops population 5.0 -> 3.0, then endAndRun's food step runs:
+        // spring rate=1, consumed=floor(3.0)*1=3.0; food=3.0 covers it exactly (no
+        // deficit, no leftover surplus), so population is unaffected by growth.
         def minorLoss = new Card("Minor loss", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-2)])
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
                 .table(Season.SPRING, [minorLoss])
-                .population(5.0).build()
+                .population(5.0).food(3.0).build()
         def engine = engine(state)
 
         when:
