@@ -32,10 +32,14 @@ export interface CouncilActions {
   skipCouncilAdd: () => void;
   acceptCouncilProposal: () => void;
   passCouncilProposal: () => void;
+  dismissAdvisor: (id: string) => void;
 }
 
 // Mirrors GameEngine.MAX_COUNCIL_SIZE exactly.
 const MAX_COUNCIL_SIZE = 3;
+
+// Mirrors GameEngine.ADVISOR_DISMISSAL_COST_RATE exactly.
+const ADVISOR_DISMISSAL_COST_RATE = 0.2;
 
 // ─── Season display metadata (mirrors addPhaseScene's local SEASON_META) ─────
 
@@ -226,7 +230,7 @@ export class CouncilScene {
 
   private buildRosterPanel(state: GameState): string {
     const seatsHTML = Array.from({ length: MAX_COUNCIL_SIZE }, (_, i) => state.council[i])
-      .map((seated) => (seated ? this.buildFilledSeat(seated) : this.buildEmptySeat()))
+      .map((seated) => (seated ? this.buildFilledSeat(state, seated) : this.buildEmptySeat()))
       .join("");
 
     return `
@@ -237,9 +241,11 @@ export class CouncilScene {
     `;
   }
 
-  private buildFilledSeat(seated: SeatedAdvisor): string {
+  private buildFilledSeat(state: GameState, seated: SeatedAdvisor): string {
     const info = getAdvisorDisplayInfo(seated.advisorId);
     const reformDone = seated.reformStacksTaken >= info.reform.maxStacks;
+    const dismissCost = Math.round(info.hiringCost * ADVISOR_DISMISSAL_COST_RATE);
+    const canAffordDismissal = state.gold >= dismissCost;
     return `
       <div class="kh-cs-seat" data-advisor-id="${seated.advisorId}">
         ${buildPortraitPlaceholder(info.ringColor, 56)}
@@ -248,6 +254,18 @@ export class CouncilScene {
         <div class="kh-cs-seat-progress">
           <span class="kh-cs-seat-tag ${reformDone ? "kh-cs-seat-tag-done" : ""}">⚖ ${seated.reformStacksTaken}/${info.reform.maxStacks}</span>
           <span class="kh-cs-seat-tag ${seated.decreeTaken ? "kh-cs-seat-tag-done" : ""}">📜 ${seated.decreeTaken ? "Spent" : "Ready"}</span>
+        </div>
+
+        <!-- ── Hover tooltip: what they do, and "let them go" ─────────────── -->
+        <div class="kh-cs-seat-tooltip">
+          <div class="kh-cs-seat-tt-name">${info.displayName} — ${info.title}</div>
+          <div class="kh-cs-seat-tt-desc">${info.specialtyDescription}</div>
+          <div class="kh-cs-seat-tt-footer">
+            <button class="kh-cs-btn-letgo" data-advisor-id="${seated.advisorId}" ${canAffordDismissal ? "" : "disabled"}>
+              👋 Let Go <span class="kh-cs-letgo-cost">💰 ${dismissCost}</span>
+            </button>
+            ${canAffordDismissal ? "" : `<div class="kh-cs-letgo-warn">Cannot afford</div>`}
+          </div>
         </div>
       </div>
     `;
@@ -438,11 +456,26 @@ export class CouncilScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
+    this.attachRosterListeners();
     if (state.curPhase === Phase.COUNCIL_ADD) {
       this.attachCouncilAddListeners(state);
     } else {
       this.attachCouncilMeetingListeners();
     }
+  }
+
+  /** Wires the "let go" button on the roster panel — present in both council sub-phases. */
+  private attachRosterListeners(): void {
+    this.overlay.querySelectorAll<HTMLButtonElement>(".kh-cs-btn-letgo").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.advisorId;
+        if (!id) return;
+        const info = getAdvisorDisplayInfo(id);
+        this.disableAllActions();
+        this.showToast(`Letting ${info.displayName} go…`);
+        this.actions.dismissAdvisor(id);
+      });
+    });
   }
 
   private attachCouncilAddListeners(state: GameState): void {
@@ -658,7 +691,9 @@ export class CouncilScene {
         border-radius: 10px;
         padding: 14px 10px;
         text-align: center;
+        position: relative;
       }
+      .kh-cs-seat:hover { z-index: 10; }
       .kh-cs-seat-empty { border-style: dashed; opacity: .6; }
       .kh-cs-seat-empty-ring {
         width: 56px; height: 56px; min-width: 56px;
@@ -688,6 +723,65 @@ export class CouncilScene {
         color: #c4a060;
       }
       .kh-cs-seat-tag-done { background: rgba(100,180,100,.18); color: #90d090; }
+
+      /* ── Seated-advisor hover tooltip: what they do, and "let them go" ──── */
+      .kh-cs-seat-tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 260px;
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 12px;
+        padding: 14px 16px 12px;
+        box-shadow: 0 10px 36px rgba(0,0,0,.75);
+        z-index: 30;
+        pointer-events: none;
+        text-align: left;
+      }
+      .kh-cs-seat:hover .kh-cs-seat-tooltip {
+        display: block;
+        pointer-events: auto;
+      }
+      .kh-cs-seat-tt-name {
+        font-family: 'Cinzel', serif;
+        font-size: .82rem;
+        font-weight: 700;
+        color: #f0e8c0;
+        margin-bottom: 8px;
+        padding-bottom: 7px;
+        border-bottom: 1px solid rgba(196,160,96,.3);
+      }
+      .kh-cs-seat-tt-desc {
+        font-family: 'Crimson Text', serif;
+        font-size: .82rem;
+        line-height: 1.4;
+        color: #d4c090;
+        margin-bottom: 10px;
+      }
+      .kh-cs-seat-tt-footer { border-top: 1px dashed rgba(196,160,96,.3); padding-top: 10px; }
+      .kh-cs-btn-letgo {
+        width: 100%;
+        padding: 7px 0;
+        border-radius: 7px;
+        border: 1px solid #a06040;
+        background: linear-gradient(135deg, #7a3020 0%, #5a1e10 100%);
+        color: #f0d0b0;
+        font-family: 'Cinzel', serif;
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .5px;
+        cursor: pointer;
+      }
+      .kh-cs-btn-letgo:hover:not(:disabled) {
+        background: linear-gradient(135deg, #9a3828 0%, #722416 100%);
+        box-shadow: 0 2px 8px rgba(0,0,0,.28);
+      }
+      .kh-cs-btn-letgo:disabled { background: #9a8a70; border-color: #b0a080; color: #d0c0a0; cursor: not-allowed; opacity: .65; }
+      .kh-cs-letgo-cost { font-weight: 400; opacity: .85; }
+      .kh-cs-letgo-warn { text-align: center; font-family: 'Cinzel', serif; font-size: .58rem; color: #a06040; margin-top: 5px; letter-spacing: .5px; }
 
       /* Prompt */
       .kh-cs-prompt       { text-align: center; margin-bottom: 32px; }

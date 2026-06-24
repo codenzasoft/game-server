@@ -219,6 +219,7 @@ interface GameStateData {
   strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
+  permanentFreeRerolls: number;
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
@@ -484,6 +485,7 @@ export class GameState {
   strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
+  permanentFreeRerolls: number;
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
@@ -511,6 +513,7 @@ export class GameState {
     this.strengthUnlocked = data.strengthUnlocked;
     this.gameWon = data.gameWon;
     this.greatWorkLog = data.greatWorkLog;
+    this.permanentFreeRerolls = data.permanentFreeRerolls;
     this.council = data.council;
     this.councilOfferChoices = data.councilOfferChoices;
     this.currentProposal = data.currentProposal;
@@ -720,6 +723,10 @@ export const GameStateSchema = z
     // Great-Work-related events emitted by the most recent endAndRun (e.g.
     // "TREASURY_COMPLETED"); empty between seasons.
     greatWorkLog: z.array(z.string()).default([]),
+    // Permanent free-ADD-phase-reroll count from one-time Decrees (e.g. Lady Iseult Varn's
+    // "Plant an Informant"). Distinct from a seated advisor's own bonusFreeRerolls (Reform-driven,
+    // tied to that seat) — this persists even after the granting advisor is later dismissed.
+    permanentFreeRerolls: z.number().int().default(0),
     // Advisors currently seated on the council; never more than MAX_COUNCIL_SIZE (3).
     council: z.array(SeatedAdvisorSchema).default([]),
     // Candidate advisors offered during the current COUNCIL_ADD phase; empty outside it.
@@ -894,6 +901,19 @@ export class GameEventHandler {
   public passCouncilProposal(): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/council/pass`,
+    });
+  }
+
+  /**
+   * Dismisses ("lets go") the seated advisor identified by stable catalog id, paying a gold cost
+   * deducted server-side. Available during either council sub-phase.
+   *
+   * @param id The stable {@code Advisor.id} of the advisor to dismiss.
+   */
+  public dismissAdvisor(id: string): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/council/dismiss`,
+      body: JSON.stringify({ id }),
     });
   }
 

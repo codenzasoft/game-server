@@ -12,7 +12,7 @@
 // Keys match the `id` field on the Java Advisor record (AdvisorCatalog.java).
 // Add a new entry here whenever a new advisor constant is added on the server.
 
-import { ReformBenefitType, DecreeType, ResourceTarget } from "./kingshand.ts";
+import { ReformBenefitType, DecreeType, ResourceTarget, SeatedAdvisor } from "./kingshand.ts";
 
 export interface AdvisorReformInfo {
   name: string;
@@ -36,9 +36,18 @@ export interface AdvisorDisplayInfo {
   displayName: string;
   title: string;
   specialtyDescription: string;
+  /** One-time gold cost to hire this advisor — mirrors {@code Advisor.hiringCost} on the server.
+   *  Needed client-side to price the "let go" dismissal cost for seated advisors, since the wire
+   *  only sends a lean SeatedAdvisor (no hiringCost) once an advisor is seated. */
+  hiringCost: number;
   /** Drives the placeholder-portrait ring color — see {@link ringColorHex}. */
   ringColor: string;
   portraitPlaceholderId: string;
+  /** Base count of additional free ADD-phase rerolls while seated — mirrors
+   *  {@code Advisor.freeRerollsWhileSeated} on the server. 0 (omitted) for every advisor except
+   *  Maester Joric. See {@link seatedFreeRerollBonus}, which sums this across the whole council
+   *  to compute the ADD-phase reroll button's true cost. */
+  freeRerollsWhileSeated?: number;
   reform: AdvisorReformInfo;
   decree: AdvisorDecreeInfo;
 }
@@ -47,6 +56,7 @@ const UNKNOWN_ADVISOR: AdvisorDisplayInfo = {
   displayName: "Unknown Advisor",
   title: "Unknown",
   specialtyDescription: "",
+  hiringCost: 0,
   ringColor: "slate-grey",
   portraitPlaceholderId: "unknown_placeholder",
   reform: {
@@ -70,6 +80,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     title: "The Steward",
     specialtyDescription:
       "+60 Production/season. The default first hire — competent, unglamorous, always useful.",
+    hiringCost: 60,
     ringColor: "slate-grey",
     portraitPlaceholderId: "reeve_aldwin_placeholder",
     reform: {
@@ -91,6 +102,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Mira Voss",
     title: "The Master of Coin",
     specialtyDescription: "+15 Gold/season.",
+    hiringCost: 120,
     ringColor: "amber",
     portraitPlaceholderId: "mira_voss_placeholder",
     reform: {
@@ -115,6 +127,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     title: "The Lord Marshal",
     specialtyDescription:
       "+25 Strength/season. Only appears in the offer pool once BARRACKS is completed.",
+    hiringCost: 200,
     ringColor: "deep-red",
     portraitPlaceholderId: "sir_bram_holt_placeholder",
     reform: {
@@ -138,6 +151,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Old Yarrow",
     title: "The Court Physician",
     specialtyDescription: "+80 Food/season.",
+    hiringCost: 70,
     ringColor: "green",
     portraitPlaceholderId: "old_yarrow_placeholder",
     reform: {
@@ -160,6 +174,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     title: "The Master Engineer",
     specialtyDescription:
       "+50 Production/season. Only appears once at least one Great Work has been commissioned.",
+    hiringCost: 110,
     ringColor: "slate-grey",
     portraitPlaceholderId: "tomas_ferro_placeholder",
     reform: {
@@ -181,6 +196,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Lady Iseult Varn",
     title: "The Spymaster",
     specialtyDescription: "Reveals one extra candidate in every ADD-phase offer while seated.",
+    hiringCost: 220,
     ringColor: "violet",
     portraitPlaceholderId: "lady_iseult_varn_placeholder",
     reform: {
@@ -201,6 +217,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Brother Cassian",
     title: "The High Chaplain",
     specialtyDescription: "+6 Population/season.",
+    hiringCost: 90,
     ringColor: "dusty-blue",
     portraitPlaceholderId: "brother_cassian_placeholder",
     reform: {
@@ -224,6 +241,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Garrick Stoneback",
     title: "The Quarrymaster",
     specialtyDescription: "+90 Production/season.",
+    hiringCost: 65,
     ringColor: "slate-grey",
     portraitPlaceholderId: "garrick_stoneback_placeholder",
     reform: {
@@ -246,6 +264,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Dame Petra Lysk",
     title: "The Harbor Mistress",
     specialtyDescription: "+12 Gold/season. Only appears once THE_GREAT_ROAD has been commissioned.",
+    hiringCost: 130,
     ringColor: "amber",
     portraitPlaceholderId: "dame_petra_lysk_placeholder",
     reform: {
@@ -269,6 +288,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Wendel Ashgrove",
     title: "The Royal Forester",
     specialtyDescription: "+70 Food/season.",
+    hiringCost: 60,
     ringColor: "green",
     portraitPlaceholderId: "wendel_ashgrove_placeholder",
     reform: {
@@ -290,8 +310,10 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Maester Joric",
     title: "The Royal Archivist",
     specialtyDescription: "The first reroll each season is free while he's seated.",
+    hiringCost: 140,
     ringColor: "violet",
     portraitPlaceholderId: "maester_joric_placeholder",
+    freeRerollsWhileSeated: 1,
     reform: {
       name: "Expand the Archive",
       maxStacks: 1,
@@ -313,6 +335,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     title: "The Master of Horse",
     specialtyDescription:
       "Boosts the first Production-producing card on the active season's table by +10 each season.",
+    hiringCost: 210,
     ringColor: "slate-grey",
     portraitPlaceholderId: "brynn_ostlar_placeholder",
     reform: {
@@ -334,6 +357,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Hewett Cray",
     title: "The Master of Works",
     specialtyDescription: "+55 Production/season.",
+    hiringCost: 100,
     ringColor: "slate-grey",
     portraitPlaceholderId: "hewett_cray_placeholder",
     reform: {
@@ -356,6 +380,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     title: "Captain of the Watch",
     specialtyDescription:
       "+50 Production/season. Available from the start of a run — the early-game counterpart to Sir Bram Holt.",
+    hiringCost: 85,
     ringColor: "slate-grey",
     portraitPlaceholderId: "captain_yseult_marrow_placeholder",
     reform: {
@@ -378,6 +403,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
     displayName: "Mother Brask",
     title: "Keeper of the Hearth",
     specialtyDescription: "+8 Population/season.",
+    hiringCost: 75,
     ringColor: "dusty-blue",
     portraitPlaceholderId: "mother_brask_placeholder",
     reform: {
@@ -400,6 +426,19 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
 /** Looks up an advisor's display info by stable catalog id. Falls back to a generic placeholder. */
 export function getAdvisorDisplayInfo(advisorId: string): AdvisorDisplayInfo {
   return ADVISOR_DISPLAY_CATALOG[advisorId] ?? UNKNOWN_ADVISOR;
+}
+
+/**
+ * Total extra free ADD-phase rerolls granted by every seated advisor's base trait plus any
+ * Reform-driven bonus accrued on that seat — mirrors {@code GameEngine.seatedFreeRerollBonus()}
+ * exactly. Combine with {@code GameState.permanentFreeRerolls} (Decree-driven, kingdom-wide) to
+ * reproduce the server's {@code freeCalls} total for the ADD-phase reroll button's true cost.
+ */
+export function seatedFreeRerollBonus(council: SeatedAdvisor[]): number {
+  return council.reduce((total, seated) => {
+    const info = getAdvisorDisplayInfo(seated.advisorId);
+    return total + (info.freeRerollsWhileSeated ?? 0) + seated.bonusFreeRerolls;
+  }, 0);
 }
 
 // ─── Placeholder portrait rendering ────────────────────────────────────────────

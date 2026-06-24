@@ -228,8 +228,27 @@ const getGameId = (): string | undefined => {
           // and the COUNCIL_ADD → COUNCIL_MEETING transition within one council
           // turn, so the roster panel never flickers between the two steps.
           currentScene.update(state);
+        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
+          // PLAY → COUNCIL transition with resolution data (Winter just ended and gold is
+          // unlocked): animate the end-and-run resolution first, exactly like the PLAY → ADD
+          // case above, instead of cutting straight to the council screen.
+          const preState = currentScene.getState();
+          const playScene = currentScene;
+          playScene.animateFromResolutionLog(state, preState).then(() => {
+            playScene.unmount();
+            const councilScene = new CouncilScene(state, {
+              hireAdvisor:           (id) => handler.hireAdvisor(id),
+              skipCouncilAdd:        ()   => handler.skipCouncilAdd(),
+              acceptCouncilProposal: ()   => handler.acceptCouncilProposal(),
+              passCouncilProposal:   ()   => handler.passCouncilProposal(),
+              dismissAdvisor:        (id) => handler.dismissAdvisor(id),
+            });
+            currentScene = councilScene;
+            councilScene.mount(mountTarget);
+          });
         } else {
-          // Either a fresh mount or switching from ADD/PLAY: tear down the old scene first.
+          // Either a fresh mount or switching from ADD/PLAY (no resolution log): tear down the
+          // old scene first.
           if (currentScene) {
             currentScene.unmount();
             currentScene = null;
@@ -239,6 +258,7 @@ const getGameId = (): string | undefined => {
             skipCouncilAdd:        ()   => handler.skipCouncilAdd(),
             acceptCouncilProposal: ()   => handler.acceptCouncilProposal(),
             passCouncilProposal:   ()   => handler.passCouncilProposal(),
+            dismissAdvisor:        (id) => handler.dismissAdvisor(id),
           });
           currentScene.mount(mountTarget);
         }

@@ -7,6 +7,7 @@ import {
   resourceLabel,
   resourceShortLabel,
 } from "./cardCatalog.ts";
+import { seatedFreeRerollBonus } from "./advisorCatalog.ts";
 import {
   injectSharedStyles,
   buildDeckIndicator,
@@ -28,7 +29,7 @@ export interface AddPhaseActions {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Mirrors GameEngine.REROLL_COST_STEP — keep in sync with the Java constant. */
-const REROLL_COST_STEP = 10;
+const REROLL_COST_STEP = 50;
 
 const SEASON_META: Record<
   Season,
@@ -109,7 +110,17 @@ export class AddPhaseScene {
     const { state } = this;
     const season = state.curSeason;
     const meta = SEASON_META[season];
-    const nextRerollCost = state.rerollCount * REROLL_COST_STEP;
+    // Mirrors GameEngine.offerAddChoices()'s freeCalls/cost formula exactly: the first call each
+    // ADD phase is always free, plus any permanent (Decree) and seated (base trait / Reform) free
+    // rerolls on top of that. Only once state.rerollCount reaches that total does a reroll cost
+    // anything — previously this ignored both bonuses entirely, so the button always showed (and
+    // charged) as if no advisor or Decree had ever granted a free reroll.
+    const freeRerollCalls = 1 + state.permanentFreeRerolls + seatedFreeRerollBonus(state.council);
+    const nextRerollCost =
+      state.rerollCount >= freeRerollCalls
+        ? (state.rerollCount - freeRerollCalls + 1) * REROLL_COST_STEP
+        : 0;
+    const isFreeReroll = nextRerollCost === 0;
     const canAffordReroll = state.production >= nextRerollCost;
 
     this.overlay.innerHTML = `
@@ -129,7 +140,7 @@ export class AddPhaseScene {
           <button class="kh-btn-reroll" id="kh-btn-reroll"
             ${!canAffordReroll ? "disabled" : ""}>
             ⟳ &nbsp;Reroll
-            <span class="kh-reroll-cost">(${nextRerollCost} ⚒️)</span>
+            <span class="kh-reroll-cost">${isFreeReroll ? "(Free)" : `(${nextRerollCost} ⚒️)`}</span>
           </button>
           <button class="kh-btn-skip" id="kh-btn-skip">
             Pass — Add Nothing

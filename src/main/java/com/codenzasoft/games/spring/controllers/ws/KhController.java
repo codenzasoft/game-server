@@ -186,6 +186,29 @@ public class KhController {
             });
   }
 
+  /**
+   * Dismisses ("lets go") the seated advisor identified by stable catalog id, charging {@link
+   * com.codenzasoft.games.kingshand.GameEngine#ADVISOR_DISMISSAL_COST_RATE} × their original hiring
+   * cost in gold. Available during either council sub-phase.
+   */
+  @MessageMapping("/kh/{gameId}/council/dismiss")
+  public void councilDismiss(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body) {
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final String id = (String) body.get("id");
+              try {
+                game.dismissAdvisor(id);
+                khBroadcastService.gameLoaded(game);
+              } catch (final IllegalStateException e) {
+                log.error("councilDismiss rejected for game {}: {}", gameId, e.getMessage());
+                NewRelic.noticeError(e);
+              }
+            });
+  }
+
   // ── PLAY phase actions ────────────────────────────────────────────────────
 
   /**

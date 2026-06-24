@@ -56,6 +56,12 @@ public class GameEngine implements Game<GameEngine> {
 
   static final int COUNCIL_OFFER_SIZE = 3;
 
+  /**
+   * Fraction of an advisor's original {@link Advisor#hiringCost()} charged in gold to dismiss them
+   * from the council ("let them go"). Mirrors {@link #DEMOLISH_COST_RATE}'s role for table cards.
+   */
+  public static final double ADVISOR_DISMISSAL_COST_RATE = 0.20;
+
   private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
       new KhGameStartedNotification();
   private static final KhGameOverNotification GAME_OVER_NOTIFICATION = new KhGameOverNotification();
@@ -849,6 +855,21 @@ public class GameEngine implements Game<GameEngine> {
     }
   }
 
+  /**
+   * Like {@link #requirePhase} but accepts either council sub-phase. The roster panel (and its "let
+   * go" action) is visible and interactive throughout the whole once-a-year council turn, not just
+   * one sub-phase of it.
+   */
+  private void requireCouncilPhase(String operation) {
+    Phase current = state.getCurPhase();
+    if (current != Phase.COUNCIL_ADD && current != Phase.COUNCIL_MEETING) {
+      throw new IllegalStateException(
+          operation
+              + " requires phase COUNCIL_ADD or COUNCIL_MEETING but current phase is "
+              + current);
+    }
+  }
+
   private void clearAddState() {
     state.setAddChoices(List.of());
     state.setRerollCount(0);
@@ -1340,6 +1361,48 @@ public class GameEngine implements Game<GameEngine> {
 
   private void clearCouncilAddState() {
     state.setCouncilOfferChoices(List.of());
+  }
+
+  /**
+   * Dismisses the seated advisor identified by {@code advisorId} from the council ("let them go"),
+   * freeing their seat. Charges {@link #ADVISOR_DISMISSAL_COST_RATE} × the advisor's original
+   * {@link Advisor#hiringCost()} in gold, mirroring {@link #demolishCard(int)}'s production-cost
+   * convention for removing a table card.
+   *
+   * <p>Available during either council sub-phase, since the roster panel is visible throughout the
+   * whole once-a-year council turn. If the dismissed advisor was the proposing advisor for the
+   * current {@link Phase#COUNCIL_MEETING} proposal, a fresh proposal is offered immediately so the
+   * meeting screen never shows a proposal from someone no longer seated.
+   *
+   * @throws IllegalStateException if the current phase is neither {@link Phase#COUNCIL_ADD} nor
+   *     {@link Phase#COUNCIL_MEETING}, if no advisor with {@code advisorId} is currently seated, or
+   *     if the player cannot afford the dismissal cost
+   */
+  public synchronized void dismissAdvisor(String advisorId) {
+    requireCouncilPhase("dismissAdvisor");
+    SeatedAdvisor seated = state.findSeatedAdvisor(advisorId);
+    if (seated == null) {
+      throw new IllegalStateException("advisor is not seated: " + advisorId);
+    }
+    Advisor advisor = AdvisorCatalog.byId(advisorId);
+    double cost = (advisor == null ? 0 : advisor.hiringCost()) * ADVISOR_DISMISSAL_COST_RATE;
+    if (state.getGold() < cost) {
+      throw new IllegalStateException(
+          "not enough gold to let go "
+              + (advisor == null ? advisorId : advisor.displayName())
+              + ": need "
+              + cost
+              + ", have "
+              + (int) state.getGold());
+    }
+    state.setGold(state.getGold() - cost);
+    state.removeFromCouncil(advisorId);
+    CouncilProposal proposal = state.getCurrentProposal();
+    if (state.getCurPhase() == Phase.COUNCIL_MEETING
+        && proposal != null
+        && proposal.advisorId().equals(advisorId)) {
+      offerCouncilProposal();
+    }
   }
 
   /**

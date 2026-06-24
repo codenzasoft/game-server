@@ -489,6 +489,15 @@ public class GameState {
   }
 
   /**
+   * Removes the seated advisor whose {@code advisorId} equals {@code advisorId}, if present. Caller
+   * is responsible for any cost/affordability check and for refreshing any in-flight proposal that
+   * referenced this advisor.
+   */
+  public void removeFromCouncil(String advisorId) {
+    council.removeIf(s -> s.getAdvisorId().equals(advisorId));
+  }
+
+  /**
    * Returns the seated advisor whose {@code advisorId} equals {@code advisorId}, or {@code null}.
    */
   public SeatedAdvisor findSeatedAdvisor(String advisorId) {
