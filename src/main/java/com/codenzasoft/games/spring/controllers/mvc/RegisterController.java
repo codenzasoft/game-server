@@ -7,6 +7,7 @@ import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.WhitelistRepository;
 import com.codenzasoft.games.spring.services.EmailVerificationService;
 import com.codenzasoft.games.spring.validation.PasswordValidator;
+import com.codenzasoft.games.spring.validation.UsernameValidator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,10 @@ public class RegisterController {
           trimmedEmail,
           trimmedUserName,
           redirectAttrs);
+    }
+    final UsernameValidator.Result usernameResult = UsernameValidator.validate(trimmedUserName);
+    if (!usernameResult.isValid()) {
+      return failed(usernameResult.getErrorMessage(), trimmedEmail, trimmedUserName, redirectAttrs);
     }
     if (!password.equals(confirmPassword)) {
       return failed("Passwords do not match.", trimmedEmail, trimmedUserName, redirectAttrs);
