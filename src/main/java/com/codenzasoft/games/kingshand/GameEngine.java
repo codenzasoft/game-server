@@ -39,8 +39,8 @@ import java.util.function.BiConsumer;
  * <p><b>Advisors</b> deliberately bypass the worker-staffing system: once seated (see {@link
  * #hireAdvisor(Advisor)}), a {@link SeatedAdvisor}'s card effects fire unconditionally and in full
  * every season as part of {@link #endAndRun()} — their "cost" is the upfront hiring fee, not
- * population staffing. See {@link Advisor}/{@link AdvisorCatalog} for the roster and {@link Reform}/
- * {@link Decree} for the two project types proposed once a year during {@link
+ * population staffing. See {@link Advisor}/{@link AdvisorCatalog} for the roster and {@link
+ * Reform}/ {@link Decree} for the two project types proposed once a year during {@link
  * Phase#COUNCIL_MEETING}.
  */
 public class GameEngine implements Game<GameEngine> {
@@ -50,8 +50,10 @@ public class GameEngine implements Game<GameEngine> {
   public static final int REROLL_COST_STEP = 50;
   public static final double DEMOLISH_COST_RATE = 0.20;
   static final int ADD_OFFER_SIZE = 3;
+
   /** Maximum number of advisors that may be seated on the council at once. */
   public static final int MAX_COUNCIL_SIZE = 3;
+
   static final int COUNCIL_OFFER_SIZE = 3;
 
   private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
@@ -149,8 +151,7 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /** Full constructor with all dependencies injected, no listeners. */
-  GameEngine(
-      UUID id, Player player, GameState state, CardCatalog cardCatalog, Random rng) {
+  GameEngine(UUID id, Player player, GameState state, CardCatalog cardCatalog, Random rng) {
     this(id, player, state, cardCatalog, rng, List.of(), Runnable::run);
   }
 
@@ -581,7 +582,9 @@ public class GameEngine implements Game<GameEngine> {
         boolean hasMatch =
             target.effects().stream()
                 .anyMatch(
-                    e -> e.target() == ResourceTarget.PRODUCTION && e.valueType() == ValueType.INTEGER);
+                    e ->
+                        e.target() == ResourceTarget.PRODUCTION
+                            && e.valueType() == ValueType.INTEGER);
         if (hasMatch) {
           currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
           log.add(
@@ -1447,9 +1450,9 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Passes on the current rotating proposal without applying it. The proposing advisor's rotation
-   * timestamp is still updated (so the rotation moves on to a different advisor next year), then the
-   * phase advances to {@link Phase#ADD}. No-ops gracefully if there is no current proposal (every
-   * seated advisor was already out of projects to propose).
+   * timestamp is still updated (so the rotation moves on to a different advisor next year), then
+   * the phase advances to {@link Phase#ADD}. No-ops gracefully if there is no current proposal
+   * (every seated advisor was already out of projects to propose).
    *
    * @throws IllegalStateException if the current phase is not {@link Phase#COUNCIL_MEETING}
    */
@@ -1469,7 +1472,8 @@ public class GameEngine implements Game<GameEngine> {
 
   /** Returns {@code true} if {@code seated} currently has an available Reform stack or Decree. */
   private boolean hasAnyProposalAvailable(SeatedAdvisor seated, Advisor advisor) {
-    return isDecreeAvailable(seated, advisor.decree()) || isReformAvailable(seated, advisor.reform());
+    return isDecreeAvailable(seated, advisor.decree())
+        || isReformAvailable(seated, advisor.reform());
   }
 
   /** Returns {@code true} if {@code seated} has not yet taken their Decree and it is available. */
@@ -1490,18 +1494,22 @@ public class GameEngine implements Game<GameEngine> {
   /**
    * Applies one stack of {@code reform} to {@code seated}: grants the benefit described by {@link
    * Reform#benefitType()}, then always drains {@link Reform#costResource()} on the advisor's own
-   * card by {@link Reform#costPerStack()} (a negative magnitude), then increments the stack counter.
+   * card by {@link Reform#costPerStack()} (a negative magnitude), then increments the stack
+   * counter.
    */
   private void applyReform(SeatedAdvisor seated, Reform reform) {
     switch (reform.benefitType()) {
       case CARD_EFFECT ->
           seated.setCard(
-              seated.getCard().withEffectBoostOrAdd(reform.benefitResource(), reform.benefitPerStack()));
+              seated
+                  .getCard()
+                  .withEffectBoostOrAdd(reform.benefitResource(), reform.benefitPerStack()));
       case FREE_REROLL -> seated.addBonusFreeRerolls((int) reform.benefitPerStack());
       case EXTRA_ADD_CANDIDATE -> seated.addBonusExtraAddCandidates((int) reform.benefitPerStack());
       case CROSS_TABLE_BOOST -> seated.addBonusCrossTableBoost(reform.benefitPerStack());
     }
-    seated.setCard(seated.getCard().withEffectBoostOrAdd(reform.costResource(), reform.costPerStack()));
+    seated.setCard(
+        seated.getCard().withEffectBoostOrAdd(reform.costResource(), reform.costPerStack()));
     seated.incrementReformStacksTaken();
   }
 
@@ -1510,7 +1518,9 @@ public class GameEngine implements Game<GameEngine> {
     switch (decree.type()) {
       case PASSIVE_BOOST ->
           seated.setCard(
-              seated.getCard().withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
+              seated
+                  .getCard()
+                  .withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
       case GREAT_WORK_BOOST -> {
         Card target = findCardOnBoard(decree.targetGreatWorkName());
         if (target != null) {
@@ -1567,7 +1577,8 @@ public class GameEngine implements Game<GameEngine> {
     return null;
   }
 
-  // ----- Cross-board lookup helpers (Council Decrees can target a card on any season's table) -----
+  // ----- Cross-board lookup helpers (Council Decrees can target a card on any season's table)
+  // -----
 
   /** Scans every season's table for a card named {@code name}, returning the first match found. */
   private Card findCardOnBoard(String name) {
@@ -1579,7 +1590,9 @@ public class GameEngine implements Game<GameEngine> {
     return null;
   }
 
-  /** Replaces {@code oldCard} with {@code newCard} on whichever season's table currently holds it. */
+  /**
+   * Replaces {@code oldCard} with {@code newCard} on whichever season's table currently holds it.
+   */
   private void replaceCardOnBoard(Card oldCard, Card newCard) {
     for (List<Card> table : state.getBoard().values()) {
       int idx = table.indexOf(oldCard);
@@ -1602,7 +1615,9 @@ public class GameEngine implements Game<GameEngine> {
     return total;
   }
 
-  /** Total extra ADD-phase offer candidates granted by every seated advisor's base trait + Reforms. */
+  /**
+   * Total extra ADD-phase offer candidates granted by every seated advisor's base trait + Reforms.
+   */
   private int seatedExtraAddCandidates() {
     int total = 0;
     for (SeatedAdvisor seated : state.getCouncil()) {

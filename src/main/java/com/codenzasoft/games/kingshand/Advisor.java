@@ -36,8 +36,8 @@ package com.codenzasoft.games.kingshand;
  * @param gate when this advisor becomes eligible to appear in the COUNCIL_ADD offer pool
  * @param reform the repeatable self-enhancement this advisor can propose; never {@code null}
  * @param decree the one-time civic project this advisor can propose; never {@code null}
- * @param crossTableBoostAmount base cross-table Production boost amount; 0 for every advisor
- *     except Brynn Ostlar
+ * @param crossTableBoostAmount base cross-table Production boost amount; 0 for every advisor except
+ *     Brynn Ostlar
  * @param freeRerollsWhileSeated base count of additional free ADD-phase rerolls while seated; 0 for
  *     every advisor except Maester Joric
  * @param extraAddCandidatesWhileSeated base count of additional ADD-phase offer candidates while

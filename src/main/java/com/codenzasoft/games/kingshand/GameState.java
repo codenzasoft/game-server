@@ -488,9 +488,14 @@ public class GameState {
     council.add(seated);
   }
 
-  /** Returns the seated advisor whose {@code advisorId} equals {@code advisorId}, or {@code null}. */
+  /**
+   * Returns the seated advisor whose {@code advisorId} equals {@code advisorId}, or {@code null}.
+   */
   public SeatedAdvisor findSeatedAdvisor(String advisorId) {
-    return council.stream().filter(s -> s.getAdvisorId().equals(advisorId)).findFirst().orElse(null);
+    return council.stream()
+        .filter(s -> s.getAdvisorId().equals(advisorId))
+        .findFirst()
+        .orElse(null);
   }
 
   /**
@@ -503,12 +508,13 @@ public class GameState {
   }
 
   public void setCouncilOfferChoices(List<Advisor> councilOfferChoices) {
-    this.councilOfferChoices = councilOfferChoices == null ? List.of() : List.copyOf(councilOfferChoices);
+    this.councilOfferChoices =
+        councilOfferChoices == null ? List.of() : List.copyOf(councilOfferChoices);
   }
 
   /**
-   * The single rotating Reform/Decree proposal for the current {@link Phase#COUNCIL_MEETING}
-   * phase, or {@code null} (omitted from JSON) if no seated advisor currently has anything left to
+   * The single rotating Reform/Decree proposal for the current {@link Phase#COUNCIL_MEETING} phase,
+   * or {@code null} (omitted from JSON) if no seated advisor currently has anything left to
    * propose.
    */
   @JsonProperty("currentProposal")
@@ -741,7 +747,9 @@ public class GameState {
 
     public Builder acceleratedGreatWorkNames(Set<String> acceleratedGreatWorkNames) {
       this.acceleratedGreatWorkNames =
-          acceleratedGreatWorkNames == null ? new HashSet<>() : new HashSet<>(acceleratedGreatWorkNames);
+          acceleratedGreatWorkNames == null
+              ? new HashSet<>()
+              : new HashSet<>(acceleratedGreatWorkNames);
       return this;
     }
 

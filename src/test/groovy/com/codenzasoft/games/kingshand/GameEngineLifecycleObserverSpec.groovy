@@ -21,7 +21,6 @@ class GameEngineLifecycleObserverSpec extends Specification {
                 .withId(UUID.randomUUID())
                 .withPlayer(TEST_PLAYER)
                 .withState(state)
-                .withEventCatalog(new EventCatalog([:]))
                 .withNotificationExecutor({ it.run() } as Executor)
         observers.each { builder.addLifecycleObserver(it) }
         builder.build()
@@ -66,17 +65,18 @@ class GameEngineLifecycleObserverSpec extends Specification {
         0 * observer.gameResumed(_)
     }
 
-    def "population dropping to zero via an event option fires gameOver"() {
+    def "population dropping to zero during end-of-season resolution fires gameOver"() {
         setup:
         def observer = Mock(GameLifecycleObserver)
-        def option = new EventOption("Plague", [ResourceTarget.POPULATION.integer(-5)])
+        def plague = new Card("Plague", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-5)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [plague])
                 .population(5.0).build()
         def engine = engineWith(state, observer)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         1 * observer.gameOver(engine)
@@ -85,14 +85,15 @@ class GameEngineLifecycleObserverSpec extends Specification {
     def "gameOver does not fire again once the game is already over"() {
         setup:
         def observer = Mock(GameLifecycleObserver)
-        def option = new EventOption("Aftermath", [ResourceTarget.POPULATION.integer(-1)])
+        def aftermath = new Card("Aftermath", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-1)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [aftermath])
                 .population(0.0).gameOver(true).build()
         def engine = engineWith(state, observer)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         0 * observer.gameOver(_)
@@ -177,7 +178,6 @@ class GameEngineLifecycleObserverSpec extends Specification {
                 .withId(UUID.randomUUID())
                 .withPlayer(TEST_PLAYER)
                 .withState(state)
-                .withEventCatalog(new EventCatalog([:]))
                 .withNotificationExecutor({ it.run() } as Executor)
                 .addListener(khObserver)
                 .addLifecycleObserver(lifecycleObserver)

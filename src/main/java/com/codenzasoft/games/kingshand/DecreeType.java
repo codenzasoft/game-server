@@ -17,7 +17,9 @@ public enum DecreeType {
    * received this acceleration once before.
    */
   GREAT_WORK_ACCELERATE,
-  /** Permanently grants additional free ADD-phase rerolls each season (unconditional, not tied to
-   *  this advisor remaining seated). */
+  /**
+   * Permanently grants additional free ADD-phase rerolls each season (unconditional, not tied to
+   * this advisor remaining seated).
+   */
   FREE_REROLL
 }

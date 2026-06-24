@@ -5,8 +5,8 @@ import spock.lang.Specification
 
 /**
  * Behavior tests for {@link GameEngine}: phase/season advancement, table mutations, season-trigger
- * pass, deck/draw/discard/hand pile mutations, and RANDOM_EVENT resolution (event rolling, option
- * effect application, year filtering, and winter magnitude scaling).
+ * pass, deck/draw/discard/hand pile mutations, and end-of-PLAY resolution (worker staffing,
+ * great-work construction, food consumption/starvation, and GAME_OVER triggers).
  *
  * <p>Pure-data invariants on {@link GameState} are covered by {@link GameStateSpec}.
  */
@@ -20,24 +20,12 @@ class GameEngineSpec extends Specification {
         new GameEngine(UUID.randomUUID(), TEST_PLAYER, state)
     }
 
-    private static GameEngine engine(GameState state, EventCatalog catalog) {
-        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, CardCatalog.defaultCatalog(), catalog, new Random())
-    }
-
-    private static GameEngine engine(GameState state, EventCatalog catalog, Random random) {
-        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, CardCatalog.defaultCatalog(), catalog, random)
-    }
-
     private static GameEngine engine(GameState state, CardCatalog catalog) {
-        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, catalog, EventCatalog.defaultCatalog(), new Random())
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, catalog, new Random())
     }
 
-    private static EventCatalog catalogWith(Season season, Event... events) {
-        new EventCatalog([(season): events.toList()])
-    }
-
-    private static Event simpleEvent(String id, Season season, int minYear, List<Effect> effects = []) {
-        new Event(id, season, minYear, id, [new EventOption("opt", effects)])
+    private static GameEngine engine(GameState state, CardCatalog catalog, Random random) {
+        new GameEngine(UUID.randomUUID(), TEST_PLAYER, state, catalog, random)
     }
 
     // ----- construction -----
@@ -109,20 +97,42 @@ class GameEngineSpec extends Specification {
         startSeason << [Season.SPRING, Season.SUMMER, Season.FALL]
     }
 
-    def "advancing the play phase advances both the season and the phase"() {
+    def "advancing the play phase outside winter (or before gold is unlocked) goes straight to ADD"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(Season.SPRING).build()
+        def state = GameState.builder().curPhase(Phase.PLAY).curSeason(startSeason).build()
         def engine = engine(state)
 
         when:
         engine.advancePhase()
 
         then:
-        state.curPhase == Phase.PLAY.next()
-        state.curSeason == Season.SUMMER
+        state.curPhase == Phase.ADD
+        state.curSeason == expectedSeason
+
+        where:
+        startSeason   || expectedSeason
+        Season.SPRING || Season.SUMMER
+        Season.SUMMER || Season.FALL
+        Season.FALL   || Season.WINTER
+        Season.WINTER || Season.SPRING   // gold not unlocked — council is skipped
     }
 
-    def "advancing a non-play phase does not change the season"() {
+    def "advancing the play phase after winter opens the council once gold is unlocked"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.WINTER)
+                .goldUnlocked(true).build()
+        def engine = engine(state)
+
+        when:
+        engine.advancePhase()
+
+        then:
+        state.curPhase == Phase.COUNCIL_ADD
+        state.curSeason == Season.SPRING
+    }
+
+    def "advancing a non-play phase is a no-op"() {
         setup:
         def state = GameState.builder().curPhase(startPhase).curSeason(Season.SPRING).build()
         def engine = engine(state)
@@ -131,11 +141,11 @@ class GameEngineSpec extends Specification {
         engine.advancePhase()
 
         then:
-        state.curPhase == startPhase.next()
+        state.curPhase == startPhase
         state.curSeason == Season.SPRING
 
         where:
-        startPhase << [Phase.ADD, Phase.RANDOM_EVENT]
+        startPhase << [Phase.ADD, Phase.COUNCIL_ADD, Phase.COUNCIL_MEETING]
     }
 
     // ----- season trigger pass -----
@@ -592,7 +602,7 @@ class GameEngineSpec extends Specification {
 
     def "offerAddChoices throws when phase is not ADD"() {
         setup:
-        def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).build()
+        def state = GameState.builder().curPhase(Phase.PLAY).build()
         def engine = engine(state)
 
         when:
@@ -604,7 +614,7 @@ class GameEngineSpec extends Specification {
 
     // ----- ADD phase: pickCard -----
 
-    def "pickCard shuffles the chosen card into the current season's draw pile"() {
+    def "pickCard shuffles the chosen card into the current season's draw pile or hand"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).build()
         def engine = engine(state)
@@ -614,10 +624,11 @@ class GameEngineSpec extends Specification {
         engine.pickCard(card)
 
         then:
-        state.drawPile.get(Season.SPRING).contains(card)
+        // startPlay() runs synchronously after pickCard and may draw the card straight into hand.
+        (state.drawPile.get(Season.SPRING) + state.hand).contains(card)
     }
 
-    def "pickCard advances the phase to RANDOM_EVENT"() {
+    def "pickCard advances the phase to PLAY"() {
         setup:
         def state = GameState.builder().curPhase(Phase.ADD).build()
         def engine = engine(state)
@@ -626,7 +637,7 @@ class GameEngineSpec extends Specification {
         engine.pickCard(CardCatalog.FARM)
 
         then:
-        state.curPhase == Phase.RANDOM_EVENT
+        state.curPhase == Phase.PLAY
     }
 
     def "pickCard clears addChoices and resets reroll count"() {
@@ -661,7 +672,7 @@ class GameEngineSpec extends Specification {
 
     // ----- ADD phase: skipAdd -----
 
-    def "skipAdd advances the phase to RANDOM_EVENT without adding a card"() {
+    def "skipAdd advances the phase to PLAY without adding a card"() {
         setup:
         def state = GameState.builder()
                 .curPhase(Phase.ADD)
@@ -673,7 +684,7 @@ class GameEngineSpec extends Specification {
         engine.skipAdd()
 
         then:
-        state.curPhase == Phase.RANDOM_EVENT
+        state.curPhase == Phase.PLAY
         state.drawPile.get(Season.SPRING).isEmpty()
         state.drawPile.get(Season.SUMMER).isEmpty()
         state.drawPile.get(Season.FALL).isEmpty()
@@ -709,294 +720,9 @@ class GameEngineSpec extends Specification {
         thrown(IllegalStateException)
     }
 
-    // ----- RANDOM_EVENT: event rolling -----
-
-    def "advancing to RANDOM_EVENT rolls an eligible event and stores it on the state"() {
-        setup:
-        def event = simpleEvent("spring.test", Season.SPRING, 1)
-        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(1).build()
-        def engine = engine(state, catalogWith(Season.SPRING, event))
-
-        when:
-        engine.advancePhase()   // ADD -> RANDOM_EVENT
-
-        then:
-        state.curPhase == Phase.RANDOM_EVENT
-        engine.currentEvent() == event
-    }
-
-    def "currentEvent returns null when no eligible events exist for the current year"() {
-        setup:
-        // event not eligible until year 5; state is at year 1
-        def event = simpleEvent("spring.late", Season.SPRING, 5)
-        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(1).build()
-        def engine = engine(state, catalogWith(Season.SPRING, event))
-
-        when:
-        engine.advancePhase()   // ADD -> RANDOM_EVENT
-
-        then:
-        engine.currentEvent() == null
-    }
-
-    def "year-filter: only events with minYear <= currentYear enter the roll pool"() {
-        setup:
-        def early = simpleEvent("spring.early", Season.SPRING, 1)
-        def late  = simpleEvent("spring.late",  Season.SPRING, 5)
-        // Use a seeded Random that always picks index 0; with a pool of [early] only early can appear
-        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.SPRING).year(3).build()
-        def engine = engine(state, new EventCatalog([(Season.SPRING): [early, late]]), new Random(0))
-
-        when:
-        engine.advancePhase()   // ADD -> RANDOM_EVENT
-
-        then:
-        // 'late' has minYear 5 so it must be excluded; only 'early' is in the pool
-        engine.currentEvent() == early
-    }
-
-    def "roll selects from all eligible events when multiple are in the pool"() {
-        setup:
-        def e1 = simpleEvent("w1", Season.WINTER, 1)
-        def e2 = simpleEvent("w2", Season.WINTER, 1)
-        def e3 = simpleEvent("w3", Season.WINTER, 1)
-        def state = GameState.builder().curPhase(Phase.ADD).curSeason(Season.WINTER).year(1).build()
-        // Run many times with different seeds and confirm every event can be selected
-        def catalog = new EventCatalog([(Season.WINTER): [e1, e2, e3]])
-        def seen = [] as Set
-
-        when:
-        (0..99).each { seed ->
-            def s = GameState.builder().curPhase(Phase.ADD).curSeason(Season.WINTER).year(1).build()
-            def eng = engine(s, catalog, new Random(seed))
-            eng.advancePhase()
-            seen << eng.currentEvent().id()
-        }
-
-        then:
-        seen.containsAll(["w1", "w2", "w3"])
-    }
-
-    // ----- RANDOM_EVENT: applyEventOption — normal effect application -----
-
-    def "applyEventOption applies a food bonus to state and advances to PLAY"() {
-        setup:
-        def option = new EventOption("Take food", [ResourceTarget.FOOD.integer(15)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1).food(50.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.food == 65.0
-        state.curPhase == Phase.PLAY
-    }
-
-    def "applyEventOption applies a production penalty to state"() {
-        setup:
-        // Summer year 2: scale = 1.0 + (2-1)*0.05 = 1.05; -10 * 1.05 = -10.5; 100 - 10.5 = 89.5
-        def option = new EventOption("Pay cost", [ResourceTarget.PRODUCTION.integer(-10)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(2).production(100.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.production == 89.5
-        state.curPhase == Phase.PLAY
-    }
-
-    def "applyEventOption applies multiple effects from one option"() {
-        setup:
-        def option = new EventOption(
-                "Plant aggressively",
-                [ResourceTarget.FOOD.integer(15), ResourceTarget.PRODUCTION.integer(-5)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
-                .food(50.0).production(100.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.food == 65.0
-        state.production == 95.0
-        state.curPhase == Phase.PLAY
-    }
-
-    def "applyEventOption with an empty effect list still advances to PLAY"() {
-        setup:
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(1).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(new EventOption("Do nothing", []))
-
-        then:
-        state.curPhase == Phase.PLAY
-        state.food       == 750.0  // unchanged
-        state.production == 1000.0 // unchanged
-        state.population == 100.0  // unchanged
-    }
-
-    def "applyEventOption throws when option is null"() {
-        setup:
-        def state = GameState.builder().curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(null)
-
-        then:
-        def e = thrown(IllegalArgumentException)
-        e.message == "option cannot be null"
-    }
-
-    def "applyEventOption throws when the player cannot afford the production cost"() {
-        setup:
-        // Production is 10; option costs -20 → would go to -10, which is unaffordable
-        def option = new EventOption("Expensive choice", [ResourceTarget.PRODUCTION.integer(-20)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
-                .production(10.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        thrown(IllegalStateException)
-        state.production == 10.0   // unchanged — no side-effects before the guard fires
-        state.curPhase == Phase.RANDOM_EVENT
-    }
-
-    def "applyEventOption affordability check accounts for winter year-scaling"() {
-        setup:
-        // Base cost -10, year 4 → scale = 2.0 → scaled cost -20; production 15 → would go to -5, unaffordable
-        def option = new EventOption("Winter cost", [ResourceTarget.PRODUCTION.integer(-10)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4)
-                .production(15.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        thrown(IllegalStateException)
-        state.production == 15.0   // unchanged
-        state.curPhase == Phase.RANDOM_EVENT
-    }
-
-    def "applyEventOption succeeds when production exactly covers the cost"() {
-        setup:
-        // Production 15 exactly matches the cost of -15 → result is 0, which is the boundary
-        def option = new EventOption("Exact cost", [ResourceTarget.PRODUCTION.integer(-15)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
-                .production(15.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.production == 0.0
-        state.curPhase == Phase.PLAY
-    }
-
-    // ----- RANDOM_EVENT: winter magnitude scaling (KH-6) -----
-
-    def "winter event effects are scaled by the current year"() {
-        setup:
-        // Base modifier is -10; at year 4 scale = 2.0 → applied delta = -20; 50 - 20 = 30
-        def option = new EventOption("Endure", [ResourceTarget.FOOD.integer(-10)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.food == 30.0   // 50 + (-10 * 2.0)
-        state.curPhase == Phase.PLAY
-    }
-
-    def "winter scaling applies to every resource target in the option"() {
-        setup:
-        def option = new EventOption(
-                "Slaughter livestock",
-                [ResourceTarget.FOOD.integer(10), ResourceTarget.PRODUCTION.integer(-10)])
-        // year 4: scale = 2.0 → food +20, production -20
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4)
-                .food(50.0).production(100.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.food       == 70.0   // 50  + (10  * 2.0)
-        state.production == 80.0   // 100 + (-10 * 2.0)
-    }
-
-    def "winter scaling at year 1 leaves the magnitude unchanged"() {
-        setup:
-        def option = new EventOption("Burn firewood", [ResourceTarget.PRODUCTION.integer(-5)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(1).production(100.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.production == 100.0 + (-5 * 1)   // 95.0
-    }
-
-    def "non-winter event effects use gentle 5%/year scaling"() {
-        setup:
-        // Summer year 5: scale = 1.0 + (5-1)*0.05 = 1.20; +10 * 1.20 = +12; 100 + 12 = 112
-        def option = new EventOption("Trade", [ResourceTarget.PRODUCTION.integer(10)])
-        def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SUMMER).year(5).production(100.0).build()
-        def engine = engine(state, new EventCatalog([:]))
-
-        when:
-        engine.applyEventOption(option)
-
-        then:
-        state.production == 112.0
-    }
-
-    def "year-scaling applies piecewise: non-winter gentle linear, winter accelerated"() {
-        setup:
-        def option = new EventOption("opt", [ResourceTarget.FOOD.integer(10)])
-
-        when: "fall year 4 — gentle linear: scale = 1.0 + 3*0.05 = 1.15; food = 50 + 10*1.15 = 61.5"
-        def fallState = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.FALL).year(4).food(50.0).build()
-        engine(fallState, new EventCatalog([:])).applyEventOption(option)
-
-        then:
-        fallState.food == 61.5
-
-        when: "winter year 4 — linear ramp: scale = 2.0; food = 50 + 10*2.0 = 70.0"
-        def winterState = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.WINTER).year(4).food(50.0).build()
-        engine(winterState, new EventCatalog([:])).applyEventOption(option)
-
-        then:
-        winterState.food == 70.0
-    }
+    // Note: COUNCIL_ADD/COUNCIL_MEETING (hireAdvisor/skipCouncilAdd/acceptCouncilProposal/
+    // passCouncilProposal) replaced the old RANDOM_EVENT system but have no dedicated test
+    // coverage yet — out of scope for this build fix.
 
     // ----- construction guard -----
 
@@ -1011,7 +737,7 @@ class GameEngineSpec extends Specification {
 
     def "constructing an engine with a null rng throws"() {
         when:
-        engine(GameState.newState(), new EventCatalog([:]), null)
+        engine(GameState.newState(), CardCatalog.defaultCatalog(), null)
 
         then:
         def e = thrown(IllegalArgumentException)
@@ -1203,7 +929,7 @@ class GameEngineSpec extends Specification {
     def "placeCard throws when the current phase is not PLAY"() {
         setup:
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT)
+                .curPhase(Phase.ADD)
                 .curSeason(Season.SPRING)
                 .hand([CardCatalog.FARM])
                 .build()
@@ -1517,7 +1243,7 @@ class GameEngineSpec extends Specification {
         e.message.contains("reorderTable")
 
         where:
-        phase << [Phase.ADD, Phase.RANDOM_EVENT]
+        phase << [Phase.ADD, Phase.COUNCIL_ADD, Phase.COUNCIL_MEETING]
     }
 
     def "reorderTable does not affect resources"() {
@@ -1678,7 +1404,7 @@ class GameEngineSpec extends Specification {
         e.message.contains("endAndRun")
 
         where:
-        phase << [Phase.ADD, Phase.RANDOM_EVENT]
+        phase << [Phase.ADD, Phase.COUNCIL_ADD, Phase.COUNCIL_MEETING]
     }
 
     // ----- PLAY phase: endAndRun — hand discard -----
@@ -1928,53 +1654,56 @@ class GameEngineSpec extends Specification {
 
     // ----- Game Over: population reaching zero -----
 
-    def "population dropping to exactly zero via an event option triggers GAME_OVER"() {
+    def "population dropping to exactly zero during end-of-season resolution triggers GAME_OVER"() {
         setup:
-        // pop=5, event -5 → raw 0.0 → GAME_OVER
-        def option = new EventOption("Plague", [ResourceTarget.POPULATION.integer(-5)])
+        // pop=5, card -5 → raw 0.0 → GAME_OVER
+        def plague = new Card("Plague", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-5)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [plague])
                 .population(5.0).build()
-        def engine = engine(state, new EventCatalog([:]))
+        def engine = engine(state)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         state.gameOver   == true
         state.population == 0.0
     }
 
-    def "population driven below zero by an event is clamped to zero and triggers GAME_OVER"() {
+    def "population driven below zero by a card is clamped to zero and triggers GAME_OVER"() {
         setup:
-        // pop=2, event -5 → raw -3 → clamped to 0
-        def option = new EventOption("Catastrophe", [ResourceTarget.POPULATION.integer(-5)])
+        // pop=2, card -5 → raw -3 → clamped to 0
+        def catastrophe = new Card("Catastrophe", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-5)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [catastrophe])
                 .population(2.0).build()
-        def engine = engine(state, new EventCatalog([:]))
+        def engine = engine(state)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         state.gameOver   == true
         state.population == 0.0
     }
 
-    def "GAME_OVER is not set when population stays above zero after an event"() {
+    def "GAME_OVER is not set when population stays above zero after resolution"() {
         setup:
-        def option = new EventOption("Minor loss", [ResourceTarget.POPULATION.integer(-2)])
+        def minorLoss = new Card("Minor loss", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-2)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [minorLoss])
                 .population(5.0).build()
-        def engine = engine(state, new EventCatalog([:]))
+        def engine = engine(state)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
-        state.curPhase   == Phase.PLAY   // normal transition
+        state.curPhase   == Phase.ADD   // normal transition: SPRING isn't WINTER, so PLAY -> ADD
         state.gameOver   == false
         state.population == 3.0
     }

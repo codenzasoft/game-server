@@ -147,8 +147,8 @@ public class KhController {
 
   /**
    * Accepts the current COUNCIL_MEETING proposal (a Reform or Decree from one seated advisor),
-   * applying its effect. Advances the phase to {@link
-   * com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
+   * applying its effect. Advances the phase to {@link com.codenzasoft.games.kingshand.Phase#ADD}
+   * and seeds the next ADD-phase offer.
    */
   @MessageMapping("/kh/{gameId}/council/accept")
   public void councilAccept(@DestinationVariable String gameId) {

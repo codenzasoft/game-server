@@ -3,10 +3,10 @@ package com.codenzasoft.games.kingshand;
 /**
  * The current phase of a King's Hand turn.
  *
- * <p>There is no generic {@code next()} cycle: {@code COUNCIL_ADD}/{@code COUNCIL_MEETING} are
- * only inserted once per year (after Winter's {@code PLAY} ends), and only once GOLD has been
- * unlocked, so the transition out of {@code PLAY} is conditional rather than a fixed rotation.
- * Every transition is instead made explicit at its call site in {@code GameEngine}:
+ * <p>There is no generic {@code next()} cycle: {@code COUNCIL_ADD}/{@code COUNCIL_MEETING} are only
+ * inserted once per year (after Winter's {@code PLAY} ends), and only once GOLD has been unlocked,
+ * so the transition out of {@code PLAY} is conditional rather than a fixed rotation. Every
+ * transition is instead made explicit at its call site in {@code GameEngine}:
  *
  * <ul>
  *   <li>{@code ADD} → {@code PLAY} via {@code pickCard}/{@code skipAdd}.

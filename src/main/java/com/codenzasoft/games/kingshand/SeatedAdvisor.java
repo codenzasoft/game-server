@@ -3,13 +3,13 @@ package com.codenzasoft.games.kingshand;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Runtime state for an {@link Advisor} who has actually been hired onto the council. Mutable (unlike
- * the static {@link Advisor} catalog entry it references by {@link #getAdvisorId()}) because Reforms
- * and Decrees permanently change it over the life of a run: {@link #getCard()} accumulates
- * boosted/added effects exactly the way a table card does via {@link Card#withEffectBoostOrAdd}, and
- * the three bonus counters track stacking improvements to the three meta-mechanic Specialties
- * (Joric's free rerolls, Varn's extra ADD candidates, Ostlar's cross-table boost amount) without ever
- * mutating the shared {@link Advisor} catalog constant.
+ * Runtime state for an {@link Advisor} who has actually been hired onto the council. Mutable
+ * (unlike the static {@link Advisor} catalog entry it references by {@link #getAdvisorId()})
+ * because Reforms and Decrees permanently change it over the life of a run: {@link #getCard()}
+ * accumulates boosted/added effects exactly the way a table card does via {@link
+ * Card#withEffectBoostOrAdd}, and the three bonus counters track stacking improvements to the three
+ * meta-mechanic Specialties (Joric's free rerolls, Varn's extra ADD candidates, Ostlar's
+ * cross-table boost amount) without ever mutating the shared {@link Advisor} catalog constant.
  */
 public class SeatedAdvisor {
 

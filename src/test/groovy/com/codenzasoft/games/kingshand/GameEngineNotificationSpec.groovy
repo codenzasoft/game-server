@@ -15,7 +15,6 @@ class GameEngineNotificationSpec extends Specification {
                 .withId(UUID.randomUUID())
                 .withPlayer(TEST_PLAYER)
                 .withState(state)
-                .withEventCatalog(new EventCatalog([:]))
                 .withNotificationExecutor({ it.run() } as Executor)
         listeners.each { builder.addListener(it) }
         builder.build()
@@ -47,17 +46,18 @@ class GameEngineNotificationSpec extends Specification {
         0 * listener.gameStarted(_, _)
     }
 
-    def "population dropping to zero via an event option fires gameOver"() {
+    def "population dropping to zero during end-of-season resolution fires gameOver"() {
         setup:
         def listener = Mock(KhObserver)
-        def option = new EventOption("Plague", [ResourceTarget.POPULATION.integer(-5)])
+        def plague = new Card("Plague", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-5)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [plague])
                 .population(5.0).build()
         def engine = engineWith(state, listener)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         1 * listener.gameOver(engine, state)
@@ -66,30 +66,32 @@ class GameEngineNotificationSpec extends Specification {
     def "gameOver does not fire again once the game is already over"() {
         setup:
         def listener = Mock(KhObserver)
-        def option = new EventOption("Aftermath", [ResourceTarget.POPULATION.integer(-1)])
+        def aftermath = new Card("Aftermath", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-1)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [aftermath])
                 .population(0.0).gameOver(true).build()
         def engine = engineWith(state, listener)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         0 * listener.gameOver(_, _)
     }
 
-    def "an event that leaves population above zero does not fire gameOver"() {
+    def "a resolution that leaves population above zero does not fire gameOver"() {
         setup:
         def listener = Mock(KhObserver)
-        def option = new EventOption("Minor loss", [ResourceTarget.POPULATION.integer(-2)])
+        def minorLoss = new Card("Minor loss", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-2)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [minorLoss])
                 .population(5.0).build()
         def engine = engineWith(state, listener)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         0 * listener.gameOver(_, _)
@@ -114,14 +116,15 @@ class GameEngineNotificationSpec extends Specification {
         setup:
         def listener1 = Mock(KhObserver)
         def listener2 = Mock(KhObserver)
-        def option = new EventOption("Plague", [ResourceTarget.POPULATION.integer(-5)])
+        def plague = new Card("Plague", 0, 0, FrequencyType.SINGLE, [ResourceTarget.POPULATION.integer(-5)])
         def state = GameState.builder()
-                .curPhase(Phase.RANDOM_EVENT).curSeason(Season.SPRING).year(1)
+                .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
+                .table(Season.SPRING, [plague])
                 .population(5.0).build()
         def engine = engineWith(state, listener1, listener2)
 
         when:
-        engine.applyEventOption(option)
+        engine.endAndRun()
 
         then:
         1 * listener1.gameOver(engine, state)

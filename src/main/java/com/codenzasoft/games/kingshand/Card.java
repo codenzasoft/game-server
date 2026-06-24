@@ -130,8 +130,8 @@ public record Card(
   }
 
   /**
-   * Returns a new {@link Card} with the modifier of every matching {@link ValueType#INTEGER}
-   * effect increased by {@code delta}, exactly like {@link #boostEffect}, except that if no effect
+   * Returns a new {@link Card} with the modifier of every matching {@link ValueType#INTEGER} effect
+   * increased by {@code delta}, exactly like {@link #boostEffect}, except that if no effect
    * targeting {@code resource} exists yet, a brand-new {@code INTEGER} effect of {@code delta} is
    * appended instead of being silently dropped.
    *
@@ -146,7 +146,8 @@ public record Card(
    */
   public Card withEffectBoostOrAdd(ResourceTarget resource, double delta) {
     boolean hasMatch =
-        effects.stream().anyMatch(e -> e.target() == resource && e.valueType() == ValueType.INTEGER);
+        effects.stream()
+            .anyMatch(e -> e.target() == resource && e.valueType() == ValueType.INTEGER);
     if (hasMatch) {
       return boostEffect(resource, delta);
     }
