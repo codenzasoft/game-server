@@ -53,6 +53,12 @@ public class HeartsBroadcastService implements HeartsListener {
     }
   }
 
+  /**
+   * Builds a player-specific {@link HeartsContext} for the given user. Only that player's hand is
+   * included; opponents' hands are never sent over the wire. The shared {@link HeartsState} omits
+   * all hand/deal/pass maps via {@code @JsonIgnore}, so only public information (tricks, scores,
+   * pass direction, game-over status) is serialized.
+   */
   public HeartsContext buildContext(
       final UserEntity user,
       final HeartsGame game,
