@@ -45,7 +45,7 @@ export interface AdvisorDisplayInfo {
   portraitPlaceholderId: string;
   /** Base count of additional free ADD-phase rerolls while seated — mirrors
    *  {@code Advisor.freeRerollsWhileSeated} on the server. 0 (omitted) for every advisor except
-   *  Maester Joric. See {@link seatedFreeRerollBonus}, which sums this across the whole council
+   *  Joric Wren. See {@link seatedFreeRerollBonus}, which sums this across the whole council
    *  to compute the ADD-phase reroll button's true cost. */
   freeRerollsWhileSeated?: number;
   reform: AdvisorReformInfo;
@@ -77,10 +77,10 @@ const UNKNOWN_ADVISOR: AdvisorDisplayInfo = {
 const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
   REEVE_ALDWIN: {
     displayName: "Reeve Aldwin",
-    title: "The Steward",
+    title: "The Overseer",
     specialtyDescription:
-      "+60 Production/season. The default first hire — competent, unglamorous, always useful.",
-    hiringCost: 60,
+      "Competent and unglamorous, Aldwin keeps the granaries running and the ledgers balanced without ever needing to be asked twice.",
+    hiringCost: 180,
     ringColor: "slate-grey",
     portraitPlaceholderId: "reeve_aldwin_placeholder",
     reform: {
@@ -88,9 +88,9 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.PRODUCTION,
-      benefitPerStack: 20,
+      benefitPerStack: 90,
       costResource: ResourceTarget.POPULATION,
-      costPerStack: -5,
+      costPerStack: -45,
     },
     decree: {
       name: "Found the Town Hall",
@@ -100,9 +100,10 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
   },
   MIRA_VOSS: {
     displayName: "Mira Voss",
-    title: "The Master of Coin",
-    specialtyDescription: "+15 Gold/season.",
-    hiringCost: 120,
+    title: "The Treasurer",
+    specialtyDescription:
+      "Sharp with numbers and sharper in a negotiation, Voss keeps the coffers fuller than anyone expects.",
+    hiringCost: 360,
     ringColor: "amber",
     portraitPlaceholderId: "mira_voss_placeholder",
     reform: {
@@ -110,24 +111,24 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.GOLD,
-      benefitPerStack: 10,
+      benefitPerStack: 38,
       costResource: ResourceTarget.POPULATION,
-      costPerStack: -8,
+      costPerStack: -38,
     },
     decree: {
       name: "Mint a Currency",
       type: DecreeType.GREAT_WORK_BOOST,
       targetGreatWorkName: "TREASURY",
       effectResource: ResourceTarget.GOLD,
-      effectAmount: 15,
+      effectAmount: 23,
     },
   },
   SIR_BRAM_HOLT: {
     displayName: "Sir Bram Holt",
     title: "The Lord Marshal",
     specialtyDescription:
-      "+25 Strength/season. Only appears in the offer pool once BARRACKS is completed.",
-    hiringCost: 200,
+      "A grizzled veteran who drills the garrison hard and trusts results over rank.",
+    hiringCost: 300,
     ringColor: "deep-red",
     portraitPlaceholderId: "sir_bram_holt_placeholder",
     reform: {
@@ -135,23 +136,24 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.STRENGTH,
-      benefitPerStack: 15,
+      benefitPerStack: 23,
       costResource: ResourceTarget.POPULATION,
-      costPerStack: -10,
+      costPerStack: -15,
     },
     decree: {
       name: "Drill the Garrison",
       type: DecreeType.GREAT_WORK_BOOST,
       targetGreatWorkName: "BARRACKS",
       effectResource: ResourceTarget.STRENGTH,
-      effectAmount: 20,
+      effectAmount: 30,
     },
   },
   OLD_YARROW: {
     displayName: "Old Yarrow",
     title: "The Court Physician",
-    specialtyDescription: "+80 Food/season.",
-    hiringCost: 70,
+    specialtyDescription:
+      "A blunt, no-nonsense healer who's seen every fever and famine the realm can offer, and still keeps the larders full.",
+    hiringCost: 105,
     ringColor: "green",
     portraitPlaceholderId: "old_yarrow_placeholder",
     reform: {
@@ -159,22 +161,22 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.FOOD,
-      benefitPerStack: 25,
+      benefitPerStack: 38,
       costResource: ResourceTarget.PRODUCTION,
-      costPerStack: -15,
+      costPerStack: -23,
     },
     decree: {
       name: "Found the Almshouse",
       type: DecreeType.POPULATION_CAP_BOOST,
-      effectAmount: 15,
+      effectAmount: 23,
     },
   },
   TOMAS_FERRO: {
     displayName: "Tomas Ferro",
     title: "The Master Engineer",
     specialtyDescription:
-      "+50 Production/season. Only appears once at least one Great Work has been commissioned.",
-    hiringCost: 110,
+      "A tireless tinkerer drawn to the scaffolding of any grand project, always certain the next design will be sturdier than the last.",
+    hiringCost: 165,
     ringColor: "slate-grey",
     portraitPlaceholderId: "tomas_ferro_placeholder",
     reform: {
@@ -182,9 +184,9 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.PRODUCTION,
-      benefitPerStack: 20,
+      benefitPerStack: 30,
       costResource: ResourceTarget.GOLD,
-      costPerStack: -10,
+      costPerStack: -15,
     },
     decree: {
       name: "Expedite Construction",
@@ -194,9 +196,10 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
   },
   LADY_ISEULT_VARN: {
     displayName: "Lady Iseult Varn",
-    title: "The Spymaster",
-    specialtyDescription: "Reveals one extra candidate in every ADD-phase offer while seated.",
-    hiringCost: 220,
+    title: "The Broker",
+    specialtyDescription:
+      "Keeps a network of informants that always turns up one more name worth considering when the court convenes.",
+    hiringCost: 330,
     ringColor: "violet",
     portraitPlaceholderId: "lady_iseult_varn_placeholder",
     reform: {
@@ -205,7 +208,7 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       benefitType: ReformBenefitType.EXTRA_ADD_CANDIDATE,
       benefitPerStack: 1,
       costResource: ResourceTarget.GOLD,
-      costPerStack: -15,
+      costPerStack: -23,
     },
     decree: {
       name: "Plant an Informant",
@@ -216,8 +219,9 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
   BROTHER_CASSIAN: {
     displayName: "Brother Cassian",
     title: "The High Chaplain",
-    specialtyDescription: "+6 Population/season.",
-    hiringCost: 90,
+    specialtyDescription:
+      "A gentle, steady presence who tends to the sick and newly born alike, and always seems to know just what to say.",
+    hiringCost: 135,
     ringColor: "dusty-blue",
     portraitPlaceholderId: "brother_cassian_placeholder",
     reform: {
@@ -225,23 +229,24 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.POPULATION,
-      benefitPerStack: 4,
+      benefitPerStack: 6,
       costResource: ResourceTarget.FOOD,
-      costPerStack: -40,
+      costPerStack: -60,
     },
     decree: {
       name: "Consecrate the Reservoir",
       type: DecreeType.GREAT_WORK_BOOST,
       targetGreatWorkName: "THE_GREAT_RESERVOIR",
       effectResource: ResourceTarget.FOOD,
-      effectAmount: 200,
+      effectAmount: 300,
     },
   },
   GARRICK_STONEBACK: {
     displayName: "Garrick Stoneback",
     title: "The Quarrymaster",
-    specialtyDescription: "+90 Production/season.",
-    hiringCost: 65,
+    specialtyDescription:
+      "Built like the stone he cuts, Stoneback has never met a vein of rock he couldn't crack open.",
+    hiringCost: 98,
     ringColor: "slate-grey",
     portraitPlaceholderId: "garrick_stoneback_placeholder",
     reform: {
@@ -249,22 +254,23 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.PRODUCTION,
-      benefitPerStack: 30,
+      benefitPerStack: 45,
       costResource: ResourceTarget.FOOD,
-      costPerStack: -20,
+      costPerStack: -30,
     },
     decree: {
       name: "Open the Royal Quarry",
       type: DecreeType.PASSIVE_BOOST,
       effectResource: ResourceTarget.PRODUCTION,
-      effectAmount: 35,
+      effectAmount: 53,
     },
   },
   DAME_PETRA_LYSK: {
     displayName: "Dame Petra Lysk",
     title: "The Harbor Mistress",
-    specialtyDescription: "+12 Gold/season. Only appears once THE_GREAT_ROAD has been commissioned.",
-    hiringCost: 130,
+    specialtyDescription:
+      "A shrewd negotiator who knows every merchant captain in port by name, and exactly how much they owe her.",
+    hiringCost: 195,
     ringColor: "amber",
     portraitPlaceholderId: "dame_petra_lysk_placeholder",
     reform: {
@@ -272,23 +278,24 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.GOLD,
-      benefitPerStack: 8,
+      benefitPerStack: 12,
       costResource: ResourceTarget.PRODUCTION,
-      costPerStack: -15,
+      costPerStack: -23,
     },
     decree: {
       name: "Charter the Trade Road",
       type: DecreeType.GREAT_WORK_BOOST,
       targetGreatWorkName: "THE_GREAT_ROAD",
       effectResource: ResourceTarget.GOLD,
-      effectAmount: 300,
+      effectAmount: 450,
     },
   },
   WENDEL_ASHGROVE: {
     displayName: "Wendel Ashgrove",
     title: "The Royal Forester",
-    specialtyDescription: "+70 Food/season.",
-    hiringCost: 60,
+    specialtyDescription:
+      "Knows every deer trail and berry patch in the royal wood, and never comes back empty-handed.",
+    hiringCost: 90,
     ringColor: "green",
     portraitPlaceholderId: "wendel_ashgrove_placeholder",
     reform: {
@@ -296,21 +303,22 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.FOOD,
-      benefitPerStack: 25,
+      benefitPerStack: 38,
       costResource: ResourceTarget.PRODUCTION,
-      costPerStack: -20,
+      costPerStack: -30,
     },
     decree: {
       name: "Settle the Old Groves",
       type: DecreeType.POPULATION_CAP_BOOST,
-      effectAmount: 40,
+      effectAmount: 60,
     },
   },
   MAESTER_JORIC: {
-    displayName: "Maester Joric",
+    displayName: "Joric Wren",
     title: "The Royal Archivist",
-    specialtyDescription: "The first reroll each season is free while he's seated.",
-    hiringCost: 140,
+    specialtyDescription:
+      "A meticulous record-keeper who's always already double-checked your decision before you've finished making it, and isn't shy about offering a free second opinion.",
+    hiringCost: 210,
     ringColor: "violet",
     portraitPlaceholderId: "maester_joric_placeholder",
     freeRerollsWhileSeated: 1,
@@ -320,44 +328,45 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       benefitType: ReformBenefitType.FREE_REROLL,
       benefitPerStack: 1,
       costResource: ResourceTarget.GOLD,
-      costPerStack: -20,
+      costPerStack: -30,
     },
     decree: {
       name: "Catalogue the Treasury",
       type: DecreeType.GREAT_WORK_BOOST,
       targetGreatWorkName: "TREASURY",
       effectResource: ResourceTarget.PRODUCTION,
-      effectAmount: 50,
+      effectAmount: 75,
     },
   },
   BRYNN_OSTLAR: {
     displayName: "Brynn Ostlar",
-    title: "The Master of Horse",
+    title: "The Stablemaster",
     specialtyDescription:
-      "Boosts the first Production-producing card on the active season's table by +10 each season.",
-    hiringCost: 210,
+      "Has an eye for good bloodlines and broken wagon wheels alike — whatever in the yard needs the most help, she's already there.",
+    hiringCost: 315,
     ringColor: "slate-grey",
     portraitPlaceholderId: "brynn_ostlar_placeholder",
     reform: {
       name: "Breed Finer Stock",
       maxStacks: 3,
       benefitType: ReformBenefitType.CROSS_TABLE_BOOST,
-      benefitPerStack: 5,
+      benefitPerStack: 8,
       costResource: ResourceTarget.FOOD,
-      costPerStack: -20,
+      costPerStack: -30,
     },
     decree: {
       name: "Build the Stables",
       type: DecreeType.PASSIVE_BOOST,
       effectResource: ResourceTarget.PRODUCTION,
-      effectAmount: 40,
+      effectAmount: 60,
     },
   },
   HEWETT_CRAY: {
     displayName: "Hewett Cray",
-    title: "The Master of Works",
-    specialtyDescription: "+55 Production/season.",
-    hiringCost: 100,
+    title: "The Foreman",
+    specialtyDescription:
+      "Runs every worksite like it's behind schedule, because in his mind, it always is.",
+    hiringCost: 150,
     ringColor: "slate-grey",
     portraitPlaceholderId: "hewett_cray_placeholder",
     reform: {
@@ -365,45 +374,46 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.PRODUCTION,
-      benefitPerStack: 20,
+      benefitPerStack: 30,
       costResource: ResourceTarget.GOLD,
-      costPerStack: -12,
+      costPerStack: -18,
     },
     decree: {
       name: "Raise New Wards",
       type: DecreeType.POPULATION_CAP_BOOST,
-      effectAmount: 75,
+      effectAmount: 113,
     },
   },
   CAPTAIN_YSEULT_MARROW: {
     displayName: "Captain Yseult Marrow",
-    title: "Captain of the Watch",
+    title: "Captain of the Guard",
     specialtyDescription:
-      "+50 Production/season. Available from the start of a run — the early-game counterpart to Sir Bram Holt.",
-    hiringCost: 85,
+      "Keeps the guard sharp and the work crews moving, often by little more than the threat of her glare.",
+    hiringCost: 128,
     ringColor: "slate-grey",
     portraitPlaceholderId: "captain_yseult_marrow_placeholder",
     reform: {
-      name: "Drill the Watch",
+      name: "Drill the Guard",
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.PRODUCTION,
-      benefitPerStack: 15,
+      benefitPerStack: 23,
       costResource: ResourceTarget.POPULATION,
-      costPerStack: -6,
+      costPerStack: -9,
     },
     decree: {
       name: "Walk the Walls",
       type: DecreeType.PASSIVE_BOOST,
       effectResource: ResourceTarget.PRODUCTION,
-      effectAmount: 30,
+      effectAmount: 45,
     },
   },
   MOTHER_BRASK: {
     displayName: "Mother Brask",
     title: "Keeper of the Hearth",
-    specialtyDescription: "+8 Population/season.",
-    hiringCost: 75,
+    specialtyDescription:
+      "Runs the household like a small kingdom of her own — fed, warm, and never short of advice nobody asked for.",
+    hiringCost: 113,
     ringColor: "dusty-blue",
     portraitPlaceholderId: "mother_brask_placeholder",
     reform: {
@@ -411,14 +421,14 @@ const ADVISOR_DISPLAY_CATALOG: Record<string, AdvisorDisplayInfo> = {
       maxStacks: 3,
       benefitType: ReformBenefitType.CARD_EFFECT,
       benefitResource: ResourceTarget.POPULATION,
-      benefitPerStack: 5,
+      benefitPerStack: 8,
       costResource: ResourceTarget.FOOD,
-      costPerStack: -45,
+      costPerStack: -68,
     },
     decree: {
       name: "Bless the Hearths",
       type: DecreeType.POPULATION_CAP_BOOST,
-      effectAmount: 50,
+      effectAmount: 75,
     },
   },
 };

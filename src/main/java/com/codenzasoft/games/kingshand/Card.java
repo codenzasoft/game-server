@@ -135,7 +135,7 @@ public record Card(
    * targeting {@code resource} exists yet, a brand-new {@code INTEGER} effect of {@code delta} is
    * appended instead of being silently dropped.
    *
-   * <p>Used by Reform/Decree resolution on advisor cards: some advisors (e.g. Maester Joric, Brynn
+   * <p>Used by Reform/Decree resolution on advisor cards: some advisors (e.g. Joric Wren, Brynn
    * Ostlar) start with an empty effects list because their base Specialty is meta-only, but a later
    * Decree can still grant them a plain resource effect (e.g. Ostlar's "Build the Stables" Decree
    * adds a Production boost where none existed before). {@link #boostEffect} alone can't express

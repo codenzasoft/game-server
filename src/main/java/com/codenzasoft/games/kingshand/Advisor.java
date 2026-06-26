@@ -15,7 +15,7 @@ package com.codenzasoft.games.kingshand;
  * own, so it's modeled via small dedicated fields instead of {@code baseCard} effects:
  *
  * <ul>
- *   <li>{@link #freeRerollsWhileSeated()} — Maester Joric (free ADD-phase rerolls while seated).
+ *   <li>{@link #freeRerollsWhileSeated()} — Joric Wren (free ADD-phase rerolls while seated).
  *   <li>{@link #extraAddCandidatesWhileSeated()} — Lady Iseult Varn (extra ADD-phase candidates
  *       while seated).
  *   <li>{@link #crossTableBoostAmount()} — Brynn Ostlar (permanently boosts the first
@@ -27,7 +27,7 @@ package com.codenzasoft.games.kingshand;
  * @param id stable catalog identifier, e.g. {@code "REEVE_ALDWIN"}; used as the {@code advisorId}
  *     key everywhere a seated advisor is referenced
  * @param displayName the advisor's full name, e.g. {@code "Reeve Aldwin"}
- * @param title the advisor's title, e.g. {@code "The Steward"}
+ * @param title the advisor's title, e.g. {@code "The Overseer"}
  * @param specialtyDescription human-readable summary of the Specialty, for client display
  * @param hiringCost one-time gold cost to seat this advisor (deducted at hire time)
  * @param baseCard the advisor's underlying card — carries the Specialty's RECURRING resource
@@ -39,7 +39,7 @@ package com.codenzasoft.games.kingshand;
  * @param crossTableBoostAmount base cross-table Production boost amount; 0 for every advisor except
  *     Brynn Ostlar
  * @param freeRerollsWhileSeated base count of additional free ADD-phase rerolls while seated; 0 for
- *     every advisor except Maester Joric
+ *     every advisor except Joric Wren
  * @param extraAddCandidatesWhileSeated base count of additional ADD-phase offer candidates while
  *     seated; 0 for every advisor except Lady Iseult Varn
  * @param ringColor art-direction ring-color key from the design doc (e.g. {@code "slate-grey"}),
