@@ -246,6 +246,17 @@ export class CouncilScene {
     const reformDone = seated.reformStacksTaken >= info.reform.maxStacks;
     const dismissCost = Math.round(info.hiringCost * ADVISOR_DISMISSAL_COST_RATE);
     const canAffordDismissal = state.gold >= dismissCost;
+    // Render the advisor's *live* card effects rather than trusting the static catalog
+    // description alone: accepted Reforms/Decrees permanently boost (or add to) this card via
+    // GameEngine#withEffectBoostOrAdd, so info.specialtyDescription's baked-in number goes stale
+    // the moment a proposal is accepted, even though the PLAY-phase resolution already applies
+    // the correct boosted value.
+    const effectsHTML = seated.card.effects
+      .map((e) => {
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+      })
+      .join("");
     return `
       <div class="kh-cs-seat" data-advisor-id="${seated.advisorId}">
         ${buildPortraitPlaceholder(info.ringColor, 56)}
@@ -260,6 +271,10 @@ export class CouncilScene {
         <div class="kh-cs-seat-tooltip">
           <div class="kh-cs-seat-tt-name">${info.displayName} — ${info.title}</div>
           <div class="kh-cs-seat-tt-desc">${info.specialtyDescription}</div>
+          ${effectsHTML ? `
+          <div class="kh-cs-seat-tt-effects-label">Currently grants</div>
+          <div class="kh-cs-seat-tt-effects">${effectsHTML}</div>
+          ` : ""}
           <div class="kh-cs-seat-tt-footer">
             <button class="kh-cs-btn-letgo" data-advisor-id="${seated.advisorId}" ${canAffordDismissal ? "" : "disabled"}>
               👋 Let Go <span class="kh-cs-letgo-cost">💰 ${dismissCost}</span>
@@ -299,7 +314,7 @@ export class CouncilScene {
       <div class="kh-cs-prompt">
         <div class="kh-cs-prompt-label">The Council Convenes</div>
         <h2 class="kh-cs-prompt-title">Hire an advisor, or hold your gold</h2>
-        <p class="kh-cs-prompt-sub">Hiring costs Gold immediately. Advisors bypass worker staffing and act every season automatically.</p>
+        <p class="kh-cs-prompt-sub">Hiring costs Gold immediately — once seated, an advisor acts every season automatically.</p>
       </div>
       ${banner}
       ${body}
@@ -760,6 +775,18 @@ export class CouncilScene {
         line-height: 1.4;
         color: #d4c090;
         margin-bottom: 10px;
+      }
+      .kh-cs-seat-tt-effects-label {
+        font-size: .72rem;
+        color: #9a8860;
+        margin-top: -4px;
+        margin-bottom: 5px;
+      }
+      .kh-cs-seat-tt-effects {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 8px;
       }
       .kh-cs-seat-tt-footer { border-top: 1px dashed rgba(196,160,96,.3); padding-top: 10px; }
       .kh-cs-btn-letgo {

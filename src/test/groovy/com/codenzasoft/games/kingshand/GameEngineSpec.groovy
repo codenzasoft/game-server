@@ -2268,6 +2268,128 @@ class GameEngineSpec extends Specification {
         state.board.get(Season.FALL)[0].name() == "BARRACKS"
     }
 
+    // ----- scheduled raids: unlock-triggered scheduling, telegraph, resolve (repel/fail), escalation -----
+
+    def "completing BARRACKS's construction schedules the first raid for the following year"() {
+        setup:
+        def almostDone = CardCatalog.BARRACKS_CONSTRUCTION.withConstructionPeriod(1)
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(150.0).production(500.0).food(500.0)
+                .table(Season.FALL, [almostDone])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // default year is 1; the raid is scheduled RAID_SCHEDULE_DELAY_YEARS (1) later
+        state.nextRaidYear == 2
+        state.raidCount == 0
+    }
+
+    def "resolveThreats is a no-op while no raid has been scheduled"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .population(50.0).food(50.0)
+                .strength(500.0).strengthUnlocked(true)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.threatLog.isEmpty()
+        state.strength == 500.0
+        state.nextRaidYear == 0
+        state.raidCount == 0
+    }
+
+    def "a scheduled raid telegraphs a warning in SUMMER of its raid year, with no resource change yet"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
+                .year(5).nextRaidYear(5).raidCount(0)
+                .population(100.0).food(100.0)
+                .strength(200.0).strengthUnlocked(true)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // base threshold 150 + 0 prior raids x 100
+        state.threatLog == ["RAID_WARNING:150"]
+        state.strength == 200.0
+        state.nextRaidYear == 5
+        state.raidCount == 0
+    }
+
+    def "a scheduled raid resolved in FALL is repelled when Strength meets the threshold, consuming it and rescheduling the next raid"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .year(5).nextRaidYear(5).raidCount(0)
+                .population(100.0).food(100.0)
+                .strength(200.0).strengthUnlocked(true)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.threatLog == ["RAID_REPELLED:150"]
+        state.strength == 50.0          // 200 - 150 threshold
+        state.nextRaidYear == 7         // 5 + RAID_INTERVAL_YEARS (2)
+        state.raidCount == 1
+    }
+
+    def "a scheduled raid resolved in FALL fails when Strength is below the threshold, wiping Strength and costing Population/Production"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.FALL)
+                .year(5).nextRaidYear(5).raidCount(0)
+                .population(100.0).production(400.0).food(100.0)
+                .strength(100.0).strengthUnlocked(true)   // below the 150 threshold
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // popLoss = floor(100 x 0.15) = 15, prodLoss = floor(400 x 0.25) = 100
+        state.threatLog == ["RAID_FAILED:POP:-15:PROD:-100"]
+        state.strength == 0.0
+        state.population == 85.0
+        state.production == 300.0
+        state.nextRaidYear == 7         // 5 + RAID_INTERVAL_YEARS (2)
+        state.raidCount == 1
+    }
+
+    def "the raid Strength threshold escalates by 100 per prior raid"() {
+        setup:
+        def state = GameState.builder()
+                .curPhase(Phase.PLAY).curSeason(Season.SUMMER)
+                .year(3).nextRaidYear(3).raidCount(2)
+                .population(50.0).food(50.0)
+                .strength(1000.0).strengthUnlocked(true)
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        // 150 base + 2 prior raids x 100 = 350
+        state.threatLog == ["RAID_WARNING:350"]
+    }
+
     def "completing the fourth and final win-condition Great Work sets gameWon to true"() {
         setup:
         def almostDone = CardCatalog.THE_GREAT_CONQUEST_CONSTRUCTION.withConstructionPeriod(1)

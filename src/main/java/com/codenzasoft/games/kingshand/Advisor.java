@@ -7,9 +7,9 @@ package com.codenzasoft.games.kingshand;
  * on {@link SeatedAdvisor}.
  *
  * <p>Most advisors' Specialty is a plain RECURRING effect on {@link #baseCard()} that fires
- * automatically every season once seated — advisors deliberately bypass the table worker-staffing
- * system (see {@code GameEngine}'s council resolution step): their "cost" is the upfront {@link
- * #hiringCost()} gold fee, not population staffing.
+ * automatically every season once seated — a seated advisor's card effects always resolve in full
+ * and are never subject to the table's {@code StaffingTier} degradation, and seating an advisor
+ * costs nothing beyond the upfront {@link #hiringCost()} gold fee paid at hire time.
  *
  * <p>Three advisors have a Specialty that the plain resource-effect system can't express on its
  * own, so it's modeled via small dedicated fields instead of {@code baseCard} effects:

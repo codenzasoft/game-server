@@ -67,6 +67,17 @@ public class GameState {
   // names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree;
   // prevents that Decree from being used more than once on the same distinct Great Work
   private Set<String> acceleratedGreatWorkNames;
+  // ----- Threats / Raids -----
+  // year of the next scheduled raid telegraph/resolution; 0 means no raid is currently scheduled.
+  // Set once, the first time STRENGTH unlocks (see GameEngine's raid-scheduling helper) — raids
+  // never begin before the player has any means of defending against them.
+  private int nextRaidYear;
+  // number of raids that have already resolved (success or failure); used to escalate the
+  // Strength threshold required to repel each subsequent raid
+  private int raidCount;
+  // events emitted during the most recent endAndRun relating to raids (e.g. "RAID_WARNING:150",
+  // "RAID_REPELLED:150", "RAID_FAILED:POP:-12:PROD:-180"); empty between seasons
+  private List<String> threatLog;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -94,6 +105,9 @@ public class GameState {
     this.currentProposal = b.currentProposal;
     this.permanentFreeRerolls = b.permanentFreeRerolls;
     this.acceleratedGreatWorkNames = b.acceleratedGreatWorkNames;
+    this.nextRaidYear = b.nextRaidYear;
+    this.raidCount = b.raidCount;
+    this.threatLog = b.threatLog;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -568,6 +582,52 @@ public class GameState {
     acceleratedGreatWorkNames.add(greatWorkName);
   }
 
+  /**
+   * Year of the next scheduled raid telegraph/resolution. {@code 0} means no raid is currently
+   * scheduled — true until STRENGTH unlocks, at which point {@code GameEngine} sets this exactly
+   * once and then advances it after each raid resolves.
+   */
+  @JsonProperty("nextRaidYear")
+  public int getNextRaidYear() {
+    return nextRaidYear;
+  }
+
+  public void setNextRaidYear(int nextRaidYear) {
+    this.nextRaidYear = nextRaidYear;
+  }
+
+  /**
+   * Number of raids that have already resolved (repelled or not). Used by {@code GameEngine} to
+   * escalate the Strength threshold required to repel each subsequent raid.
+   */
+  @JsonProperty("raidCount")
+  public int getRaidCount() {
+    return raidCount;
+  }
+
+  public void setRaidCount(int raidCount) {
+    this.raidCount = raidCount;
+  }
+
+  public void incrementRaidCount() {
+    this.raidCount++;
+  }
+
+  /**
+   * Events emitted during the most recent {@link Phase#PLAY} resolution relating to scheduled raids
+   * (e.g. {@code "RAID_WARNING:150"}, {@code "RAID_REPELLED:150"}, {@code
+   * "RAID_FAILED:POP:-12:PROD:-180"}). Empty between seasons. Cleared at the start of each {@code
+   * endAndRun}, mirroring {@link #getGreatWorkLog()}.
+   */
+  @JsonProperty("threatLog")
+  public List<String> getThreatLog() {
+    return threatLog == null ? List.of() : threatLog;
+  }
+
+  public void setThreatLog(List<String> log) {
+    this.threatLog = log == null ? List.of() : List.copyOf(log);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -601,6 +661,9 @@ public class GameState {
     private CouncilProposal currentProposal = null;
     private int permanentFreeRerolls = 0;
     private Set<String> acceleratedGreatWorkNames = new HashSet<>();
+    private int nextRaidYear = 0;
+    private int raidCount = 0;
+    private List<String> threatLog = List.of();
 
     // fill similar data types with seasons
     private Builder() {
@@ -759,6 +822,21 @@ public class GameState {
           acceleratedGreatWorkNames == null
               ? new HashSet<>()
               : new HashSet<>(acceleratedGreatWorkNames);
+      return this;
+    }
+
+    public Builder nextRaidYear(int nextRaidYear) {
+      this.nextRaidYear = nextRaidYear;
+      return this;
+    }
+
+    public Builder raidCount(int raidCount) {
+      this.raidCount = raidCount;
+      return this;
+    }
+
+    public Builder threatLog(List<String> threatLog) {
+      this.threatLog = threatLog == null ? List.of() : new ArrayList<>(threatLog);
       return this;
     }
 

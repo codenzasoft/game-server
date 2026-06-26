@@ -391,12 +391,27 @@ export class PlayPhaseScene {
 
   private buildAdvisorSeat(seated: SeatedAdvisor): string {
     const info = getAdvisorDisplayInfo(seated.advisorId);
+    // Render the advisor's *live* card effects rather than trusting the static catalog
+    // description alone: Reforms/Decrees permanently boost (or add to) this card via
+    // GameEngine#withEffectBoostOrAdd, so info.specialtyDescription's baked-in number goes
+    // stale the moment a proposal is accepted, even though resolution already applies the
+    // correct boosted value (see the resource indicators spawned during animateFromResolutionLog).
+    const effectsHTML = seated.card.effects
+      .map((e) => {
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+      })
+      .join("");
     return `
       <div class="kh-play-advisor-seat" data-advisor-id="${seated.advisorId}">
         ${buildPortraitPlaceholder(info.ringColor, 48)}
         <div class="kh-play-advisor-tooltip">
           <div class="kh-play-advisor-tt-name">${info.displayName} — ${info.title}</div>
           <div class="kh-play-advisor-tt-desc">${info.specialtyDescription}</div>
+          ${effectsHTML ? `
+          <div class="kh-play-advisor-tt-effects-label">Currently grants</div>
+          <div class="kh-play-advisor-tt-effects">${effectsHTML}</div>
+          ` : ""}
         </div>
       </div>
     `;
@@ -1206,6 +1221,54 @@ export class PlayPhaseScene {
 
       await this.delay(1500);
     }
+
+    // ── Step through threat/raid events ────────────────────────────────────
+    // Mirrors GameEngine.resolveThreats()'s threatLog entries: "RAID_WARNING:<threshold>"
+    // (telegraph, no resource change yet), "RAID_REPELLED:<threshold>" (Strength spent to
+    // defend), and "RAID_FAILED:POP:-<n>:PROD:-<n>" (Strength wiped, Population/Production lost).
+    for (const entry of newState.threatLog) {
+      const parts = entry.split(":");
+      const kind = parts[0];
+
+      if (kind === "RAID_WARNING") {
+        const threshold = Number(parts[1]);
+        this.showToast(`⚔️ Raiders sighted — muster ${threshold} Strength by next season!`);
+        await this.delay(1800);
+        continue;
+      }
+
+      if (kind === "RAID_REPELLED") {
+        const threshold = Number(parts[1]);
+        const prevStrength = simStrength;
+        simStrength = Math.max(0, simStrength - threshold);
+        updateBar(simPop, simProd, simFood, simGold, simStrength,
+          { pop: false, prod: false, food: false, gold: false, strength: true });
+        const els = this.resEls();
+        if (els.strength) spawnResourceIndicator(els.strength, simStrength - prevStrength, "⚔️", 0);
+        this.showToast("🛡️ The raiders are repelled!");
+        await this.delay(1800);
+        continue;
+      }
+
+      if (kind === "RAID_FAILED") {
+        // parts: ["RAID_FAILED", "POP", "-<n>", "PROD", "-<n>"] — losses are already negative.
+        const popLoss  = Number(parts[2]);
+        const prodLoss = Number(parts[4]);
+        const prevStrength = simStrength;
+        simStrength = 0;
+        simPop  = Math.max(0, simPop + popLoss);
+        simProd = Math.max(0, simProd + prodLoss);
+        updateBar(simPop, simProd, simFood, simGold, simStrength,
+          { pop: true, prod: true, food: false, gold: false, strength: true });
+        const els = this.resEls();
+        if (els.strength) spawnResourceIndicator(els.strength, simStrength - prevStrength, "⚔️", 0);
+        if (els.pop)      spawnResourceIndicator(els.pop,      popLoss,  "👥", 1);
+        if (els.prod)     spawnResourceIndicator(els.prod,     prodLoss, "⚒️", 2);
+        this.showToast("🔥 The raiders broke through! Strength is shattered, Population and Production fall.");
+        await this.delay(2200);
+        continue;
+      }
+    }
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────
@@ -1424,6 +1487,17 @@ export class PlayPhaseScene {
         font-size: .8rem;
         line-height: 1.4;
         color: #d4c090;
+      }
+      .kh-play-advisor-tt-effects-label {
+        font-size: .68rem;
+        color: #9a8860;
+        margin-top: 7px;
+        margin-bottom: 4px;
+      }
+      .kh-play-advisor-tt-effects {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
       }
 
       /* ── Scene body ──────────────────────────────────────────────────── */
