@@ -4,6 +4,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.validation.PasswordValidator;
+import com.codenzasoft.games.spring.validation.UsernameValidator;
 import com.codenzasoft.games.spring.views.ViewHelper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
@@ -70,6 +71,11 @@ public class ProfileController {
       return "redirect:/profile";
     }
     if (!trimmedUserName.equals(user.getUsername())) {
+      final UsernameValidator.Result usernameResult = UsernameValidator.validate(trimmedUserName);
+      if (!usernameResult.isValid()) {
+        redirectAttrs.addFlashAttribute("error", usernameResult.getErrorMessage());
+        return "redirect:/profile";
+      }
       final UserEntity takenBy = usersRepository.findByUserName(trimmedUserName);
       if (takenBy != null && !takenBy.getId().equals(user.getId())) {
         redirectAttrs.addFlashAttribute(
