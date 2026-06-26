@@ -212,6 +212,11 @@ export class HeartsGameHandler {
   // Pass selection state (cleared on each new message when not required)
   private selectedPassCards: Card[] = [];
 
+  // Cards the player has submitted for passing; kept non-empty until the
+  // receive animation completes so renderHand can exclude them from display
+  // and maybeAnimatePassReceived knows the fly-away phase already ran.
+  private passedCards: Card[] = [];
+
   // HTML overlay for pass button
   private passOverlay: HTMLDivElement | null = null;
 
@@ -433,6 +438,7 @@ export class HeartsGameHandler {
 
   private sendPass() {
     if (this.selectedPassCards.length !== 3) return;
+    this.passedCards = [...this.selectedPassCards];
     this.stompClient.publish({
       destination: `/games/hearts/${this.gameId}/pass`,
       body: JSON.stringify({ cards: this.selectedPassCards }),
@@ -514,15 +520,38 @@ export class HeartsGameHandler {
 
     await this.maybeAnimateDeal(prevMessage, message);
     await this.maybeAnimateTrickWon(prevMessage, message);
+    await this.maybeAnimatePassSent(prevMessage, message);
     await this.maybeAnimatePassReceived(prevMessage, message);
 
     this.clearScene();
-    this.renderScoreTable(context, state);
 
     if (state.over || state.quit) {
+      // If the last trick completed in this same message (4th card + game-over
+      // arrived together), renderTrick was never called for it — show and
+      // animate it now before revealing the game-over screen.
+      const round = state.rounds[state.rounds.length - 1];
+      const lastTrick = round?.tricks[round.tricks.length - 1];
+      const prevRound = prevMessage?.state.rounds[prevMessage.state.rounds.length - 1];
+      const prevCount =
+        prevRound?.tricks.find((t) => t.number === lastTrick?.number)
+          ?.playedCards.length ?? 0;
+      if (lastTrick?.winner && prevCount < 4) {
+        await this.renderTrick(context, state, round!, prevMessage);
+        const winner = lastTrick.winner.player;
+        const myIdx = state.players.indexOf(context.player);
+        const winnerIdx = state.players.indexOf(winner);
+        const dirs = ["S", "W", "N", "E"] as const;
+        await this.animateTrickWon(dirs[(winnerIdx - myIdx + 4) % 4]);
+        this.clearScene();
+      }
+      // Render score table only after any trick animation so the game-over
+      // score overlay doesn't appear on top of the last trick.
+      this.renderScoreTable(context, state);
       this.renderGameOver(context, state);
       return;
     }
+
+    this.renderScoreTable(context, state);
 
     if (state.rounds.length === 0) {
       this.renderStatus("Starting game...");
@@ -914,9 +943,13 @@ export class HeartsGameHandler {
     // Skip if the current message still shows the same complete trick — the
     // server emits separate card-played and trick-ended broadcasts that both
     // carry the same 4-card state; only animate on the transition away from it.
+    // Exception: when the game is over we are genuinely transitioning away from
+    // the last trick, so the animation must run even if the trick data is unchanged.
+    const gameOver = message.state.over || message.state.quit;
     const curRound = message.state.rounds[message.state.rounds.length - 1];
     const curTrick = curRound?.tricks[curRound.tricks.length - 1];
     if (
+      !gameOver &&
       curTrick?.number === prevTrick.number &&
       curTrick?.playedCards.length === 4
     )
@@ -999,7 +1032,85 @@ export class HeartsGameHandler {
     banner.destroy();
   }
 
-  // ── Pass received animation ───────────────────────────────────────────────
+  // ── Pass sent animation (fly-away) ───────────────────────────────────────
+
+  // Fires when the player's own pass submission is acknowledged: passingRequired
+  // flips false but passComplete is still false (opponents haven't passed yet).
+  // Plays the fly-away phase immediately so the player sees 10 cards while waiting.
+  private async maybeAnimatePassSent(
+    prevMessage: HeartsMessage | null,
+    message: HeartsMessage,
+  ): Promise<void> {
+    if (!prevMessage || this.passedCards.length === 0) return;
+    const curRound = message.state.rounds[message.state.rounds.length - 1];
+    if (!curRound || curRound.passComplete || curRound.pass === Pass.KEEPER) return;
+    if (!prevMessage.context.passingRequired || message.context.passingRequired) return;
+
+    await this.animatePassSent(message.context, message.state, curRound);
+  }
+
+  private async animatePassSent(
+    context: HeartsContext,
+    state: HeartsState,
+    round: RoundState,
+  ): Promise<void> {
+    const sw = this.app.screen.width;
+    const sh = this.app.screen.height;
+    const cw = this.cardW;
+    const ch = this.cardH;
+    const spacing = cw + 12;
+    const showY = sh - ch * 2.5 - 40;
+    const cx = sw / 2;
+
+    const passTarget: Record<Pass, [number, number]> = {
+      [Pass.LEFT]: [-cw * 2, sh / 2 - ch / 2],
+      [Pass.RIGHT]: [sw + cw, sh / 2 - ch / 2],
+      [Pass.ACROSS]: [sw / 2 - cw / 2, -ch * 2],
+      [Pass.KEEPER]: [sw / 2, sh / 2],
+    };
+    const [toX, toY] = passTarget[round.pass];
+
+    const passedSet = new Set(this.passedCards.map((c) => cardKey(c.suit, c.rank)));
+    const staying = context.hand.filter((c) => !passedSet.has(cardKey(c.suit, c.rank)));
+
+    this.clearScene();
+    this.renderScoreTable(context, state);
+    this.renderStatus(this.buildStatusText(context, state, round));
+    this.renderOpponents(context, state);
+    const handContainer = this.renderStaticHand(staying);
+
+    const passContainer = new Container();
+    passContainer.filters = [
+      new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
+    ];
+    this.app.stage.addChild(passContainer);
+
+    const passedSprites = this.passedCards.map((card, i) => {
+      const sprite = new Sprite(this.getTexture(card)!);
+      sprite.width = cw;
+      sprite.height = ch;
+      sprite.x = cx + (i - (this.passedCards.length - 1) / 2) * spacing - cw / 2;
+      sprite.y = showY;
+      passContainer.addChild(sprite);
+      return sprite;
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 450));
+
+    playPassSound();
+    await Promise.all(
+      passedSprites.map((sprite) =>
+        this.animateCard(sprite, sprite.x, sprite.y, toX, toY, 320),
+      ),
+    );
+
+    this.app.stage.removeChild(passContainer);
+    passContainer.destroy({ children: true });
+    this.app.stage.removeChild(handContainer);
+    handContainer.destroy({ children: true });
+  }
+
+  // ── Pass received animation (fly-in) ─────────────────────────────────────
 
   private async maybeAnimatePassReceived(
     prevMessage: HeartsMessage | null,
@@ -1045,6 +1156,9 @@ export class HeartsGameHandler {
     );
     if (received.length === 0) return;
 
+    // If the fly-away already ran in maybeAnimatePassSent, skip Phase 1.
+    const skipFlyaway = this.passedCards.length > 0;
+
     await this.animatePassReceived(
       passed,
       received,
@@ -1052,7 +1166,10 @@ export class HeartsGameHandler {
       curRound.pass,
       message.context,
       message.state,
+      skipFlyaway,
     );
+
+    this.passedCards = [];
   }
 
   private async animatePassReceived(
@@ -1062,6 +1179,7 @@ export class HeartsGameHandler {
     pass: Pass,
     context: HeartsContext,
     state: HeartsState,
+    skipFlyaway = false,
   ): Promise<void> {
     const sw = this.app.screen.width;
     const sh = this.app.screen.height;
@@ -1097,35 +1215,36 @@ export class HeartsGameHandler {
     this.renderOpponents(context, state);
     const handContainer = this.renderStaticHand(staying);
 
-    // Phase 1 — show the 3 passed cards above the hand, then fly them out
-    const passContainer = new Container();
-    passContainer.filters = [
-      new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
-    ];
-    this.app.stage.addChild(passContainer);
+    if (!skipFlyaway) {
+      // Phase 1 — show the 3 passed cards above the hand, then fly them out.
+      // Skipped when maybeAnimatePassSent already ran the fly-away earlier.
+      const passContainer = new Container();
+      passContainer.filters = [
+        new DropShadowFilter({ alpha: 0.6, blur: 4, distance: 5, padding: 20 }),
+      ];
+      this.app.stage.addChild(passContainer);
 
-    const passedSprites = passed.map((card, i) => {
-      const sprite = new Sprite(this.getTexture(card)!);
-      sprite.width = cw;
-      sprite.height = ch;
-      sprite.x = cx + (i - (passed.length - 1) / 2) * spacing - cw / 2;
-      sprite.y = showY;
-      passContainer.addChild(sprite);
-      return sprite;
-    });
+      const passedSprites = passed.map((card, i) => {
+        const sprite = new Sprite(this.getTexture(card)!);
+        sprite.width = cw;
+        sprite.height = ch;
+        sprite.x = cx + (i - (passed.length - 1) / 2) * spacing - cw / 2;
+        sprite.y = showY;
+        passContainer.addChild(sprite);
+        return sprite;
+      });
 
-    // Brief pause: player sees which cards are leaving
-    await new Promise<void>((resolve) => setTimeout(resolve, 450));
+      await new Promise<void>((resolve) => setTimeout(resolve, 450));
 
-    // Fly passed cards out
-    playPassSound();
-    await Promise.all(
-      passedSprites.map((sprite) =>
-        this.animateCard(sprite, sprite.x, sprite.y, toX, toY, 320),
-      ),
-    );
-    this.app.stage.removeChild(passContainer);
-    passContainer.destroy({ children: true });
+      playPassSound();
+      await Promise.all(
+        passedSprites.map((sprite) =>
+          this.animateCard(sprite, sprite.x, sprite.y, toX, toY, 320),
+        ),
+      );
+      this.app.stage.removeChild(passContainer);
+      passContainer.destroy({ children: true });
+    }
 
     // Phase 2 — received cards fly in from the opposite edge
     const recvContainer = new Container();
@@ -1338,7 +1457,12 @@ export class HeartsGameHandler {
     _state: HeartsState,
     round: RoundState,
   ) {
-    const hand = sortHand(context.hand);
+    const passedSet = new Set(this.passedCards.map((c) => cardKey(c.suit, c.rank)));
+    const hand = sortHand(
+      passedSet.size > 0
+        ? context.hand.filter((c) => !passedSet.has(cardKey(c.suit, c.rank)))
+        : context.hand,
+    );
     if (hand.length === 0) return;
 
     const n = hand.length;
