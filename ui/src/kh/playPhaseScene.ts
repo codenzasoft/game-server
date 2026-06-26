@@ -1221,54 +1221,6 @@ export class PlayPhaseScene {
 
       await this.delay(1500);
     }
-
-    // ── Step through threat/raid events ────────────────────────────────────
-    // Mirrors GameEngine.resolveThreats()'s threatLog entries: "RAID_WARNING:<threshold>"
-    // (telegraph, no resource change yet), "RAID_REPELLED:<threshold>" (Strength spent to
-    // defend), and "RAID_FAILED:POP:-<n>:PROD:-<n>" (Strength wiped, Population/Production lost).
-    for (const entry of newState.threatLog) {
-      const parts = entry.split(":");
-      const kind = parts[0];
-
-      if (kind === "RAID_WARNING") {
-        const threshold = Number(parts[1]);
-        this.showToast(`⚔️ Raiders sighted — muster ${threshold} Strength by next season!`);
-        await this.delay(1800);
-        continue;
-      }
-
-      if (kind === "RAID_REPELLED") {
-        const threshold = Number(parts[1]);
-        const prevStrength = simStrength;
-        simStrength = Math.max(0, simStrength - threshold);
-        updateBar(simPop, simProd, simFood, simGold, simStrength,
-          { pop: false, prod: false, food: false, gold: false, strength: true });
-        const els = this.resEls();
-        if (els.strength) spawnResourceIndicator(els.strength, simStrength - prevStrength, "⚔️", 0);
-        this.showToast("🛡️ The raiders are repelled!");
-        await this.delay(1800);
-        continue;
-      }
-
-      if (kind === "RAID_FAILED") {
-        // parts: ["RAID_FAILED", "POP", "-<n>", "PROD", "-<n>"] — losses are already negative.
-        const popLoss  = Number(parts[2]);
-        const prodLoss = Number(parts[4]);
-        const prevStrength = simStrength;
-        simStrength = 0;
-        simPop  = Math.max(0, simPop + popLoss);
-        simProd = Math.max(0, simProd + prodLoss);
-        updateBar(simPop, simProd, simFood, simGold, simStrength,
-          { pop: true, prod: true, food: false, gold: false, strength: true });
-        const els = this.resEls();
-        if (els.strength) spawnResourceIndicator(els.strength, simStrength - prevStrength, "⚔️", 0);
-        if (els.pop)      spawnResourceIndicator(els.pop,      popLoss,  "👥", 1);
-        if (els.prod)     spawnResourceIndicator(els.prod,     prodLoss, "⚒️", 2);
-        this.showToast("🔥 The raiders broke through! Strength is shattered, Population and Production fall.");
-        await this.delay(2200);
-        continue;
-      }
-    }
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────

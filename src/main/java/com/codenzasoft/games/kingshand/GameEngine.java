@@ -43,11 +43,6 @@ import java.util.function.BiConsumer;
  * {@link Reform}/ {@link Decree} for the two project types proposed once a year during {@link
  * Phase#COUNCIL_MEETING}.
  *
- * <p><b>Raids</b>: once STRENGTH unlocks (BARRACKS completes), a recurring raid is scheduled —
- * telegraphed one season ahead, then resolved against the player's current Strength. A sufficient
- * Strength total repels the raid (consuming the threshold amount); an insufficient total wipes
- * Strength to zero and costs Population/Production. See {@link #resolveThreats()} for the exact
- * schedule and thresholds.
  */
 public class GameEngine implements Game<GameEngine> {
 
@@ -67,35 +62,6 @@ public class GameEngine implements Game<GameEngine> {
    * from the council ("let them go"). Mirrors {@link #DEMOLISH_COST_RATE}'s role for table cards.
    */
   public static final double ADVISOR_DISMISSAL_COST_RATE = 0.20;
-
-  // ----- Raid scheduling/resolution constants -----
-
-  /** Season a raid is telegraphed in, one season before it resolves. */
-  static final Season RAID_TELEGRAPH_SEASON = Season.SUMMER;
-
-  /** Season a raid actually resolves in (consumes/wipes Strength, applies losses on failure). */
-  static final Season RAID_RESOLVE_SEASON = Season.FALL;
-
-  /**
-   * Years after STRENGTH first unlocks before the first raid is telegraphed — gives the player one
-   * full year to start building Strength sources before facing any threat.
-   */
-  static final int RAID_SCHEDULE_DELAY_YEARS = 1;
-
-  /** Years between one raid's resolution and the next raid's telegraph. */
-  static final int RAID_INTERVAL_YEARS = 2;
-
-  /** Strength required to repel the very first raid (raidCount == 0). */
-  static final int RAID_BASE_STRENGTH_THRESHOLD = 150;
-
-  /** Additional Strength required to repel each subsequent raid, on top of the base threshold. */
-  static final int RAID_STRENGTH_THRESHOLD_STEP = 100;
-
-  /** Fraction of current Population lost when a raid is not repelled. */
-  static final double RAID_POPULATION_LOSS_RATE = 0.15;
-
-  /** Fraction of current Production lost when a raid is not repelled. */
-  static final double RAID_PRODUCTION_LOSS_RATE = 0.25;
 
   private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
       new KhGameStartedNotification();
@@ -486,8 +452,8 @@ public class GameEngine implements Game<GameEngine> {
             Card completedCard = card.completedCard();
             snapshot.set(i, completedCard);
             liveTable.set(i - discardedCount, completedCard);
-            // Unlock any new resource types (and schedule the first raid if STRENGTH just did).
-            unlockAndMaybeScheduleRaid(card);
+            // Unlock any new resource types this Great Work grants.
+            state.unlock(card);
             gwLog.add(card.name() + "_COMPLETED");
           } else {
             // Decrement: replace the card on the table with the same card minus one period.
@@ -655,10 +621,7 @@ public class GameEngine implements Game<GameEngine> {
     state.setResolutionLog(log);
     state.setGreatWorkLog(gwLog);
 
-    // 6. Telegraph/resolve any scheduled raid for this season (no-ops until STRENGTH unlocks).
-    resolveThreats();
-
-    // 7. Advance to the next phase (ADD for next season, or stay put if game is over / won).
+    // 6. Advance to the next phase (ADD for next season, or stay put if game is over / won).
     if (!state.isVictoryComplete()) {
       advancePhase();
     }
@@ -1309,75 +1272,6 @@ public class GameEngine implements Game<GameEngine> {
     state.setStrength(Math.max(0.0, value));
   }
 
-  /**
-   * Unlocks every resource {@code card} unlocks (delegates to {@link GameState#unlock(Card)}), then
-   * — the very first time this causes STRENGTH to transition from locked to unlocked — schedules
-   * the first raid via {@link GameState#setNextRaidYear(int)}. Called from both Great Work
-   * completion paths (normal staffed completion and Tomas Ferro's acceleration Decree) so raid
-   * scheduling can't be skipped depending on which path finishes BARRACKS.
-   */
-  private void unlockAndMaybeScheduleRaid(Card card) {
-    boolean strengthWasLocked = !state.isStrengthUnlocked();
-    state.unlock(card);
-    if (strengthWasLocked && state.isStrengthUnlocked() && state.getNextRaidYear() == 0) {
-      state.setNextRaidYear(state.getYear() + RAID_SCHEDULE_DELAY_YEARS);
-    }
-  }
-
-  /**
-   * Returns the Strength required to repel the {@code raidCount}-th raid (0-indexed), escalating
-   * linearly by {@value #RAID_STRENGTH_THRESHOLD_STEP} per prior raid on top of the base threshold.
-   */
-  private int raidStrengthThreshold(int raidCount) {
-    return RAID_BASE_STRENGTH_THRESHOLD + raidCount * RAID_STRENGTH_THRESHOLD_STEP;
-  }
-
-  /**
-   * Telegraphs and resolves scheduled raids. No-ops entirely until {@link
-   * #unlockAndMaybeScheduleRaid} has set {@link GameState#getNextRaidYear()} to something non-zero
-   * (i.e. until STRENGTH unlocks).
-   *
-   * <p>Once scheduled, a raid telegraphs during {@link #RAID_TELEGRAPH_SEASON} of {@code
-   * nextRaidYear} (appending {@code "RAID_WARNING:<threshold>"} to the threat log) and resolves
-   * during {@link #RAID_RESOLVE_SEASON} of the same year:
-   *
-   * <ul>
-   *   <li>If current Strength ≥ the threshold, the raid is repelled: the threshold amount of
-   *       Strength is consumed and {@code "RAID_REPELLED:<threshold>"} is logged.
-   *   <li>Otherwise, Strength is wiped to zero, Population and Production each drop by their
-   *       respective loss rate, and {@code "RAID_FAILED:POP:-<n>:PROD:-<n>"} is logged.
-   * </ul>
-   *
-   * <p>Either way, {@code raidCount} increments and the next raid is rescheduled {@value
-   * #RAID_INTERVAL_YEARS} years out — raids repeat indefinitely once they begin, with an
-   * ever-escalating Strength threshold.
-   */
-  private void resolveThreats() {
-    List<String> threatLog = new ArrayList<>();
-    int nextRaidYear = state.getNextRaidYear();
-    if (nextRaidYear != 0 && state.getYear() == nextRaidYear) {
-      int threshold = raidStrengthThreshold(state.getRaidCount());
-      if (state.getCurSeason() == RAID_TELEGRAPH_SEASON) {
-        threatLog.add("RAID_WARNING:" + threshold);
-      } else if (state.getCurSeason() == RAID_RESOLVE_SEASON) {
-        if (state.getStrength() >= threshold) {
-          applyStrength(state.getStrength() - threshold);
-          threatLog.add("RAID_REPELLED:" + threshold);
-        } else {
-          applyStrength(0.0);
-          int popLoss = (int) Math.floor(state.getPopulation() * RAID_POPULATION_LOSS_RATE);
-          int prodLoss = (int) Math.floor(state.getProduction() * RAID_PRODUCTION_LOSS_RATE);
-          applyPopulation(state.getPopulation() - popLoss);
-          applyProduction(state.getProduction() - prodLoss);
-          threatLog.add("RAID_FAILED:POP:-" + popLoss + ":PROD:-" + prodLoss);
-        }
-        state.incrementRaidCount();
-        state.setNextRaidYear(state.getYear() + RAID_INTERVAL_YEARS);
-      }
-    }
-    state.setThreatLog(threatLog);
-  }
-
   // ----- COUNCIL_ADD: advisor offer / hire / skip -----
 
   /**
@@ -1721,7 +1615,7 @@ public class GameEngine implements Game<GameEngine> {
     if (newPeriod <= 0) {
       Card completed = target.completedCard();
       replaceCardOnBoard(target, completed);
-      unlockAndMaybeScheduleRaid(target);
+      state.unlock(target);
       gwLog.add(target.name() + "_COMPLETED");
     } else {
       Card decremented = target.withConstructionPeriod(newPeriod);

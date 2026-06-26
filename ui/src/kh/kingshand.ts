@@ -223,9 +223,6 @@ interface GameStateData {
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
-  nextRaidYear: number;
-  raidCount: number;
-  threatLog: string[];
 }
 
 interface GameMessageData {
@@ -492,12 +489,6 @@ export class GameState {
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
-  /** Year of the next scheduled raid telegraph/resolution; 0 means none is scheduled yet. */
-  nextRaidYear: number;
-  /** Number of raids that have already resolved (repelled or not). */
-  raidCount: number;
-  /** Raid-related events from the most recent endAndRun (e.g. "RAID_WARNING:150"); empty between seasons. */
-  threatLog: string[];
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -526,9 +517,6 @@ export class GameState {
     this.council = data.council;
     this.councilOfferChoices = data.councilOfferChoices;
     this.currentProposal = data.currentProposal;
-    this.nextRaidYear = data.nextRaidYear;
-    this.raidCount = data.raidCount;
-    this.threatLog = data.threatLog;
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -748,13 +736,6 @@ export const GameStateSchema = z
     // Same null-vs-undefined issue: Jackson sends explicit JSON `null` when no seated
     // advisor currently has anything left to propose, not a missing key.
     currentProposal: CouncilProposalSchema.nullish().transform((v) => v ?? undefined),
-    // Raid scheduling/resolution state. nextRaidYear is 0 until STRENGTH unlocks (BARRACKS
-    // completes), at which point the server schedules the first raid.
-    nextRaidYear: z.number().int().default(0),
-    raidCount: z.number().int().default(0),
-    // Raid-related events from the most recent endAndRun (e.g. "RAID_WARNING:150",
-    // "RAID_REPELLED:150", "RAID_FAILED:POP:-12:PROD:-180"); empty between seasons.
-    threatLog: z.array(z.string()).default([]),
   })
   .transform((data) => new GameState(data as GameStateData));
 
