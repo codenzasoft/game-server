@@ -17,7 +17,7 @@ function createLoadingOverlay(): {
   overlay.style.cssText = [
     "position:fixed", "inset:0", "display:flex", "flex-direction:column",
     "align-items:center", "justify-content:center", "z-index:100",
-    "background:#1a6b1a", "font-family:Arial,sans-serif",
+    "background:#0f3318", "font-family:Arial,sans-serif",
     "color:rgba(255,255,255,0.75)",
   ].join(";");
 
@@ -55,7 +55,7 @@ function createLoadingOverlay(): {
 (async () => {
   const app = new Application();
   await app.init({
-    background: "#1a6b1a",
+    background: "#0f3318",
     resizeTo: window,
     antialias: true,
     resolution: window.devicePixelRatio || 1,
