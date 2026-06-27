@@ -130,6 +130,43 @@ public record Card(
   }
 
   /**
+   * Returns a new {@link Card} with the modifier of every matching {@link ValueType#INTEGER} effect
+   * increased by {@code delta}, exactly like {@link #boostEffect}, except that if no effect
+   * targeting {@code resource} exists yet, a brand-new {@code INTEGER} effect of {@code delta} is
+   * appended instead of being silently dropped.
+   *
+   * <p>Used by Reform/Decree resolution on advisor cards: some advisors (e.g. Joric Wren, Brynn
+   * Ostlar) start with an empty effects list because their base Specialty is meta-only, but a later
+   * Decree can still grant them a plain resource effect (e.g. Ostlar's "Build the Stables" Decree
+   * adds a Production boost where none existed before). {@link #boostEffect} alone can't express
+   * that first-time addition.
+   *
+   * @param resource the resource target to boost or add
+   * @param delta the flat amount to add to the matching effect, or the modifier of the new effect
+   */
+  public Card withEffectBoostOrAdd(ResourceTarget resource, double delta) {
+    boolean hasMatch =
+        effects.stream()
+            .anyMatch(e -> e.target() == resource && e.valueType() == ValueType.INTEGER);
+    if (hasMatch) {
+      return boostEffect(resource, delta);
+    }
+    List<Effect> withAdded = new ArrayList<>(effects);
+    withAdded.add(new Effect(resource, delta, ValueType.INTEGER));
+    return new Card(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        withAdded,
+        constructionPeriod,
+        completedCard,
+        unlockedResources,
+        victory,
+        season);
+  }
+
+  /**
    * Returns a new {@link Card} with identical requirements but every effect's modifier multiplied
    * by {@code factor}. Used internally when both cards have identical modifiers (no engine boost).
    *

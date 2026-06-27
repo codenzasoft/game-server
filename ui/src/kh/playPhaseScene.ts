@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, SeatedAdvisor } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -8,6 +8,7 @@ import {
   resourceShortLabel,
   WIN_CONDITION_GREAT_WORK_NAMES,
 } from "./cardCatalog.ts";
+import { getAdvisorDisplayInfo, buildPortraitPlaceholder } from "./advisorCatalog.ts";
 import {
   injectSharedStyles,
   buildDeckIndicator,
@@ -36,6 +37,9 @@ const DEMOLISH_COST_RATE = 0.20;
 
 /** Mirrors GameEngine.MAX_TABLE_SIZE. */
 const MAX_TABLE_SIZE = 5;
+
+/** Mirrors GameEngine.MAX_COUNCIL_SIZE — keep in sync with councilScene.ts's copy. */
+const MAX_COUNCIL_SIZE = 3;
 
 const HOME_URL = `${window.location.origin}/`;
 
@@ -126,6 +130,7 @@ export class PlayPhaseScene {
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
       ${this.buildPhaseTracker()}
+      ${this.buildAdvisorRow(state)}
       <main class="kh-play-scene">
         ${this.buildTableSection(state, table, meta, state.tableStaffing)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
@@ -350,13 +355,72 @@ export class PlayPhaseScene {
           <span class="kh-play-phase-dot"></span>I. ADD
         </div>
         <span class="kh-play-phase-arrow">→</span>
-        <div class="kh-play-phase-step">
-          <span class="kh-play-phase-dot"></span>II. RANDOM EVENT
+        <div class="kh-play-phase-step kh-play-phase-active">
+          <span class="kh-play-phase-dot"></span>II. PLAY
         </div>
         <span class="kh-play-phase-arrow">→</span>
-        <div class="kh-play-phase-step kh-play-phase-active">
-          <span class="kh-play-phase-dot"></span>III. PLAY
+        <div class="kh-play-phase-step">
+          <span class="kh-play-phase-dot"></span>III. COUNCIL
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Small "council table" strip — three circular seats connected by lines,
+   * mirroring the council roster panel's seats (see councilScene.ts's
+   * buildRosterPanel/buildFilledSeat) but compact enough to live in the PLAY
+   * header. Hovering a filled seat shows what that advisor does. Hidden
+   * entirely until gold (and thus the council) unlocks, since there is no
+   * council to show before then.
+   */
+  private buildAdvisorRow(state: GameState): string {
+    if (!state.goldUnlocked) return "";
+
+    const seatHTML = Array.from({ length: MAX_COUNCIL_SIZE }, (_, i) => state.council[i])
+      .map((seated) => (seated ? this.buildAdvisorSeat(seated) : this.buildEmptyAdvisorSeat()))
+      .reduce((html, seat, i) => (i === 0 ? seat : `${html}<div class="kh-play-advisor-link"></div>${seat}`), "");
+
+    return `
+      <div class="kh-play-advisor-row">
+        <div class="kh-play-advisor-row-label"><span>👑</span><span>Council</span></div>
+        <div class="kh-play-advisor-table">${seatHTML}</div>
+      </div>
+    `;
+  }
+
+  private buildAdvisorSeat(seated: SeatedAdvisor): string {
+    const info = getAdvisorDisplayInfo(seated.advisorId);
+    // Render the advisor's *live* card effects rather than trusting the static catalog
+    // description alone: Reforms/Decrees permanently boost (or add to) this card via
+    // GameEngine#withEffectBoostOrAdd, so info.specialtyDescription's baked-in number goes
+    // stale the moment a proposal is accepted, even though resolution already applies the
+    // correct boosted value (see the resource indicators spawned during animateFromResolutionLog).
+    const effectsHTML = seated.card.effects
+      .map((e) => {
+        const targetStr = typeof e.target === "string" ? e.target : "CARD";
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+      })
+      .join("");
+    return `
+      <div class="kh-play-advisor-seat" data-advisor-id="${seated.advisorId}">
+        ${buildPortraitPlaceholder(info.ringColor, 48)}
+        <div class="kh-play-advisor-tooltip">
+          <div class="kh-play-advisor-tt-name">${info.displayName} — ${info.title}</div>
+          <div class="kh-play-advisor-tt-desc">${info.specialtyDescription}</div>
+          ${effectsHTML ? `
+          <div class="kh-play-advisor-tt-effects-label">Currently grants</div>
+          <div class="kh-play-advisor-tt-effects">${effectsHTML}</div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  private buildEmptyAdvisorSeat(): string {
+    return `
+      <div class="kh-play-advisor-seat kh-play-advisor-seat-empty">
+        <div class="kh-play-advisor-empty-ring">👤</div>
       </div>
     `;
   }
@@ -1289,6 +1353,104 @@ export class PlayPhaseScene {
       }
       .kh-play-phase-dot   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
       .kh-play-phase-arrow { color: rgba(196,160,96,0.5); font-size: 1rem; padding: 0 4px; }
+
+      /* ── Mini council row (PLAY header) ──────────────────────────────── */
+      .kh-play-advisor-row {
+        background: rgba(10,5,2,0.5);
+        border-bottom: 2px solid rgba(196,160,96,0.2);
+        padding: 9px 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+      .kh-play-advisor-row-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Cinzel', serif;
+        font-size: .66rem;
+        letter-spacing: 1.5px;
+        color: rgba(200,176,140,0.65);
+        text-transform: uppercase;
+      }
+      .kh-play-advisor-table {
+        display: flex;
+        align-items: center;
+      }
+      .kh-play-advisor-link {
+        width: 34px;
+        height: 2px;
+        flex-shrink: 0;
+        background: linear-gradient(90deg, rgba(196,160,96,.12), rgba(196,160,96,.6), rgba(196,160,96,.12));
+      }
+      .kh-play-advisor-seat {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .kh-play-advisor-seat:hover { z-index: 10; }
+      .kh-play-advisor-empty-ring {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 2px dashed rgba(196,160,96,.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        opacity: .4;
+        flex-shrink: 0;
+      }
+
+      /* Mini council seat hover tooltip — name + what they do, no actions. */
+      .kh-play-advisor-tooltip {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        width: 240px;
+        background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
+        border: 2px solid #c49428;
+        border-radius: 12px;
+        padding: 12px 14px 11px;
+        box-shadow: 0 10px 36px rgba(0,0,0,.75);
+        z-index: 30;
+        pointer-events: none;
+        text-align: left;
+      }
+      .kh-play-advisor-seat:hover .kh-play-advisor-tooltip {
+        display: block;
+        pointer-events: auto;
+      }
+      .kh-play-advisor-tt-name {
+        font-family: 'Cinzel', serif;
+        font-size: .78rem;
+        font-weight: 700;
+        color: #f0e8c0;
+        margin-bottom: 7px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(196,160,96,.3);
+      }
+      .kh-play-advisor-tt-desc {
+        font-family: 'Crimson Text', serif;
+        font-size: .8rem;
+        line-height: 1.4;
+        color: #d4c090;
+      }
+      .kh-play-advisor-tt-effects-label {
+        font-size: .68rem;
+        color: #9a8860;
+        margin-top: 7px;
+        margin-bottom: 4px;
+      }
+      .kh-play-advisor-tt-effects {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
 
       /* ── Scene body ──────────────────────────────────────────────────── */
       .kh-play-scene { max-width: 1160px; margin: 0 auto; padding: 36px 28px 80px; }

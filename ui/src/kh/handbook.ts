@@ -34,10 +34,12 @@ export const HANDBOOK: HandbookChapter[] = [
         title: "Each season",
         body: `<b>Add</b> — pick one of three offered cards to add to your deck. Skip or reroll if nothing fits.
                <br><br>
-               <b>Random Event</b> — an event fires and you choose a response. Read both options before picking.
-               <br><br>
                <b>Play</b> — draw up to 3 cards and place them on your table. Hit Play when done.
-               Cards fire left to right, then food is consumed. Repeat each season.`,
+               Cards fire left to right, then food is consumed. Repeat each season.
+               <br><br>
+               <b>Council</b> — once per year, after Winter ends (and once Gold is unlocked), you
+               may hire a new advisor and your seated council proposes one project. See the
+               Council chapter for details.`,
       },
       {
         title: "The one rule",
@@ -57,7 +59,7 @@ export const HANDBOOK: HandbookChapter[] = [
                workers you have — more population means more cards can be staffed each season.
                <br><br>
                Population grows when you have leftover food after feeding everyone, and drops
-               through starvation or negative events.`,
+               through starvation.`,
       },
       {
         title: "Population Cap 🏠",
@@ -82,13 +84,13 @@ export const HANDBOOK: HandbookChapter[] = [
       {
         title: "Gold 💰",
         body: `Gold is unlocked once the Treasury Great Work is completed. From then on it
-               appears in your resource bar and can be earned and spent by cards and events
+               appears in your resource bar and can be earned and spent by cards and advisors
                just like any other resource.`,
       },
       {
         title: "Strength ⚔️",
         body: `Strength is unlocked once the Barracks Great Work is completed. From then on it
-               appears in your resource bar and can be earned and spent by cards and events
+               appears in your resource bar and can be earned and spent by cards and advisors
                just like any other resource.`,
       },
     ],
@@ -221,20 +223,43 @@ export const HANDBOOK: HandbookChapter[] = [
     ],
   },
 
-  // ── Events ────────────────────────────────────────────────────────────────
+  // ── Council & Advisors ──────────────────────────────────────────────────────
   {
-    icon: "⚡",
-    title: "Random Events",
+    icon: "🏰",
+    title: "Council & Advisors",
     sections: [
       {
-        title: "How events work",
-        body: `Each season a random event fires and you choose one of its options. Harsher
-               events only appear in later years. Effects are applied before the Play phase.`,
+        title: "Unlocking the Council",
+        body: `The Council becomes active once the Treasury Great Work is completed and Gold is
+               unlocked. From then on, once per year — right after Winter's Play phase ends — you
+               get a Council turn.`,
       },
       {
-        title: "Winter scaling ❄️",
-        body: `Winter event effects scale up each year — early winters are survivable, later
-               ones are not. Non-winter events also scale slightly, but much more slowly.`,
+        title: "Hiring advisors",
+        body: `You're offered up to 3 random eligible advisors and may hire one (or skip). Hiring
+               costs Gold, paid immediately. Your council holds at most 3 seats at once. Passing
+               on an advisor doesn't remove them — they can appear again in a later offer.`,
+      },
+      {
+        title: "How seated advisors work",
+        body: `Each seated advisor grants their Specialty effect in full, every season,
+               automatically — advisors bypass worker staffing entirely. Their "cost" is the
+               upfront hiring fee, not population.`,
+      },
+      {
+        title: "Reforms & Decrees",
+        body: `After the hiring step, your council proposes a single project from whichever
+               seated advisor has gone longest without proposing one.
+               <br><br>
+               <b>Reforms</b> are repeatable self-enhancements — each acceptance strengthens that
+               advisor further but adds a permanent trade-off to their own card. They cap out
+               after a few stacks.
+               <br><br>
+               <b>Decrees</b> are one-time civic projects — once accepted, that advisor's Decree
+               is spent for good. Some Decrees are gated behind specific Great Works.
+               <br><br>
+               You may accept or pass on the proposal. Passing still moves the rotation along to
+               a different advisor next year.`,
       },
     ],
   },
@@ -251,8 +276,8 @@ export const HANDBOOK: HandbookChapter[] = [
       },
       {
         title: "Plan for winter",
-        body: `Winter costs twice the food and events hit harder each year. Stock up before
-               Fall ends.`,
+        body: `Winter costs twice the food, and your Council turn lands right after it. Stock up
+               before Fall ends, and keep a little Gold in reserve for a hire.`,
       },
       {
         title: "Save single-use cards",

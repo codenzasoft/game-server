@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,8 +37,6 @@ public class GameState {
   // ADD-phase offer state
   private List<Card> addChoices;
   private int rerollCount;
-  // the event rolled for the current RANDOM_EVENT phase (null between phases)
-  private Event currentEvent;
   // true once the player's population has reached zero; no further actions are possible
   private boolean gameOver;
   // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
@@ -53,6 +52,21 @@ public class GameState {
   private Set<ResourceTarget> unlockedResources;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
   private List<String> greatWorkLog;
+  // ----- Council / Advisors -----
+  // hired advisors currently seated on the council; max GameEngine.MAX_COUNCIL_SIZE (3)
+  private List<SeatedAdvisor> council;
+  // candidate advisors offered during the current COUNCIL_ADD phase; empty outside that phase
+  private List<Advisor> councilOfferChoices;
+  // the single rotating Reform/Decree proposal for the current COUNCIL_MEETING phase, or null if no
+  // seated advisor currently has anything left to propose
+  private CouncilProposal currentProposal;
+  // cumulative permanent free-reroll count granted by Decrees (Aldwin's "Found the Town Hall",
+  // Varn's "Plant an Informant") — added on top of the base 1 free reroll every ADD phase already
+  // gets, regardless of whether the granting advisor is still seated
+  private int permanentFreeRerolls;
+  // names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree;
+  // prevents that Decree from being used more than once on the same distinct Great Work
+  private Set<String> acceleratedGreatWorkNames;
 
   private GameState(Builder b) {
     this.board = b.board;
@@ -68,7 +82,6 @@ public class GameState {
     this.year = b.year;
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
-    this.currentEvent = b.currentEvent;
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
@@ -76,6 +89,11 @@ public class GameState {
     this.strength = b.strength;
     this.unlockedResources = b.unlockedResources;
     this.greatWorkLog = b.greatWorkLog;
+    this.council = b.council;
+    this.councilOfferChoices = b.councilOfferChoices;
+    this.currentProposal = b.currentProposal;
+    this.permanentFreeRerolls = b.permanentFreeRerolls;
+    this.acceleratedGreatWorkNames = b.acceleratedGreatWorkNames;
   }
 
   // Creates a fresh game state: empty season tables, starting population/production, spring of year
@@ -265,16 +283,6 @@ public class GameState {
     return rerollCount;
   }
 
-  /**
-   * The event rolled at the start of the current {@link Phase#RANDOM_EVENT} turn, or {@code null}
-   * if no event has been rolled yet (or no eligible events existed).
-   */
-  @JsonProperty("currentEvent")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public Event getCurrentEvent() {
-    return currentEvent;
-  }
-
   // ----- Setters -----
 
   public void setPopulation(double population) {
@@ -309,10 +317,6 @@ public class GameState {
     this.rerollCount = rerollCount;
   }
 
-  public void setCurrentEvent(Event currentEvent) {
-    this.currentEvent = currentEvent;
-  }
-
   @JsonProperty("gameOver")
   public boolean isGameOver() {
     return gameOver;
@@ -341,8 +345,8 @@ public class GameState {
 
   /**
    * Per-card resolution log from the most recent {@link Phase#PLAY} end-and-run. Empty between
-   * seasons (during ADD and RANDOM_EVENT phases). The client uses this to drive indicators and
-   * toasts without re-simulating game logic.
+   * seasons (during ADD, COUNCIL_ADD, and COUNCIL_MEETING phases). The client uses this to drive
+   * indicators and toasts without re-simulating game logic.
    */
   @JsonProperty("resolutionLog")
   public List<ResolutionStep> getResolutionLog() {
@@ -473,6 +477,97 @@ public class GameState {
     this.greatWorkLog = log == null ? List.of() : List.copyOf(log);
   }
 
+  /** Advisors currently seated on the council; never more than {@code MAX_COUNCIL_SIZE} (3). */
+  @JsonProperty("council")
+  public List<SeatedAdvisor> getCouncil() {
+    return council == null ? List.of() : council;
+  }
+
+  /** Seats {@code seated} onto the council. Caller is responsible for the seat-count check. */
+  public void addToCouncil(SeatedAdvisor seated) {
+    council.add(seated);
+  }
+
+  /**
+   * Removes the seated advisor whose {@code advisorId} equals {@code advisorId}, if present. Caller
+   * is responsible for any cost/affordability check and for refreshing any in-flight proposal that
+   * referenced this advisor.
+   */
+  public void removeFromCouncil(String advisorId) {
+    council.removeIf(s -> s.getAdvisorId().equals(advisorId));
+  }
+
+  /**
+   * Returns the seated advisor whose {@code advisorId} equals {@code advisorId}, or {@code null}.
+   */
+  public SeatedAdvisor findSeatedAdvisor(String advisorId) {
+    return council.stream()
+        .filter(s -> s.getAdvisorId().equals(advisorId))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Candidate advisors offered during the current {@link Phase#COUNCIL_ADD} phase; empty outside
+   * that phase.
+   */
+  @JsonProperty("councilOfferChoices")
+  public List<Advisor> getCouncilOfferChoices() {
+    return councilOfferChoices == null ? List.of() : councilOfferChoices;
+  }
+
+  public void setCouncilOfferChoices(List<Advisor> councilOfferChoices) {
+    this.councilOfferChoices =
+        councilOfferChoices == null ? List.of() : List.copyOf(councilOfferChoices);
+  }
+
+  /**
+   * The single rotating Reform/Decree proposal for the current {@link Phase#COUNCIL_MEETING} phase,
+   * or {@code null} (omitted from JSON) if no seated advisor currently has anything left to
+   * propose.
+   */
+  @JsonProperty("currentProposal")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public CouncilProposal getCurrentProposal() {
+    return currentProposal;
+  }
+
+  public void setCurrentProposal(CouncilProposal currentProposal) {
+    this.currentProposal = currentProposal;
+  }
+
+  /**
+   * Cumulative permanent free-reroll count granted by Decrees (Reeve Aldwin's "Found the Town
+   * Hall", Lady Iseult Varn's "Plant an Informant"). Stacks across advisors and survives them being
+   * removed from the council (a Decree, once enacted, is a permanent civic change).
+   */
+  @JsonProperty("permanentFreeRerolls")
+  public int getPermanentFreeRerolls() {
+    return permanentFreeRerolls;
+  }
+
+  public void setPermanentFreeRerolls(int permanentFreeRerolls) {
+    this.permanentFreeRerolls = permanentFreeRerolls;
+  }
+
+  public void incrementPermanentFreeRerolls(int delta) {
+    this.permanentFreeRerolls += delta;
+  }
+
+  /**
+   * Names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree.
+   * Prevents that Decree from accelerating the same distinct Great Work more than once, while still
+   * allowing it to recur across different Great Works over the course of a run.
+   */
+  @JsonProperty("acceleratedGreatWorkNames")
+  public Set<String> getAcceleratedGreatWorkNames() {
+    return acceleratedGreatWorkNames == null ? Set.of() : acceleratedGreatWorkNames;
+  }
+
+  public void markGreatWorkAccelerated(String greatWorkName) {
+    acceleratedGreatWorkNames.add(greatWorkName);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -489,7 +584,6 @@ public class GameState {
     private int year = 1;
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
-    private Event currentEvent = null;
     private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
@@ -502,6 +596,11 @@ public class GameState {
             ResourceTarget.FOOD,
             ResourceTarget.POPULATION_CAP);
     private List<String> greatWorkLog = List.of();
+    private List<SeatedAdvisor> council = new ArrayList<>();
+    private List<Advisor> councilOfferChoices = new ArrayList<>();
+    private CouncilProposal currentProposal = null;
+    private int permanentFreeRerolls = 0;
+    private Set<String> acceleratedGreatWorkNames = new HashSet<>();
 
     // fill similar data types with seasons
     private Builder() {
@@ -578,11 +677,6 @@ public class GameState {
       return this;
     }
 
-    public Builder currentEvent(Event currentEvent) {
-      this.currentEvent = currentEvent;
-      return this;
-    }
-
     public Builder gameOver(boolean gameOver) {
       this.gameOver = gameOver;
       return this;
@@ -636,6 +730,35 @@ public class GameState {
 
     public Builder greatWorkLog(List<String> greatWorkLog) {
       this.greatWorkLog = greatWorkLog == null ? List.of() : new ArrayList<>(greatWorkLog);
+      return this;
+    }
+
+    public Builder council(List<SeatedAdvisor> council) {
+      this.council = council == null ? new ArrayList<>() : new ArrayList<>(council);
+      return this;
+    }
+
+    public Builder councilOfferChoices(List<Advisor> councilOfferChoices) {
+      this.councilOfferChoices =
+          councilOfferChoices == null ? new ArrayList<>() : new ArrayList<>(councilOfferChoices);
+      return this;
+    }
+
+    public Builder currentProposal(CouncilProposal currentProposal) {
+      this.currentProposal = currentProposal;
+      return this;
+    }
+
+    public Builder permanentFreeRerolls(int permanentFreeRerolls) {
+      this.permanentFreeRerolls = permanentFreeRerolls;
+      return this;
+    }
+
+    public Builder acceleratedGreatWorkNames(Set<String> acceleratedGreatWorkNames) {
+      this.acceleratedGreatWorkNames =
+          acceleratedGreatWorkNames == null
+              ? new HashSet<>()
+              : new HashSet<>(acceleratedGreatWorkNames);
       return this;
     }
 
