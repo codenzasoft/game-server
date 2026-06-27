@@ -136,7 +136,35 @@ class UsernameValidatorSpec extends Specification {
     }
 
     // -------------------------------------------------------------------------
-    // Disallowed characters
+    // Email-format usernames
+    // -------------------------------------------------------------------------
+
+    def "valid email address is accepted as username"() {
+        when:
+        def result = UsernameValidator.validate("user@example.com")
+
+        then:
+        result.valid
+    }
+
+    def "email with subdomains is accepted as username"() {
+        when:
+        def result = UsernameValidator.validate("user@mail.example.co.uk")
+
+        then:
+        result.valid
+    }
+
+    def "email longer than MAX_LENGTH is accepted as username"() {
+        when:
+        def result = UsernameValidator.validate("averylongemailaddress@somedomain.example.com")
+
+        then:
+        result.valid
+    }
+
+    // -------------------------------------------------------------------------
+    // Disallowed values
     // -------------------------------------------------------------------------
 
     def "username with a space is rejected"() {
@@ -147,7 +175,7 @@ class UsernameValidatorSpec extends Specification {
         !result.valid
     }
 
-    def "username with an @ symbol is rejected"() {
+    def "bare @ with no valid domain is rejected"() {
         when:
         def result = UsernameValidator.validate("user@name")
 
