@@ -209,6 +209,46 @@ class AdaptiveStrategySpec extends Specification {
 
     // ── saboteur mode ─────────────────────────────────────────────────────────────
 
+    def "mode is SABOTEUR when opponent accumulates 4 hearts before Q♠ is played"() {
+        given: "bob wins 4 heart tricks; Q♠ has not appeared yet"
+        def strategy = new AdaptiveStrategy(false)
+        def heart = { Rank r -> c(Suit.HEARTS, r) }
+        def club  = { Rank r -> c(Suit.CLUBS, r) }
+        def tricks = (1..4).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   heart(Rank.values()[Rank.ACE.ordinal() - (i-1)])),
+                new PlayedCard("carol", club(Rank.TWO)),
+                new PlayedCard("dave",  club(Rank.THREE)),
+                new PlayedCard("alice", club(Rank.FOUR)),
+            ])
+        }
+        def round = HeartsStateBuilder.inProgressRound(tricks: tricks)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        expect: "saboteur activates 9 tricks before Q♠ would cross the old threshold"
+        strategy.resolveMode(state, alice) == Mode.SABOTEUR
+    }
+
+    def "mode stays DEFENSIVE when hearts accumulation is below the early threshold"() {
+        given: "bob wins 3 hearts — not yet suspicious without Q♠"
+        def strategy = new AdaptiveStrategy(false)
+        def heart = { Rank r -> c(Suit.HEARTS, r) }
+        def club  = { Rank r -> c(Suit.CLUBS, r) }
+        def tricks = (1..3).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   heart(Rank.values()[Rank.ACE.ordinal() - (i-1)])),
+                new PlayedCard("carol", club(Rank.TWO)),
+                new PlayedCard("dave",  club(Rank.THREE)),
+                new PlayedCard("alice", club(Rank.FOUR)),
+            ])
+        }
+        def round = HeartsStateBuilder.inProgressRound(tricks: tricks)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        expect:
+        strategy.resolveMode(state, alice) == Mode.DEFENSIVE
+    }
+
     def "mode is SABOTEUR when opponent has crossed the shoot threshold"() {
         given: "bob has won Q♠ + A♥ = 14 points this round"
         def strategy = new AdaptiveStrategy(false)
