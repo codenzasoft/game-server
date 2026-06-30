@@ -250,7 +250,6 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void quit() {
     if (state.isGameOver()) return;
-    state.setGameOver(true);
     notifyLifecycleObservers(GameLifecycleObserver::gameQuit);
   }
 

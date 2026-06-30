@@ -56,23 +56,30 @@ public record ResourceState(
               strength,
               unlocked);
         case GOLD:
-          return new ResourceState(
-              food,
-              production,
-              population,
-              populationCap,
-              nextValue(effect, gold),
-              strength,
-              unlocked);
+          if (unlocked.contains(ResourceTarget.GOLD)) {
+            return new ResourceState(
+                food,
+                production,
+                population,
+                populationCap,
+                nextValue(effect, gold),
+                strength,
+                unlocked);
+          }
+          break;
+
         case STRENGTH:
-          return new ResourceState(
-              food,
-              production,
-              population,
-              populationCap,
-              gold,
-              nextValue(effect, strength),
-              unlocked);
+          if (unlocked.contains(ResourceTarget.STRENGTH)) {
+            return new ResourceState(
+                food,
+                production,
+                population,
+                populationCap,
+                gold,
+                nextValue(effect, strength),
+                unlocked);
+          }
+          break;
       }
     }
     return this;
@@ -89,9 +96,12 @@ public record ResourceState(
   }
 
   public ResourceState addGold(double value) {
-    double newGold = Math.max(0.0, (gold + value));
-    return new ResourceState(
-        food, production, population, populationCap, newGold, strength, unlocked);
+    if (unlocked.contains(ResourceTarget.GOLD)) {
+      double newGold = Math.max(0.0, (gold + value));
+      return new ResourceState(
+          food, production, population, populationCap, newGold, strength, unlocked);
+    }
+    return this;
   }
 
   public ResourceState addPopulationCap(double value) {

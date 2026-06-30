@@ -42,7 +42,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
     def "initialize does not fire gameStarted when the game is already over"() {
         setup:
         def observer = Mock(GameLifecycleObserver)
-        def state = GameState.builder().population(0.0).gameOver(true).build()
+        def state = GameState.builder().population(0.0).build()
         def engine = engineWith(state, observer)
 
         when:
@@ -89,7 +89,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
                 .table(Season.SPRING, [aftermath])
-                .population(0.0).gameOver(true).build()
+                .population(0.0).build()
         def engine = engineWith(state, observer)
 
         when:
@@ -116,7 +116,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
     def "quit does not fire again once the game is already over"() {
         setup:
         def observer = Mock(GameLifecycleObserver)
-        def state = GameState.builder().gameOver(true).build()
+        def state = GameState.builder().population(0.0).build()
         def engine = engineWith(state, observer)
 
         when:

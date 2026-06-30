@@ -69,7 +69,6 @@ public class GameState {
     this.year = b.year;
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
-    this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
     this.greatWorkLog = b.greatWorkLog;
@@ -287,11 +286,7 @@ public class GameState {
 
   @JsonProperty("gameOver")
   public boolean isGameOver() {
-    return gameOver;
-  }
-
-  public void setGameOver(boolean gameOver) {
-    this.gameOver = gameOver;
+    return resources.population() < 1.0;
   }
 
   /**
@@ -564,7 +559,6 @@ public class GameState {
     private int year = 1;
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
-    private boolean gameOver = false;
     private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
     private double gold = 0.0;
@@ -658,11 +652,6 @@ public class GameState {
 
     public Builder rerollCount(int rerollCount) {
       this.rerollCount = rerollCount;
-      return this;
-    }
-
-    public Builder gameOver(boolean gameOver) {
-      this.gameOver = gameOver;
       return this;
     }
 
