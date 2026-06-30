@@ -42,7 +42,6 @@ import java.util.function.BiConsumer;
  * beyond the upfront hiring fee. See {@link Advisor}/{@link AdvisorCatalog} for the roster and
  * {@link Reform}/ {@link Decree} for the two project types proposed once a year during {@link
  * Phase#COUNCIL_MEETING}.
- *
  */
 public class GameEngine implements Game<GameEngine> {
 
