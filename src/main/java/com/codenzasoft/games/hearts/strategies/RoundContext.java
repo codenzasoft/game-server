@@ -10,28 +10,51 @@ import java.util.Optional;
 /**
  * Derives the current strategic context from live game state.
  *
- * <p>A player is considered a moon-shot threat once they have accumulated at least {@link
- * #SHOOT_THREAT_THRESHOLD} points in the current round. This requires Q♠ plus at least one heart —
- * accidentally picking up Q♠ alone (13 pts) does not cross the threshold, reducing false positives.
+ * <p>Moon-shot detection uses two thresholds:
+ *
+ * <ul>
+ *   <li>While Q♠ is still unplayed, all round points are pure hearts. {@link
+ *       #HEARTS_ONLY_THRESHOLD} fires after a player collects that many hearts, catching a
+ *       hearts-first shooter well before they acquire Q♠.
+ *   <li>Once Q♠ has been played, {@link #SHOOT_THREAT_THRESHOLD} fires on Q♠ + at least one heart
+ *       (14 pts). This intentionally excludes Q♠ alone (13 pts) to avoid false positives.
+ * </ul>
  */
 public final class RoundContext {
 
-  /** Points in the current round at which a player is treated as attempting to shoot. Tunable. */
+  /** Points threshold used after Q♠ has been played: Q♠ + at least one heart. */
   public static final int SHOOT_THREAT_THRESHOLD = 14;
+
+  /**
+   * Hearts-only threshold (Q♠ still in play): flag after this many hearts. Deliberately lower so
+   * that a hearts-first shooter is detected early enough to interfere.
+   */
+  public static final int HEARTS_ONLY_THRESHOLD = 4;
 
   private RoundContext() {}
 
   /**
    * Returns the player who appears to be shooting the moon, based on accumulated round points.
-   * Returns empty if no player meets the threshold or the round is already complete.
+   * Returns empty if no player meets the applicable threshold or the round is already complete.
    */
   public static Optional<String> shootingPlayer(final HeartsState state) {
     if (state.getCurrentRound().isEmpty()) return Optional.empty();
     final RoundState round = state.getRound();
     if (round.isComplete()) return Optional.empty();
 
-    return round.getScore().entrySet().stream()
-        .filter(e -> e.getValue() >= SHOOT_THREAT_THRESHOLD)
+    final Map<String, Integer> scores = round.getScore();
+
+    if (StrategyHelper.hasQueenBeenPlayed(round)) {
+      // Q♠ is already in someone's score; only a Q♠ + heart combination is a real threat
+      return scores.entrySet().stream()
+          .filter(e -> e.getValue() >= SHOOT_THREAT_THRESHOLD)
+          .max(Comparator.comparing(Map.Entry::getValue))
+          .map(Map.Entry::getKey);
+    }
+
+    // Q♠ still in play — all points so far are hearts. Catch hearts-first accumulation early.
+    return scores.entrySet().stream()
+        .filter(e -> e.getValue() >= HEARTS_ONLY_THRESHOLD)
         .max(Comparator.comparing(Map.Entry::getValue))
         .map(Map.Entry::getKey);
   }

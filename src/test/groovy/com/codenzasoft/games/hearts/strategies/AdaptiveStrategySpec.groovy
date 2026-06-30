@@ -5,6 +5,7 @@ import com.codenzasoft.games.common.cards.Card
 import com.codenzasoft.games.common.cards.Rank
 import com.codenzasoft.games.common.cards.Suit
 import com.codenzasoft.games.hearts.*
+import com.codenzasoft.games.hearts.strategies.HandEvaluator
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -209,6 +210,46 @@ class AdaptiveStrategySpec extends Specification {
 
     // ── saboteur mode ─────────────────────────────────────────────────────────────
 
+    def "mode is SABOTEUR when opponent accumulates 4 hearts before Q♠ is played"() {
+        given: "bob wins 4 heart tricks; Q♠ has not appeared yet"
+        def strategy = new AdaptiveStrategy(false)
+        def heart = { Rank r -> c(Suit.HEARTS, r) }
+        def club  = { Rank r -> c(Suit.CLUBS, r) }
+        def tricks = (1..4).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   heart(Rank.values()[Rank.ACE.ordinal() - (i-1)])),
+                new PlayedCard("carol", club(Rank.TWO)),
+                new PlayedCard("dave",  club(Rank.THREE)),
+                new PlayedCard("alice", club(Rank.FOUR)),
+            ])
+        }
+        def round = HeartsStateBuilder.inProgressRound(tricks: tricks)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        expect: "saboteur activates 9 tricks before Q♠ would cross the old threshold"
+        strategy.resolveMode(state, alice) == Mode.SABOTEUR
+    }
+
+    def "mode stays DEFENSIVE when hearts accumulation is below the early threshold"() {
+        given: "bob wins 3 hearts — not yet suspicious without Q♠"
+        def strategy = new AdaptiveStrategy(false)
+        def heart = { Rank r -> c(Suit.HEARTS, r) }
+        def club  = { Rank r -> c(Suit.CLUBS, r) }
+        def tricks = (1..3).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   heart(Rank.values()[Rank.ACE.ordinal() - (i-1)])),
+                new PlayedCard("carol", club(Rank.TWO)),
+                new PlayedCard("dave",  club(Rank.THREE)),
+                new PlayedCard("alice", club(Rank.FOUR)),
+            ])
+        }
+        def round = HeartsStateBuilder.inProgressRound(tricks: tricks)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        expect:
+        strategy.resolveMode(state, alice) == Mode.DEFENSIVE
+    }
+
     def "mode is SABOTEUR when opponent has crossed the shoot threshold"() {
         given: "bob has won Q♠ + A♥ = 14 points this round"
         def strategy = new AdaptiveStrategy(false)
@@ -285,6 +326,130 @@ class AdaptiveStrategySpec extends Specification {
 
         then:
         card.isEmpty()
+    }
+
+    // ── post-pass re-evaluation ───────────────────────────────────────────────────
+
+    def "commits to shooting after receiving strong cards via pass"() {
+        given: "pre-pass hand scores below threshold — does not commit"
+        def strategy = new AdaptiveStrategy()
+        def game = Mock(HeartsGame)
+        // AH(3)+KH(3)+QH(2) = 8 < SHOOT_THRESHOLD(10)
+        def prePassHand = [AH, KH, QH, _2C, _3C, _4C, _2D, _3D,
+                           c(Suit.DIAMONDS, Rank.FOUR), c(Suit.DIAMONDS, Rank.FIVE),
+                           c(Suit.DIAMONDS, Rank.SIX), c(Suit.DIAMONDS, Rank.SEVEN),
+                           c(Suit.DIAMONDS, Rank.EIGHT)]
+        assert HandEvaluator.shootingScore(prePassHand) < HandEvaluator.SHOOT_THRESHOLD
+        def passRound = roundWithHand("alice", prePassHand)
+        strategy.yourTurnToPass(game, HeartsStateBuilder.state(rounds: [passRound]), alice, prePassHand)
+
+        and: "after the pass alice receives Q♠ + J♥ + T♥ — now well above threshold"
+        // AH(3)+KH(3)+QH(2)+JH(2)+TH(1)+QS(2) = 13 >= 10
+        def postPassHand = [AH, KH, QH, JH, TH, QS, _2C, _3C, _4C, _2D, _3D,
+                            c(Suit.DIAMONDS, Rank.FOUR), c(Suit.DIAMONDS, Rank.FIVE)]
+        assert HandEvaluator.shootingScore(postPassHand) >= HandEvaluator.SHOOT_THRESHOLD
+        def leadingTrick = new TrickState(1, "alice", [])
+        def playRound = new RoundState(1, Pass.LEFT, "alice",
+            ["alice": postPassHand], [:], true,
+            [leadingTrick], ["alice": postPassHand])
+        def playState = HeartsStateBuilder.state(rounds: [playRound])
+
+        when: "alice leads the first trick with the updated hand"
+        strategy.yourTurnToPlay(game, playState, alice, new LinkedHashSet<>(postPassHand))
+
+        then: "leads A♥ — committed to shoot based on the post-pass hand"
+        1 * game.playCard(alice, AH)
+    }
+
+    def "abandons shooting commitment when post-pass hand drops below threshold"() {
+        given: "pre-pass hand is viable — commits to shoot"
+        def strategy = new AdaptiveStrategy()
+        def game = Mock(HeartsGame)
+        // AH(3)+KH(3)+QH(2)+JH(2)+TH(1)+NH(1)+QS(2) = 14 >= 10
+        def prePassHand = [AH, KH, QH, JH, TH, NH, QS, _2C, _3C, _4C, _2D, _3D,
+                           c(Suit.DIAMONDS, Rank.FOUR)]
+        assert HandEvaluator.shootingScore(prePassHand) >= HandEvaluator.SHOOT_THRESHOLD
+        def passRound = roundWithHand("alice", prePassHand)
+        strategy.yourTurnToPass(game, HeartsStateBuilder.state(rounds: [passRound]), alice, prePassHand)
+
+        and: "after the pass alice has lost A♥ K♥ and received low junk — below threshold"
+        // QH(2)+JH(2)+TH(1)+NH(1)+QS(2) = 8 < 10
+        def postPassHand = [QH, JH, TH, NH, QS, _2C, _3C, _4C, _2D, _3D,
+                            c(Suit.DIAMONDS, Rank.FOUR), c(Suit.DIAMONDS, Rank.FIVE),
+                            c(Suit.DIAMONDS, Rank.SIX)]
+        assert HandEvaluator.shootingScore(postPassHand) < HandEvaluator.SHOOT_THRESHOLD
+        def leadingTrick = new TrickState(1, "alice", [])
+        def playRound = new RoundState(1, Pass.LEFT, "alice",
+            ["alice": postPassHand], [:], true,
+            [leadingTrick], ["alice": postPassHand])
+        def playState = HeartsStateBuilder.state(rounds: [playRound])
+
+        when: "alice leads the first trick"
+        strategy.yourTurnToPlay(game, playState, alice, new LinkedHashSet<>(postPassHand))
+
+        then: "does not lead A♥ offensively — reverted to defensive after post-pass re-evaluation"
+        0 * game.playCard(alice, AH)
+        1 * game.playCard(alice, _)
+    }
+
+    // ── saboteur lead ─────────────────────────────────────────────────────────────
+
+    def "saboteur leads guaranteed-win card to take the trick away from the shooter"() {
+        given: "bob has collected 4 hearts — saboteur active; alice leads with a guaranteed club win"
+        def strategy = new AdaptiveStrategy(false)
+        def game = Mock(HeartsGame)
+        def completedTricks = (1..4).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   c(Suit.HEARTS, Rank.values()[Rank.ACE.ordinal() - (i - 1)])),
+                new PlayedCard("carol", _2C),
+                new PlayedCard("dave",  _3C),
+                new PlayedCard("alice", _4C),
+            ])
+        }
+        def currentTrick = new TrickState(5, "alice", [])
+        // alice holds A♣ (highest remaining club) and 6♠; opponents have only low diamonds
+        def round = new RoundState(
+            1, Pass.KEEPER, "alice",
+            [:], [:], true,
+            completedTricks + [currentTrick],
+            ["alice": [AC, c(Suit.SPADES, Rank.SIX)], "bob": [_2D, _3D]]
+        )
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [AC, c(Suit.SPADES, Rank.SIX)] as Set)
+
+        then: "leads A♣ (guaranteed win) rather than 6♠ (defensive spade smoke-out)"
+        1 * game.playCard(alice, AC)
+    }
+
+    def "saboteur falls back to defensive lead when no guaranteed-win card exists"() {
+        given: "bob has 4 hearts (shooter); alice has only cards opponents can beat"
+        def strategy = new AdaptiveStrategy(false)
+        def game = Mock(HeartsGame)
+        def completedTricks = (1..4).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   c(Suit.HEARTS, Rank.values()[Rank.ACE.ordinal() - (i - 1)])),
+                new PlayedCard("carol", _2C),
+                new PlayedCard("dave",  _3C),
+                new PlayedCard("alice", _4C),
+            ])
+        }
+        def currentTrick = new TrickState(5, "alice", [])
+        // bob holds A♣ — alice's 2♣ is not a guaranteed win; falls back to defensive
+        def round = new RoundState(
+            1, Pass.KEEPER, "alice",
+            [:], [:], true,
+            completedTricks + [currentTrick],
+            ["alice": [_2C, _3C], "bob": [AC, _2D]]
+        )
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [_2C, _3C] as Set)
+
+        then: "still plays a card via the defensive lead fallback"
+        1 * game.playCard(alice, _)
     }
 
     // ── full game completion ──────────────────────────────────────────────────────
