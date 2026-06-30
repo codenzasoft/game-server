@@ -4,7 +4,6 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.RoleEntity;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
-import com.codenzasoft.games.spring.repositories.WhitelistRepository;
 import com.codenzasoft.games.spring.services.EmailVerificationService;
 import com.codenzasoft.games.spring.validation.PasswordValidator;
 import com.codenzasoft.games.spring.validation.UsernameValidator;
@@ -30,7 +29,6 @@ public class RegisterController {
   private static final String EMAIL_PATTERN = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$";
 
   @Autowired UsersRepository usersRepository;
-  @Autowired WhitelistRepository whitelistRepository;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired EmailVerificationService verificationService;
 
