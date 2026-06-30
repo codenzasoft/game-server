@@ -121,7 +121,7 @@ STOMP over WebSocket. Connection endpoint: `/games/connect` (`WebSocketConfig.ja
 
 ### Account creation flow
 
-Registration is open to anyone with a valid email address. The admin whitelist (`whitelist` table / `WhitelistRepository`) is retained in code but bypassed.
+Registration is open to anyone with a valid email address.
 
 1. User submits the registration form (`POST /register`) — `RegisterController` validates input, checks email/username uniqueness, creates the `UserEntity` with `email_verified_at = NULL` and the `USER` role, then calls `EmailVerificationService.sendVerification()`.
 2. `EmailVerificationService` (extends `MailgunEmailService`) stores a 24-hour UUID token in `email_verification_tokens` and sends an email via the Mailgun HTTP API. In local development, when `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` are not set, the verification URL is logged at WARN level instead.
