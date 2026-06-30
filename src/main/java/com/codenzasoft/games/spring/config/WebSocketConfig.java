@@ -12,7 +12,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
   @Override
   public void configureMessageBroker(MessageBrokerRegistry config) {
-    config.enableSimpleBroker("/topic", "/queue");
+    config.enableSimpleBroker("/topic", "/queue").setHeartbeatValue(new long[] {25000, 25000});
     config.setApplicationDestinationPrefixes("/games");
   }
 
