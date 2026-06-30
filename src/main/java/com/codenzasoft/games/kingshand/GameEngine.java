@@ -386,6 +386,11 @@ public class GameEngine implements Game<GameEngine> {
    * @throws IllegalStateException if the current phase is not {@link Phase#PLAY}
    */
   public synchronized void endAndRun() {
+
+    if (state.isGameOver()) {
+      return;
+    }
+
     requirePhase(Phase.PLAY, "endAndRun");
 
     // 1. Discard everything remaining in hand.
@@ -588,6 +593,10 @@ public class GameEngine implements Game<GameEngine> {
     state.setResolutionLog(log);
     state.setGreatWorkLog(gwLog);
 
+    if (state.isGameOver()) {
+      notifyListeners(GAME_OVER_NOTIFICATION);
+      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
+    }
     // 6. Advance to the next phase (ADD for next season, or stay put if game is over / won).
     if (!state.isVictoryComplete()) {
       advancePhase();

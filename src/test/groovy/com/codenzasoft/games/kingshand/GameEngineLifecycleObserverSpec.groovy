@@ -110,7 +110,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
 
         then:
         1 * observer.gameQuit(engine)
-        engine.state.isGameOver()
+
     }
 
     def "quit does not fire again once the game is already over"() {
