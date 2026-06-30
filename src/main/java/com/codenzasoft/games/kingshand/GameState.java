@@ -26,10 +26,7 @@ public class GameState {
   // current hand
   private List<Card> hand;
   // resources
-  private double population;
-  private double populationCap;
-  private double production;
-  private double food;
+  private ResourceState resources;
   // where are we
   private Season curSeason;
   private Phase curPhase;
@@ -43,13 +40,6 @@ public class GameState {
   private List<CardStaffing> tableStaffing;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
-  // new resource types — both start locked at 0
-  private double gold;
-  private double strength;
-  // resources currently usable; population/production/food/populationCap are always present,
-  // gold/strength are added once TREASURY/BARRACKS complete. A set (rather than one boolean per
-  // resource) so future unlockable resources don't need a new field.
-  private Set<ResourceTarget> unlockedResources;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
   private List<String> greatWorkLog;
   // ----- Council / Advisors -----
@@ -73,10 +63,7 @@ public class GameState {
     this.drawPile = b.drawPile;
     this.discardPile = b.discardPile;
     this.hand = b.hand;
-    this.population = b.population;
-    this.populationCap = b.populationCap;
-    this.production = b.production;
-    this.food = b.food;
+    this.resources = b.resources;
     this.curSeason = b.curSeason;
     this.curPhase = b.curPhase;
     this.year = b.year;
@@ -85,9 +72,6 @@ public class GameState {
     this.gameOver = b.gameOver;
     this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
-    this.gold = b.gold;
-    this.strength = b.strength;
-    this.unlockedResources = b.unlockedResources;
     this.greatWorkLog = b.greatWorkLog;
     this.council = b.council;
     this.councilOfferChoices = b.councilOfferChoices;
@@ -231,7 +215,7 @@ public class GameState {
 
   @JsonProperty("population")
   public double getPopulation() {
-    return population;
+    return resources.population();
   }
 
   /**
@@ -241,21 +225,17 @@ public class GameState {
    */
   @JsonProperty("populationCap")
   public double getPopulationCap() {
-    return populationCap;
-  }
-
-  public void setPopulationCap(double populationCap) {
-    this.populationCap = populationCap;
+    return resources.populationCap();
   }
 
   @JsonProperty("production")
   public double getProduction() {
-    return production;
+    return resources.production();
   }
 
   @JsonProperty("food")
   public double getFood() {
-    return food;
+    return resources.food();
   }
 
   @JsonProperty("curSeason")
@@ -284,18 +264,6 @@ public class GameState {
   }
 
   // ----- Setters -----
-
-  public void setPopulation(double population) {
-    this.population = population;
-  }
-
-  public void setProduction(double production) {
-    this.production = production;
-  }
-
-  public void setFood(double food) {
-    this.food = food;
-  }
 
   public void setCurSeason(Season curSeason) {
     this.curSeason = curSeason;
@@ -359,20 +327,12 @@ public class GameState {
 
   @JsonProperty("gold")
   public double getGold() {
-    return gold;
-  }
-
-  public void setGold(double gold) {
-    this.gold = gold;
+    return resources.gold();
   }
 
   @JsonProperty("strength")
   public double getStrength() {
-    return strength;
-  }
-
-  public void setStrength(double strength) {
-    this.strength = strength;
+    return resources.strength();
   }
 
   /**
@@ -381,12 +341,12 @@ public class GameState {
    */
   @JsonProperty("unlockedResources")
   public Set<ResourceTarget> getUnlockedResources() {
-    return unlockedResources;
+    return resources.unlocked();
   }
 
   /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
   public void unlock(Card card) {
-    unlockedResources.addAll(card.unlockedResources());
+    resources = resources.unlock(card);
   }
 
   /**
@@ -394,7 +354,7 @@ public class GameState {
    * currently unlocked. Used to gate the ADD-phase offer pool and Great Work commissioning.
    */
   public boolean areRequiredResourcesUnlocked(Card card) {
-    return unlockedResources.containsAll(card.requiredResources());
+    return resources.unlocked().containsAll(card.requiredResources());
   }
 
   /**
@@ -407,10 +367,10 @@ public class GameState {
    * (not construction costs).
    */
   public boolean canAfford(List<Effect> effects) {
-    double simProd = production;
-    double simFood = food;
-    double simGold = gold;
-    double simStrength = strength;
+    double simProd = resources.production();
+    double simFood = resources.food();
+    double simGold = resources.gold();
+    double simStrength = resources.strength();
 
     for (Effect e : effects) {
       if (e.target() instanceof ResourceTarget rt) {
@@ -429,12 +389,12 @@ public class GameState {
 
   @JsonProperty("goldUnlocked")
   public boolean isGoldUnlocked() {
-    return unlockedResources.contains(ResourceTarget.GOLD);
+    return resources.unlocked().contains(ResourceTarget.GOLD);
   }
 
   @JsonProperty("strengthUnlocked")
   public boolean isStrengthUnlocked() {
-    return unlockedResources.contains(ResourceTarget.STRENGTH);
+    return resources.unlocked().contains(ResourceTarget.STRENGTH);
   }
 
   /**
@@ -568,6 +528,26 @@ public class GameState {
     acceleratedGreatWorkNames.add(greatWorkName);
   }
 
+  public void apply(Effect effect) {
+    resources = resources.apply(effect);
+  }
+
+  public void consumeFood(double rate) {
+    resources = resources.consumeFood(rate);
+  }
+
+  public void addProduction(double value) {
+    resources = resources.addProduction(value);
+  }
+
+  public void addGold(double value) {
+    resources = resources.addGold(value);
+  }
+
+  public void addPopulationCap(double value) {
+    resources = resources.addPopulationCap(value);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -601,6 +581,10 @@ public class GameState {
     private CouncilProposal currentProposal = null;
     private int permanentFreeRerolls = 0;
     private Set<String> acceleratedGreatWorkNames = new HashSet<>();
+
+    private ResourceState resources =
+        new ResourceState(
+            food, production, population, populationCap, gold, strength, unlockedResources);
 
     // fill similar data types with seasons
     private Builder() {
@@ -786,6 +770,9 @@ public class GameState {
       if (year < 0) {
         throw new IllegalStateException("year cannot be negative");
       }
+      resources =
+          new ResourceState(
+              food, production, population, populationCap, gold, strength, unlockedResources);
       return new GameState(this);
     }
   }

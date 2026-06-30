@@ -341,14 +341,7 @@ public class GameEngine implements Game<GameEngine> {
       if (card.frequencyType() != FrequencyType.RECURRING) continue;
       for (Effect effect : card.effects()) {
         if (effect.target() instanceof ResourceTarget rt) {
-          switch (rt) {
-            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-            case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-            case FOOD -> applyFood(effect.apply(state.getFood()));
-            case POPULATION_CAP -> {} // passive
-            case GOLD -> applyGold(effect.apply(state.getGold()));
-            case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-          }
+          state.apply(effect);
         } else if (effect.target() instanceof CardTarget ct) {
           // RECURRING engine builder: permanently boost matching cards to the right.
           for (int j = i + 1; j < table.size(); j++) {
@@ -433,15 +426,7 @@ public class GameEngine implements Game<GameEngine> {
           // Apply the per-season construction costs.
           for (Effect effect : card.effects()) {
             if (effect.target() instanceof ResourceTarget rt) {
-              switch (rt) {
-                case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-                case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-                case FOOD -> applyFood(effect.apply(state.getFood()));
-                case POPULATION_CAP ->
-                    state.setPopulationCap(state.getPopulationCap() + effect.modifier());
-                case GOLD -> applyGold(effect.apply(state.getGold()));
-                case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-              }
+              state.apply(effect);
             }
           }
 
@@ -493,15 +478,7 @@ public class GameEngine implements Game<GameEngine> {
 
         for (Effect effect : effects) {
           if (effect.target() instanceof ResourceTarget rt) {
-            switch (rt) {
-              case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-              case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-              case FOOD -> applyFood(effect.apply(state.getFood()));
-              case POPULATION_CAP ->
-                  state.setPopulationCap(state.getPopulationCap() + effect.modifier());
-              case GOLD -> applyGold(effect.apply(state.getGold()));
-              case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-            }
+            state.apply(effect);
           } else if (effect.target() instanceof CardTarget ct) {
             for (int j = i + 1; j < snapshot.size(); j++) {
               Card target = snapshot.get(j);
@@ -553,15 +530,7 @@ public class GameEngine implements Game<GameEngine> {
 
       for (Effect effect : card.effects()) {
         if (effect.target() instanceof ResourceTarget rt) {
-          switch (rt) {
-            case POPULATION -> applyPopulation(effect.apply(state.getPopulation()));
-            case PRODUCTION -> applyProduction(effect.apply(state.getProduction()));
-            case FOOD -> applyFood(effect.apply(state.getFood()));
-            case POPULATION_CAP ->
-                state.setPopulationCap(state.getPopulationCap() + effect.modifier());
-            case GOLD -> applyGold(effect.apply(state.getGold()));
-            case STRENGTH -> applyStrength(effect.apply(state.getStrength()));
-          }
+          state.apply(effect);
         }
       }
 
@@ -679,44 +648,6 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
-   * Applies a population change, clamping to zero and setting game-over if the result reaches zero.
-   * All engine-level population mutations route through this method so game-over detection is never
-   * scattered.
-   */
-  private void applyPopulation(double value) {
-    // Clamp between zero and the current population cap.
-    double clamped = Math.max(0.0, Math.min(value, state.getPopulationCap()));
-    state.setPopulation(clamped);
-    // A fractional population (< 1) means nobody is actually alive.
-    if (clamped < 1.0 && !state.isGameOver()) {
-      state.setPopulation(0.0);
-      state.setGameOver(true);
-      notifyListeners(GAME_OVER_NOTIFICATION);
-      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
-    }
-  }
-
-  /** Applies a production change, clamping to zero. Production can never go negative. */
-  private void applyProduction(double value) {
-    state.setProduction(Math.max(0.0, value));
-  }
-
-  /**
-   * Applies a food change, clamping to zero. If the result would be negative the shortfall is
-   * treated as a starvation deficit — food is set to 0 and population drops by {@code 0.5 ×
-   * deficit}, mirroring the logic in {@link #consumeFood()}.
-   */
-  private void applyFood(double value) {
-    if (value >= 0) {
-      state.setFood(value);
-    } else {
-      double deficit = -value;
-      state.setFood(0.0);
-      applyPopulation(state.getPopulation() - 0.5 * deficit);
-    }
-  }
-
-  /**
    * Consumes food at the end of every PLAY phase.
    *
    * <p>The per-population rate is 2 for {@link Season#WINTER} and 1 for all other seasons. Total
@@ -725,23 +656,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   private void consumeFood() {
     int rate = (state.getCurSeason() == Season.WINTER) ? 2 : 1;
-    double consumed = Math.floor(state.getPopulation()) * rate;
-    double available = state.getFood();
-    if (available >= consumed) {
-      state.setFood(available - consumed);
-    } else {
-      double deficit = consumed - available;
-      state.setFood(0.0);
-      applyPopulation(state.getPopulation() - 0.5 * deficit);
-    }
-
-    // Surplus growth: if food remains after consumption, grow population proportionally.
-    // Growth rate is capped at 20% per season so the population snowball stays manageable.
-    // The surplus food is not consumed — it carries over to the next season.
-    if (!state.isGameOver() && state.getFood() > 0 && state.getPopulation() > 0) {
-      double growthRate = Math.min(state.getFood() / state.getPopulation(), 0.20);
-      applyPopulation(state.getPopulation() + state.getPopulation() * growthRate);
-    }
+    state.consumeFood(rate);
   }
 
   // ----- ADD phase: card offer, pick, skip -----
@@ -772,7 +687,7 @@ public class GameEngine implements Game<GameEngine> {
                 + ", have "
                 + (int) state.getProduction());
       }
-      applyProduction(state.getProduction() - cost);
+      state.addProduction(0.0 - cost);
     }
     state.setRerollCount(state.getRerollCount() + 1);
     // Filter out cards whose effects target locked resources (GOLD / STRENGTH), and Great Works
@@ -1014,7 +929,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // Pay the production cost and remove the card from the hand.
-    applyProduction(state.getProduction() - card.productionRequirement());
+    state.addProduction(0.0 - card.productionRequirement());
     state.getHand().remove(card);
 
     // If a matching card is already on the table, merge the hand card into it so that
@@ -1139,7 +1054,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // else pay and demolish card
-    applyProduction(state.getProduction() - cost);
+    state.addProduction(0.0 - cost);
     state.removeFromTableAt(slot);
 
     // Recompute staffing so freed workers are redistributed immediately.
@@ -1224,7 +1139,7 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) state.getProduction());
     }
-    applyProduction(state.getProduction() - cost);
+    state.addProduction(0.0 - cost);
 
     targetTable.add(gw);
     computeAndSetStaffing();
@@ -1249,26 +1164,6 @@ public class GameEngine implements Game<GameEngine> {
     return cardCatalog.greatWorksForSeason(season).stream()
         .filter(gw -> !greatWorkAlreadyClaimed(gw))
         .toList();
-  }
-
-  // ----- New resource application -----
-
-  /**
-   * Applies a gold change, clamping to zero. No-ops if gold is not yet unlocked (TREASURY not
-   * complete).
-   */
-  private void applyGold(double value) {
-    if (!state.isGoldUnlocked()) return;
-    state.setGold(Math.max(0.0, value));
-  }
-
-  /**
-   * Applies a strength change, clamping to zero. No-ops if strength is not yet unlocked (BARRACKS
-   * not complete).
-   */
-  private void applyStrength(double value) {
-    if (!state.isStrengthUnlocked()) return;
-    state.setStrength(Math.max(0.0, value));
   }
 
   // ----- COUNCIL_ADD: advisor offer / hire / skip -----
@@ -1325,7 +1220,7 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) state.getGold());
     }
-    state.setGold(state.getGold() - advisor.hiringCost());
+    state.addGold(0.0 - advisor.hiringCost());
     state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getYear()));
     clearCouncilAddState();
     state.setCurPhase(Phase.COUNCIL_MEETING);
@@ -1395,7 +1290,7 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) state.getGold());
     }
-    state.setGold(state.getGold() - cost);
+    state.addGold(0.0 - cost);
     state.removeFromCouncil(advisorId);
     CouncilProposal proposal = state.getCurrentProposal();
     if (state.getCurPhase() == Phase.COUNCIL_MEETING
@@ -1591,8 +1486,7 @@ public class GameEngine implements Game<GameEngine> {
               target, target.withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
         }
       }
-      case POPULATION_CAP_BOOST ->
-          state.setPopulationCap(state.getPopulationCap() + decree.effectAmount());
+      case POPULATION_CAP_BOOST -> state.addPopulationCap(decree.effectAmount());
       case GREAT_WORK_ACCELERATE -> accelerateOneGreatWork();
       case FREE_REROLL -> state.incrementPermanentFreeRerolls((int) decree.effectAmount());
     }
