@@ -544,6 +544,9 @@ export class HeartsGameHandler {
         await this.animateTrickWon(dirs[(winnerIdx - myIdx + 4) % 4]);
         this.clearScene();
       }
+      // Show moon-shoot banner before the game-over screen if someone shot
+      // the moon on the final round.
+      await this.maybeShowMoonShoot(prevMessage, message);
       // Render score table only after any trick animation so the game-over
       // score overlay doesn't appear on top of the last trick.
       this.renderScoreTable(context, state);

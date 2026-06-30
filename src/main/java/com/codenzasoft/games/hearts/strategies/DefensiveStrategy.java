@@ -60,8 +60,8 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
 
   private Optional<Card> followTrump(
       final RoundState round, final Player player, final Set<Card> legalCards, final Suit trump) {
-    if (round.number() == 1) {
-      // play the highest trump, it's safe on the first trick
+    if (round.getTrick().number() == 1) {
+      // first trick of the round — few discards possible, safe to play high
       return StrategyHelper.getMaxRank(legalCards, trump);
     }
 
@@ -291,10 +291,15 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
     final List<Card> cardsToPass = new ArrayList<>(selectSpadesToPass(round, player));
 
     if (cardsToPass.size() < 3) {
+      cardsToPass.addAll(selectVoidCards(round, player, cardsToPass, 3 - cardsToPass.size()));
+    }
+
+    if (cardsToPass.size() < 3) {
       final List<Card> spades =
           StrategyHelper.filterSuit(round.getHand(player), Suit.SPADES).toList();
       final List<Card> others = new ArrayList<>(round.getHand(player));
       others.removeAll(spades);
+      others.removeAll(cardsToPass);
       final List<Suit> suits = List.of(Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS);
       Rank rank = Rank.ACE;
       while (cardsToPass.size() < 3) {
@@ -309,12 +314,52 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
     return cardsToPass;
   }
 
+  private List<Card> selectVoidCards(
+      final RoundState round,
+      final Player player,
+      final List<Card> alreadyPassing,
+      final int needed) {
+    final List<Card> hand = round.getHand(player);
+    final Set<Card> excluded = new HashSet<>(alreadyPassing);
+    final List<Card> result = new ArrayList<>();
+
+    // Prefer voiding the shortest suit first (clubs then diamonds, or vice versa)
+    final List<Suit> candidates =
+        List.of(Suit.CLUBS, Suit.DIAMONDS).stream()
+            .sorted(
+                Comparator.comparingLong(
+                    s ->
+                        StrategyHelper.filterSuit(hand, s)
+                            .filter(c -> !excluded.contains(c))
+                            .count()))
+            .toList();
+
+    for (final Suit suit : candidates) {
+      final List<Card> inSuit =
+          StrategyHelper.filterSuit(hand, suit)
+              .filter(c -> !excluded.contains(c))
+              .sorted(Comparator.comparing(Card::getRank).reversed())
+              .toList();
+      // Only pass if all cards in the suit fit in the remaining budget — partial voids add no value
+      if (!inSuit.isEmpty() && inSuit.size() <= needed - result.size()) {
+        result.addAll(inSuit);
+        excluded.addAll(inSuit);
+      }
+      if (result.size() >= needed) break;
+    }
+    return result;
+  }
+
   protected List<Card> selectSpadesToPass(final RoundState round, final Player player) {
     final List<Card> spades =
         StrategyHelper.filterSuit(round.getHand(player), Suit.SPADES).toList();
-    // if spades are a long suit (4 or more), it's OK to keep them
     if (spades.size() < 4) {
-      // otherwise, pass any spades queen and higher
+      return StrategyHelper.getHigherCards(spades, Suit.SPADES, Rank.JACK);
+    }
+    // With 4+ spades, only keep the suit when ≥ 2 low cards (≤ J) can absorb early leads;
+    // Q/K/A alone alongside a single low card leaves the queen exposed.
+    final long lowSpades = spades.stream().filter(c -> !c.outRanks(Rank.JACK)).count();
+    if (lowSpades < 2) {
       return StrategyHelper.getHigherCards(spades, Suit.SPADES, Rank.JACK);
     }
     return List.of();

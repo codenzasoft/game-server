@@ -27,7 +27,8 @@ import java.util.stream.Collectors;
  */
 public class AdaptiveStrategy extends DefensiveStrategy {
 
-  private int evaluatedRound = -1;
+  private int evaluatedPassRound = -1;
+  private int evaluatedPlayRound = -1;
   private boolean committedToShoot = false;
 
   public AdaptiveStrategy() {}
@@ -35,7 +36,8 @@ public class AdaptiveStrategy extends DefensiveStrategy {
   /** Test constructor: pre-seeds shooting commitment without requiring a game to be played. */
   AdaptiveStrategy(final boolean committedToShoot) {
     this.committedToShoot = committedToShoot;
-    this.evaluatedRound = Integer.MAX_VALUE;
+    this.evaluatedPassRound = Integer.MAX_VALUE;
+    this.evaluatedPlayRound = Integer.MAX_VALUE;
   }
 
   // ── HeartsPlayerObserver ────────────────────────────────────────────────────
@@ -46,7 +48,7 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       final HeartsState state,
       final Player player,
       final Set<Card> validCards) {
-    evaluateRoundIfNeeded(state, player);
+    evaluateForPlay(state, player);
     final Mode mode = resolveMode(state, player);
     if (mode == Mode.OFFENSIVE) {
       selectOffensiveCard(state, player, validCards).ifPresent(card -> game.playCard(player, card));
@@ -66,7 +68,7 @@ public class AdaptiveStrategy extends DefensiveStrategy {
   @Override
   public void yourTurnToPass(
       final HeartsGame game, final HeartsState state, final Player player, final List<Card> hand) {
-    evaluateRoundIfNeeded(state, player);
+    evaluateForPass(state, player);
     if (committedToShoot) {
       game.setPass(player, selectOffensivePassCards(state.getRound(), player));
     } else {
@@ -188,7 +190,7 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     final Optional<Suit> maybeTrump = trick.getTrump();
 
     if (maybeTrump.isEmpty()) {
-      return Optional.empty(); // leading — defer to defensive
+      return selectSaboteurLeadCard(round, player, validCards);
     }
 
     final Suit trump = maybeTrump.get();
@@ -230,12 +232,39 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     return validCards.stream().min(Comparator.comparing(Card::getRank));
   }
 
+  // ── Saboteur lead ────────────────────────────────────────────────────────────
+
+  private Optional<Card> selectSaboteurLeadCard(
+      final RoundState round, final Player player, final Set<Card> validCards) {
+    final List<Card> myHand = round.getHand(player);
+    // Lead the highest non-hearts card we're guaranteed to win (no opponent holds a higher card
+    // of that suit), so the saboteur takes the trick and the shooter doesn't.
+    return validCards.stream()
+        .filter(c -> c.getSuit() != Suit.HEARTS)
+        .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .filter(
+            c ->
+                StrategyHelper.filterSuit(round.getRemainingCards(), c.getSuit())
+                    .filter(r -> !myHand.contains(r))
+                    .noneMatch(r -> r.outRanks(c)))
+        .max(Comparator.comparing(Card::getRank));
+  }
+
   // ── Internal ────────────────────────────────────────────────────────────────
 
-  private void evaluateRoundIfNeeded(final HeartsState state, final Player player) {
+  private void evaluateForPass(final HeartsState state, final Player player) {
     final int roundNumber = state.getRound().number();
-    if (evaluatedRound != roundNumber) {
-      evaluatedRound = roundNumber;
+    if (evaluatedPassRound != roundNumber) {
+      evaluatedPassRound = roundNumber;
+      committedToShoot = HandEvaluator.isShootViable(state.getRound().getHand(player));
+    }
+  }
+
+  private void evaluateForPlay(final HeartsState state, final Player player) {
+    final int roundNumber = state.getRound().number();
+    if (evaluatedPlayRound != roundNumber) {
+      evaluatedPlayRound = roundNumber;
+      // Re-evaluate with the post-pass hand; received cards may change viability.
       committedToShoot = HandEvaluator.isShootViable(state.getRound().getHand(player));
     }
   }
