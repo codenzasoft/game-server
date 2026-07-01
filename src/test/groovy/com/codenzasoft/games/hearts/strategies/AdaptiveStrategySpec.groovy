@@ -314,8 +314,8 @@ class AdaptiveStrategySpec extends Specification {
         card.get() == _2D
     }
 
-    def "saboteur defers to defensive when shooter is not currently winning"() {
-        given: "carol (not the shooter) is winning; alice returns empty to fall back to defensive"
+    def "saboteur defers to defensive when shooter is not currently winning and trick has no points"() {
+        given: "carol (not the shooter) is winning with a pointless club; alice returns empty"
         def strategy = new AdaptiveStrategy(false)
         def trick = new TrickState(1, "carol", [new PlayedCard("carol", _3C)])
         def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
@@ -326,6 +326,23 @@ class AdaptiveStrategySpec extends Specification {
 
         then:
         card.isEmpty()
+    }
+
+    def "saboteur steals a point trick preemptively before the shooter plays"() {
+        given: "dave leads 4♣; carol (void) sluffs 2♥; alice plays before bob (shooter)"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(2, "dave", [
+            new PlayedCard("dave",  _4C),
+            new PlayedCard("carol", c(Suit.HEARTS, Rank.TWO)),
+        ])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "alice has A♣ — highest remaining club; bob (shooter) has not yet played"
+        def card = strategy.selectSaboteurCard(state, alice, [AC, _2D] as Set, "bob")
+
+        then: "plays A♣ to steal the 2♥ before bob can win it"
+        card.get() == AC
     }
 
     // ── post-pass re-evaluation ───────────────────────────────────────────────────
@@ -449,6 +466,62 @@ class AdaptiveStrategySpec extends Specification {
         strategy.yourTurnToPlay(game, state, alice, [_2C, _3C] as Set)
 
         then: "still plays a card via the defensive lead fallback"
+        1 * game.playCard(alice, _)
+    }
+
+    // ── bail-out after failed moon shot ──────────────────────────────────────────
+
+    def "failed moon-shooter leads highest heart to dump dangerous cards"() {
+        given: "alice committed to shoot (hand scores ≥ 10); bob won a heart trick — moon shot failed"
+        def strategy = new AdaptiveStrategy(true)
+        def game = Mock(HeartsGame)
+        def completedTrick = new TrickState(1, "bob", [
+            new PlayedCard("bob",   AH),
+            new PlayedCard("carol", _2C),
+            new PlayedCard("dave",  _3C),
+            new PlayedCard("alice", _4C),
+        ])
+        def leadingTrick = new TrickState(2, "alice", [])
+        // KH(3)+QH(2)+JH(2)+TH(1)+QS(2) = 10 — re-evaluation keeps committedToShoot=true
+        def hand = [KH, QH, JH, TH, QS, _2C, _3C]
+        assert HandEvaluator.shootingScore(hand) >= HandEvaluator.SHOOT_THRESHOLD
+        def round = new RoundState(1, Pass.KEEPER, "alice",
+            ["alice": hand], [:], true,
+            [completedTrick, leadingTrick],
+            ["alice": hand])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, new LinkedHashSet<>(hand))
+
+        then: "leads K♥ (highest remaining heart) to shed dangerous cards"
+        1 * game.playCard(alice, KH)
+    }
+
+    def "failed moon-shooter falls back to defensive when no hearts are valid to lead"() {
+        given: "alice committed but failed; hearts are not yet broken so she cannot lead them"
+        def strategy = new AdaptiveStrategy(true)
+        def game = Mock(HeartsGame)
+        def completedTrick = new TrickState(1, "bob", [
+            new PlayedCard("bob",   AH),
+            new PlayedCard("carol", _2C),
+            new PlayedCard("dave",  _3C),
+            new PlayedCard("alice", _4C),
+        ])
+        def leadingTrick = new TrickState(2, "alice", [])
+        // KH(3)+QH(2)+JH(2)+TH(1)+QS(2)+AC(1) = 11 — re-evaluation keeps committedToShoot=true
+        def fullHand = [KH, QH, JH, TH, QS, AC, _2C]
+        assert HandEvaluator.shootingScore(fullHand) >= HandEvaluator.SHOOT_THRESHOLD
+        def round = new RoundState(1, Pass.KEEPER, "alice",
+            ["alice": fullHand], [:], true,
+            [completedTrick, leadingTrick],
+            ["alice": fullHand])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "hearts not yet broken — valid cards exclude hearts"
+        strategy.yourTurnToPlay(game, state, alice, [AC, _2C] as Set)
+
+        then: "still plays a card via defensive fallback"
         1 * game.playCard(alice, _)
     }
 

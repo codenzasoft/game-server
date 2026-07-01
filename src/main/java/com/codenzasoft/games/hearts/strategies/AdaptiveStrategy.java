@@ -49,6 +49,15 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       final Player player,
       final Set<Card> validCards) {
     evaluateForPlay(state, player);
+    if (committedToShoot && RoundContext.hasMoonShotFailed(state, player.name())) {
+      final Optional<Card> bail = selectBailOutCard(state.getRound(), validCards);
+      if (bail.isPresent()) {
+        game.playCard(player, bail.get());
+      } else {
+        super.yourTurnToPlay(game, state, player, validCards);
+      }
+      return;
+    }
     final Mode mode = resolveMode(state, player);
     if (mode == Mode.OFFENSIVE) {
       selectOffensiveCard(state, player, validCards).ifPresent(card -> game.playCard(player, card));
@@ -202,7 +211,16 @@ public class AdaptiveStrategy extends DefensiveStrategy {
             .orElse(false);
 
     if (!shooterIsWinning) {
-      return Optional.empty(); // shooter not currently winning — defer to defensive
+      final boolean shooterHasPlayed =
+          trick.cards().stream().anyMatch(pc -> pc.player().equals(shooter));
+      if (shooterHasPlayed || StrategyHelper.getPoints(trick) == 0) {
+        return Optional.empty(); // safe to defer — no points at risk or shooter already played
+      }
+      // Points are in the trick and the shooter hasn't played yet — steal it preemptively
+      if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
+        return StrategyHelper.getMaxRank(validCards, trump);
+      }
+      return selectSaboteurSafeSluff(validCards);
     }
 
     if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
@@ -248,6 +266,16 @@ public class AdaptiveStrategy extends DefensiveStrategy {
                     .filter(r -> !myHand.contains(r))
                     .noneMatch(r -> r.outRanks(c)))
         .max(Comparator.comparing(Card::getRank));
+  }
+
+  // ── Bail-out ─────────────────────────────────────────────────────────────────
+
+  private Optional<Card> selectBailOutCard(final RoundState round, final Set<Card> validCards) {
+    if (round.getTrick().getTrump().isPresent()) {
+      return Optional.empty(); // not leading — defensive follow/sluff handles this correctly
+    }
+    // Leading after a failed moon shot — dump the highest heart to shed dangerous cards
+    return StrategyHelper.getMaxRank(validCards, Suit.HEARTS);
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────
