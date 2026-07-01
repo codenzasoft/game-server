@@ -126,9 +126,12 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     final Optional<Card> highHeart = StrategyHelper.getMaxRank(validCards, Suit.HEARTS);
     if (highHeart.isPresent()) return highHeart;
 
-    // No hearts available — lead a suit where I hold the highest remaining card
+    // No hearts available — lead a suit where I hold the highest remaining card (never Q♠)
     for (final Card candidate :
-        validCards.stream().sorted(Comparator.comparing(Card::getRank).reversed()).toList()) {
+        validCards.stream()
+            .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .sorted(Comparator.comparing(Card::getRank).reversed())
+            .toList()) {
       final Suit suit = candidate.getSuit();
       final boolean isHighest =
           StrategyHelper.filterSuit(round.getRemainingCards(), suit)
@@ -137,17 +140,29 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       if (isHighest) return Optional.of(candidate);
     }
 
-    return validCards.stream().max(Comparator.comparing(Card::getRank));
+    // No guaranteed-win card exists — lead highest non-Q♠ card to avoid handing away 13 pts
+    return validCards.stream()
+        .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .max(Comparator.comparing(Card::getRank))
+        .or(() -> validCards.stream().max(Comparator.comparing(Card::getRank)));
   }
 
   private Optional<Card> selectOffensiveSluff(final Set<Card> validCards) {
-    // Discard a low safe card — preserve hearts and Q♠ for the moon shot
+    // Discard a low safe card — preserve hearts, Q♠, and A♠/K♠ (spade protection) for the shot
     final Optional<Card> safeLow =
         validCards.stream()
             .filter(c -> c.getSuit() != Suit.HEARTS)
             .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .filter(c -> !(c.getSuit() == Suit.SPADES && c.outRanks(Rank.QUEEN)))
             .min(Comparator.comparing(Card::getRank));
     if (safeLow.isPresent()) return safeLow;
+    // Fall back to A♠/K♠ only when no other non-point option exists
+    final Optional<Card> spadeProtector =
+        validCards.stream()
+            .filter(c -> c.getSuit() != Suit.HEARTS)
+            .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .min(Comparator.comparing(Card::getRank));
+    if (spadeProtector.isPresent()) return spadeProtector;
     // All cards are hearts / Q♠ — nothing safe to discard, play lowest
     return validCards.stream().min(Comparator.comparing(Card::getRank));
   }

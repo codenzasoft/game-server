@@ -154,6 +154,36 @@ class AdaptiveStrategySpec extends Specification {
         card.get() == _2C
     }
 
+    def "offensive sluff preserves K♠ over A♣ to keep spade protection for Q♠"() {
+        given: "trick led with diamonds — alice void in diamonds, must sluff"
+        def strategy = new AdaptiveStrategy(true)
+        def leadCard = new PlayedCard("bob", _2D)
+        def trick = new TrickState(1, "bob", [leadCard])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "valid sluff cards are K♠ and A♣ — K♠ outranks Q♠ so must not be lost"
+        def card = strategy.selectOffensiveCard(state, alice, [KS, AC] as Set)
+
+        then: "sluffs A♣ rather than K♠ to preserve spade protection"
+        card.get() == AC
+    }
+
+    def "offensive lead fallback avoids Q♠ when guaranteed-win card does not exist"() {
+        given: "alice has Q♠ and 5♦; opponents hold A♦ so 5♦ is not a guaranteed win"
+        def strategy = new AdaptiveStrategy(true)
+        def myHand = [QS, c(Suit.DIAMONDS, Rank.FIVE)]
+        def allRemaining = myHand + [AD]
+        def round = roundWithRemainingCards("alice", myHand, allRemaining)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectOffensiveCard(state, alice, new LinkedHashSet<>(myHand))
+
+        then: "leads 5♦ rather than Q♠ — leading Q♠ risks handing 13 pts to A♠/K♠ holder"
+        card.get() == c(Suit.DIAMONDS, Rank.FIVE)
+    }
+
     def "offensive sluff plays lowest card when only hearts and Q♠ remain"() {
         given:
         def strategy = new AdaptiveStrategy(true)
