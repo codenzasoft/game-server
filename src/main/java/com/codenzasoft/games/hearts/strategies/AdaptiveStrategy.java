@@ -49,6 +49,15 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       final Player player,
       final Set<Card> validCards) {
     evaluateForPlay(state, player);
+    if (committedToShoot && RoundContext.hasMoonShotFailed(state, player.name())) {
+      final Optional<Card> bail = selectBailOutCard(state.getRound(), validCards);
+      if (bail.isPresent()) {
+        game.playCard(player, bail.get());
+      } else {
+        super.yourTurnToPlay(game, state, player, validCards);
+      }
+      return;
+    }
     final Mode mode = resolveMode(state, player);
     if (mode == Mode.OFFENSIVE) {
       selectOffensiveCard(state, player, validCards).ifPresent(card -> game.playCard(player, card));
@@ -117,9 +126,12 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     final Optional<Card> highHeart = StrategyHelper.getMaxRank(validCards, Suit.HEARTS);
     if (highHeart.isPresent()) return highHeart;
 
-    // No hearts available — lead a suit where I hold the highest remaining card
+    // No hearts available — lead a suit where I hold the highest remaining card (never Q♠)
     for (final Card candidate :
-        validCards.stream().sorted(Comparator.comparing(Card::getRank).reversed()).toList()) {
+        validCards.stream()
+            .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .sorted(Comparator.comparing(Card::getRank).reversed())
+            .toList()) {
       final Suit suit = candidate.getSuit();
       final boolean isHighest =
           StrategyHelper.filterSuit(round.getRemainingCards(), suit)
@@ -128,17 +140,29 @@ public class AdaptiveStrategy extends DefensiveStrategy {
       if (isHighest) return Optional.of(candidate);
     }
 
-    return validCards.stream().max(Comparator.comparing(Card::getRank));
+    // No guaranteed-win card exists — lead highest non-Q♠ card to avoid handing away 13 pts
+    return validCards.stream()
+        .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .max(Comparator.comparing(Card::getRank))
+        .or(() -> validCards.stream().max(Comparator.comparing(Card::getRank)));
   }
 
   private Optional<Card> selectOffensiveSluff(final Set<Card> validCards) {
-    // Discard a low safe card — preserve hearts and Q♠ for the moon shot
+    // Discard a low safe card — preserve hearts, Q♠, and A♠/K♠ (spade protection) for the shot
     final Optional<Card> safeLow =
         validCards.stream()
             .filter(c -> c.getSuit() != Suit.HEARTS)
             .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .filter(c -> !(c.getSuit() == Suit.SPADES && c.outRanks(Rank.QUEEN)))
             .min(Comparator.comparing(Card::getRank));
     if (safeLow.isPresent()) return safeLow;
+    // Fall back to A♠/K♠ only when no other non-point option exists
+    final Optional<Card> spadeProtector =
+        validCards.stream()
+            .filter(c -> c.getSuit() != Suit.HEARTS)
+            .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+            .min(Comparator.comparing(Card::getRank));
+    if (spadeProtector.isPresent()) return spadeProtector;
     // All cards are hearts / Q♠ — nothing safe to discard, play lowest
     return validCards.stream().min(Comparator.comparing(Card::getRank));
   }
@@ -202,7 +226,20 @@ public class AdaptiveStrategy extends DefensiveStrategy {
             .orElse(false);
 
     if (!shooterIsWinning) {
-      return Optional.empty(); // shooter not currently winning — defer to defensive
+      final boolean shooterHasPlayed =
+          trick.cards().stream().anyMatch(pc -> pc.player().equals(shooter));
+      final boolean trickHasHeartsOnly =
+          trick.cards().stream().anyMatch(pc -> pc.card().getSuit() == Suit.HEARTS)
+              && trick.cards().stream()
+                  .noneMatch(pc -> pc.card().equals(HeartsGame.QUEEN_OF_SPADES));
+      if (shooterHasPlayed || !trickHasHeartsOnly) {
+        return Optional.empty(); // defer — no cheap hearts at risk, or shooter already played
+      }
+      // Hearts (no Q♠) are in the trick and the shooter hasn't played — steal it preemptively
+      if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
+        return StrategyHelper.getMaxRank(validCards, trump);
+      }
+      return selectSaboteurSafeSluff(validCards);
     }
 
     if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
@@ -248,6 +285,16 @@ public class AdaptiveStrategy extends DefensiveStrategy {
                     .filter(r -> !myHand.contains(r))
                     .noneMatch(r -> r.outRanks(c)))
         .max(Comparator.comparing(Card::getRank));
+  }
+
+  // ── Bail-out ─────────────────────────────────────────────────────────────────
+
+  private Optional<Card> selectBailOutCard(final RoundState round, final Set<Card> validCards) {
+    if (round.getTrick().getTrump().isPresent()) {
+      return Optional.empty(); // not leading — defensive follow/sluff handles this correctly
+    }
+    // Leading after a failed moon shot — dump the highest heart to shed dangerous cards
+    return StrategyHelper.getMaxRank(validCards, Suit.HEARTS);
   }
 
   // ── Internal ────────────────────────────────────────────────────────────────
