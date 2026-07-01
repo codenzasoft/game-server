@@ -228,10 +228,14 @@ public class AdaptiveStrategy extends DefensiveStrategy {
     if (!shooterIsWinning) {
       final boolean shooterHasPlayed =
           trick.cards().stream().anyMatch(pc -> pc.player().equals(shooter));
-      if (shooterHasPlayed || StrategyHelper.getPoints(trick) == 0) {
-        return Optional.empty(); // safe to defer — no points at risk or shooter already played
+      final boolean trickHasHeartsOnly =
+          trick.cards().stream().anyMatch(pc -> pc.card().getSuit() == Suit.HEARTS)
+              && trick.cards().stream()
+                  .noneMatch(pc -> pc.card().equals(HeartsGame.QUEEN_OF_SPADES));
+      if (shooterHasPlayed || !trickHasHeartsOnly) {
+        return Optional.empty(); // defer — no cheap hearts at risk, or shooter already played
       }
-      // Points are in the trick and the shooter hasn't played yet — steal it preemptively
+      // Hearts (no Q♠) are in the trick and the shooter hasn't played — steal it preemptively
       if (StrategyHelper.filterSuit(validCards, trump).findAny().isPresent()) {
         return StrategyHelper.getMaxRank(validCards, trump);
       }

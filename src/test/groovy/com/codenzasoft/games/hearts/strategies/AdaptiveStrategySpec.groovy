@@ -375,6 +375,41 @@ class AdaptiveStrategySpec extends Specification {
         card.get() == AC
     }
 
+    def "saboteur does not steal preemptively when Q♠ is in the trick"() {
+        given: "dave leads 4♣; carol sluffs Q♠ into the trick; alice plays before bob (shooter)"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(2, "dave", [
+            new PlayedCard("dave",  _4C),
+            new PlayedCard("carol", QS),
+        ])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "taking Q♠ costs the saboteur 13 points — not worth it"
+        def card = strategy.selectSaboteurCard(state, alice, [AC, _2D] as Set, "bob")
+
+        then: "defers to defensive rather than stealing 13 points"
+        card.isEmpty()
+    }
+
+    def "saboteur does not steal preemptively when Q♠ and hearts are both in the trick"() {
+        given: "trick has both a heart and Q♠ dumped into it; alice plays before bob (shooter)"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(2, "dave", [
+            new PlayedCard("dave",  _4C),
+            new PlayedCard("carol", c(Suit.HEARTS, Rank.TWO)),
+            new PlayedCard("eve",   QS),
+        ])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "taking this trick would cost the saboteur 14+ points"
+        def card = strategy.selectSaboteurCard(state, alice, [AC, _2D] as Set, "bob")
+
+        then: "defers to defensive"
+        card.isEmpty()
+    }
+
     // ── post-pass re-evaluation ───────────────────────────────────────────────────
 
     def "commits to shooting after receiving strong cards via pass"() {
