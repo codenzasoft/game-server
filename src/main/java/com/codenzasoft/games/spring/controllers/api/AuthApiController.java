@@ -3,7 +3,6 @@ package com.codenzasoft.games.spring.controllers.api;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.security.Principal;
 import java.util.Map;
@@ -11,12 +10,11 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,38 +22,44 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 public class AuthApiController {
 
+  private static final ResponseEntity<Object> UNAUTHORIZED =
+      ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
+
   record LoginRequest(String username, String password) {}
 
-  @Autowired private AuthenticationManager authenticationManager;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
+  @Autowired private PasswordEncoder passwordEncoder;
 
   /**
    * Authenticates with username/password and establishes a session cookie for subsequent requests.
    */
   @PostMapping("/login")
   public ResponseEntity<?> login(
-      @RequestBody final LoginRequest request,
-      final HttpServletRequest httpRequest,
-      final HttpServletResponse httpResponse) {
-    try {
-      final Authentication auth =
-          authenticationManager.authenticate(
-              UsernamePasswordAuthenticationToken.unauthenticated(
-                  request.username(), request.password()));
-      final SecurityContext context = SecurityContextHolder.createEmptyContext();
-      context.setAuthentication(auth);
-      SecurityContextHolder.setContext(context);
-      httpRequest
-          .getSession(true)
-          .setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
-      return gamesUserDetailsService
-          .getUserByUsernameOrEmail(auth.getName())
-          .map(user -> ResponseEntity.ok((Object) user))
-          .orElse(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-    } catch (AuthenticationException e) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("error", "Invalid credentials"));
+      @RequestBody final LoginRequest request, final HttpServletRequest httpRequest) {
+    final Optional<UserEntity> userOpt =
+        gamesUserDetailsService.getUserByUsernameOrEmail(request.username());
+    if (userOpt.isEmpty()) {
+      return UNAUTHORIZED;
     }
+    final UserEntity entity = userOpt.get();
+    if (!entity.isEmailVerified()) {
+      return UNAUTHORIZED;
+    }
+    if (!passwordEncoder.matches(request.password(), entity.getPassword())) {
+      return UNAUTHORIZED;
+    }
+    final UserDetails userDetails =
+        gamesUserDetailsService.loadUserByUsername(entity.getUsername());
+    final UsernamePasswordAuthenticationToken auth =
+        UsernamePasswordAuthenticationToken.authenticated(
+            userDetails, null, userDetails.getAuthorities());
+    final SecurityContext context = SecurityContextHolder.createEmptyContext();
+    context.setAuthentication(auth);
+    SecurityContextHolder.setContext(context);
+    httpRequest
+        .getSession(true)
+        .setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+    return ResponseEntity.ok(entity);
   }
 
   /** Invalidates the current session, clearing the server-side session record. */
