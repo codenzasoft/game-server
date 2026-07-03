@@ -35,35 +35,34 @@ public record ResolutionStep(
      * resource deltas will be zero; the frontend should show a boost toast instead.
      */
     @JsonProperty("engineBoost") boolean engineBoost,
-    @JsonIgnore ResourceState before,
-    @JsonIgnore ResourceState after) {
+    @JsonIgnore ResourceState delta) {
   @JsonProperty("populationDelta")
   double populationDelta() {
-    return after.population() - before.population();
+    return delta.population();
   }
 
   @JsonProperty("productionDelta")
   double productionDelta() {
-    return after.production() - before.production();
+    return delta.production();
   }
 
   @JsonProperty("foodDelta")
   double foodDelta() {
-    return after.food() - before.food();
+    return delta.food();
   }
 
   @JsonProperty("populationCapDelta")
   double populationCapDelta() {
-    return after.populationCap() - before.populationCap();
+    return delta.populationCap();
   }
 
   @JsonProperty("goldDelta")
   double goldDelta() {
-    return after.gold() - before.gold();
+    return delta.gold();
   }
 
   @JsonProperty("strengthDelta")
   double strengthDelta() {
-    return after.strength() - before.strength();
+    return delta.strength();
   }
 }

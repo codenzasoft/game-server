@@ -13,6 +13,10 @@ public record ResourceState(
     double strength,
     Set<ResourceTarget> unlocked) {
 
+  public static ResourceState empty() {
+    return new ResourceState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Collections.emptySet());
+  }
+
   public ResourceState apply(Effect effect) {
 
     if (effect.target() instanceof ResourceTarget rt) {
@@ -143,5 +147,18 @@ public record ResourceState(
     double nextPopulation = Math.min((population + (population * growthRate)), populationCap);
     return new ResourceState(
         nextFood, production, nextPopulation, populationCap, gold, strength, unlocked);
+  }
+
+  public ResourceState getDelta(final ResourceState since) {
+    final Set<ResourceTarget> unlockedSince = new HashSet<>(unlocked);
+    unlockedSince.removeAll(since.unlocked);
+    return new ResourceState(
+        food - since.food,
+        production - since.production,
+        population - since.population,
+        populationCap - since.populationCap,
+        gold - since.gold,
+        strength - since.strength,
+        Collections.unmodifiableSet(unlockedSince));
   }
 }

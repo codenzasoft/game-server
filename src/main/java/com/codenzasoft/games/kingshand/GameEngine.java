@@ -449,7 +449,8 @@ public class GameEngine implements Game<GameEngine> {
           gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
         }
 
-        log.add(new ResolutionStep(card.name(), tier, false, before, state.getResources()));
+        log.add(
+            new ResolutionStep(card.name(), tier, false, state.getResources().getDelta(before)));
         // Great-work construction/completed cards are NEVER discarded by the engine.
         continue;
       }
@@ -488,7 +489,9 @@ public class GameEngine implements Game<GameEngine> {
         }
       }
 
-      log.add(new ResolutionStep(card.name(), tier, isEngineBoost, before, state.getResources()));
+      log.add(
+          new ResolutionStep(
+              card.name(), tier, isEngineBoost, state.getResources().getDelta(before)));
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
@@ -509,7 +512,8 @@ public class GameEngine implements Game<GameEngine> {
       }
 
       log.add(
-          new ResolutionStep(card.name(), StaffingTier.FULL, false, before, state.getResources()));
+          new ResolutionStep(
+              card.name(), StaffingTier.FULL, false, state.getResources().getDelta(before)));
     }
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
@@ -529,11 +533,7 @@ public class GameEngine implements Game<GameEngine> {
           currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
           log.add(
               new ResolutionStep(
-                  "COUNCIL_CROSS_TABLE_BOOST",
-                  StaffingTier.FULL,
-                  true,
-                  state.getResources(),
-                  state.getResources()));
+                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true, ResourceState.empty()));
           break;
         }
       }
@@ -542,7 +542,7 @@ public class GameEngine implements Game<GameEngine> {
     // 5. Food consumption / starvation / growth — captured as a tail step.
     ResourceState before = state.getResources();
     consumeFood();
-    log.add(new ResolutionStep(null, null, false, before, state.getResources()));
+    log.add(new ResolutionStep(null, null, false, state.getResources().getDelta(before)));
 
     state.setResolutionLog(log);
     state.setGreatWorkLog(gwLog);
