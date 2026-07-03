@@ -36,7 +36,7 @@ class GameEngineNotificationSpec extends Specification {
     def "initialize does not fire gameStarted when the game is already over"() {
         setup:
         def listener = Mock(KhObserver)
-        def state = GameState.builder().population(0.0).gameOver(true).build()
+        def state = GameState.builder().population(0.0).build()
         def engine = engineWith(state, listener)
 
         when:
@@ -70,7 +70,7 @@ class GameEngineNotificationSpec extends Specification {
         def state = GameState.builder()
                 .curPhase(Phase.PLAY).curSeason(Season.SPRING).year(1)
                 .table(Season.SPRING, [aftermath])
-                .population(0.0).gameOver(true).build()
+                .population(0.0).build()
         def engine = engineWith(state, listener)
 
         when:

@@ -549,7 +549,7 @@ public class GameService {
     log.debug("Building KH game from entity: {}", entity.getId());
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
-    final GameState state = GameState.builder().gameOver(isOver).build();
+    final GameState state = GameState.builder().build();
     // Built via the Builder (rather than the raw constructor) so a GameLifecycleListener can be
     // registered; the Builder's defaults (default catalogs, a fresh Random, synchronous executor)
     // exactly replicate the old constructor's behavior.
