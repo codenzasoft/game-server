@@ -416,12 +416,7 @@ public class GameEngine implements Game<GameEngine> {
       Card card = snapshot.get(i);
       StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
 
-      double popBefore = state.getPopulation();
-      double prodBefore = state.getProduction();
-      double foodBefore = state.getFood();
-      double capBefore = state.getPopulationCap();
-      double goldBefore = state.getGold();
-      double strengthBefore = state.getStrength();
+      ResourceState before = state.getResources();
 
       if (card.isGreatWork()) {
         // Construction cards are never discarded and never run normal effects.
@@ -454,17 +449,7 @@ public class GameEngine implements Game<GameEngine> {
           gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
         }
 
-        log.add(
-            new ResolutionStep(
-                card.name(),
-                tier,
-                false,
-                state.getPopulation() - popBefore,
-                state.getProduction() - prodBefore,
-                state.getFood() - foodBefore,
-                state.getPopulationCap() - capBefore,
-                state.getGold() - goldBefore,
-                state.getStrength() - strengthBefore));
+        log.add(new ResolutionStep(card.name(), tier, false, before, state.getResources()));
         // Great-work construction/completed cards are NEVER discarded by the engine.
         continue;
       }
@@ -503,17 +488,7 @@ public class GameEngine implements Game<GameEngine> {
         }
       }
 
-      log.add(
-          new ResolutionStep(
-              card.name(),
-              tier,
-              isEngineBoost,
-              state.getPopulation() - popBefore,
-              state.getProduction() - prodBefore,
-              state.getFood() - foodBefore,
-              state.getPopulationCap() - capBefore,
-              state.getGold() - goldBefore,
-              state.getStrength() - strengthBefore));
+      log.add(new ResolutionStep(card.name(), tier, isEngineBoost, before, state.getResources()));
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
@@ -525,12 +500,7 @@ public class GameEngine implements Game<GameEngine> {
     // card effects fire unconditionally, at full value, every season. See class javadoc.
     for (SeatedAdvisor seated : state.getCouncil()) {
       Card card = seated.getCard();
-      double popBefore2 = state.getPopulation();
-      double prodBefore2 = state.getProduction();
-      double foodBefore2 = state.getFood();
-      double capBefore2 = state.getPopulationCap();
-      double goldBefore2 = state.getGold();
-      double strengthBefore2 = state.getStrength();
+      ResourceState before = state.getResources();
 
       for (Effect effect : card.effects()) {
         if (effect.target() instanceof ResourceTarget rt) {
@@ -539,16 +509,7 @@ public class GameEngine implements Game<GameEngine> {
       }
 
       log.add(
-          new ResolutionStep(
-              card.name(),
-              StaffingTier.FULL,
-              false,
-              state.getPopulation() - popBefore2,
-              state.getProduction() - prodBefore2,
-              state.getFood() - foodBefore2,
-              state.getPopulationCap() - capBefore2,
-              state.getGold() - goldBefore2,
-              state.getStrength() - strengthBefore2));
+          new ResolutionStep(card.name(), StaffingTier.FULL, false, before, state.getResources()));
     }
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
@@ -568,27 +529,20 @@ public class GameEngine implements Game<GameEngine> {
           currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
           log.add(
               new ResolutionStep(
-                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true, 0, 0, 0, 0, 0, 0));
+                  "COUNCIL_CROSS_TABLE_BOOST",
+                  StaffingTier.FULL,
+                  true,
+                  state.getResources(),
+                  state.getResources()));
           break;
         }
       }
     }
 
     // 5. Food consumption / starvation / growth — captured as a tail step.
-    double popBefore = state.getPopulation();
-    double foodBefore = state.getFood();
+    ResourceState before = state.getResources();
     consumeFood();
-    log.add(
-        new ResolutionStep(
-            null,
-            null,
-            false,
-            state.getPopulation() - popBefore,
-            0,
-            state.getFood() - foodBefore,
-            0,
-            0,
-            0));
+    log.add(new ResolutionStep(null, null, false, before, state.getResources()));
 
     state.setResolutionLog(log);
     state.setGreatWorkLog(gwLog);

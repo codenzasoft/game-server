@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
@@ -90,6 +91,11 @@ public class GameState {
   }
 
   // ----- Getters -----
+
+  @JsonIgnore
+  public ResourceState getResources() {
+    return resources;
+  }
 
   @JsonProperty("board")
   public Map<Season, List<Card>> getBoard() {
