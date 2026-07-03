@@ -506,6 +506,7 @@ export class GameEventHandler {
   stompClient: Client;
   subscription: StompSubscription;
   gameId: string;
+  wsErrorCount: number = 0;
   board: Board;
   myMove: Text | undefined = undefined;
   yourMove: Text | undefined = undefined;
@@ -716,6 +717,7 @@ export class GameEventHandler {
   }
 
   onConnect(frame: Frame) {
+    this.wsErrorCount = 0;
     console.log("Connected: " + frame);
     this.subscription = this.stompClient.subscribe(
       `/user/queue/games/${this.gameId}`,
@@ -741,9 +743,12 @@ export class GameEventHandler {
   }
 
   onWebSocketError(error: unknown) {
-    console.error("Error with websocket", error);
-    // redirect to login page to ensure user is authenticated
-    window.location.href = loginUrl;
+    this.wsErrorCount++;
+    console.error("Error with websocket", error, `(${this.wsErrorCount})`);
+    if (this.wsErrorCount >= 3) {
+      console.error("Repeated WebSocket errors — redirecting to login");
+      window.location.href = loginUrl;
+    }
   }
 
   onStompError(frame: Frame) {
