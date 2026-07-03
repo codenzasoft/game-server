@@ -149,16 +149,24 @@ public record ResourceState(
         nextFood, production, nextPopulation, populationCap, gold, strength, unlocked);
   }
 
-  public ResourceState getDelta(final ResourceState since) {
+  /**
+   * Returns a {@link ResourceState} containing delta values between this and the provided previous
+   * {@link ResourceState}.
+   *
+   * @param previous A {@link ResourceState}
+   * @return A {@link ResourceState} with the difference in values between this state and the
+   *     previous state.
+   */
+  public ResourceState getDelta(final ResourceState previous) {
     final Set<ResourceTarget> unlockedSince = new HashSet<>(unlocked);
-    unlockedSince.removeAll(since.unlocked);
+    unlockedSince.removeAll(previous.unlocked);
     return new ResourceState(
-        food - since.food,
-        production - since.production,
-        population - since.population,
-        populationCap - since.populationCap,
-        gold - since.gold,
-        strength - since.strength,
+        food - previous.food,
+        production - previous.production,
+        population - previous.population,
+        populationCap - previous.populationCap,
+        gold - previous.gold,
+        strength - previous.strength,
         Collections.unmodifiableSet(unlockedSince));
   }
 }
