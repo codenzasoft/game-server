@@ -39,31 +39,31 @@ public record ResolutionStep(
     @JsonIgnore ResourceState after) {
   @JsonProperty("populationDelta")
   double populationDelta() {
-    return before.population() - after.population();
+    return after.population() - before.population();
   }
 
   @JsonProperty("productionDelta")
   double productionDelta() {
-    return before.production() - after.production();
+    return after.production() - before.production();
   }
 
   @JsonProperty("foodDelta")
   double foodDelta() {
-    return before.food() - after.food();
+    return after.food() - before.food();
   }
 
   @JsonProperty("populationCapDelta")
   double populationCapDelta() {
-    return before.populationCap() - after.populationCap();
+    return after.populationCap() - before.populationCap();
   }
 
   @JsonProperty("goldDelta")
   double goldDelta() {
-    return before.gold() - after.gold();
+    return after.gold() - before.gold();
   }
 
   @JsonProperty("strengthDelta")
   double strengthDelta() {
-    return before.strength() - after.strength();
+    return after.strength() - before.strength();
   }
 }
