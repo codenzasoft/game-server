@@ -755,6 +755,8 @@ export class GameEventHandler {
     this.gameId = gameId;
     const client = new Client({
       brokerURL: wsUrl,
+      heartbeatIncoming: 25000,
+      heartbeatOutgoing: 25000,
     });
     client.onConnect = (frame) => this.onConnect(frame);
     client.onWebSocketError = (error) => this.onWebSocketError(error);
