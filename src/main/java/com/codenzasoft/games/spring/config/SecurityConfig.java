@@ -1,10 +1,12 @@
 package com.codenzasoft.games.spring.config;
 
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -59,6 +61,26 @@ public class SecurityConfig {
     encoders.put("sha256", new StandardPasswordEncoder());
 
     return new DelegatingPasswordEncoder(idForEncode, encoders);
+  }
+
+  /** Dedicated filter chain for the REST API. Matches before the MVC chain. */
+  @Bean
+  @Order(1)
+  public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
+    http.securityMatcher("/api/**")
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers("/api/auth/login").permitAll().anyRequest().authenticated())
+        .csrf(csrf -> csrf.disable())
+        .exceptionHandling(
+            ex ->
+                ex.authenticationEntryPoint(
+                    (request, response, e) -> {
+                      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                      response.setContentType("application/json");
+                      response.getWriter().write("{\"error\":\"Unauthorized\"}");
+                    }));
+    return http.build();
   }
 
   @Bean
