@@ -140,7 +140,7 @@ public record ResourceState(
     // Growth rate is capped at 20% per season so the population snowball stays manageable.
     // The surplus food is not consumed — it carries over to the next season.
     double growthRate = Math.min(nextFood / population, 0.20);
-    double nextPopulation = population + (population * growthRate);
+    double nextPopulation = Math.min((population + (population * growthRate)), populationCap);
     return new ResourceState(
         nextFood, production, nextPopulation, populationCap, gold, strength, unlocked);
   }
