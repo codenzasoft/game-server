@@ -356,7 +356,11 @@ export class HeartsGameHandler {
 
   connect(gameId: string) {
     this.gameId = gameId;
-    const client = new Client({ brokerURL: wsUrl });
+    const client = new Client({
+      brokerURL: wsUrl,
+      heartbeatIncoming: 25000,
+      heartbeatOutgoing: 25000,
+    });
     client.onConnect = () => {
       console.log("[Hearts] STOMP connected, subscribing to game", this.gameId);
       this.subscription = this.stompClient.subscribe(
