@@ -34,8 +34,6 @@ public class GameState {
   // ADD-phase offer state
   private List<Card> addChoices;
   private int rerollCount;
-  // true once the player's population has reached zero; no further actions are possible
-  private boolean gameOver;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
@@ -294,7 +292,7 @@ public class GameState {
   /** Returns staffing for the current season's table. */
   @JsonProperty("tableStaffing")
   public List<CardStaffing> getTableStaffing() {
-    return CardStaffing.computeTableStaffing(board.get(curSeason), resources);
+    return CardStaffing.computeStaffing(board.get(curSeason), resources);
   }
 
   /**
