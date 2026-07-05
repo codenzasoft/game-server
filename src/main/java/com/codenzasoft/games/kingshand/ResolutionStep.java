@@ -1,5 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -34,9 +35,34 @@ public record ResolutionStep(
      * resource deltas will be zero; the frontend should show a boost toast instead.
      */
     @JsonProperty("engineBoost") boolean engineBoost,
-    @JsonProperty("populationDelta") double populationDelta,
-    @JsonProperty("productionDelta") double productionDelta,
-    @JsonProperty("foodDelta") double foodDelta,
-    @JsonProperty("populationCapDelta") double populationCapDelta,
-    @JsonProperty("goldDelta") double goldDelta,
-    @JsonProperty("strengthDelta") double strengthDelta) {}
+    @JsonIgnore ResourceState delta) {
+  @JsonProperty("populationDelta")
+  double populationDelta() {
+    return delta.population();
+  }
+
+  @JsonProperty("productionDelta")
+  double productionDelta() {
+    return delta.production();
+  }
+
+  @JsonProperty("foodDelta")
+  double foodDelta() {
+    return delta.food();
+  }
+
+  @JsonProperty("populationCapDelta")
+  double populationCapDelta() {
+    return delta.populationCap();
+  }
+
+  @JsonProperty("goldDelta")
+  double goldDelta() {
+    return delta.gold();
+  }
+
+  @JsonProperty("strengthDelta")
+  double strengthDelta() {
+    return delta.strength();
+  }
+}
