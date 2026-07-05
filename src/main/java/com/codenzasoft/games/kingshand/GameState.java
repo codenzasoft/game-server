@@ -36,12 +36,6 @@ public class GameState {
   private int rerollCount;
   // true once the player's population has reached zero; no further actions are possible
   private boolean gameOver;
-
-  // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
-  // TODO: It looks like staffing could be computed dynamically as needed for a given board.
-  // TODO: This could be a getter on seasonal state if/when that is refactored.
-  // private List<CardStaffing> tableStaffing;
-
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
