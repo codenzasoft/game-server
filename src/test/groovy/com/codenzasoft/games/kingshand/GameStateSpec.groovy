@@ -43,7 +43,7 @@ class GameStateSpec extends Specification {
     def "test that builder throws exception when current season is missing"() {
         setup:
         def builder = GameState.builder()
-                .curSeason(null)
+                .season(null)
 
         when:
         builder.build()
@@ -56,7 +56,7 @@ class GameStateSpec extends Specification {
     def "test that builder throws exception when current phase is missing"() {
         setup:
         def builder = GameState.builder()
-                .curPhase(null)
+                .phase(null)
 
         when:
         builder.build()
@@ -160,7 +160,7 @@ class GameStateSpec extends Specification {
 
     def "getCurrentTable returns the table for the current season"() {
         setup:
-        def state = GameState.builder().curSeason(Season.FALL).build()
+        def state = GameState.builder().season(Season.FALL).build()
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         state.board.get(Season.FALL).add(card)
 
@@ -174,7 +174,7 @@ class GameStateSpec extends Specification {
     def "tableContains returns true when the card is on the current season's table"() {
         setup:
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
-        def state = GameState.builder().curSeason(Season.SPRING).table(Season.SPRING, [card]).build()
+        def state = GameState.builder().season(Season.SPRING).table(Season.SPRING, [card]).build()
 
         expect:
         state.tableContains(card)
@@ -183,7 +183,7 @@ class GameStateSpec extends Specification {
     def "tableContains returns false when the card is not on the current season's table"() {
         setup:
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
-        def state = GameState.builder().curSeason(Season.SPRING).build()
+        def state = GameState.builder().season(Season.SPRING).build()
 
         expect:
         !state.tableContains(card)
@@ -193,7 +193,7 @@ class GameStateSpec extends Specification {
         setup:
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder()
-                .curSeason(Season.SPRING)
+                .season(Season.SPRING)
                 .table(Season.SUMMER, [card])   // card is on SUMMER, not SPRING
                 .build()
 
@@ -207,7 +207,7 @@ class GameStateSpec extends Specification {
         setup:
         def original    = new Card("TEST", 1, 10, FrequencyType.RECURRING, [])
         def replacement = new Card("TEST", 1, 10, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 20, ValueType.INTEGER)])
-        def state = GameState.builder().curSeason(Season.FALL).table(Season.FALL, [original]).build()
+        def state = GameState.builder().season(Season.FALL).table(Season.FALL, [original]).build()
 
         when:
         state.replaceTableCard(original, replacement)
@@ -221,7 +221,7 @@ class GameStateSpec extends Specification {
         def card  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def other = new Card("TEST", 1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
-                .curSeason(Season.WINTER)
+                .season(Season.WINTER)
                 .table(Season.WINTER, [card, other, card])
                 .build()
 
@@ -234,7 +234,7 @@ class GameStateSpec extends Specification {
 
     def "replaceTableCard throws when the card is not on the table"() {
         setup:
-        def state = GameState.builder().curSeason(Season.SPRING).build()
+        def state = GameState.builder().season(Season.SPRING).build()
 
         when:
         state.replaceTableCard(new Card("TEST", 0, 0, FrequencyType.RECURRING, []), new Card("TEST", 1, 5, FrequencyType.RECURRING, []))
@@ -249,7 +249,7 @@ class GameStateSpec extends Specification {
     def "addToTable appends the card to the current season's table"() {
         setup:
         def card  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
-        def state = GameState.builder().curSeason(Season.SUMMER).build()
+        def state = GameState.builder().season(Season.SUMMER).build()
 
         when:
         state.addToTable(card)
@@ -266,7 +266,7 @@ class GameStateSpec extends Specification {
         def card  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def other = new Card("TEST", 1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
-                .curSeason(Season.SPRING)
+                .season(Season.SPRING)
                 .table(Season.SPRING, [card, other])
                 .build()
 
@@ -284,7 +284,7 @@ class GameStateSpec extends Specification {
         def first  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def second = new Card("TEST", 1, 10, FrequencyType.RECURRING, [])
         def state = GameState.builder()
-                .curSeason(Season.FALL)
+                .season(Season.FALL)
                 .table(Season.FALL, [first, second])
                 .build()
 
@@ -301,7 +301,7 @@ class GameStateSpec extends Specification {
         setup:
         def card1 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
         def card2 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)])
-        def state = GameState.builder().curSeason(Season.SPRING).build()
+        def state = GameState.builder().season(Season.SPRING).build()
         state.hand.add(card1)
         state.hand.add(card2)
 
@@ -320,7 +320,7 @@ class GameStateSpec extends Specification {
     def "discardHand uses curSeason — discards to the correct pile when season is not SPRING"() {
         setup:
         def card = new Card("TEST", 0, 0, FrequencyType.SINGLE, [])
-        def state = GameState.builder().curSeason(Season.WINTER).build()
+        def state = GameState.builder().season(Season.WINTER).build()
         state.hand.add(card)
 
         when:
@@ -339,7 +339,7 @@ class GameStateSpec extends Specification {
         def card  = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
         def other = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def state = GameState.builder()
-                .curSeason(Season.SUMMER)
+                .season(Season.SUMMER)
                 .table(Season.SUMMER, [card, other])
                 .build()
 
