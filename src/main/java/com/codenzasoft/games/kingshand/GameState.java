@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,8 +36,12 @@ public class GameState {
   private int rerollCount;
   // true once the player's population has reached zero; no further actions are possible
   private boolean gameOver;
+
   // staffing snapshot for the current season's table — computed by GameEngine during PLAY phase
-  private List<CardStaffing> tableStaffing;
+  // TODO: It looks like staffing could be computed dynamically as needed for a given board.
+  // TODO: This could be a getter on seasonal state if/when that is refactored.
+  // private List<CardStaffing> tableStaffing;
+
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
   // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
@@ -70,7 +73,6 @@ public class GameState {
     this.year = b.year;
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
-    this.tableStaffing = b.tableStaffing;
     this.resolutionLog = b.resolutionLog;
     this.greatWorkLog = b.greatWorkLog;
     this.council = b.council;
@@ -295,21 +297,10 @@ public class GameState {
     return resources.population() < 1.0;
   }
 
-  /**
-   * Staffing snapshot for the current season's table, computed by {@link GameEngine} during the
-   * {@link Phase#PLAY} phase. Index {@code i} corresponds to the card at slot {@code i} on the
-   * table. Empty list outside of the PLAY phase.
-   */
+  /** Returns staffing for the current season's table. */
   @JsonProperty("tableStaffing")
   public List<CardStaffing> getTableStaffing() {
-    return tableStaffing == null ? List.of() : tableStaffing;
-  }
-
-  public void setTableStaffing(List<CardStaffing> tableStaffing) {
-    this.tableStaffing =
-        tableStaffing == null
-            ? List.of()
-            : Collections.unmodifiableList(new ArrayList<>(tableStaffing));
+    return CardStaffing.computeTableStaffing(board.get(curSeason), resources);
   }
 
   /**
@@ -565,7 +556,6 @@ public class GameState {
     private int year = 1;
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
-    private List<CardStaffing> tableStaffing = List.of();
     private List<ResolutionStep> resolutionLog = List.of();
     private double gold = 0.0;
     private double strength = 0.0;
@@ -658,11 +648,6 @@ public class GameState {
 
     public Builder rerollCount(int rerollCount) {
       this.rerollCount = rerollCount;
-      return this;
-    }
-
-    public Builder tableStaffing(List<CardStaffing> tableStaffing) {
-      this.tableStaffing = tableStaffing == null ? List.of() : new ArrayList<>(tableStaffing);
       return this;
     }
 
