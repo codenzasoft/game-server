@@ -27,7 +27,7 @@ import java.util.function.BiConsumer;
  *
  * <ol>
  *   <li>{@link Phase#ADD} → {@link Phase#PLAY} via {@link #pickCard(Card)} / {@link #skipAdd()}.
- *   <li>{@link Phase#PLAY} ends → {@link #endAndRun()} calls {@link #advancePhase()}, which enters
+ *   <li>{@link Phase#PLAY} → {@link #endAndRun()} calls {@link #advancePhase()}, which enters
  *       {@link Phase#COUNCIL_ADD} (if Winter just ended and GOLD is unlocked) or goes straight to
  *       {@link Phase#ADD} otherwise.
  *   <li>{@link Phase#COUNCIL_ADD} → {@link Phase#COUNCIL_MEETING} via {@link #hireAdvisor(Advisor)}
@@ -285,31 +285,22 @@ public class GameEngine implements Game<GameEngine> {
    * Phase#ADD}. No-ops outside of {@link Phase#PLAY}, and never does anything once the game is over
    * or won.
    */
-  public synchronized void advancePhase() {
+  protected synchronized void advancePhase() {
     if (state.isGameOver() || state.isVictoryComplete()) {
       return;
     }
     if (state.getCurPhase() != Phase.PLAY) {
       return;
     }
-    Season endedSeason = state.getCurSeason();
-    advanceSeason();
-    if (endedSeason == Season.WINTER && state.isGoldUnlocked()) {
-      state.setCurPhase(Phase.COUNCIL_ADD);
-      offerCouncilChoices();
-    } else {
-      state.setCurPhase(Phase.ADD);
-      offerAddChoices();
+    state.advanceTime();
+    switch (state.getCurPhase()) {
+      case COUNCIL_ADD:
+        offerCouncilChoices();
+        break;
+      case ADD:
+        offerAddChoices();
+        break;
     }
-  }
-
-  public synchronized void advanceSeason() {
-    // new year if we end winter
-    if (state.getCurSeason() == Season.WINTER) {
-      state.setYear(state.getYear() + 1);
-    }
-
-    state.setCurSeason(state.getCurSeason().next());
   }
 
   // ----- Table mutations -----
@@ -634,7 +625,7 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
     clearAddState();
-    state.setCurPhase(Phase.PLAY);
+    state.advanceTime();
     startPlay();
   }
 
@@ -661,7 +652,7 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
     clearAddState();
-    state.setCurPhase(Phase.PLAY);
+    state.advanceTime();
     startPlay();
   }
 
@@ -1130,7 +1121,7 @@ public class GameEngine implements Game<GameEngine> {
     state.addGold(0.0 - advisor.hiringCost());
     state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getYear()));
     clearCouncilAddState();
-    state.setCurPhase(Phase.COUNCIL_MEETING);
+    state.advanceTime();
     offerCouncilProposal();
   }
 
@@ -1157,7 +1148,7 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void skipCouncilAdd() {
     requirePhase(Phase.COUNCIL_ADD, "skipCouncilAdd");
     clearCouncilAddState();
-    state.setCurPhase(Phase.COUNCIL_MEETING);
+    state.advanceTime();
     offerCouncilProposal();
   }
 
@@ -1309,7 +1300,7 @@ public class GameEngine implements Game<GameEngine> {
     }
     seated.setLastProposalYear(state.getYear());
     state.setCurrentProposal(null);
-    state.setCurPhase(Phase.ADD);
+    state.advanceTime();
     offerAddChoices();
   }
 
@@ -1331,7 +1322,7 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
     state.setCurrentProposal(null);
-    state.setCurPhase(Phase.ADD);
+    state.advanceTime();
     offerAddChoices();
   }
 

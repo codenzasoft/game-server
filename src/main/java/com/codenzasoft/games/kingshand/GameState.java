@@ -28,9 +28,7 @@ public class GameState {
   // resources
   private ResourceState resources;
   // where are we
-  private Season curSeason;
-  private Phase curPhase;
-  private int year;
+  private TimeState time;
   // ADD-phase offer state
   private List<Card> addChoices;
   private int rerollCount;
@@ -60,9 +58,7 @@ public class GameState {
     this.discardPile = b.discardPile;
     this.hand = b.hand;
     this.resources = b.resources;
-    this.curSeason = b.curSeason;
-    this.curPhase = b.curPhase;
-    this.year = b.year;
+    this.time = b.time;
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
     this.resolutionLog = b.resolutionLog;
@@ -98,7 +94,7 @@ public class GameState {
 
   /** Convenience accessor for the table belonging to the current season. */
   public List<Card> getCurrentTable() {
-    return board.get(curSeason);
+    return board.get(time.season());
   }
 
   /**
@@ -160,7 +156,7 @@ public class GameState {
    */
   public void discardFromTable(Card card) {
     removeFromTable(card);
-    getDiscardPile().get(curSeason).add(card);
+    getDiscardPile().get(time.season()).add(card);
   }
 
   /**
@@ -168,7 +164,7 @@ public class GameState {
    * {@link #getCurSeason()} so callers don't need to pass the season explicitly.
    */
   public void discardHand() {
-    getDiscardPile().get(curSeason).addAll(hand);
+    getDiscardPile().get(time.season()).addAll(hand);
     hand.clear();
   }
 
@@ -239,17 +235,17 @@ public class GameState {
 
   @JsonProperty("curSeason")
   public Season getCurSeason() {
-    return curSeason;
+    return time.season();
   }
 
   @JsonProperty("curPhase")
   public Phase getCurPhase() {
-    return curPhase;
+    return time.phase();
   }
 
   @JsonProperty("year")
   public int getYear() {
-    return year;
+    return time.year();
   }
 
   @JsonProperty("addChoices")
@@ -263,18 +259,6 @@ public class GameState {
   }
 
   // ----- Setters -----
-
-  public void setCurSeason(Season curSeason) {
-    this.curSeason = curSeason;
-  }
-
-  public void setCurPhase(Phase curPhase) {
-    this.curPhase = curPhase;
-  }
-
-  public void setYear(int year) {
-    this.year = year;
-  }
 
   public void setAddChoices(List<Card> addChoices) {
     this.addChoices = addChoices;
@@ -532,6 +516,10 @@ public class GameState {
     resources = resources.addPopulationCap(value);
   }
 
+  public void advanceTime() {
+    time = time.advance(resources);
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -543,8 +531,8 @@ public class GameState {
     private double populationCap = 100.0;
     private double production = 1000.0;
     private double food = 750.0;
-    private Season curSeason = Season.SPRING;
-    private Phase curPhase = Phase.ADD;
+    private Season season = Season.SPRING;
+    private Phase phase = Phase.ADD;
     private int year = 1;
     private List<Card> addChoices = new ArrayList<>();
     private int rerollCount = 0;
@@ -567,6 +555,8 @@ public class GameState {
     private ResourceState resources =
         new ResourceState(
             food, production, population, populationCap, gold, strength, unlockedResources);
+
+    private TimeState time = new TimeState(season, phase, year);
 
     // fill similar data types with seasons
     private Builder() {
@@ -618,13 +608,13 @@ public class GameState {
       return this;
     }
 
-    public Builder curSeason(Season curSeason) {
-      this.curSeason = curSeason;
+    public Builder season(Season season) {
+      this.season = season;
       return this;
     }
 
-    public Builder curPhase(Phase curPhase) {
-      this.curPhase = curPhase;
+    public Builder phase(Phase phase) {
+      this.phase = phase;
       return this;
     }
 
@@ -719,10 +709,10 @@ public class GameState {
     }
 
     public GameState build() {
-      if (curSeason == null) {
+      if (season == null) {
         throw new IllegalStateException("missing current season");
       }
-      if (curPhase == null) {
+      if (phase == null) {
         throw new IllegalStateException("missing current phase");
       }
       for (Season s : Season.values()) {
@@ -745,6 +735,7 @@ public class GameState {
       resources =
           new ResourceState(
               food, production, population, populationCap, gold, strength, unlockedResources);
+      time = new TimeState(season, phase, year);
       return new GameState(this);
     }
   }
