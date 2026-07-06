@@ -19,9 +19,13 @@ class TimeStateSpec extends Specification {
 
         where:
         startSeason   | startPhase  | startYear || expectedSeason    | expectedPhase    | expectedYear
+        Season.SPRING | Phase.ADD   | 1         || Season.SPRING     | Phase.PLAY       | 1
         Season.SPRING | Phase.PLAY  | 1         || Season.SUMMER     | Phase.ADD        | 1
+        Season.SUMMER | Phase.ADD   | 1         || Season.SUMMER     | Phase.PLAY       | 1
         Season.SUMMER | Phase.PLAY  | 1         || Season.FALL       | Phase.ADD        | 1
+        Season.FALL   | Phase.ADD   | 1         || Season.FALL       | Phase.PLAY       | 1
         Season.FALL   | Phase.PLAY  | 1         || Season.WINTER     | Phase.ADD        | 1
+        Season.WINTER | Phase.ADD   | 1         || Season.WINTER     | Phase.PLAY       | 1
         Season.WINTER | Phase.PLAY  | 1         || Season.SPRING     | Phase.ADD        | 2 // gold not unlocked — council is skipped
     }
 
@@ -39,10 +43,12 @@ class TimeStateSpec extends Specification {
         state.year() == expectedYear
 
         where:
-        startSeason   | startPhase  | startYear || expectedSeason    | expectedPhase        | expectedYear
-        Season.SPRING | Phase.PLAY  | 1         || Season.SUMMER     | Phase.ADD            | 1
-        Season.SUMMER | Phase.PLAY  | 1         || Season.FALL       | Phase.ADD            | 1
-        Season.FALL   | Phase.PLAY  | 1         || Season.WINTER     | Phase.ADD            | 1
-        Season.WINTER | Phase.PLAY  | 1         || Season.WINTER     | Phase.COUNCIL_ADD    | 1
+        startSeason   | startPhase              | startYear || expectedSeason    | expectedPhase            | expectedYear
+        Season.SPRING | Phase.PLAY              | 1         || Season.SUMMER     | Phase.ADD                | 1
+        Season.SUMMER | Phase.PLAY              | 1         || Season.FALL       | Phase.ADD                | 1
+        Season.FALL   | Phase.PLAY              | 1         || Season.WINTER     | Phase.ADD                | 1
+        Season.WINTER | Phase.PLAY              | 1         || Season.WINTER     | Phase.COUNCIL_ADD        | 1
+        Season.WINTER | Phase.COUNCIL_ADD       | 1         || Season.WINTER     | Phase.COUNCIL_MEETING    | 1
+        Season.WINTER | Phase.COUNCIL_MEETING   | 1         || Season.SPRING     | Phase.ADD                | 2
     }
 }
