@@ -392,7 +392,7 @@ public class GameEngine implements Game<GameEngine> {
     state.setGreatWorkLog(List.of());
 
     // 3. Compute staffing based on current population (locked in at End and Run time).
-    List<CardStaffing> staffing = computeTableStaffing();
+    List<CardStaffing> staffing = state.getTableStaffing();
 
     // 4. Snapshot the table order before resolution so that removals during the walk don't
     //    disturb the iteration sequence.
@@ -546,48 +546,6 @@ public class GameEngine implements Game<GameEngine> {
     if (!state.isVictoryComplete()) {
       advancePhase();
     }
-  }
-
-  /**
-   * Distributes {@code floor(population)} workers left-to-right across the current season's table,
-   * filling each card's {@link Card#staffRequirement()} greedily in slot order, and returns the
-   * resulting {@link CardStaffing} list (one entry per table slot).
-   *
-   * <p>The half threshold for {@link StaffingTier#HALF} is {@code ceil(staffRequirement / 2)}.
-   */
-  List<CardStaffing> computeTableStaffing() {
-    List<Card> table = state.getCurrentTable();
-    int remaining = (int) Math.floor(state.getPopulation());
-    List<CardStaffing> result = new ArrayList<>(table.size());
-
-    for (Card card : table) {
-      int cost = (int) card.staffRequirement();
-      int allocated = Math.min(remaining, cost);
-      remaining -= allocated;
-
-      int halfThreshold = (int) Math.ceil(cost / 2.0);
-      StaffingTier tier;
-      if (allocated >= cost) {
-        tier = StaffingTier.FULL;
-      } else if (allocated >= halfThreshold) {
-        tier = StaffingTier.HALF;
-      } else {
-        tier = StaffingTier.NONE;
-      }
-
-      result.add(new CardStaffing(allocated, cost, tier));
-    }
-
-    return result;
-  }
-
-  /**
-   * Computes staffing for the current table and stores it on the state so the client can render the
-   * live staffing indicator. Call after any mutation that changes table order or contents during
-   * the PLAY phase.
-   */
-  private void computeAndSetStaffing() {
-    state.setTableStaffing(computeTableStaffing());
   }
 
   /**
@@ -827,10 +785,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized List<Card> startPlay() {
     requirePhase(Phase.PLAY, "startPlay");
-    List<Card> drawn = draw(state.getCurSeason(), MAX_HAND_SIZE);
-    // Compute initial staffing snapshot when the Play phase begins.
-    computeAndSetStaffing();
-    return drawn;
+    return draw(state.getCurSeason(), MAX_HAND_SIZE);
   }
 
   /**
@@ -894,9 +849,6 @@ public class GameEngine implements Game<GameEngine> {
     } else {
       state.addToTable(card);
     }
-
-    // Recompute staffing so the client sees the updated allocation immediately.
-    computeAndSetStaffing();
   }
 
   /**
@@ -974,9 +926,6 @@ public class GameEngine implements Game<GameEngine> {
     // Replace table contents in-place so the existing list reference stays valid.
     table.clear();
     table.addAll(reordered);
-
-    // Recompute staffing so the client sees the updated priority chain immediately.
-    computeAndSetStaffing();
   }
 
   /**
@@ -1009,9 +958,6 @@ public class GameEngine implements Game<GameEngine> {
     // else pay and demolish card
     state.addProduction(0.0 - cost);
     state.removeFromTableAt(slot);
-
-    // Recompute staffing so freed workers are redistributed immediately.
-    computeAndSetStaffing();
   }
 
   // ----- Great Work commissioning -----
@@ -1095,7 +1041,6 @@ public class GameEngine implements Game<GameEngine> {
     state.addProduction(0.0 - cost);
 
     targetTable.add(gw);
-    computeAndSetStaffing();
   }
 
   // ----- Great Work helpers -----
