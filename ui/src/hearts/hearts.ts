@@ -198,6 +198,7 @@ export class HeartsGameHandler {
   private gameId = "";
   private stompClient!: Client;
   private subscription!: StompSubscription;
+  private wsErrorCount = 0;
 
   private messageQueue: HeartsMessage[] = [];
   private isProcessing = false;
@@ -362,6 +363,7 @@ export class HeartsGameHandler {
       heartbeatOutgoing: 25000,
     });
     client.onConnect = () => {
+      this.wsErrorCount = 0;
       console.log("[Hearts] STOMP connected, subscribing to game", this.gameId);
       this.subscription = this.stompClient.subscribe(
         `/user/queue/games/${this.gameId}`,
@@ -404,8 +406,12 @@ export class HeartsGameHandler {
       console.warn("[Hearts] WebSocket closed");
     };
     client.onWebSocketError = () => {
-      console.error("[Hearts] WebSocket error — redirecting to login");
-      window.location.href = loginUrl;
+      this.wsErrorCount++;
+      console.error(`[Hearts] WebSocket error (${this.wsErrorCount})`);
+      if (this.wsErrorCount >= 3) {
+        console.error("[Hearts] Repeated WebSocket errors — redirecting to login");
+        window.location.href = loginUrl;
+      }
     };
     client.onStompError = (frame: Frame) => {
       console.error("[Hearts] STOMP error", frame.headers["message"]);

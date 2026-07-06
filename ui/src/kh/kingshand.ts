@@ -763,6 +763,7 @@ export class GameEventHandler {
   private gameId!: string;
   private stompClient!: Client;
   private subscription!: StompSubscription;
+  private wsErrorCount = 0;
 
   private messageQueue: GameMessage[] = [];
   private isProcessing: boolean = false;
@@ -976,6 +977,7 @@ export class GameEventHandler {
   // ── STOMP lifecycle ───────────────────────────────────────────────────────
 
   private onConnect(frame: Frame): void {
+    this.wsErrorCount = 0;
     console.log("Connected: " + frame);
 
     this.subscription = this.stompClient.subscribe(
@@ -1018,8 +1020,12 @@ export class GameEventHandler {
   }
 
   private onWebSocketError(error: unknown): void {
-    console.error("Error with websocket", error);
-    window.location.href = loginUrl;
+    this.wsErrorCount++;
+    console.error("Error with websocket", error, `(${this.wsErrorCount})`);
+    if (this.wsErrorCount >= 3) {
+      console.error("Repeated WebSocket errors — redirecting to login");
+      window.location.href = loginUrl;
+    }
   }
 
   private onStompError(frame: Frame): void {
