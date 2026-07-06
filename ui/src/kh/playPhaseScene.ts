@@ -122,7 +122,7 @@ export class PlayPhaseScene {
       return;
     }
 
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
     const table = state.getCurrentTable();
     const tableNames = new Set(table.map((c) => c.name));
 
@@ -167,7 +167,7 @@ export class PlayPhaseScene {
 
   private renderGameOver(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -179,7 +179,7 @@ export class PlayPhaseScene {
         <div class="kh-play-go-stats">
           <div class="kh-play-go-stat">
             <div class="kh-play-go-stat-label">Years Reigned</div>
-            <div class="kh-play-go-stat-val">${state.year}</div>
+            <div class="kh-play-go-stat-val">${state.time.year}</div>
           </div>
           <div class="kh-play-go-stat">
             <div class="kh-play-go-stat-label">Final Season</div>
@@ -216,7 +216,7 @@ export class PlayPhaseScene {
 
   private renderGameWon(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     const greatWorksHTML = WIN_CONDITION_GREAT_WORK_NAMES.map((name) => {
       const info = getCardDisplayInfo({ name } as Card);
@@ -233,7 +233,7 @@ export class PlayPhaseScene {
         <div class="kh-play-win-stats">
           <div class="kh-play-win-stat">
             <div class="kh-play-win-stat-label">Years Reigned</div>
-            <div class="kh-play-win-stat-val">${state.year}</div>
+            <div class="kh-play-win-stat-val">${state.time.year}</div>
           </div>
           <div class="kh-play-win-stat">
             <div class="kh-play-win-stat-label">Great Works</div>
@@ -283,7 +283,7 @@ export class PlayPhaseScene {
           <h1>King's Hand</h1>
           <div class="kh-play-year-badge">
             <span>${meta.icon}</span>
-            <span>YEAR ${state.year} — ${meta.label.toUpperCase()}</span>
+            <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
         </div>
@@ -663,7 +663,7 @@ export class PlayPhaseScene {
     }
 
     const tagsHTML = [
-      `<span class="kh-play-tag kh-play-tag-season">${state.curSeason}</span>`,
+      `<span class="kh-play-tag kh-play-tag-season">${state.time.season}</span>`,
       `<span class="kh-play-tag ${card.frequencyType === "RECURRING" ? "kh-play-tag-recurring" : "kh-play-tag-single"}">${card.frequencyType}</span>`,
       ...info.tags.map((t) => `<span class="kh-play-tag kh-play-tag-category">${t}</span>`),
       isUpgrade ? `<span class="kh-play-tag kh-play-tag-upgrade">UPGRADES TABLE</span>` : "",
@@ -742,8 +742,8 @@ export class PlayPhaseScene {
   // ─── Pile indicators & modal ─────────────────────────────────────────────
 
   private buildPileIndicators(state: GameState): string {
-    const drawCount    = state.drawPile.get(state.curSeason)?.length ?? 0;
-    const discardCount = state.discardPile.get(state.curSeason)?.length ?? 0;
+    const drawCount    = state.drawPile.get(state.time.season)?.length ?? 0;
+    const discardCount = state.discardPile.get(state.time.season)?.length ?? 0;
 
     return `
       <!-- Draw pile — bottom left -->
@@ -788,8 +788,8 @@ export class PlayPhaseScene {
     if (!backdrop || !titleEl || !tabsEl || !bodyEl) return;
 
     const pile  = pileType === "draw" ? state.drawPile : state.discardPile;
-    const cards = pile.get(state.curSeason) ?? [];
-    const meta  = SEASON_META[state.curSeason];
+    const cards = pile.get(state.time.season) ?? [];
+    const meta  = SEASON_META[state.time.season];
     titleEl.textContent = pileType === "draw"
       ? `Draw Pile — ${meta.label}`
       : `Discard Pile — ${meta.label}`;

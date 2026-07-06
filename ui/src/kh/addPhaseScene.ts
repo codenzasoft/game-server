@@ -108,7 +108,7 @@ export class AddPhaseScene {
 
   private render(): void {
     const { state } = this;
-    const season = state.curSeason;
+    const season = state.time.season;
     const meta = SEASON_META[season];
     // Mirrors GameEngine.offerAddChoices()'s freeCalls/cost formula exactly: the first call each
     // ADD phase is always free, plus any permanent (Decree) and seated (base trait / Reform) free
@@ -176,7 +176,7 @@ export class AddPhaseScene {
           <h1>King's Hand</h1>
           <div class="kh-year-badge">
             <span>${meta.icon}</span>
-            <span>YEAR ${state.year} — ${meta.label.toUpperCase()}</span>
+            <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
         </div>
@@ -262,7 +262,7 @@ export class AddPhaseScene {
   private buildCard(card: Card, index: number, state: GameState): string {
     const info   = getCardDisplayInfo(card);
     const imgSrc = cardImagePath(card.name);
-    const season = state.curSeason;
+    const season = state.time.season;
 
     const tagsHTML = [
       `<span class="kh-tag kh-tag-season">${season}</span>`,
@@ -345,7 +345,7 @@ export class AddPhaseScene {
         this.actions.pickCard(cardName);
         // Optimistic UI: disable all interaction while server responds
         this.disableAllActions();
-        this.showToast(`Adding card to your ${SEASON_META[state.curSeason].label} deck…`);
+        this.showToast(`Adding card to your ${SEASON_META[state.time.season].label} deck…`);
       });
     });
 

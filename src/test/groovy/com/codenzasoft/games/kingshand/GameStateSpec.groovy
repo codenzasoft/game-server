@@ -14,8 +14,8 @@ class GameStateSpec extends Specification {
         GameState state = GameState.newState()
 
         then:
-        state.curSeason == Season.SPRING
-        state.year == 1
+        state.time.season == Season.SPRING
+        state.time.year == 1
         state.resources.population == 100
         state.resources.production == 1000
         state.resources.food == 750
@@ -37,7 +37,7 @@ class GameStateSpec extends Specification {
 
     def "fresh state starts in the ADD phase"() {
         expect:
-        GameState.newState().curPhase == Phase.ADD
+        GameState.newState().time.phase == Phase.ADD
     }
 
     def "test that builder throws exception when current season is missing"() {
@@ -155,7 +155,7 @@ class GameStateSpec extends Specification {
         state.resources.population == 0.0
         state.resources.production == 0.0
         state.resources.food == 0.0
-        state.getYear() == 0.0
+        state.time.year == 0.0
     }
 
     def "getCurrentTable returns the table for the current season"() {

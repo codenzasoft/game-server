@@ -56,8 +56,8 @@ class GameEngineSpec extends Specification {
         engine.advancePhase()
 
         then:
-        state.curPhase == startPhase
-        state.curSeason == Season.SPRING
+        state.time.phase == startPhase
+        state.time.season == Season.SPRING
 
         where:
         startPhase << [Phase.ADD, Phase.COUNCIL_ADD, Phase.COUNCIL_MEETING]
@@ -127,7 +127,7 @@ class GameEngineSpec extends Specification {
         engine.state.advanceTime() // play -> add (summer)
 
         then:
-        engine.state.getCurSeason() == Season.SUMMER
+        engine.state.time.season == Season.SUMMER
         state.resources.food == 750   // unchanged because the effect is SINGLE
     }
 
@@ -554,7 +554,7 @@ class GameEngineSpec extends Specification {
         engine.pickCard(CardCatalog.FARM)
 
         then:
-        state.curPhase == Phase.PLAY
+        state.time.phase == Phase.PLAY
     }
 
     def "pickCard clears addChoices and resets reroll count"() {
@@ -601,7 +601,7 @@ class GameEngineSpec extends Specification {
         engine.skipAdd()
 
         then:
-        state.curPhase == Phase.PLAY
+        state.time.phase == Phase.PLAY
         state.drawPile.get(Season.SPRING).isEmpty()
         state.drawPile.get(Season.SUMMER).isEmpty()
         state.drawPile.get(Season.FALL).isEmpty()
@@ -1623,7 +1623,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.curPhase   == Phase.ADD   // normal transition: SPRING isn't WINTER, so PLAY -> ADD
+        state.time.phase   == Phase.ADD   // normal transition: SPRING isn't WINTER, so PLAY -> ADD
         state.gameOver   == false
         state.resources.population == 3.0
     }
@@ -1659,7 +1659,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.curPhase   == Phase.ADD   // endAndRun advances phase internally
+        state.time.phase   == Phase.ADD   // endAndRun advances phase internally
         state.gameOver   == false
         state.resources.population == 6.0    // 5.0 * 1.2 after 20% surplus growth cap
     }

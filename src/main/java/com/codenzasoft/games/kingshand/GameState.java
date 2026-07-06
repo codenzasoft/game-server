@@ -158,10 +158,7 @@ public class GameState {
     getDiscardPile().get(time.season()).add(card);
   }
 
-  /**
-   * Moves every card in the hand to the current season's discard pile and clears the hand. Uses
-   * {@link #getCurSeason()} so callers don't need to pass the season explicitly.
-   */
+  /** Moves every card in the hand to the current season's discard pile and clears the hand. */
   public void discardHand() {
     getDiscardPile().get(time.season()).addAll(hand);
     hand.clear();
@@ -207,19 +204,9 @@ public class GameState {
     return false;
   }
 
-  @JsonProperty("curSeason")
-  public Season getCurSeason() {
-    return time.season();
-  }
-
-  @JsonProperty("curPhase")
-  public Phase getCurPhase() {
-    return time.phase();
-  }
-
-  @JsonProperty("year")
-  public int getYear() {
-    return time.year();
+  @JsonProperty("time")
+  public TimeState getTime() {
+    return time;
   }
 
   @JsonProperty("addChoices")
@@ -250,7 +237,7 @@ public class GameState {
   /** Returns staffing for the current season's table. */
   @JsonProperty("tableStaffing")
   public List<CardStaffing> getTableStaffing() {
-    return CardStaffing.computeStaffing(board.get(getCurSeason()), resources);
+    return CardStaffing.computeStaffing(board.get(time.season()), resources);
   }
 
   /**

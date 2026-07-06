@@ -179,6 +179,12 @@ interface CouncilProposalData {
   name: string;
 }
 
+interface TimeStateData {
+  season: Season;
+  phase: Phase;
+  year: number;
+}
+
 interface ResourceStateData {
   food: number;
   production: number;
@@ -213,9 +219,7 @@ interface GameStateData {
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   resources: ResourceState;
-  curSeason: Season;
-  curPhase: Phase;
-  year: number;
+  time: TimeState;
   addChoices: Card[];
   rerollCount: number;
   gameOver: boolean;
@@ -462,6 +466,18 @@ export class GameContext {
   }
 }
 
+export class TimeState {
+  season: Season;
+  phase: Phase;
+  year: number;
+
+  constructor(data: TimeStateData) {
+    this.season = data.season;
+    this.phase = data.phase;
+    this.year = data.year;
+  }
+}
+
 export class ResourceState {
   food: number;
   production: number;
@@ -495,9 +511,7 @@ export class GameState {
   discardPile: Map<Season, Card[]>;
   hand: Card[];
   resources: ResourceState;
-  curSeason: Season;
-  curPhase: Phase;
-  year: number;
+  time: TimeState;
   addChoices: Card[];
   rerollCount: number;
   gameOver: boolean;
@@ -516,9 +530,7 @@ export class GameState {
     this.discardPile = data.discardPile;
     this.hand = data.hand;
     this.resources = data.resources;
-    this.curSeason = data.curSeason;
-    this.curPhase = data.curPhase;
-    this.year = data.year;
+    this.time = data.time;
     this.addChoices = data.addChoices;
     this.rerollCount = data.rerollCount;
     this.gameOver = data.gameOver;
@@ -534,7 +546,7 @@ export class GameState {
 
   // Convenience accessor — the current season's table is needed very often.
   public getCurrentTable(): Card[] {
-    return this.board.get(this.curSeason) ?? [];
+    return this.board.get(this.time.season) ?? [];
   }
 }
 
@@ -705,6 +717,14 @@ const SeasonToCardsSchema = z.preprocess(
   z.map(z.enum(Season), z.array(CardSchema)),
 );
 
+const TimeStateSchema = z
+  .object({
+    season: z.enum(Season),
+    phase: z.enum(Phase),
+    year: z.number().int(),
+  })
+  .transform((data) => new TimeState(data));
+
 const ResourceStateSchema = z
   .object({
     food: z.number(),
@@ -724,9 +744,7 @@ export const GameStateSchema = z
     discardPile: SeasonToCardsSchema,
     hand: z.array(CardSchema),
     resources: ResourceStateSchema,
-    curSeason: z.enum(Season),
-    curPhase: z.enum(Phase),
-    year: z.number().int(),
+    time: TimeStateSchema,
     addChoices: z.array(CardSchema),
     rerollCount: z.number().int(),
     gameOver: z.boolean(),

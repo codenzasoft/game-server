@@ -69,7 +69,7 @@ function formatGreatWorkName(name: string | undefined): string {
  * Full-screen HTML overlay covering both council sub-phases: {@link Phase#COUNCIL_ADD}
  * (hire an advisor or skip) and {@link Phase#COUNCIL_MEETING} (accept or pass the
  * year's single rotating Reform/Decree proposal). One scene class handles both —
- * {@code state.curPhase} picks which body renders — so main.ts can keep a single
+ * {@code state.time.phase} picks which body renders — so main.ts can keep a single
  * scene instance alive across the COUNCIL_ADD → COUNCIL_MEETING transition.
  *
  * Advisor portraits are placeholders (a colored ring around a generic profile
@@ -111,10 +111,10 @@ export class CouncilScene {
 
   private render(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     const bodyHTML =
-      state.curPhase === Phase.COUNCIL_ADD
+      state.time.phase === Phase.COUNCIL_ADD
         ? this.buildCouncilAddBody(state)
         : this.buildCouncilMeetingBody(state);
 
@@ -152,7 +152,7 @@ export class CouncilScene {
           <h1>King's Hand</h1>
           <div class="kh-cs-year-badge">
             <span>🏰</span>
-            <span>YEAR ${state.year} — COUNCIL</span>
+            <span>YEAR ${state.time.year} — COUNCIL</span>
             <span>🏰</span>
           </div>
         </div>
@@ -473,7 +473,7 @@ export class CouncilScene {
 
   private attachListeners(state: GameState): void {
     this.attachRosterListeners();
-    if (state.curPhase === Phase.COUNCIL_ADD) {
+    if (state.time.phase === Phase.COUNCIL_ADD) {
       this.attachCouncilAddListeners(state);
     } else {
       this.attachCouncilMeetingListeners();

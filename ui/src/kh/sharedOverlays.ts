@@ -576,7 +576,7 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
     const tableCards   = state.board.get(season) ?? [];
     const drawCards    = state.drawPile.get(season) ?? [];
     const discardCards = state.discardPile.get(season) ?? [];
-    const handCards    = season === state.curSeason ? state.hand : [];
+    const handCards    = season === state.time.season ? state.hand : [];
     const allCards     = [...tableCards, ...handCards, ...drawCards, ...discardCards];
 
     tabsEl.querySelectorAll<HTMLButtonElement>(".kh-deck-tab").forEach((btn) => {
@@ -612,9 +612,9 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
     const count = (state.board.get(s)?.length ?? 0)
                 + (state.drawPile.get(s)?.length ?? 0)
                 + (state.discardPile.get(s)?.length ?? 0)
-                + (s === state.curSeason ? state.hand.length : 0);
+                + (s === state.time.season ? state.hand.length : 0);
     return `
-      <button class="kh-deck-tab ${s === state.curSeason ? "kh-deck-tab-active" : ""}" data-season="${s}">
+      <button class="kh-deck-tab ${s === state.time.season ? "kh-deck-tab-active" : ""}" data-season="${s}">
         ${SEASON_ICONS[s]} ${s} <span class="kh-deck-tab-count">${count}</span>
       </button>
     `;
@@ -624,7 +624,7 @@ export function attachDeckListeners(overlay: HTMLElement, state: GameState): voi
     btn.addEventListener("click", () => renderTab(btn.dataset.season as Season));
   });
 
-  renderTab(state.curSeason);
+  renderTab(state.time.season);
 
   openBtn?.addEventListener("click",  () => { backdrop.style.display = "flex"; });
   closeBtn?.addEventListener("click", () => { backdrop.style.display = "none"; });
