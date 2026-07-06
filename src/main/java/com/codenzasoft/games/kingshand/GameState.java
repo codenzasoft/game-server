@@ -276,7 +276,7 @@ public class GameState {
   /** Returns staffing for the current season's table. */
   @JsonProperty("tableStaffing")
   public List<CardStaffing> getTableStaffing() {
-    return CardStaffing.computeStaffing(board.get(curSeason), resources);
+    return CardStaffing.computeStaffing(board.get(getCurSeason()), resources);
   }
 
   /**
