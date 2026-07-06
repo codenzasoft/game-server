@@ -624,7 +624,6 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void pickCard(Card card) {
     requirePhase(Phase.ADD, "pickCard");
     addToDeck(state.getCurSeason(), card);
-    clearAddState();
     state.advanceTime();
     startPlay();
   }
@@ -651,7 +650,6 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
-    clearAddState();
     state.advanceTime();
     startPlay();
   }
@@ -694,11 +692,6 @@ public class GameEngine implements Game<GameEngine> {
               + " requires phase COUNCIL_ADD or COUNCIL_MEETING but current phase is "
               + current);
     }
-  }
-
-  private void clearAddState() {
-    state.setAddChoices(List.of());
-    state.setRerollCount(0);
   }
 
   /** Returns {@code count} distinct cards chosen uniformly at random from {@code source}. */

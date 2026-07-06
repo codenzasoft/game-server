@@ -517,6 +517,11 @@ public class GameState {
   }
 
   public void advanceTime() {
+    if (time.phase() == Phase.ADD) {
+      // clean add choices and re-roll count when exiting the add phase
+      setAddChoices(List.of());
+      setRerollCount(0);
+    }
     time = time.advance(resources);
   }
 
