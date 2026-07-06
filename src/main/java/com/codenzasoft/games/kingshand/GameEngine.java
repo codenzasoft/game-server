@@ -27,9 +27,9 @@ import java.util.function.BiConsumer;
  *
  * <ol>
  *   <li>{@link Phase#ADD} → {@link Phase#PLAY} via {@link #pickCard(Card)} / {@link #skipAdd()}.
- *   <li>{@link Phase#PLAY} ends → {@link #endAndRun()} calls {@link ()}, which enters {@link
- *       Phase#COUNCIL_ADD} (if Winter just ended and GOLD is unlocked) or goes straight to {@link
- *       Phase#ADD} otherwise.
+ *   <li>{@link Phase#PLAY} → {@link #endAndRun()} calls {@link #advancePhase()}, which enters
+ *       {@link Phase#COUNCIL_ADD} (if Winter just ended and GOLD is unlocked) or goes straight to
+ *       {@link Phase#ADD} otherwise.
  *   <li>{@link Phase#COUNCIL_ADD} → {@link Phase#COUNCIL_MEETING} via {@link #hireAdvisor(Advisor)}
  *       / {@link #hireAdvisorById(String)} / {@link #skipCouncilAdd()}.
  *   <li>{@link Phase#COUNCIL_MEETING} → {@link Phase#ADD} via {@link #acceptCouncilProposal()} /
@@ -285,7 +285,7 @@ public class GameEngine implements Game<GameEngine> {
    * Phase#ADD}. No-ops outside of {@link Phase#PLAY}, and never does anything once the game is over
    * or won.
    */
-  public synchronized void advancePhase() {
+  protected synchronized void advancePhase() {
     if (state.isGameOver() || state.isVictoryComplete()) {
       return;
     }
