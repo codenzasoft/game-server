@@ -16,9 +16,9 @@ class GameStateSpec extends Specification {
         then:
         state.curSeason == Season.SPRING
         state.year == 1
-        state.population == 100
-        state.production == 1000
-        state.food == 750
+        state.resources.population == 100
+        state.resources.production == 1000
+        state.resources.food == 750
         state.board.size() == 4
     }
 
@@ -152,9 +152,9 @@ class GameStateSpec extends Specification {
                 .build()
 
         expect:
-        state.getPopulation() == 0.0
-        state.getProduction() == 0.0
-        state.getFood() == 0.0
+        state.resources.population == 0.0
+        state.resources.production == 0.0
+        state.resources.food == 0.0
         state.getYear() == 0.0
     }
 

@@ -591,12 +591,12 @@ public class GameEngine implements Game<GameEngine> {
     int freeCalls = 1 + state.getPermanentFreeRerolls() + seatedFreeRerollBonus();
     if (state.getRerollCount() >= freeCalls) {
       int cost = (state.getRerollCount() - freeCalls + 1) * REROLL_COST_STEP;
-      if (state.getProduction() < cost) {
+      if (state.getResources().production() < cost) {
         throw new IllegalStateException(
             "not enough production to reroll: need "
                 + cost
                 + ", have "
-                + (int) state.getProduction());
+                + (int) state.getResources().production());
       }
       state.addProduction(0.0 - cost);
     }
@@ -828,12 +828,12 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // if you cannot afford the production cost, reject
-    if (state.getProduction() < card.productionRequirement()) {
+    if (state.getResources().production() < card.productionRequirement()) {
       throw new IllegalStateException(
           "not enough production to place card: need "
               + (int) card.productionRequirement()
               + ", have "
-              + (int) state.getProduction());
+              + (int) state.getResources().production());
     }
 
     // Pay the production cost and remove the card from the hand.
@@ -950,9 +950,12 @@ public class GameEngine implements Game<GameEngine> {
     double cost = card.productionRequirement() * DEMOLISH_COST_RATE;
 
     // if you cannot afford the production cost, reject.
-    if (state.getProduction() < cost) {
+    if (state.getResources().production() < cost) {
       throw new IllegalStateException(
-          "not enough production to demolish: need " + cost + ", have " + state.getProduction());
+          "not enough production to demolish: need "
+              + cost
+              + ", have "
+              + state.getResources().production());
     }
 
     // else pay and demolish card
@@ -1029,14 +1032,14 @@ public class GameEngine implements Game<GameEngine> {
 
     // Pay the one-time commission cost.
     double cost = gw.productionRequirement();
-    if (state.getProduction() < cost) {
+    if (state.getResources().production() < cost) {
       throw new IllegalStateException(
           "not enough production to commission "
               + name
               + ": need "
               + (int) cost
               + ", have "
-              + (int) state.getProduction());
+              + (int) state.getResources().production());
     }
     state.addProduction(0.0 - cost);
 
@@ -1109,14 +1112,14 @@ public class GameEngine implements Game<GameEngine> {
     if (state.findSeatedAdvisor(advisor.id()) != null) {
       throw new IllegalStateException("advisor is already seated: " + advisor.id());
     }
-    if (state.getGold() < advisor.hiringCost()) {
+    if (state.getResources().gold() < advisor.hiringCost()) {
       throw new IllegalStateException(
           "not enough gold to hire "
               + advisor.displayName()
               + ": need "
               + advisor.hiringCost()
               + ", have "
-              + (int) state.getGold());
+              + (int) state.getResources().gold());
     }
     state.addGold(0.0 - advisor.hiringCost());
     state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getYear()));
@@ -1179,14 +1182,14 @@ public class GameEngine implements Game<GameEngine> {
     }
     Advisor advisor = AdvisorCatalog.byId(advisorId);
     double cost = (advisor == null ? 0 : advisor.hiringCost()) * ADVISOR_DISMISSAL_COST_RATE;
-    if (state.getGold() < cost) {
+    if (state.getResources().gold() < cost) {
       throw new IllegalStateException(
           "not enough gold to let go "
               + (advisor == null ? advisorId : advisor.displayName())
               + ": need "
               + cost
               + ", have "
-              + (int) state.getGold());
+              + (int) state.getResources().gold());
     }
     state.addGold(0.0 - cost);
     state.removeFromCouncil(advisorId);
@@ -1208,7 +1211,7 @@ public class GameEngine implements Game<GameEngine> {
   private boolean isAdvisorGateOpen(Advisor advisor) {
     return switch (advisor.gate()) {
       case NONE -> true;
-      case BARRACKS_COMPLETED -> state.isStrengthUnlocked();
+      case BARRACKS_COMPLETED -> state.getResources().isUnlocked(ResourceTarget.STRENGTH);
       case ANY_GREAT_WORK_COMMISSIONED ->
           CardCatalog.ALL_GREAT_WORKS.stream().anyMatch(this::isGreatWorkCommissioned);
       case GREAT_ROAD_COMMISSIONED ->

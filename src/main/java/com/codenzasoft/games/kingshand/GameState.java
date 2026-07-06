@@ -1,6 +1,5 @@
 package com.codenzasoft.games.kingshand;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
@@ -82,7 +81,7 @@ public class GameState {
 
   // ----- Getters -----
 
-  @JsonIgnore
+  @JsonProperty("resources")
   public ResourceState getResources() {
     return resources;
   }
@@ -208,31 +207,6 @@ public class GameState {
     return false;
   }
 
-  @JsonProperty("population")
-  public double getPopulation() {
-    return resources.population();
-  }
-
-  /**
-   * The maximum population allowed. Starts at 100 and is permanently raised whenever a housing card
-   * (e.g. BUNKHOUSE, MANOR) fires its {@link ResourceTarget#POPULATION_CAP} effect during {@link
-   * Phase#PLAY} resolution.
-   */
-  @JsonProperty("populationCap")
-  public double getPopulationCap() {
-    return resources.populationCap();
-  }
-
-  @JsonProperty("production")
-  public double getProduction() {
-    return resources.production();
-  }
-
-  @JsonProperty("food")
-  public double getFood() {
-    return resources.food();
-  }
-
   @JsonProperty("curSeason")
   public Season getCurSeason() {
     return time.season();
@@ -293,25 +267,6 @@ public class GameState {
     this.resolutionLog = log == null ? List.of() : List.copyOf(log);
   }
 
-  @JsonProperty("gold")
-  public double getGold() {
-    return resources.gold();
-  }
-
-  @JsonProperty("strength")
-  public double getStrength() {
-    return resources.strength();
-  }
-
-  /**
-   * The set of resources currently usable. Population, production, and food are always present;
-   * gold and strength are added once the TREASURY/BARRACKS Great Works complete, respectively.
-   */
-  @JsonProperty("unlockedResources")
-  public Set<ResourceTarget> getUnlockedResources() {
-    return resources.unlocked();
-  }
-
   /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
   public void unlock(Card card) {
     resources = resources.unlock(card);
@@ -353,16 +308,6 @@ public class GameState {
     }
 
     return simProd >= 0 && simFood >= 0 && simGold >= 0 && simStrength >= 0;
-  }
-
-  @JsonProperty("goldUnlocked")
-  public boolean isGoldUnlocked() {
-    return resources.unlocked().contains(ResourceTarget.GOLD);
-  }
-
-  @JsonProperty("strengthUnlocked")
-  public boolean isStrengthUnlocked() {
-    return resources.unlocked().contains(ResourceTarget.STRENGTH);
   }
 
   /**

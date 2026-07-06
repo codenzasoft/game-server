@@ -179,6 +179,16 @@ interface CouncilProposalData {
   name: string;
 }
 
+interface ResourceStateData {
+  food: number;
+  production: number;
+  population: number;
+  populationCap: number;
+  gold: number;
+  strength: number;
+  unlockedResources: ResourceTarget[];
+}
+
 interface GameContextData {
   player: string;
   gameId: string;
@@ -202,10 +212,7 @@ interface GameStateData {
   drawPile: Map<Season, Card[]>;
   discardPile: Map<Season, Card[]>;
   hand: Card[];
-  population: number;
-  populationCap: number;
-  production: number;
-  food: number;
+  resources: ResourceState;
   curSeason: Season;
   curPhase: Phase;
   year: number;
@@ -213,10 +220,6 @@ interface GameStateData {
   rerollCount: number;
   gameOver: boolean;
   tableStaffing: CardStaffing[];
-  gold: number;
-  strength: number;
-  goldUnlocked: boolean;
-  strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
   permanentFreeRerolls: number;
@@ -459,6 +462,30 @@ export class GameContext {
   }
 }
 
+export class ResourceState {
+  food: number;
+  production: number;
+  population: number;
+  populationCap: number;
+  gold: number;
+  strength: number;
+  unlockedResources: ResourceTarget[];
+
+  constructor(data: ResourceStateData) {
+    this.food = data.food;
+    this.production = data.production;
+    this.population = data.population;
+    this.populationCap = data.populationCap;
+    this.gold = data.gold;
+    this.strength = data.strength;
+    this.unlockedResources = data.unlockedResources;
+  }
+
+  isUnlocked(target: ResourceTarget): boolean {
+    return this.unlockedResources.includes(target);
+  }
+}
+
 // GameState: full snapshot of the game at one point in time.
 // Season-keyed piles are kept as Maps so rendering code can do a direct
 // state.board.get(Season.SPRING) lookup without scanning arrays.
@@ -467,10 +494,7 @@ export class GameState {
   drawPile: Map<Season, Card[]>;
   discardPile: Map<Season, Card[]>;
   hand: Card[];
-  population: number;
-  populationCap: number;
-  production: number;
-  food: number;
+  resources: ResourceState;
   curSeason: Season;
   curPhase: Phase;
   year: number;
@@ -479,10 +503,6 @@ export class GameState {
   gameOver: boolean;
   tableStaffing: CardStaffing[];
   resolutionLog: ResolutionStep[];
-  gold: number;
-  strength: number;
-  goldUnlocked: boolean;
-  strengthUnlocked: boolean;
   gameWon: boolean;
   greatWorkLog: string[];
   permanentFreeRerolls: number;
@@ -495,10 +515,7 @@ export class GameState {
     this.drawPile = data.drawPile;
     this.discardPile = data.discardPile;
     this.hand = data.hand;
-    this.population = data.population;
-    this.populationCap = data.populationCap;
-    this.production = data.production;
-    this.food = data.food;
+    this.resources = data.resources;
     this.curSeason = data.curSeason;
     this.curPhase = data.curPhase;
     this.year = data.year;
@@ -507,10 +524,6 @@ export class GameState {
     this.gameOver = data.gameOver;
     this.tableStaffing = data.tableStaffing;
     this.resolutionLog = data.resolutionLog;
-    this.gold = data.gold;
-    this.strength = data.strength;
-    this.goldUnlocked = data.goldUnlocked;
-    this.strengthUnlocked = data.strengthUnlocked;
     this.gameWon = data.gameWon;
     this.greatWorkLog = data.greatWorkLog;
     this.permanentFreeRerolls = data.permanentFreeRerolls;
@@ -692,16 +705,25 @@ const SeasonToCardsSchema = z.preprocess(
   z.map(z.enum(Season), z.array(CardSchema)),
 );
 
+const ResourceStateSchema = z
+  .object({
+    food: z.number(),
+    production: z.number(),
+    population: z.number(),
+    populationCap: z.number(),
+    gold: z.number().default(0),
+    strength: z.number().default(0),
+    unlockedResources: z.array(z.enum(ResourceTarget)).default([]),
+  })
+  .transform((data) => new ResourceState(data));
+
 export const GameStateSchema = z
   .object({
     board: SeasonToCardsSchema,
     drawPile: SeasonToCardsSchema,
     discardPile: SeasonToCardsSchema,
     hand: z.array(CardSchema),
-    population: z.number(),
-    populationCap: z.number(),
-    production: z.number(),
-    food: z.number(),
+    resources: ResourceStateSchema,
     curSeason: z.enum(Season),
     curPhase: z.enum(Phase),
     year: z.number().int(),
@@ -712,12 +734,6 @@ export const GameStateSchema = z
     tableStaffing: z.array(CardStaffingSchema).default([]),
     // resolutionLog is populated after endAndRun; empty between seasons.
     resolutionLog: z.array(ResolutionStepSchema).default([]),
-    // Great Work resources: both start at 0/locked until their unlocking
-    // Great Work (TREASURY / BARRACKS) completes.
-    gold: z.number().default(0),
-    strength: z.number().default(0),
-    goldUnlocked: z.boolean().default(false),
-    strengthUnlocked: z.boolean().default(false),
     // true once all four win-condition Great Works are completed.
     gameWon: z.boolean().default(false),
     // Great-Work-related events emitted by the most recent endAndRun (e.g.

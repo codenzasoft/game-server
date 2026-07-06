@@ -1,4 +1,4 @@
-import { GameState, Season, Card, CardTarget } from "./kingshand.ts";
+import { GameState, Season, Card, CardTarget, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -121,7 +121,7 @@ export class AddPhaseScene {
         ? (state.rerollCount - freeRerollCalls + 1) * REROLL_COST_STEP
         : 0;
     const isFreeReroll = nextRerollCost === 0;
-    const canAffordReroll = state.production >= nextRerollCost;
+    const canAffordReroll = state.resources.production >= nextRerollCost;
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -186,26 +186,26 @@ export class AddPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const goldHTML = state.goldUnlocked
+    const goldHTML = state.resources.isUnlocked(ResourceTarget.GOLD)
       ? `
         <div class="kh-res-divider"></div>
         <div class="kh-resource kh-gold">
           <span class="kh-res-icon">💰</span>
           <div>
             <div class="kh-res-label">Gold</div>
-            <div class="kh-res-value">${Math.floor(state.gold)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
       `
       : "";
-    const strengthHTML = state.strengthUnlocked
+    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
       ? `
         <div class="kh-res-divider"></div>
         <div class="kh-resource kh-strength">
           <span class="kh-res-icon">⚔️</span>
           <div>
             <div class="kh-res-label">Strength</div>
-            <div class="kh-res-value">${Math.floor(state.strength)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>
       `
@@ -216,7 +216,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">👥</span>
           <div>
             <div class="kh-res-label">Population</div>
-            <div class="kh-res-value">${Math.floor(state.population)} <span class="kh-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
+            <div class="kh-res-value">${Math.floor(state.resources.population)} <span class="kh-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-res-divider"></div>
@@ -224,7 +224,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">⚒️</span>
           <div>
             <div class="kh-res-label">Production</div>
-            <div class="kh-res-value">${Math.floor(state.production)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.production)}</div>
           </div>
         </div>
         <div class="kh-res-divider"></div>
@@ -232,7 +232,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">🌾</span>
           <div>
             <div class="kh-res-label">Food</div>
-            <div class="kh-res-value">${Math.floor(state.food)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.food)}</div>
           </div>
         </div>
         ${goldHTML}

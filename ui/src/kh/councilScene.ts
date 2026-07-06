@@ -7,6 +7,7 @@ import {
   ProposalKind,
   ReformBenefitType,
   DecreeType,
+  ResourceTarget,
 } from "./kingshand.ts";
 import { formatModifier, resourceIcon, resourceLabel } from "./cardCatalog.ts";
 import {
@@ -161,13 +162,13 @@ export class CouncilScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const strengthHTML = state.strengthUnlocked ? `
+    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH) ? `
         <div class="kh-cs-res-divider"></div>
         <div class="kh-cs-resource kh-cs-strength">
           <span class="kh-cs-res-icon">⚔️</span>
           <div>
             <div class="kh-cs-res-label">Strength</div>
-            <div class="kh-cs-res-value">${Math.floor(state.strength)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>` : "";
     return `
@@ -176,7 +177,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">👥</span>
           <div>
             <div class="kh-cs-res-label">Population</div>
-            <div class="kh-cs-res-value">${Math.floor(state.population)} <span class="kh-cs-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.population)} <span class="kh-cs-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -184,7 +185,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">⚒️</span>
           <div>
             <div class="kh-cs-res-label">Production</div>
-            <div class="kh-cs-res-value">${Math.floor(state.production)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.production)}</div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -192,7 +193,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">🌾</span>
           <div>
             <div class="kh-cs-res-label">Food</div>
-            <div class="kh-cs-res-value">${Math.floor(state.food)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.food)}</div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -200,7 +201,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">💰</span>
           <div>
             <div class="kh-cs-res-label">Gold</div>
-            <div class="kh-cs-res-value">${Math.floor(state.gold)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
         ${strengthHTML}
@@ -245,7 +246,7 @@ export class CouncilScene {
     const info = getAdvisorDisplayInfo(seated.advisorId);
     const reformDone = seated.reformStacksTaken >= info.reform.maxStacks;
     const dismissCost = Math.round(info.hiringCost * ADVISOR_DISMISSAL_COST_RATE);
-    const canAffordDismissal = state.gold >= dismissCost;
+    const canAffordDismissal = state.resources.gold >= dismissCost;
     // Render the advisor's *live* card effects rather than trusting the static catalog
     // description alone: accepted Reforms/Decrees permanently boost (or add to) this card via
     // GameEngine#withEffectBoostOrAdd, so info.specialtyDescription's baked-in number goes stale
@@ -323,7 +324,7 @@ export class CouncilScene {
   }
 
   private buildAdvisorCard(state: GameState, advisor: Advisor, councilFull: boolean): string {
-    const canAfford = state.gold >= advisor.hiringCost;
+    const canAfford = state.resources.gold >= advisor.hiringCost;
     const disabled = councilFull || !canAfford;
     return `
       <div class="kh-cs-advisor-card ${disabled ? "kh-cs-advisor-card-disabled" : ""}" data-id="${advisor.id}">
