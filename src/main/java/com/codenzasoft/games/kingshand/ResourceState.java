@@ -18,7 +18,7 @@ public record ResourceState(
     return new ResourceState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Collections.emptySet());
   }
 
-  public ResourceState withFood(double food) {
+  public ResourceState withFood(final double food) {
     return new ResourceState(
         food,
         this.production,
@@ -29,7 +29,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withProduction(double production) {
+  public ResourceState withProduction(final double production) {
     return new ResourceState(
         this.food,
         production,
@@ -40,7 +40,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withPopulation(double population) {
+  public ResourceState withPopulation(final double population) {
     return new ResourceState(
         this.food,
         this.production,
@@ -51,7 +51,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withPopulationCap(double populationCap) {
+  public ResourceState withPopulationCap(final double populationCap) {
     return new ResourceState(
         this.food,
         this.production,
@@ -62,7 +62,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withGold(double gold) {
+  public ResourceState withGold(final double gold) {
     return new ResourceState(
         this.food,
         this.production,
@@ -73,7 +73,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withStrength(double strength) {
+  public ResourceState withStrength(final double strength) {
     return new ResourceState(
         this.food,
         this.production,
@@ -84,7 +84,7 @@ public record ResourceState(
         this.unlocked);
   }
 
-  public ResourceState withUnlocked(Set<ResourceTarget> unlocked) {
+  public ResourceState withUnlocked(final Set<ResourceTarget> unlocked) {
     return new ResourceState(
         this.food,
         this.production,
@@ -95,7 +95,7 @@ public record ResourceState(
         Collections.unmodifiableSet(unlocked));
   }
 
-  public ResourceState apply(Effect effect) {
+  public ResourceState apply(final Effect effect) {
 
     if (effect.target() instanceof ResourceTarget rt) {
       switch (rt) {
@@ -129,38 +129,38 @@ public record ResourceState(
     return this;
   }
 
-  private double nextValue(Effect effect, double value) {
+  private double nextValue(final Effect effect, final double value) {
     return clampZero(effect.apply(value));
   }
 
-  private double clampZero(double value) {
+  private double clampZero(final double value) {
     return Math.max(0.0, value);
   }
 
-  public ResourceState addProduction(double value) {
+  public ResourceState addProduction(final double value) {
     return withProduction(clampZero(production + value));
   }
 
-  public ResourceState addGold(double value) {
+  public ResourceState addGold(final double value) {
     if (unlocked.contains(ResourceTarget.GOLD)) {
       return withGold(clampZero(gold + value));
     }
     return this;
   }
 
-  public ResourceState addPopulationCap(double value) {
+  public ResourceState addPopulationCap(final double value) {
     return withPopulationCap(clampZero(populationCap + value));
   }
 
   /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
-  public ResourceState unlock(Card card) {
+  public ResourceState unlock(final Card card) {
 
     Set<ResourceTarget> nextUnlocked = new HashSet<>(unlocked);
     nextUnlocked.addAll(card.unlockedResources());
     return withUnlocked(nextUnlocked);
   }
 
-  public ResourceState consumeFood(double rate) {
+  public ResourceState consumeFood(final double rate) {
     double consumed = Math.floor(population * rate);
     if (consumed > food) {
       double deficit = consumed - food;
