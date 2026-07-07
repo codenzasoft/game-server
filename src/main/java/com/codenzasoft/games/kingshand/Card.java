@@ -243,18 +243,20 @@ public record Card(
   }
 
   /**
-   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} based
-   * on the provided {@link StaffingTier}.
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
+   * by the provided {@link StaffingTier}. A card is only played if its required {@link
+   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
+   * great works, as they have negative effect modifiers (costs)
    *
    * @param state A {@link GameState} to apply effects to.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
   public void play(final GameState state, final StaffingTier tier) {
-    // Great works only progress when fully staffed and all construction costs are affordable.
-    if (isGreatWork()) {
-      if (!(tier == StaffingTier.FULL && state.canAfford(effects()))) {
-        return;
-      }
+    if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
+      return;
+    }
+    if (!state.canAfford(effects())) {
+      return;
     }
 
     for (Effect effect : getTierEffects(tier)) {
@@ -325,5 +327,18 @@ public record Card(
     return effects.stream()
         .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
         .toList();
+  }
+
+  /**
+   * Returns the minimum required {@link StaffingTier} for this card to be played.
+   *
+   * @return the minimum required {@link StaffingTier} for this card to be played.
+   */
+  private StaffingTier getRequiredStaffingTier() {
+    // Great works must be fully staffed to be played
+    if (isGreatWork()) {
+      return StaffingTier.FULL;
+    }
+    return StaffingTier.NONE;
   }
 }

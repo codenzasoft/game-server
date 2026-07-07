@@ -276,6 +276,8 @@ public class GameState {
    * ignored (they don't appear on construction cards), as are POPULATION/POPULATION_CAP effects
    * (not construction costs).
    */
+  // TODO: implement with ResourceState.apply(...) - but why are population and population cap not
+  // included?
   public boolean canAfford(List<Effect> effects) {
     double simProd = resources.production();
     double simFood = resources.food();

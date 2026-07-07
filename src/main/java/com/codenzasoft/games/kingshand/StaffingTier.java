@@ -16,5 +16,9 @@ package com.codenzasoft.games.kingshand;
 public enum StaffingTier {
   NONE,
   HALF,
-  FULL
+  FULL;
+
+  public boolean greaterThanOrEqualTo(final StaffingTier tier) {
+    return ordinal() >= tier.ordinal();
+  }
 }
