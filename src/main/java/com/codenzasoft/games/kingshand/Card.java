@@ -2,6 +2,7 @@ package com.codenzasoft.games.kingshand;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -239,5 +240,105 @@ public record Card(
         unlockedResources,
         victory,
         season);
+  }
+
+  /**
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
+   * by the provided {@link StaffingTier}. A card is only played if its required {@link
+   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
+   * great works, as they have negative effect modifiers (costs)
+   *
+   * @param state A {@link GameState} to apply effects to.
+   * @param tier The {@link StaffingTier} to use when applying effects.
+   */
+  public void play(final GameState state, final StaffingTier tier) {
+    if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
+      return;
+    }
+    if (!state.canAfford(effects())) {
+      return;
+    }
+
+    for (Effect effect : getTierEffects(tier)) {
+      if (effect.target() instanceof ResourceTarget rt) {
+        state.apply(effect);
+      } else if (effect.target() instanceof CardTarget ct) {
+        final List<Card> followingCards = state.getCardsOnBoardAfter(this);
+        for (final Card card : followingCards) {
+          final Optional<Card> boosted = boost(card, effect, ct);
+          boosted.ifPresent(value -> state.replaceTableCard(card, value));
+          if (ct.adjacentOnly()) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (isGreatWork()) {
+      int newPeriod = constructionPeriod() - 1;
+      if (newPeriod == 0) {
+        // ── Construction COMPLETE — swap for the completed card ──────────
+        state.replaceTableCard(this, completedCard());
+        // Unlock any new resource types this Great Work grants.
+        state.unlock(this);
+      } else {
+        // Decrement: replace the card on the table with the same card minus one period.
+        Card decremented = withConstructionPeriod(newPeriod);
+        state.replaceTableCard(this, decremented);
+      }
+    }
+  }
+
+  public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {
+    boolean hasMatch =
+        card.effects().stream()
+            .anyMatch(
+                e -> e.target() == target.targetResource() && e.valueType() == ValueType.INTEGER);
+    if (hasMatch) {
+      return Optional.of(card.boostEffect(target.targetResource(), effect.modifier()));
+    }
+    return Optional.empty();
+  }
+
+  public List<Effect> getTierEffects(final StaffingTier tier) {
+    switch (tier) {
+      case NONE -> {
+        return List.of();
+      }
+      case HALF -> {
+        if (isGreatWork()) {
+          // Great works only have effects when fully staffed
+          return List.of();
+        }
+        return halveEffects(effects());
+      }
+      case FULL -> {
+        return effects();
+      }
+    }
+    return List.of();
+  }
+
+  /**
+   * Returns a new effect list with every modifier floored to half, used when a card resolves at
+   * {@link StaffingTier#HALF}. Both INTEGER and PERCENTAGE modifiers are halved.
+   */
+  private List<Effect> halveEffects(List<Effect> effects) {
+    return effects.stream()
+        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
+        .toList();
+  }
+
+  /**
+   * Returns the minimum required {@link StaffingTier} for this card to be played.
+   *
+   * @return the minimum required {@link StaffingTier} for this card to be played.
+   */
+  private StaffingTier getRequiredStaffingTier() {
+    // Great works must be fully staffed to be played
+    if (isGreatWork()) {
+      return StaffingTier.FULL;
+    }
+    return StaffingTier.NONE;
   }
 }

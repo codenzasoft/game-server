@@ -33,8 +33,6 @@ public class GameState {
   private int rerollCount;
   // per-card resolution log from the most recent endAndRun call — empty between seasons
   private List<ResolutionStep> resolutionLog;
-  // events emitted during the last endAndRun (e.g. "TREASURY_COMPLETED")
-  private List<String> greatWorkLog;
   // ----- Council / Advisors -----
   // hired advisors currently seated on the council; max GameEngine.MAX_COUNCIL_SIZE (3)
   private List<SeatedAdvisor> council;
@@ -61,7 +59,6 @@ public class GameState {
     this.addChoices = b.addChoices;
     this.rerollCount = b.rerollCount;
     this.resolutionLog = b.resolutionLog;
-    this.greatWorkLog = b.greatWorkLog;
     this.council = b.council;
     this.councilOfferChoices = b.councilOfferChoices;
     this.currentProposal = b.currentProposal;
@@ -276,6 +273,8 @@ public class GameState {
    * ignored (they don't appear on construction cards), as are POPULATION/POPULATION_CAP effects
    * (not construction costs).
    */
+  // TODO: implement with ResourceState.apply(...) - but why are population and population cap not
+  // included?
   public boolean canAfford(List<Effect> effects) {
     double simProd = resources.production();
     double simFood = resources.food();
@@ -321,20 +320,6 @@ public class GameState {
   @JsonProperty("gameWon")
   public boolean isGameWon() {
     return isVictoryComplete();
-  }
-
-  /**
-   * Events emitted during the most recent {@link Phase#PLAY} resolution relating to Great Works
-   * (e.g. {@code "TREASURY_COMPLETED"}, {@code "THE_GREAT_RESERVOIR_PERIOD_DECREMENTED:5"}). Empty
-   * between seasons. Cleared at the start of each {@code endAndRun}.
-   */
-  @JsonProperty("greatWorkLog")
-  public List<String> getGreatWorkLog() {
-    return greatWorkLog == null ? List.of() : greatWorkLog;
-  }
-
-  public void setGreatWorkLog(List<String> log) {
-    this.greatWorkLog = log == null ? List.of() : List.copyOf(log);
   }
 
   /** Advisors currently seated on the council; never more than {@code MAX_COUNCIL_SIZE} (3). */
@@ -452,6 +437,15 @@ public class GameState {
     time = time.advance(resources);
   }
 
+  public List<Card> getCardsOnBoardAfter(final Card card) {
+    final List<Card> cards = getBoard().get(time.season());
+    final int index = cards.indexOf(card);
+    if (index == -1 || index + 1 == cards.size()) {
+      return List.of();
+    }
+    return cards.subList(index + 1, cards.size());
+  }
+
   // ----- Builder -----
 
   public static final class Builder {
@@ -477,7 +471,6 @@ public class GameState {
             ResourceTarget.PRODUCTION,
             ResourceTarget.FOOD,
             ResourceTarget.POPULATION_CAP);
-    private List<String> greatWorkLog = List.of();
     private List<SeatedAdvisor> council = new ArrayList<>();
     private List<Advisor> councilOfferChoices = new ArrayList<>();
     private CouncilProposal currentProposal = null;
@@ -603,11 +596,6 @@ public class GameState {
           unlockedResources == null
               ? EnumSet.noneOf(ResourceTarget.class)
               : EnumSet.copyOf(unlockedResources);
-      return this;
-    }
-
-    public Builder greatWorkLog(List<String> greatWorkLog) {
-      this.greatWorkLog = greatWorkLog == null ? List.of() : new ArrayList<>(greatWorkLog);
       return this;
     }
 

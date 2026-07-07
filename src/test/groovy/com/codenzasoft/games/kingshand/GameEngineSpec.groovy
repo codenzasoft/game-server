@@ -63,55 +63,6 @@ class GameEngineSpec extends Specification {
         startPhase << [Phase.ADD, Phase.COUNCIL_ADD, Phase.COUNCIL_MEETING]
     }
 
-    // ----- season trigger pass -----
-
-    def "RECURRING cards fire all effects on the season trigger; SINGLE cards do not"() {
-        setup:
-        def state = GameState.newState()
-        def engine = engine(state)
-
-        def recurringCard = new Card("TEST", 0, 0, FrequencyType.RECURRING, [
-                new Effect(ResourceTarget.POPULATION, 10, ValueType.INTEGER),
-                new Effect(ResourceTarget.PRODUCTION, 20, ValueType.INTEGER)
-        ])
-        def singleCard = new Card("TEST", 0, 0, FrequencyType.SINGLE, [
-                new Effect(ResourceTarget.FOOD, 99, ValueType.INTEGER)
-        ])
-        engine.addCard(Season.SPRING, recurringCard)
-        engine.addCard(Season.SPRING, singleCard)
-
-        when:
-        engine.triggerCurrentSeasonTable()
-
-        then:
-        state.resources.population == 100   // 100 pop cap
-        state.resources.production == 1020  // 1000 + 20 from RECURRING card
-        state.resources.food       == 750   // unchanged — SINGLE card did not fire
-    }
-
-    def "card with recurring effects on all three resources fires every one of them"() {
-        setup:
-        def state = GameState.newState()
-        def engine = engine(state)
-
-        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [
-                        new Effect(ResourceTarget.POPULATION, 1, ValueType.INTEGER),
-                        new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER),
-                        new Effect(ResourceTarget.FOOD, 3, ValueType.INTEGER)
-                ]
-        )
-
-        engine.addCard(Season.SPRING, card)
-
-        when:
-        engine.triggerCurrentSeasonTable()
-
-        then:
-        state.resources.population == 100   // 100 pop cap
-        state.resources.production == 1005  // 1000 + 5
-        state.resources.food == 753         // 750 + 3
-    }
-
     def "single-frequency effects do not fire on the season trigger"() {
         setup:
         def state = GameState.newState()
