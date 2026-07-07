@@ -353,62 +353,19 @@ public class GameEngine implements Game<GameEngine> {
     state.discardHand();
 
     // 2. Compute staffing based on current population (locked in at End and Run time).
-    List<CardStaffing> staffing = state.getTableStaffing();
+    final List<CardStaffing> staffing = state.getTableStaffing();
 
-    // 4. Snapshot the table order before resolution so that removals during the walk don't
+    // 3. Snapshot the table order before resolution so that updates during the walk don't
     //    disturb the iteration sequence.
-    List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
+    final List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
-    // ── Single left-to-right resolution pass ─────────────────────────────────────
-    List<ResolutionStep> log = new ArrayList<>();
+    // 4. Play each card on the table updating resource state, from left to right.
+    final List<ResolutionStep> log = new ArrayList<>();
 
     for (int i = 0; i < snapshot.size(); i++) {
-      Card card = snapshot.get(i);
-      StaffingTier tier = i < staffing.size() ? staffing.get(i).tier() : StaffingTier.NONE;
-
-      ResourceState before = state.getResources();
-
-      // TODO: Great work log
-
-      //      if (card.isGreatWork()) {
-      //        // Construction cards are never discarded and never run normal effects.
-      //        // They only progress when fully staffed and all construction costs are affordable.
-      //        if (tier == StaffingTier.FULL && state.canAfford(card.effects())) {
-      //          // Apply the per-season construction costs.
-      //          for (Effect effect : card.effects()) {
-      //            if (effect.target() instanceof ResourceTarget rt) {
-      //              state.apply(effect);
-      //            }
-      //          }
-      //
-      //          int newPeriod = card.constructionPeriod() - 1;
-      //          if (newPeriod == 0) {
-      //            // ── Construction COMPLETE — swap for the completed card ──────────
-      //            Card completedCard = card.completedCard();
-      //            snapshot.set(i, completedCard);
-      //            liveTable.set(i - discardedCount, completedCard);
-      //            // Unlock any new resource types this Great Work grants.
-      //            state.unlock(card);
-
-      //          } else {
-      //            // Decrement: replace the card on the table with the same card minus one period.
-      //            Card decremented = card.withConstructionPeriod(newPeriod);
-      //            snapshot.set(i, decremented);
-      //            liveTable.set(i - discardedCount, decremented);
-
-      //          }
-      //        } else {
-
-      //        }
-      //
-      //        log.add(
-      //            new ResolutionStep(card.name(), tier, false,
-      // state.getResources().getDelta(before)));
-      //        // Great-work construction/completed cards are NEVER discarded by the engine.
-      //        continue;
-      //      }
-
-      // ── Normal card resolution ────────────────────────────────────────────────
+      final Card card = snapshot.get(i);
+      final StaffingTier tier = staffing.get(i).tier();
+      final ResourceState before = state.getResources();
 
       // Whether all effects on this card are engine-builder (CardTarget) effects.
       boolean isEngineBoost =
@@ -416,7 +373,6 @@ public class GameEngine implements Game<GameEngine> {
               && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
 
       card.play(state, tier);
-
       log.add(
           new ResolutionStep(
               card.name(), tier, isEngineBoost, state.getResources().getDelta(before)));
@@ -433,7 +389,6 @@ public class GameEngine implements Game<GameEngine> {
       ResourceState before = state.getResources();
 
       card.play(state, StaffingTier.FULL);
-
       log.add(
           new ResolutionStep(
               card.name(), StaffingTier.FULL, false, state.getResources().getDelta(before)));
@@ -445,7 +400,7 @@ public class GameEngine implements Game<GameEngine> {
     if (crossTableBoost > 0) {
       List<Card> currentTable = state.getCurrentTable();
       for (int j = 0; j < currentTable.size(); j++) {
-        Card target = currentTable.get(j);
+        final Card target = currentTable.get(j);
         boolean hasMatch =
             target.effects().stream()
                 .anyMatch(
@@ -463,7 +418,7 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // 5. Food consumption / starvation / growth — captured as a tail step.
-    ResourceState before = state.getResources();
+    final ResourceState before = state.getResources();
     consumeFood();
     log.add(new ResolutionStep(null, null, false, state.getResources().getDelta(before)));
 
