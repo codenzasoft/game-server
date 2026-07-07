@@ -317,41 +317,6 @@ public class GameEngine implements Game<GameEngine> {
     state.getBoard().get(season).remove(card);
   }
 
-  // ----- Season trigger -----
-
-  protected synchronized void triggerCurrentSeasonTable() {
-    List<Card> table = state.getCurrentTable();
-
-    // Walk every card on the current season's table. Only RECURRING cards fire here; frequency is
-    // checked once per card (it is a card-level property). The full end-of-PLAY resolver —
-    // including SINGLE-frequency cards (engine builders) and post-fire discard — lives in
-    // endAndRun.
-    for (int i = 0; i < table.size(); i++) {
-      Card card = table.get(i);
-      if (card.frequencyType() != FrequencyType.RECURRING) continue;
-      for (Effect effect : card.effects()) {
-        if (effect.target() instanceof ResourceTarget rt) {
-          state.apply(effect);
-        } else if (effect.target() instanceof CardTarget ct) {
-          // RECURRING engine builder: permanently boost matching cards to the right.
-          for (int j = i + 1; j < table.size(); j++) {
-            Card target = table.get(j);
-            boolean hasMatch =
-                target.effects().stream()
-                    .anyMatch(
-                        e ->
-                            e.target() == ct.targetResource()
-                                && e.valueType() == ValueType.INTEGER);
-            if (hasMatch) {
-              table.set(j, target.boostEffect(ct.targetResource(), effect.modifier()));
-              if (ct.adjacentOnly()) break;
-            }
-          }
-        }
-      }
-    }
-  }
-
   // ----- End-of-PLAY resolution -----
 
   /**
