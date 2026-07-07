@@ -225,7 +225,6 @@ interface GameStateData {
   gameOver: boolean;
   tableStaffing: CardStaffing[];
   gameWon: boolean;
-  greatWorkLog: string[];
   permanentFreeRerolls: number;
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
@@ -518,7 +517,6 @@ export class GameState {
   tableStaffing: CardStaffing[];
   resolutionLog: ResolutionStep[];
   gameWon: boolean;
-  greatWorkLog: string[];
   permanentFreeRerolls: number;
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
@@ -537,7 +535,6 @@ export class GameState {
     this.tableStaffing = data.tableStaffing;
     this.resolutionLog = data.resolutionLog;
     this.gameWon = data.gameWon;
-    this.greatWorkLog = data.greatWorkLog;
     this.permanentFreeRerolls = data.permanentFreeRerolls;
     this.council = data.council;
     this.councilOfferChoices = data.councilOfferChoices;
@@ -754,9 +751,6 @@ export const GameStateSchema = z
     resolutionLog: z.array(ResolutionStepSchema).default([]),
     // true once all four win-condition Great Works are completed.
     gameWon: z.boolean().default(false),
-    // Great-Work-related events emitted by the most recent endAndRun (e.g.
-    // "TREASURY_COMPLETED"); empty between seasons.
-    greatWorkLog: z.array(z.string()).default([]),
     // Permanent free-ADD-phase-reroll count from one-time Decrees (e.g. Lady Iseult Varn's
     // "Plant an Informant"). Distinct from a seated advisor's own bonusFreeRerolls (Reform-driven,
     // tied to that seat) — this persists even after the granting advisor is later dismissed.

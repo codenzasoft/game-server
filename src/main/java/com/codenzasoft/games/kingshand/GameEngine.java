@@ -352,11 +352,7 @@ public class GameEngine implements Game<GameEngine> {
     // 1. Discard everything remaining in hand.
     state.discardHand();
 
-    // 2. Clear the great-work event log for this resolution pass.
-    List<String> gwLog = new ArrayList<>();
-    state.setGreatWorkLog(List.of());
-
-    // 3. Compute staffing based on current population (locked in at End and Run time).
+    // 2. Compute staffing based on current population (locked in at End and Run time).
     List<CardStaffing> staffing = state.getTableStaffing();
 
     // 4. Snapshot the table order before resolution so that removals during the walk don't
@@ -393,16 +389,16 @@ public class GameEngine implements Game<GameEngine> {
       //            liveTable.set(i - discardedCount, completedCard);
       //            // Unlock any new resource types this Great Work grants.
       //            state.unlock(card);
-      //            gwLog.add(card.name() + "_COMPLETED");
+
       //          } else {
       //            // Decrement: replace the card on the table with the same card minus one period.
       //            Card decremented = card.withConstructionPeriod(newPeriod);
       //            snapshot.set(i, decremented);
       //            liveTable.set(i - discardedCount, decremented);
-      //            gwLog.add(card.name() + "_PERIOD_DECREMENTED:" + newPeriod);
+
       //          }
       //        } else {
-      //          gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
+
       //        }
       //
       //        log.add(
@@ -472,7 +468,6 @@ public class GameEngine implements Game<GameEngine> {
     log.add(new ResolutionStep(null, null, false, state.getResources().getDelta(before)));
 
     state.setResolutionLog(log);
-    state.setGreatWorkLog(gwLog);
 
     if (state.isGameOver()) {
       notifyListeners(GAME_OVER_NOTIFICATION);
@@ -1331,18 +1326,14 @@ public class GameEngine implements Game<GameEngine> {
     if (target == null) return;
 
     int newPeriod = target.constructionPeriod() - 1;
-    List<String> gwLog = new ArrayList<>(state.getGreatWorkLog());
     if (newPeriod <= 0) {
       Card completed = target.completedCard();
       replaceCardOnBoard(target, completed);
       state.unlock(target);
-      gwLog.add(target.name() + "_COMPLETED");
     } else {
       Card decremented = target.withConstructionPeriod(newPeriod);
       replaceCardOnBoard(target, decremented);
-      gwLog.add(target.name() + "_PERIOD_DECREMENTED:" + newPeriod);
     }
-    state.setGreatWorkLog(gwLog);
     state.markGreatWorkAccelerated(target.name());
   }
 
