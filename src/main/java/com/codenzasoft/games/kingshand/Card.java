@@ -2,6 +2,7 @@ package com.codenzasoft.games.kingshand;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -239,5 +240,69 @@ public record Card(
         unlockedResources,
         victory,
         season);
+  }
+
+  /**
+   * Applies all of this card's {@link Effect} to the provided {@link GameState} based on the
+   * provided {@link StaffingTier}.
+   *
+   * @param state A {@link GameState} to apply effects to.
+   * @param tier The {@link StaffingTier} to use when applying effects.
+   */
+  public void applyEffects(final GameState state, final StaffingTier tier) {
+    for (Effect effect : getTierEffects(tier)) {
+      if (effect.target() instanceof ResourceTarget rt) {
+        state.apply(effect);
+      } else if (effect.target() instanceof CardTarget ct) {
+        final List<Card> followingCards = state.getCardsOnBoardAfter(this);
+        for (final Card card : followingCards) {
+          final Optional<Card> boosted = boost(card, effect, ct);
+          boosted.ifPresent(value -> state.replaceTableCard(card, value));
+          if (ct.adjacentOnly()) {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {
+    boolean hasMatch =
+        card.effects().stream()
+            .anyMatch(
+                e -> e.target() == target.targetResource() && e.valueType() == ValueType.INTEGER);
+    if (hasMatch) {
+      return Optional.of(card.boostEffect(target.targetResource(), effect.modifier()));
+    }
+    return Optional.empty();
+  }
+
+  public List<Effect> getTierEffects(final StaffingTier tier) {
+    switch (tier) {
+      case NONE -> {
+        return List.of();
+      }
+      case HALF -> {
+        if (isGreatWork()) {
+          // Great works only have effects when fully staffed
+          return List.of();
+        }
+        return halveEffects(effects());
+      }
+      case FULL -> {
+        return effects();
+      }
+    }
+    return List.of();
+  }
+
+  /**
+   * Returns a new effect list with every modifier floored to half, used when a card resolves at
+   * {@link StaffingTier#HALF}. Both INTEGER and PERCENTAGE modifiers are halved.
+   */
+  private List<Effect> halveEffects(List<Effect> effects) {
+    return effects.stream()
+        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
+        .toList();
   }
 }

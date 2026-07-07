@@ -452,6 +452,15 @@ public class GameState {
     time = time.advance(resources);
   }
 
+  public List<Card> getCardsOnBoardAfter(final Card card) {
+    final List<Card> cards = getBoard().get(time.season());
+    final int index = cards.indexOf(card);
+    if (index == -1 || index + 1 == cards.size()) {
+      return List.of();
+    }
+    return cards.subList(index + 1, cards.size());
+  }
+
   // ----- Builder -----
 
   public static final class Builder {

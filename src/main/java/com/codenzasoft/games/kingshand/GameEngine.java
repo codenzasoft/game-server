@@ -453,32 +453,7 @@ public class GameEngine implements Game<GameEngine> {
           tier != StaffingTier.NONE
               && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
 
-      if (tier != StaffingTier.NONE) {
-        List<Effect> effects =
-            tier == StaffingTier.HALF ? halveEffects(card.effects()) : card.effects();
-
-        for (Effect effect : effects) {
-          if (effect.target() instanceof ResourceTarget rt) {
-            state.apply(effect);
-          } else if (effect.target() instanceof CardTarget ct) {
-            for (int j = i + 1; j < snapshot.size(); j++) {
-              Card target = snapshot.get(j);
-              boolean hasMatch =
-                  target.effects().stream()
-                      .anyMatch(
-                          e ->
-                              e.target() == ct.targetResource()
-                                  && e.valueType() == ValueType.INTEGER);
-              if (hasMatch) {
-                Card boosted = target.boostEffect(ct.targetResource(), effect.modifier());
-                snapshot.set(j, boosted);
-                liveTable.set(j - discardedCount, boosted);
-                if (ct.adjacentOnly()) break;
-              }
-            }
-          }
-        }
-      }
+      card.applyEffects(state, tier);
 
       log.add(
           new ResolutionStep(
@@ -546,16 +521,6 @@ public class GameEngine implements Game<GameEngine> {
     if (!state.isVictoryComplete()) {
       advancePhase();
     }
-  }
-
-  /**
-   * Returns a new effect list with every modifier floored to half, used when a card resolves at
-   * {@link StaffingTier#HALF}. Both INTEGER and PERCENTAGE modifiers are halved.
-   */
-  private List<Effect> halveEffects(List<Effect> effects) {
-    return effects.stream()
-        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
-        .toList();
   }
 
   /**
