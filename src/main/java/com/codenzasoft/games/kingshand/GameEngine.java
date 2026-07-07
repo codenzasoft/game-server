@@ -453,7 +453,7 @@ public class GameEngine implements Game<GameEngine> {
           tier != StaffingTier.NONE
               && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
 
-      card.applyEffects(state, tier);
+      card.play(state, tier);
 
       log.add(
           new ResolutionStep(

@@ -243,13 +243,13 @@ public record Card(
   }
 
   /**
-   * Applies all of this card's {@link Effect} to the provided {@link GameState} based on the
-   * provided {@link StaffingTier}.
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} based
+   * on the provided {@link StaffingTier}.
    *
    * @param state A {@link GameState} to apply effects to.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
-  public void applyEffects(final GameState state, final StaffingTier tier) {
+  public void play(final GameState state, final StaffingTier tier) {
     for (Effect effect : getTierEffects(tier)) {
       if (effect.target() instanceof ResourceTarget rt) {
         state.apply(effect);
