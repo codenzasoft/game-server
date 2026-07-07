@@ -471,11 +471,7 @@ public class GameEngine implements Game<GameEngine> {
       Card card = seated.getCard();
       ResourceState before = state.getResources();
 
-      for (Effect effect : card.effects()) {
-        if (effect.target() instanceof ResourceTarget rt) {
-          state.apply(effect);
-        }
-      }
+      card.play(state, StaffingTier.FULL);
 
       log.add(
           new ResolutionStep(
