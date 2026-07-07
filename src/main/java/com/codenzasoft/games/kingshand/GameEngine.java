@@ -399,8 +399,6 @@ public class GameEngine implements Game<GameEngine> {
     List<Card> snapshot = new ArrayList<>(state.getCurrentTable());
 
     // ── Single left-to-right resolution pass ─────────────────────────────────────
-    List<Card> liveTable = state.getCurrentTable();
-    int discardedCount = 0;
     List<ResolutionStep> log = new ArrayList<>();
 
     for (int i = 0; i < snapshot.size(); i++) {
@@ -409,42 +407,45 @@ public class GameEngine implements Game<GameEngine> {
 
       ResourceState before = state.getResources();
 
-      if (card.isGreatWork()) {
-        // Construction cards are never discarded and never run normal effects.
-        // They only progress when fully staffed and all construction costs are affordable.
-        if (tier == StaffingTier.FULL && state.canAfford(card.effects())) {
-          // Apply the per-season construction costs.
-          for (Effect effect : card.effects()) {
-            if (effect.target() instanceof ResourceTarget rt) {
-              state.apply(effect);
-            }
-          }
+      // TODO: Great work log
 
-          int newPeriod = card.constructionPeriod() - 1;
-          if (newPeriod == 0) {
-            // ── Construction COMPLETE — swap for the completed card ──────────
-            Card completedCard = card.completedCard();
-            snapshot.set(i, completedCard);
-            liveTable.set(i - discardedCount, completedCard);
-            // Unlock any new resource types this Great Work grants.
-            state.unlock(card);
-            gwLog.add(card.name() + "_COMPLETED");
-          } else {
-            // Decrement: replace the card on the table with the same card minus one period.
-            Card decremented = card.withConstructionPeriod(newPeriod);
-            snapshot.set(i, decremented);
-            liveTable.set(i - discardedCount, decremented);
-            gwLog.add(card.name() + "_PERIOD_DECREMENTED:" + newPeriod);
-          }
-        } else {
-          gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
-        }
-
-        log.add(
-            new ResolutionStep(card.name(), tier, false, state.getResources().getDelta(before)));
-        // Great-work construction/completed cards are NEVER discarded by the engine.
-        continue;
-      }
+      //      if (card.isGreatWork()) {
+      //        // Construction cards are never discarded and never run normal effects.
+      //        // They only progress when fully staffed and all construction costs are affordable.
+      //        if (tier == StaffingTier.FULL && state.canAfford(card.effects())) {
+      //          // Apply the per-season construction costs.
+      //          for (Effect effect : card.effects()) {
+      //            if (effect.target() instanceof ResourceTarget rt) {
+      //              state.apply(effect);
+      //            }
+      //          }
+      //
+      //          int newPeriod = card.constructionPeriod() - 1;
+      //          if (newPeriod == 0) {
+      //            // ── Construction COMPLETE — swap for the completed card ──────────
+      //            Card completedCard = card.completedCard();
+      //            snapshot.set(i, completedCard);
+      //            liveTable.set(i - discardedCount, completedCard);
+      //            // Unlock any new resource types this Great Work grants.
+      //            state.unlock(card);
+      //            gwLog.add(card.name() + "_COMPLETED");
+      //          } else {
+      //            // Decrement: replace the card on the table with the same card minus one period.
+      //            Card decremented = card.withConstructionPeriod(newPeriod);
+      //            snapshot.set(i, decremented);
+      //            liveTable.set(i - discardedCount, decremented);
+      //            gwLog.add(card.name() + "_PERIOD_DECREMENTED:" + newPeriod);
+      //          }
+      //        } else {
+      //          gwLog.add(card.name() + "_CONSTRUCTION_STALLED");
+      //        }
+      //
+      //        log.add(
+      //            new ResolutionStep(card.name(), tier, false,
+      // state.getResources().getDelta(before)));
+      //        // Great-work construction/completed cards are NEVER discarded by the engine.
+      //        continue;
+      //      }
 
       // ── Normal card resolution ────────────────────────────────────────────────
 
@@ -461,7 +462,6 @@ public class GameEngine implements Game<GameEngine> {
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
-        discardedCount++;
       }
     }
 

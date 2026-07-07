@@ -250,6 +250,13 @@ public record Card(
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
   public void play(final GameState state, final StaffingTier tier) {
+    // Great works only progress when fully staffed and all construction costs are affordable.
+    if (isGreatWork()) {
+      if (!(tier == StaffingTier.FULL && state.canAfford(effects()))) {
+        return;
+      }
+    }
+
     for (Effect effect : getTierEffects(tier)) {
       if (effect.target() instanceof ResourceTarget rt) {
         state.apply(effect);
@@ -262,6 +269,20 @@ public record Card(
             break;
           }
         }
+      }
+    }
+
+    if (isGreatWork()) {
+      int newPeriod = constructionPeriod() - 1;
+      if (newPeriod == 0) {
+        // ── Construction COMPLETE — swap for the completed card ──────────
+        state.replaceTableCard(this, completedCard());
+        // Unlock any new resource types this Great Work grants.
+        state.unlock(this);
+      } else {
+        // Decrement: replace the card on the table with the same card minus one period.
+        Card decremented = withConstructionPeriod(newPeriod);
+        state.replaceTableCard(this, decremented);
       }
     }
   }
