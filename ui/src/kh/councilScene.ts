@@ -7,6 +7,7 @@ import {
   ProposalKind,
   ReformBenefitType,
   DecreeType,
+  ResourceTarget,
 } from "./kingshand.ts";
 import { formatModifier, resourceIcon, resourceLabel } from "./cardCatalog.ts";
 import {
@@ -68,7 +69,7 @@ function formatGreatWorkName(name: string | undefined): string {
  * Full-screen HTML overlay covering both council sub-phases: {@link Phase#COUNCIL_ADD}
  * (hire an advisor or skip) and {@link Phase#COUNCIL_MEETING} (accept or pass the
  * year's single rotating Reform/Decree proposal). One scene class handles both —
- * {@code state.curPhase} picks which body renders — so main.ts can keep a single
+ * {@code state.time.phase} picks which body renders — so main.ts can keep a single
  * scene instance alive across the COUNCIL_ADD → COUNCIL_MEETING transition.
  *
  * Advisor portraits are placeholders (a colored ring around a generic profile
@@ -110,10 +111,10 @@ export class CouncilScene {
 
   private render(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     const bodyHTML =
-      state.curPhase === Phase.COUNCIL_ADD
+      state.time.phase === Phase.COUNCIL_ADD
         ? this.buildCouncilAddBody(state)
         : this.buildCouncilMeetingBody(state);
 
@@ -151,7 +152,7 @@ export class CouncilScene {
           <h1>King's Hand</h1>
           <div class="kh-cs-year-badge">
             <span>🏰</span>
-            <span>YEAR ${state.year} — COUNCIL</span>
+            <span>YEAR ${state.time.year} — COUNCIL</span>
             <span>🏰</span>
           </div>
         </div>
@@ -161,13 +162,13 @@ export class CouncilScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const strengthHTML = state.strengthUnlocked ? `
+    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH) ? `
         <div class="kh-cs-res-divider"></div>
         <div class="kh-cs-resource kh-cs-strength">
           <span class="kh-cs-res-icon">⚔️</span>
           <div>
             <div class="kh-cs-res-label">Strength</div>
-            <div class="kh-cs-res-value">${Math.floor(state.strength)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>` : "";
     return `
@@ -176,7 +177,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">👥</span>
           <div>
             <div class="kh-cs-res-label">Population</div>
-            <div class="kh-cs-res-value">${Math.floor(state.population)} <span class="kh-cs-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.population)} <span class="kh-cs-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -184,7 +185,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">⚒️</span>
           <div>
             <div class="kh-cs-res-label">Production</div>
-            <div class="kh-cs-res-value">${Math.floor(state.production)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.production)}</div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -192,7 +193,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">🌾</span>
           <div>
             <div class="kh-cs-res-label">Food</div>
-            <div class="kh-cs-res-value">${Math.floor(state.food)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.food)}</div>
           </div>
         </div>
         <div class="kh-cs-res-divider"></div>
@@ -200,7 +201,7 @@ export class CouncilScene {
           <span class="kh-cs-res-icon">💰</span>
           <div>
             <div class="kh-cs-res-label">Gold</div>
-            <div class="kh-cs-res-value">${Math.floor(state.gold)}</div>
+            <div class="kh-cs-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
         ${strengthHTML}
@@ -245,7 +246,7 @@ export class CouncilScene {
     const info = getAdvisorDisplayInfo(seated.advisorId);
     const reformDone = seated.reformStacksTaken >= info.reform.maxStacks;
     const dismissCost = Math.round(info.hiringCost * ADVISOR_DISMISSAL_COST_RATE);
-    const canAffordDismissal = state.gold >= dismissCost;
+    const canAffordDismissal = state.resources.gold >= dismissCost;
     // Render the advisor's *live* card effects rather than trusting the static catalog
     // description alone: accepted Reforms/Decrees permanently boost (or add to) this card via
     // GameEngine#withEffectBoostOrAdd, so info.specialtyDescription's baked-in number goes stale
@@ -323,7 +324,7 @@ export class CouncilScene {
   }
 
   private buildAdvisorCard(state: GameState, advisor: Advisor, councilFull: boolean): string {
-    const canAfford = state.gold >= advisor.hiringCost;
+    const canAfford = state.resources.gold >= advisor.hiringCost;
     const disabled = councilFull || !canAfford;
     return `
       <div class="kh-cs-advisor-card ${disabled ? "kh-cs-advisor-card-disabled" : ""}" data-id="${advisor.id}">
@@ -472,7 +473,7 @@ export class CouncilScene {
 
   private attachListeners(state: GameState): void {
     this.attachRosterListeners();
-    if (state.curPhase === Phase.COUNCIL_ADD) {
+    if (state.time.phase === Phase.COUNCIL_ADD) {
       this.attachCouncilAddListeners(state);
     } else {
       this.attachCouncilMeetingListeners();

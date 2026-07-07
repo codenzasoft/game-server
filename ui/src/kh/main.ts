@@ -185,7 +185,7 @@ const getGameId = (): string | undefined => {
       return;
     }
 
-    switch (state.curPhase) {
+    switch (state.time.phase) {
       case Phase.ADD: {
         if (currentScene instanceof AddPhaseScene) {
           // Same phase — just refresh content.
@@ -291,7 +291,7 @@ const getGameId = (): string | undefined => {
           currentScene.unmount();
           currentScene = null;
         }
-        console.log(`Phase ${state.curPhase} scene not yet implemented.`);
+        console.log(`Phase ${state.time.phase} scene not yet implemented.`);
         break;
       }
     }

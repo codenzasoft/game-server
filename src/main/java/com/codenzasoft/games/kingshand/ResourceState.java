@@ -1,17 +1,18 @@
 package com.codenzasoft.games.kingshand;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 public record ResourceState(
-    double food,
-    double production,
-    double population,
-    double populationCap,
-    double gold,
-    double strength,
-    Set<ResourceTarget> unlocked) {
+    @JsonProperty("food") double food,
+    @JsonProperty("production") double production,
+    @JsonProperty("population") double population,
+    @JsonProperty("populationCap") double populationCap,
+    @JsonProperty("gold") double gold,
+    @JsonProperty("strength") double strength,
+    @JsonProperty("unlockedResources") Set<ResourceTarget> unlocked) {
 
   public static ResourceState empty() {
     return new ResourceState(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Collections.emptySet());
@@ -195,5 +196,9 @@ public record ResourceState(
         gold - previous.gold,
         strength - previous.strength,
         Collections.unmodifiableSet(unlockedSince));
+  }
+
+  public boolean isUnlocked(final ResourceTarget target) {
+    return unlocked.contains(target);
   }
 }

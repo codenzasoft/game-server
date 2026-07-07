@@ -231,7 +231,7 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void initialize() {
     if (state.isGameOver()) return;
     seedStartingDeck();
-    if (state.getCurPhase() == Phase.ADD && state.getAddChoices().isEmpty()) {
+    if (state.getTime().phase() == Phase.ADD && state.getAddChoices().isEmpty()) {
       offerAddChoices();
     }
     notifyListeners(GAME_STARTED_NOTIFICATION);
@@ -289,11 +289,11 @@ public class GameEngine implements Game<GameEngine> {
     if (state.isGameOver() || state.isVictoryComplete()) {
       return;
     }
-    if (state.getCurPhase() != Phase.PLAY) {
+    if (state.getTime().phase() != Phase.PLAY) {
       return;
     }
     state.advanceTime();
-    switch (state.getCurPhase()) {
+    switch (state.getTime().phase()) {
       case COUNCIL_ADD:
         offerCouncilChoices();
         break;
@@ -566,7 +566,7 @@ public class GameEngine implements Game<GameEngine> {
    * food is insufficient, food is clamped to 0 and population drops by {@code 0.5 × deficit}.
    */
   private void consumeFood() {
-    int rate = (state.getCurSeason() == Season.WINTER) ? 2 : 1;
+    int rate = (state.getTime().season() == Season.WINTER) ? 2 : 1;
     state.consumeFood(rate);
   }
 
@@ -591,12 +591,12 @@ public class GameEngine implements Game<GameEngine> {
     int freeCalls = 1 + state.getPermanentFreeRerolls() + seatedFreeRerollBonus();
     if (state.getRerollCount() >= freeCalls) {
       int cost = (state.getRerollCount() - freeCalls + 1) * REROLL_COST_STEP;
-      if (state.getProduction() < cost) {
+      if (state.getResources().production() < cost) {
         throw new IllegalStateException(
             "not enough production to reroll: need "
                 + cost
                 + ", have "
-                + (int) state.getProduction());
+                + (int) state.getResources().production());
       }
       state.addProduction(0.0 - cost);
     }
@@ -604,7 +604,7 @@ public class GameEngine implements Game<GameEngine> {
     // Filter out cards whose effects target locked resources (GOLD / STRENGTH), and Great Works
     // that have already been drafted/commissioned/completed — each may only ever exist once.
     List<Card> available =
-        cardCatalog.forSeason(state.getCurSeason()).stream()
+        cardCatalog.forSeason(state.getTime().season()).stream()
             .filter(state::areRequiredResourcesUnlocked)
             .filter(c -> !c.isGreatWork() || !greatWorkAlreadyClaimed(c))
             .toList();
@@ -623,7 +623,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void pickCard(Card card) {
     requirePhase(Phase.ADD, "pickCard");
-    addToDeck(state.getCurSeason(), card);
+    addToDeck(state.getTime().season(), card);
     clearAddState();
     state.advanceTime();
     startPlay();
@@ -671,13 +671,13 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   private void requirePhase(Phase required, String operation) {
-    if (state.getCurPhase() != required) {
+    if (state.getTime().phase() != required) {
       throw new IllegalStateException(
           operation
               + " requires phase "
               + required
               + " but current phase is "
-              + state.getCurPhase());
+              + state.getTime().phase());
     }
   }
 
@@ -687,7 +687,7 @@ public class GameEngine implements Game<GameEngine> {
    * one sub-phase of it.
    */
   private void requireCouncilPhase(String operation) {
-    Phase current = state.getCurPhase();
+    Phase current = state.getTime().phase();
     if (current != Phase.COUNCIL_ADD && current != Phase.COUNCIL_MEETING) {
       throw new IllegalStateException(
           operation
@@ -785,7 +785,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized List<Card> startPlay() {
     requirePhase(Phase.PLAY, "startPlay");
-    return draw(state.getCurSeason(), MAX_HAND_SIZE);
+    return draw(state.getTime().season(), MAX_HAND_SIZE);
   }
 
   /**
@@ -824,16 +824,16 @@ public class GameEngine implements Game<GameEngine> {
 
     // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
     if (!state.tableContains(card) && table.size() >= MAX_TABLE_SIZE) {
-      throw new IllegalStateException(state.getCurSeason() + " table is full");
+      throw new IllegalStateException(state.getTime().season() + " table is full");
     }
 
     // if you cannot afford the production cost, reject
-    if (state.getProduction() < card.productionRequirement()) {
+    if (state.getResources().production() < card.productionRequirement()) {
       throw new IllegalStateException(
           "not enough production to place card: need "
               + (int) card.productionRequirement()
               + ", have "
-              + (int) state.getProduction());
+              + (int) state.getResources().production());
     }
 
     // Pay the production cost and remove the card from the hand.
@@ -950,9 +950,12 @@ public class GameEngine implements Game<GameEngine> {
     double cost = card.productionRequirement() * DEMOLISH_COST_RATE;
 
     // if you cannot afford the production cost, reject.
-    if (state.getProduction() < cost) {
+    if (state.getResources().production() < cost) {
       throw new IllegalStateException(
-          "not enough production to demolish: need " + cost + ", have " + state.getProduction());
+          "not enough production to demolish: need "
+              + cost
+              + ", have "
+              + state.getResources().production());
     }
 
     // else pay and demolish card
@@ -994,12 +997,12 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalArgumentException("no great work with name: " + name);
     }
 
-    if (gw.season() != state.getCurSeason()) {
+    if (gw.season() != state.getTime().season()) {
       throw new IllegalStateException(
           "cannot commission "
               + name
               + " during "
-              + state.getCurSeason()
+              + state.getTime().season()
               + " — it belongs on the "
               + gw.season()
               + " table");
@@ -1029,14 +1032,14 @@ public class GameEngine implements Game<GameEngine> {
 
     // Pay the one-time commission cost.
     double cost = gw.productionRequirement();
-    if (state.getProduction() < cost) {
+    if (state.getResources().production() < cost) {
       throw new IllegalStateException(
           "not enough production to commission "
               + name
               + ": need "
               + (int) cost
               + ", have "
-              + (int) state.getProduction());
+              + (int) state.getResources().production());
     }
     state.addProduction(0.0 - cost);
 
@@ -1109,17 +1112,17 @@ public class GameEngine implements Game<GameEngine> {
     if (state.findSeatedAdvisor(advisor.id()) != null) {
       throw new IllegalStateException("advisor is already seated: " + advisor.id());
     }
-    if (state.getGold() < advisor.hiringCost()) {
+    if (state.getResources().gold() < advisor.hiringCost()) {
       throw new IllegalStateException(
           "not enough gold to hire "
               + advisor.displayName()
               + ": need "
               + advisor.hiringCost()
               + ", have "
-              + (int) state.getGold());
+              + (int) state.getResources().gold());
     }
     state.addGold(0.0 - advisor.hiringCost());
-    state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getYear()));
+    state.addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getTime().year()));
     clearCouncilAddState();
     state.advanceTime();
     offerCouncilProposal();
@@ -1179,19 +1182,19 @@ public class GameEngine implements Game<GameEngine> {
     }
     Advisor advisor = AdvisorCatalog.byId(advisorId);
     double cost = (advisor == null ? 0 : advisor.hiringCost()) * ADVISOR_DISMISSAL_COST_RATE;
-    if (state.getGold() < cost) {
+    if (state.getResources().gold() < cost) {
       throw new IllegalStateException(
           "not enough gold to let go "
               + (advisor == null ? advisorId : advisor.displayName())
               + ": need "
               + cost
               + ", have "
-              + (int) state.getGold());
+              + (int) state.getResources().gold());
     }
     state.addGold(0.0 - cost);
     state.removeFromCouncil(advisorId);
     CouncilProposal proposal = state.getCurrentProposal();
-    if (state.getCurPhase() == Phase.COUNCIL_MEETING
+    if (state.getTime().phase() == Phase.COUNCIL_MEETING
         && proposal != null
         && proposal.advisorId().equals(advisorId)) {
       offerCouncilProposal();
@@ -1208,7 +1211,7 @@ public class GameEngine implements Game<GameEngine> {
   private boolean isAdvisorGateOpen(Advisor advisor) {
     return switch (advisor.gate()) {
       case NONE -> true;
-      case BARRACKS_COMPLETED -> state.isStrengthUnlocked();
+      case BARRACKS_COMPLETED -> state.getResources().isUnlocked(ResourceTarget.STRENGTH);
       case ANY_GREAT_WORK_COMMISSIONED ->
           CardCatalog.ALL_GREAT_WORKS.stream().anyMatch(this::isGreatWorkCommissioned);
       case GREAT_ROAD_COMMISSIONED ->
@@ -1298,7 +1301,7 @@ public class GameEngine implements Game<GameEngine> {
     } else {
       applyReform(seated, advisor.reform());
     }
-    seated.setLastProposalYear(state.getYear());
+    seated.setLastProposalYear(state.getTime().year());
     state.setCurrentProposal(null);
     state.advanceTime();
     offerAddChoices();
@@ -1318,7 +1321,7 @@ public class GameEngine implements Game<GameEngine> {
     if (proposal != null) {
       SeatedAdvisor seated = state.findSeatedAdvisor(proposal.advisorId());
       if (seated != null) {
-        seated.setLastProposalYear(state.getYear());
+        seated.setLastProposalYear(state.getTime().year());
       }
     }
     state.setCurrentProposal(null);

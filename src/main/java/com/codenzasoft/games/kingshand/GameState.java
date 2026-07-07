@@ -1,6 +1,5 @@
 package com.codenzasoft.games.kingshand;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
@@ -82,7 +81,7 @@ public class GameState {
 
   // ----- Getters -----
 
-  @JsonIgnore
+  @JsonProperty("resources")
   public ResourceState getResources() {
     return resources;
   }
@@ -159,10 +158,7 @@ public class GameState {
     getDiscardPile().get(time.season()).add(card);
   }
 
-  /**
-   * Moves every card in the hand to the current season's discard pile and clears the hand. Uses
-   * {@link #getCurSeason()} so callers don't need to pass the season explicitly.
-   */
+  /** Moves every card in the hand to the current season's discard pile and clears the hand. */
   public void discardHand() {
     getDiscardPile().get(time.season()).addAll(hand);
     hand.clear();
@@ -208,44 +204,9 @@ public class GameState {
     return false;
   }
 
-  @JsonProperty("population")
-  public double getPopulation() {
-    return resources.population();
-  }
-
-  /**
-   * The maximum population allowed. Starts at 100 and is permanently raised whenever a housing card
-   * (e.g. BUNKHOUSE, MANOR) fires its {@link ResourceTarget#POPULATION_CAP} effect during {@link
-   * Phase#PLAY} resolution.
-   */
-  @JsonProperty("populationCap")
-  public double getPopulationCap() {
-    return resources.populationCap();
-  }
-
-  @JsonProperty("production")
-  public double getProduction() {
-    return resources.production();
-  }
-
-  @JsonProperty("food")
-  public double getFood() {
-    return resources.food();
-  }
-
-  @JsonProperty("curSeason")
-  public Season getCurSeason() {
-    return time.season();
-  }
-
-  @JsonProperty("curPhase")
-  public Phase getCurPhase() {
-    return time.phase();
-  }
-
-  @JsonProperty("year")
-  public int getYear() {
-    return time.year();
+  @JsonProperty("time")
+  public TimeState getTime() {
+    return time;
   }
 
   @JsonProperty("addChoices")
@@ -276,7 +237,7 @@ public class GameState {
   /** Returns staffing for the current season's table. */
   @JsonProperty("tableStaffing")
   public List<CardStaffing> getTableStaffing() {
-    return CardStaffing.computeStaffing(board.get(getCurSeason()), resources);
+    return CardStaffing.computeStaffing(board.get(time.season()), resources);
   }
 
   /**
@@ -291,25 +252,6 @@ public class GameState {
 
   public void setResolutionLog(List<ResolutionStep> log) {
     this.resolutionLog = log == null ? List.of() : List.copyOf(log);
-  }
-
-  @JsonProperty("gold")
-  public double getGold() {
-    return resources.gold();
-  }
-
-  @JsonProperty("strength")
-  public double getStrength() {
-    return resources.strength();
-  }
-
-  /**
-   * The set of resources currently usable. Population, production, and food are always present;
-   * gold and strength are added once the TREASURY/BARRACKS Great Works complete, respectively.
-   */
-  @JsonProperty("unlockedResources")
-  public Set<ResourceTarget> getUnlockedResources() {
-    return resources.unlocked();
   }
 
   /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
@@ -353,16 +295,6 @@ public class GameState {
     }
 
     return simProd >= 0 && simFood >= 0 && simGold >= 0 && simStrength >= 0;
-  }
-
-  @JsonProperty("goldUnlocked")
-  public boolean isGoldUnlocked() {
-    return resources.unlocked().contains(ResourceTarget.GOLD);
-  }
-
-  @JsonProperty("strengthUnlocked")
-  public boolean isStrengthUnlocked() {
-    return resources.unlocked().contains(ResourceTarget.STRENGTH);
   }
 
   /**

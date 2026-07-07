@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, SeatedAdvisor } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, SeatedAdvisor, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -122,7 +122,7 @@ export class PlayPhaseScene {
       return;
     }
 
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
     const table = state.getCurrentTable();
     const tableNames = new Set(table.map((c) => c.name));
 
@@ -167,7 +167,7 @@ export class PlayPhaseScene {
 
   private renderGameOver(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -179,7 +179,7 @@ export class PlayPhaseScene {
         <div class="kh-play-go-stats">
           <div class="kh-play-go-stat">
             <div class="kh-play-go-stat-label">Years Reigned</div>
-            <div class="kh-play-go-stat-val">${state.year}</div>
+            <div class="kh-play-go-stat-val">${state.time.year}</div>
           </div>
           <div class="kh-play-go-stat">
             <div class="kh-play-go-stat-label">Final Season</div>
@@ -187,7 +187,7 @@ export class PlayPhaseScene {
           </div>
           <div class="kh-play-go-stat">
             <div class="kh-play-go-stat-label">Production</div>
-            <div class="kh-play-go-stat-val">${Math.floor(state.production)} ⚒️</div>
+            <div class="kh-play-go-stat-val">${Math.floor(state.resources.production)} ⚒️</div>
           </div>
         </div>
         <button class="kh-play-go-btn" id="kh-play-go-btn">
@@ -216,7 +216,7 @@ export class PlayPhaseScene {
 
   private renderGameWon(): void {
     const { state } = this;
-    const meta = SEASON_META[state.curSeason];
+    const meta = SEASON_META[state.time.season];
 
     const greatWorksHTML = WIN_CONDITION_GREAT_WORK_NAMES.map((name) => {
       const info = getCardDisplayInfo({ name } as Card);
@@ -233,7 +233,7 @@ export class PlayPhaseScene {
         <div class="kh-play-win-stats">
           <div class="kh-play-win-stat">
             <div class="kh-play-win-stat-label">Years Reigned</div>
-            <div class="kh-play-win-stat-val">${state.year}</div>
+            <div class="kh-play-win-stat-val">${state.time.year}</div>
           </div>
           <div class="kh-play-win-stat">
             <div class="kh-play-win-stat-label">Great Works</div>
@@ -241,7 +241,7 @@ export class PlayPhaseScene {
           </div>
           <div class="kh-play-win-stat">
             <div class="kh-play-win-stat-label">Production</div>
-            <div class="kh-play-win-stat-val">${Math.floor(state.production)} ⚒️</div>
+            <div class="kh-play-win-stat-val">${Math.floor(state.resources.production)} ⚒️</div>
           </div>
         </div>
         <ul class="kh-play-win-gw-list">
@@ -283,7 +283,7 @@ export class PlayPhaseScene {
           <h1>King's Hand</h1>
           <div class="kh-play-year-badge">
             <span>${meta.icon}</span>
-            <span>YEAR ${state.year} — ${meta.label.toUpperCase()}</span>
+            <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
         </div>
@@ -293,26 +293,26 @@ export class PlayPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const goldHTML = state.goldUnlocked
+    const goldHTML = state.resources.isUnlocked(ResourceTarget.GOLD)
       ? `
         <div class="kh-play-res-divider"></div>
         <div class="kh-play-resource kh-play-gold">
           <span class="kh-play-res-icon">💰</span>
           <div>
             <div class="kh-play-res-label">Gold</div>
-            <div class="kh-play-res-value">${Math.floor(state.gold)}</div>
+            <div class="kh-play-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
       `
       : "";
-    const strengthHTML = state.strengthUnlocked
+    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
       ? `
         <div class="kh-play-res-divider"></div>
         <div class="kh-play-resource kh-play-strength">
           <span class="kh-play-res-icon">⚔️</span>
           <div>
             <div class="kh-play-res-label">Strength</div>
-            <div class="kh-play-res-value">${Math.floor(state.strength)}</div>
+            <div class="kh-play-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>
       `
@@ -323,7 +323,7 @@ export class PlayPhaseScene {
           <span class="kh-play-res-icon">👥</span>
           <div>
             <div class="kh-play-res-label">Population</div>
-            <div class="kh-play-res-value"><span class="kh-play-pop-num">${Math.floor(state.population)}</span> <span class="kh-play-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
+            <div class="kh-play-res-value"><span class="kh-play-pop-num">${Math.floor(state.resources.population)}</span> <span class="kh-play-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-play-res-divider"></div>
@@ -331,7 +331,7 @@ export class PlayPhaseScene {
           <span class="kh-play-res-icon">⚒️</span>
           <div>
             <div class="kh-play-res-label">Production</div>
-            <div class="kh-play-res-value">${Math.floor(state.production)}</div>
+            <div class="kh-play-res-value">${Math.floor(state.resources.production)}</div>
           </div>
         </div>
         <div class="kh-play-res-divider"></div>
@@ -339,7 +339,7 @@ export class PlayPhaseScene {
           <span class="kh-play-res-icon">🌾</span>
           <div>
             <div class="kh-play-res-label">Food</div>
-            <div class="kh-play-res-value">${Math.floor(state.food)}</div>
+            <div class="kh-play-res-value">${Math.floor(state.resources.food)}</div>
           </div>
         </div>
         ${goldHTML}
@@ -375,7 +375,7 @@ export class PlayPhaseScene {
    * council to show before then.
    */
   private buildAdvisorRow(state: GameState): string {
-    if (!state.goldUnlocked) return "";
+    if (!state.resources.isUnlocked(ResourceTarget.GOLD)) return "";
 
     const seatHTML = Array.from({ length: MAX_COUNCIL_SIZE }, (_, i) => state.council[i])
       .map((seated) => (seated ? this.buildAdvisorSeat(seated) : this.buildEmptyAdvisorSeat()))
@@ -466,7 +466,7 @@ export class PlayPhaseScene {
     const info     = getCardDisplayInfo(card);
     const imgSrc   = cardImagePath(card.name);
     const demolishCost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
-    const canDemolish  = state.production >= demolishCost;
+    const canDemolish  = state.resources.production >= demolishCost;
 
     // Tier-based border colour applied inline so it overrides the default.
     const tierBorder =
@@ -634,12 +634,12 @@ export class PlayPhaseScene {
     const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
-    const canAffordProd = state.production >= card.productionRequirement;
+    const canAffordProd = state.resources.production >= card.productionRequirement;
     const hasSlot   = !tableFull || isUpgrade;
     const canPlay   = canAffordProd && hasSlot;
 
     // Warn if the card will be understaffed — but don't block placement.
-    const workers = Math.floor(state.population);
+    const workers = Math.floor(state.resources.population);
     const halfThreshold = Math.ceil(card.staffRequirement / 2);
     const staffWarn =
       workers < halfThreshold
@@ -663,7 +663,7 @@ export class PlayPhaseScene {
     }
 
     const tagsHTML = [
-      `<span class="kh-play-tag kh-play-tag-season">${state.curSeason}</span>`,
+      `<span class="kh-play-tag kh-play-tag-season">${state.time.season}</span>`,
       `<span class="kh-play-tag ${card.frequencyType === "RECURRING" ? "kh-play-tag-recurring" : "kh-play-tag-single"}">${card.frequencyType}</span>`,
       ...info.tags.map((t) => `<span class="kh-play-tag kh-play-tag-category">${t}</span>`),
       isUpgrade ? `<span class="kh-play-tag kh-play-tag-upgrade">UPGRADES TABLE</span>` : "",
@@ -742,8 +742,8 @@ export class PlayPhaseScene {
   // ─── Pile indicators & modal ─────────────────────────────────────────────
 
   private buildPileIndicators(state: GameState): string {
-    const drawCount    = state.drawPile.get(state.curSeason)?.length ?? 0;
-    const discardCount = state.discardPile.get(state.curSeason)?.length ?? 0;
+    const drawCount    = state.drawPile.get(state.time.season)?.length ?? 0;
+    const discardCount = state.discardPile.get(state.time.season)?.length ?? 0;
 
     return `
       <!-- Draw pile — bottom left -->
@@ -788,8 +788,8 @@ export class PlayPhaseScene {
     if (!backdrop || !titleEl || !tabsEl || !bodyEl) return;
 
     const pile  = pileType === "draw" ? state.drawPile : state.discardPile;
-    const cards = pile.get(state.curSeason) ?? [];
-    const meta  = SEASON_META[state.curSeason];
+    const cards = pile.get(state.time.season) ?? [];
+    const meta  = SEASON_META[state.time.season];
     titleEl.textContent = pileType === "draw"
       ? `Draw Pile — ${meta.label}`
       : `Discard Pile — ${meta.label}`;
@@ -1085,12 +1085,12 @@ export class PlayPhaseScene {
    * @param preState the state that was active when End and Run was clicked
    */
   public async animateFromResolutionLog(newState: GameState, preState: GameState): Promise<void> {
-    let simPop      = preState.population;
-    let simProd     = preState.production;
-    let simFood     = preState.food;
-    let simCap      = preState.populationCap;
-    let simGold     = preState.gold;
-    let simStrength = preState.strength;
+    let simPop      = preState.resources.population;
+    let simProd     = preState.resources.production;
+    let simFood     = preState.resources.food;
+    let simCap      = preState.resources.populationCap;
+    let simGold     = preState.resources.gold;
+    let simStrength = preState.resources.strength;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -1147,7 +1147,7 @@ export class PlayPhaseScene {
           spawnResourceIndicator(els.pop,  step.populationDelta, "👥", 1);
 
         if (step.populationDelta > 0) {
-          const cappedGrowth = simPop >= newState.populationCap;
+          const cappedGrowth = simPop >= newState.resources.populationCap;
           this.showToast(cappedGrowth
             ? "🏠 Well-fed, but housing is full — build more to grow!"
             : "🌱 Your people are well-fed — population grows!");

@@ -1,4 +1,4 @@
-import { GameState, Season, Card, CardTarget } from "./kingshand.ts";
+import { GameState, Season, Card, CardTarget, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -108,7 +108,7 @@ export class AddPhaseScene {
 
   private render(): void {
     const { state } = this;
-    const season = state.curSeason;
+    const season = state.time.season;
     const meta = SEASON_META[season];
     // Mirrors GameEngine.offerAddChoices()'s freeCalls/cost formula exactly: the first call each
     // ADD phase is always free, plus any permanent (Decree) and seated (base trait / Reform) free
@@ -121,7 +121,7 @@ export class AddPhaseScene {
         ? (state.rerollCount - freeRerollCalls + 1) * REROLL_COST_STEP
         : 0;
     const isFreeReroll = nextRerollCost === 0;
-    const canAffordReroll = state.production >= nextRerollCost;
+    const canAffordReroll = state.resources.production >= nextRerollCost;
 
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
@@ -176,7 +176,7 @@ export class AddPhaseScene {
           <h1>King's Hand</h1>
           <div class="kh-year-badge">
             <span>${meta.icon}</span>
-            <span>YEAR ${state.year} — ${meta.label.toUpperCase()}</span>
+            <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
         </div>
@@ -186,26 +186,26 @@ export class AddPhaseScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const goldHTML = state.goldUnlocked
+    const goldHTML = state.resources.isUnlocked(ResourceTarget.GOLD)
       ? `
         <div class="kh-res-divider"></div>
         <div class="kh-resource kh-gold">
           <span class="kh-res-icon">💰</span>
           <div>
             <div class="kh-res-label">Gold</div>
-            <div class="kh-res-value">${Math.floor(state.gold)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
       `
       : "";
-    const strengthHTML = state.strengthUnlocked
+    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
       ? `
         <div class="kh-res-divider"></div>
         <div class="kh-resource kh-strength">
           <span class="kh-res-icon">⚔️</span>
           <div>
             <div class="kh-res-label">Strength</div>
-            <div class="kh-res-value">${Math.floor(state.strength)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>
       `
@@ -216,7 +216,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">👥</span>
           <div>
             <div class="kh-res-label">Population</div>
-            <div class="kh-res-value">${Math.floor(state.population)} <span class="kh-res-cap">/ ${Math.floor(state.populationCap)}</span></div>
+            <div class="kh-res-value">${Math.floor(state.resources.population)} <span class="kh-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
           </div>
         </div>
         <div class="kh-res-divider"></div>
@@ -224,7 +224,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">⚒️</span>
           <div>
             <div class="kh-res-label">Production</div>
-            <div class="kh-res-value">${Math.floor(state.production)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.production)}</div>
           </div>
         </div>
         <div class="kh-res-divider"></div>
@@ -232,7 +232,7 @@ export class AddPhaseScene {
           <span class="kh-res-icon">🌾</span>
           <div>
             <div class="kh-res-label">Food</div>
-            <div class="kh-res-value">${Math.floor(state.food)}</div>
+            <div class="kh-res-value">${Math.floor(state.resources.food)}</div>
           </div>
         </div>
         ${goldHTML}
@@ -262,7 +262,7 @@ export class AddPhaseScene {
   private buildCard(card: Card, index: number, state: GameState): string {
     const info   = getCardDisplayInfo(card);
     const imgSrc = cardImagePath(card.name);
-    const season = state.curSeason;
+    const season = state.time.season;
 
     const tagsHTML = [
       `<span class="kh-tag kh-tag-season">${season}</span>`,
@@ -345,7 +345,7 @@ export class AddPhaseScene {
         this.actions.pickCard(cardName);
         // Optimistic UI: disable all interaction while server responds
         this.disableAllActions();
-        this.showToast(`Adding card to your ${SEASON_META[state.curSeason].label} deck…`);
+        this.showToast(`Adding card to your ${SEASON_META[state.time.season].label} deck…`);
       });
     });
 
