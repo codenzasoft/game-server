@@ -248,10 +248,11 @@ public record Card(
    * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
    * great works, as they have negative effect modifiers (costs)
    *
-   * @param state A {@link GameState} to apply effects to.
+   * @param state The {@link PlayerState} (kingdom) to apply effects to.
+   * @param season The season whose table this card is resolving on.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
-  public void play(final GameState state, final StaffingTier tier) {
+  public void play(final PlayerState state, final Season season, final StaffingTier tier) {
     if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
       return;
     }
@@ -263,10 +264,10 @@ public record Card(
       if (effect.target() instanceof ResourceTarget rt) {
         state.apply(effect);
       } else if (effect.target() instanceof CardTarget ct) {
-        final List<Card> followingCards = state.getCardsOnBoardAfter(this);
+        final List<Card> followingCards = state.getCardsOnBoardAfter(season, this);
         for (final Card card : followingCards) {
           final Optional<Card> boosted = boost(card, effect, ct);
-          boosted.ifPresent(value -> state.replaceTableCard(card, value));
+          boosted.ifPresent(value -> state.replaceTableCard(season, card, value));
           if (ct.adjacentOnly()) {
             break;
           }
@@ -278,13 +279,13 @@ public record Card(
       int newPeriod = constructionPeriod() - 1;
       if (newPeriod == 0) {
         // ── Construction COMPLETE — swap for the completed card ──────────
-        state.replaceTableCard(this, completedCard());
+        state.replaceTableCard(season, this, completedCard());
         // Unlock any new resource types this Great Work grants.
         state.unlock(this);
       } else {
         // Decrement: replace the card on the table with the same card minus one period.
         Card decremented = withConstructionPeriod(newPeriod);
-        state.replaceTableCard(this, decremented);
+        state.replaceTableCard(season, this, decremented);
       }
     }
   }

@@ -549,7 +549,11 @@ public class GameService {
     log.debug("Building KH game from entity: {}", entity.getId());
     final Player player = entity.getPlayers().get(0).toPlayer();
     final boolean isOver = entity.isOver() || entity.isQuit();
-    final GameState state = GameState.builder().build();
+    // Two-kingdom match: seat 0 is the human, seat 1 is the opponent's kingdom. Both kingdoms are
+    // seeded with the standard starting deck by the engine's initialize()/seedStartingDeck(). The
+    // engine's activeSeat defaults to 0, so the human plays their own board today; wiring the seat-1
+    // opponent (bot turns + per-seat WS routing) is the next slice.
+    final GameState state = GameState.newTwoPlayerState();
     // Built via the Builder (rather than the raw constructor) so a GameLifecycleListener can be
     // registered; the Builder's defaults (default catalogs, a fresh Random, synchronous executor)
     // exactly replicate the old constructor's behavior.
