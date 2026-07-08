@@ -367,10 +367,7 @@ public class GameEngine implements Game<GameEngine> {
       final StaffingTier tier = staffing.get(i).tier();
       final ResourceState before = state.getResources();
 
-      // Whether all effects on this card are engine-builder (CardTarget) effects.
-      boolean isEngineBoost =
-          tier != StaffingTier.NONE
-              && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
+      boolean isEngineBoost = tier != StaffingTier.NONE && card.isEngineBoost();
 
       card.play(state, tier);
       log.add(

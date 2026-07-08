@@ -77,6 +77,11 @@ public record Card(
     return constructionPeriod > 0;
   }
 
+  /** Returns {@code true} if every effect on this card targets another card (engine-builder). */
+  public boolean isEngineBoost() {
+    return !effects.isEmpty() && effects.stream().allMatch(e -> e.target() instanceof CardTarget);
+  }
+
   /**
    * Returns the set of {@link ResourceTarget}s referenced by this card's effects. Used by {@link
    * GameState#areRequiredResourcesUnlocked(Card)} to determine whether this card can currently be
