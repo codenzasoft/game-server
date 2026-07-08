@@ -9,13 +9,13 @@ import java.util.Set;
 
 /**
  * Match-level state for a King's Hand game: the shared clock ({@link TimeState}) plus the list of
- * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and the
- * client is sent.
+ * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and
+ * the client is sent.
  *
  * <p><b>History.</b> This class used to hold a single kingdom's data directly. In the two-player
- * refactor it became the container: the per-player fields moved to {@link PlayerState} and the clock
- * moved here so both players share one authoritative season/phase/year. For a single-player game
- * {@code players} has exactly one element.
+ * refactor it became the container: the per-player fields moved to {@link PlayerState} and the
+ * clock moved here so both players share one authoritative season/phase/year. For a single-player
+ * game {@code players} has exactly one element.
  *
  * <p><b>Backward compatibility.</b> Every accessor the old flat {@code GameState} exposed still
  * exists here, delegating to the <em>active</em> player ({@link #primary()}, currently seat 0) and
@@ -23,8 +23,8 @@ import java.util.Set;
  * {@link Card#play}, the notification/broadcast layer, and the existing test suite working
  * unchanged while the second seat and seat-aware engine paths are built out in later passes. The
  * only additions to the wire payload are the {@code time} object and the {@code players} array; the
- * previously flat properties (resources, board, hand, …) are still emitted for the active player, so
- * existing single-player clients are unaffected.
+ * previously flat properties (resources, board, hand, …) are still emitted for the active player,
+ * so existing single-player clients are unaffected.
  */
 public class GameState {
 
@@ -39,9 +39,7 @@ public class GameState {
     this.time = b.time;
   }
 
-  /**
-   * Creates a fresh single-player match: one starting kingdom, spring of year 1, ADD phase.
-   */
+  /** Creates a fresh single-player match: one starting kingdom, spring of year 1, ADD phase. */
   public static GameState newState() {
     return builder().build();
   }
@@ -50,10 +48,49 @@ public class GameState {
     return new Builder();
   }
 
-  /** Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match. */
+  /**
+   * Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match.
+   */
   public static GameState singlePlayer(PlayerState player, TimeState time) {
+    return multiPlayer(List.of(player), time);
+  }
+
+  /**
+   * Creates a fresh {@code count}-player match: {@code count} independent starting kingdoms that
+   * share one clock (Spring, year 1, ADD phase). Each kingdom is built separately so their piles,
+   * boards, and hands are fully independent — mutating one seat never touches another.
+   *
+   * @throws IllegalArgumentException if {@code count < 1}
+   */
+  public static GameState newMultiplayer(int count) {
+    if (count < 1) {
+      throw new IllegalArgumentException("a match needs at least one player");
+    }
+    List<PlayerState> kingdoms = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      kingdoms.add(PlayerState.newPlayer());
+    }
+    return multiPlayer(kingdoms, new TimeState(Season.SPRING, Phase.ADD, 1));
+  }
+
+  /** Convenience factory for the common two-player case. See {@link #newMultiplayer(int)}. */
+  public static GameState newTwoPlayerState() {
+    return newMultiplayer(2);
+  }
+
+  /**
+   * Wraps already-built kingdoms and a shared {@link TimeState} into a match. The {@code players}
+   * list is defensively copied; the {@link PlayerState} instances are used as-is, so callers must
+   * pass independent kingdoms (each with its own mutable collections).
+   *
+   * @throws IllegalArgumentException if {@code players} is null or empty
+   */
+  public static GameState multiPlayer(List<PlayerState> players, TimeState time) {
+    if (players == null || players.isEmpty()) {
+      throw new IllegalArgumentException("a match needs at least one player");
+    }
     Builder b = new Builder();
-    b.players = new ArrayList<>(List.of(player));
+    b.players = new ArrayList<>(players);
     b.time = time;
     return new GameState(b);
   }
@@ -312,8 +349,8 @@ public class GameState {
   /**
    * Builds a single-player match. Mirrors the old flat {@code GameState.Builder} fluent API: the
    * clock setters ({@link #season}, {@link #phase}, {@link #year}) live here, and every per-player
-   * setter forwards to an embedded {@link PlayerState.Builder}. This keeps existing call sites (both
-   * production and tests) compiling without change.
+   * setter forwards to an embedded {@link PlayerState.Builder}. This keeps existing call sites
+   * (both production and tests) compiling without change.
    */
   public static final class Builder {
     private final PlayerState.Builder player = PlayerState.builder();
