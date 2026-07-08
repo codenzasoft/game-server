@@ -1,10 +1,14 @@
 package com.codenzasoft.games.spring.services.kh;
 
+import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.GameEngine;
+import com.codenzasoft.games.kingshand.GameState;
+import com.codenzasoft.games.kingshand.KhObserver;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,45 +19,78 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * Sends game state to the player via websockets. The {@link KhBroadcastService} broadcasts a {@link
- * KhMessage} containing a player-specific {@link KhContext} and the current {@link
- * com.codenzasoft.games.kingshand.GameState} to the registered client.
+ * Pushes King's Hand match state to clients over websockets. Registered on each {@link GameEngine}
+ * as a {@link KhObserver}, so state pushes are driven by the engine's lifecycle/update events rather
+ * than the controller. Each human seat receives its own {@link KhMessage} carrying the full match
+ * {@link GameState} plus a {@link KhContext} that tells the client which seat it occupies; bot seats
+ * are skipped (they have no client).
  */
 @Service
-public class KhBroadcastService {
+public class KhBroadcastService implements KhObserver {
   private static final Logger log = LoggerFactory.getLogger(KhBroadcastService.class);
 
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private SimpMessagingTemplate messagingTemplate;
 
+  // ----- KhObserver: engine-driven pushes -----
+
+  @Override
+  public void gameStarted(final GameEngine game, final GameState state) {
+    broadcast(game);
+  }
+
+  @Override
+  public void gameUpdated(final GameEngine game, final GameState state) {
+    broadcast(game);
+  }
+
+  @Override
+  public void gameOver(final GameEngine game, final GameState state) {
+    broadcast(game);
+  }
+
+  // ----- Controller-triggered pushes -----
+
   /**
-   * Broadcasts the current game state to the player. Sends a {@link KhMessage} to the player's
-   * user-specific queue at {@code /user/queue/games/{gameId}}.
+   * Broadcasts the current state to every human seat. Used by the {@code load} handler (a pull) and
+   * as the shared implementation behind the observer callbacks.
    *
    * @param game The {@link GameEngine} whose state should be broadcast.
    */
   public void gameLoaded(final GameEngine game) {
-    if (game.getPlayers().isEmpty()) {
-      log.warn("gameLoaded: no players on game {}", game.getId());
+    broadcast(game);
+  }
+
+  /** Sends the current match state to each human player, tagged with that player's seat. */
+  private void broadcast(final GameEngine game) {
+    final List<Player> seats = game.getPlayers();
+    if (seats.isEmpty()) {
+      log.warn("broadcast: no players on game {}", game.getId());
       return;
     }
-    final String playerName = game.getPlayers().get(0).name();
-    final Optional<UserEntity> userOpt =
-        gamesUserDetailsService.getUserByUsernameOrEmail(playerName);
-    if (userOpt.isEmpty()) {
-      log.warn("gameLoaded: could not find user for player '{}'", playerName);
-      return;
+    final GameState state = game.getState();
+    for (int seat = 0; seat < seats.size(); seat++) {
+      final String playerName = seats.get(seat).name();
+      final Optional<UserEntity> userOpt =
+          gamesUserDetailsService.getUserByUsernameOrEmail(playerName);
+      if (userOpt.isEmpty()) {
+        log.warn("broadcast: could not find user for player '{}'", playerName);
+        continue;
+      }
+      final UserEntity user = userOpt.get();
+      if (user.isBot()) {
+        continue; // bots have no client to receive state
+      }
+      final KhContext context = new KhContext(user.getUsername(), game.getId(), seat);
+      final KhMessage message = new KhMessage(context, state);
+      messagingTemplate.convertAndSendToUser(
+          user.getUsername(), "/queue/games/" + game.getId(), message);
+      log.debug("Sent game state to user '{}' (seat {})", user.getUsername(), seat);
     }
-    final UserEntity user = userOpt.get();
-    final KhContext context = new KhContext(user.getUsername(), game.getId());
-    final KhMessage message = new KhMessage(context, game.getState());
-    messagingTemplate.convertAndSendToUser(
-        user.getUsername(), "/queue/games/" + game.getId(), message);
-    log.debug("Sent game state to user '{}'", user.getUsername());
   }
 
   /**
-   * Notifies the player that their game has been quit. Sends a simple quit acknowledgement to the
+   * Notifies a player that their game has been quit. Sends a simple quit acknowledgement to the
    * player's user-specific queue at {@code /user/queue/games/{gameId}}.
    *
    * @param gameId The UUID of the game that was quit.

@@ -125,7 +125,7 @@ class GameServiceSpec extends Specification {
 
     }
 
-    def "createKhGame persists a new KH game with the given user as player"() {
+    def "createKhGame persists a new KH game with the user at seat 0 and a bot at seat 1"() {
 
         when:
         def entity = gameService.createKhGame(testUser)
@@ -134,7 +134,9 @@ class GameServiceSpec extends Specification {
         entity instanceof KhGameEntity
         entity.id != null
         entity.gameType == GameType.KH
-        entity.players == [testUser]
+        entity.players.size() == 2
+        entity.players[0] == testUser
+        entity.players[1].isBot()
     }
 
     def "getOrBuildKhGame fetches from DB on first call and adds game to cache"() {
@@ -149,9 +151,10 @@ class GameServiceSpec extends Specification {
         result.isPresent()
         result.get() instanceof GameEngine
         result.get().id == gameId
-        result.get().players.size() == 1
+        result.get().players.size() == 2
         result.get().players[0].id() == testUser.id
         result.get().players[0].name() == "test-limit-user"
+        result.get().players[1].name() != "test-limit-user"   // seat 1 is the bot
     }
 
     def "getOrBuildKhGame adds the built game to the cache"() {

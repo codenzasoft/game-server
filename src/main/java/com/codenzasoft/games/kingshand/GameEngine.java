@@ -6,6 +6,7 @@ import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
+import com.codenzasoft.games.kingshand.notifications.KhGameUpdatedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhNotification;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,6 +65,8 @@ public class GameEngine implements Game<GameEngine> {
 
   private static final KhGameStartedNotification GAME_STARTED_NOTIFICATION =
       new KhGameStartedNotification();
+  private static final KhGameUpdatedNotification GAME_UPDATED_NOTIFICATION =
+      new KhGameUpdatedNotification();
   private static final KhGameOverNotification GAME_OVER_NOTIFICATION = new KhGameOverNotification();
 
   /**
@@ -73,6 +76,7 @@ public class GameEngine implements Game<GameEngine> {
   public static class Builder {
     private UUID id;
     private Player player;
+    private List<Player> players;
     private GameState state;
     private CardCatalog cardCatalog;
     private Random rng;
@@ -87,6 +91,15 @@ public class GameEngine implements Game<GameEngine> {
 
     public Builder withPlayer(final Player player) {
       this.player = player;
+      return this;
+    }
+
+    /**
+     * Registers the seat-ordered player identities for a multi-seat match (seat {@code i} =
+     * {@code players.get(i)}). Takes precedence over {@link #withPlayer(Player)} when both are set.
+     */
+    public Builder withPlayers(final List<Player> players) {
+      this.players = players;
       return this;
     }
 
@@ -125,9 +138,11 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     public GameEngine build() {
+      final List<Player> seatPlayers =
+          players != null ? players : (player != null ? List.of(player) : List.of());
       return new GameEngine(
           id,
-          player,
+          seatPlayers,
           state,
           cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
           rng != null ? rng : new Random(),
@@ -138,7 +153,7 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   private final UUID id;
-  private final Player player;
+  private final List<Player> players;
   private final GameState state;
   private final CardCatalog cardCatalog;
   private final Random rng;
@@ -156,17 +171,17 @@ public class GameEngine implements Game<GameEngine> {
 
   /** Convenience constructor for tests: injects state and RNG. */
   public GameEngine(GameState state, Random rng) {
-    this(null, null, state, CardCatalog.defaultCatalog(), rng);
+    this(null, List.<Player>of(), state, CardCatalog.defaultCatalog(), rng, List.of(), Runnable::run, List.of());
   }
 
-  /** Constructor for restoring a persisted game with its id and player. */
+  /** Constructor for restoring a persisted single-player game with its id and player. */
   public GameEngine(UUID id, Player player, GameState state) {
-    this(id, player, state, CardCatalog.defaultCatalog(), new Random());
+    this(id, seatList(player), state, CardCatalog.defaultCatalog(), new Random(), List.of(), Runnable::run, List.of());
   }
 
   /** Full constructor with all dependencies injected, no listeners. */
   GameEngine(UUID id, Player player, GameState state, CardCatalog cardCatalog, Random rng) {
-    this(id, player, state, cardCatalog, rng, List.of(), Runnable::run);
+    this(id, seatList(player), state, cardCatalog, rng, List.of(), Runnable::run, List.of());
   }
 
   /** Full constructor with all dependencies injected, including listeners and an executor. */
@@ -178,16 +193,21 @@ public class GameEngine implements Game<GameEngine> {
       Random rng,
       List<KhObserver> listeners,
       Executor executor) {
-    this(id, player, state, cardCatalog, rng, listeners, executor, List.of());
+    this(id, seatList(player), state, cardCatalog, rng, listeners, executor, List.of());
+  }
+
+  /** Wraps a possibly-null single player into a seat-ordered list. */
+  private static List<Player> seatList(final Player player) {
+    return player == null ? List.of() : List.of(player);
   }
 
   /**
-   * Full constructor with all dependencies injected, including {@link KhObserver} listeners, an
-   * executor, and common {@link GameLifecycleObserver}s.
+   * Full constructor with all dependencies injected, including the seat-ordered player identities,
+   * {@link KhObserver} listeners, an executor, and common {@link GameLifecycleObserver}s.
    */
   GameEngine(
       UUID id,
-      Player player,
+      List<Player> players,
       GameState state,
       CardCatalog cardCatalog,
       Random rng,
@@ -198,7 +218,7 @@ public class GameEngine implements Game<GameEngine> {
     if (cardCatalog == null) throw new IllegalArgumentException("catalog cannot be null");
     if (rng == null) throw new IllegalArgumentException("rng cannot be null");
     this.id = id;
-    this.player = player;
+    this.players = players == null ? List.of() : List.copyOf(players);
     this.state = state;
     this.cardCatalog = cardCatalog;
     this.rng = rng;
@@ -278,7 +298,30 @@ public class GameEngine implements Game<GameEngine> {
 
   @Override
   public List<Player> getPlayers() {
-    return player == null ? List.of() : List.of(player);
+    return players;
+  }
+
+  /**
+   * Returns the seat index of the player whose {@link Player#name()} equals {@code username}, or
+   * {@code -1} if no such player is seated. Used by the WS layer to map an authenticated request to
+   * the seat it should act on.
+   */
+  public int seatOf(final String username) {
+    for (int seat = 0; seat < players.size(); seat++) {
+      if (players.get(seat).name().equals(username)) {
+        return seat;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Broadcasts the current match state to registered {@link KhObserver}s via {@code gameUpdated}.
+   * Called at the request boundary after an action mutates state, so the broadcast layer can push
+   * fresh per-seat views without the engine's action methods knowing about transport.
+   */
+  public synchronized void notifyUpdated() {
+    notifyListeners(GAME_UPDATED_NOTIFICATION);
   }
 
   public GameState getState() {

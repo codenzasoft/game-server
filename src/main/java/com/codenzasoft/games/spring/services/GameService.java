@@ -24,6 +24,7 @@ import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
@@ -56,6 +57,7 @@ public class GameService {
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
   @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
+  @Autowired private KhBroadcastService khBroadcastService;
   @Autowired private HeartsPersistenceService heartsPersistenceService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
@@ -171,7 +173,13 @@ public class GameService {
   public KhGameEntity createKhGame(final UserEntity user) {
     enforceGameLimit(user);
     KhGameEntity game = new KhGameEntity(UUID.randomUUID());
-    game.setPlayers(List.of(user));
+    // Two-seat match: the creator takes seat 0, a bot fills seat 1. Seat resolution and per-seat
+    // broadcasting are generic, so replacing the bot with a second human later is a game-creation
+    // concern only.
+    final List<UserEntity> players = new ArrayList<>();
+    players.add(user);
+    players.addAll(getBots(1));
+    game.setPlayers(players);
     gamesRepository.save(game);
     return game;
   }
@@ -547,21 +555,24 @@ public class GameService {
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
     log.debug("Building KH game from entity: {}", entity.getId());
-    final Player player = entity.getPlayers().get(0).toPlayer();
+    // Seat-ordered player identities (seat i = players.get(i)); seat 0 is the creator.
+    final List<Player> players =
+        entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
     final boolean isOver = entity.isOver() || entity.isQuit();
-    // Two-kingdom match: seat 0 is the human, seat 1 is the opponent's kingdom. Both kingdoms are
-    // seeded with the standard starting deck by the engine's initialize()/seedStartingDeck(). The
-    // engine's activeSeat defaults to 0, so the human plays their own board today; wiring the seat-1
-    // opponent (bot turns + per-seat WS routing) is the next slice.
-    final GameState state = GameState.newTwoPlayerState();
-    // Built via the Builder (rather than the raw constructor) so a GameLifecycleListener can be
-    // registered; the Builder's defaults (default catalogs, a fresh Random, synchronous executor)
-    // exactly replicate the old constructor's behavior.
+    // One kingdom per seat, sharing a clock. Both kingdoms are seeded with the standard starting
+    // deck by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per
+    // request by KhController based on the acting user's seat.
+    final GameState state = GameState.newMultiplayer(Math.max(players.size(), 1));
+    // Built via the Builder so the lifecycle listener and the KH broadcast observer can be
+    // registered. Registering khBroadcastService as a KhObserver makes state pushes engine-driven:
+    // initialize() fires gameStarted, each action fires gameUpdated (via GameEngine#notifyUpdated),
+    // and resolution fires gameOver — all broadcast per-seat.
     final GameEngine engine =
         new GameEngine.Builder()
             .withId(entity.getId())
-            .withPlayer(player)
+            .withPlayers(players)
             .withState(state)
+            .addListener(khBroadcastService)
             .addLifecycleObserver(new GameLifecycleListener<>())
             .build();
     // Delegate initialization to the engine — it owns the knowledge of how a game starts.
