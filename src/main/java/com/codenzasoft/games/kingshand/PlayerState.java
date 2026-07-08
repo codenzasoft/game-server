@@ -17,12 +17,12 @@ import java.util.Set;
  * {@link GameEngine}; this class only holds fields, exposes getters/setters, and validates static
  * invariants on construction via its {@link Builder}.
  *
- * <p>This class was formerly {@code GameState}. In the two-player refactor, the shared clock ({@link
- * TimeState}) and the collection of players moved up to the new match-level {@link GameState}, so
- * everything that remains here is strictly per-player. Because a player no longer owns the clock,
- * every method that operates on "the current season's" table now takes the {@link Season} as an
- * explicit parameter; the match resolves the current season from its shared {@link TimeState} before
- * delegating.
+ * <p>This class was formerly {@code GameState}. In the two-player refactor, the shared clock
+ * ({@link TimeState}) and the collection of players moved up to the new match-level {@link
+ * GameState}, so everything that remains here is strictly per-player. Because a player no longer
+ * owns the clock, every method that operates on "the current season's" table now takes the {@link
+ * Season} as an explicit parameter; the match resolves the current season from its shared {@link
+ * TimeState} before delegating.
  */
 public class PlayerState {
 
@@ -98,26 +98,27 @@ public class PlayerState {
   }
 
   /**
-   * Returns {@code true} if {@code season}'s table contains a card whose name matches {@code card}'s
-   * name. Matching by name (rather than full record equality) ensures that an engine-boosted table
-   * card — whose effect modifiers differ from the hand card — is still recognised as the upgrade
-   * target.
+   * Returns {@code true} if {@code season}'s table contains a card whose name matches {@code
+   * card}'s name. Matching by name (rather than full record equality) ensures that an
+   * engine-boosted table card — whose effect modifiers differ from the hand card — is still
+   * recognised as the upgrade target.
    */
   public boolean tableContains(Season season, Card card) {
     return getTable(season).stream().anyMatch(c -> c.name().equals(card.name()));
   }
 
   /**
-   * Returns the first table card on {@code season}'s table whose name equals {@code name}, or {@code
-   * null} if none exists. Used by the upgrade path to retrieve the actual (potentially boosted)
-   * table card before merging.
+   * Returns the first table card on {@code season}'s table whose name equals {@code name}, or
+   * {@code null} if none exists. Used by the upgrade path to retrieve the actual (potentially
+   * boosted) table card before merging.
    */
   public Card findTableCard(Season season, String name) {
     return getTable(season).stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
   }
 
   /**
-   * Replaces the first occurrence of {@code oldCard} on {@code season}'s table with {@code newCard}.
+   * Replaces the first occurrence of {@code oldCard} on {@code season}'s table with {@code
+   * newCard}.
    *
    * @throws IllegalArgumentException if {@code oldCard} is not present on the table
    */
@@ -125,7 +126,7 @@ public class PlayerState {
     List<Card> table = getTable(season);
     int index = table.indexOf(oldCard);
     if (index == -1) {
-      throw new IllegalArgumentException("card not found on " + season + " table");
+      throw new IllegalArgumentException("card not found on current table");
     }
     table.set(index, newCard);
   }
@@ -150,8 +151,8 @@ public class PlayerState {
   }
 
   /**
-   * Removes {@code card} from {@code season}'s table and adds it to {@code season}'s discard pile in
-   * one step.
+   * Removes {@code card} from {@code season}'s table and adds it to {@code season}'s discard pile
+   * in one step.
    */
   public void discardFromTable(Season season, Card card) {
     removeFromTable(season, card);
@@ -180,9 +181,9 @@ public class PlayerState {
   }
 
   /**
-   * Returns {@code true} if a card named {@code name} exists anywhere in this player's kingdom — the
-   * hand, any season's table, draw pile, or discard pile. Used to detect whether a Great Work has
-   * already been drafted, commissioned, or completed, since each Great Work may only ever exist
+   * Returns {@code true} if a card named {@code name} exists anywhere in this player's kingdom —
+   * the hand, any season's table, draw pile, or discard pile. Used to detect whether a Great Work
+   * has already been drafted, commissioned, or completed, since each Great Work may only ever exist
    * once.
    */
   public boolean isCardInPlay(String name) {
@@ -293,10 +294,10 @@ public class PlayerState {
   }
 
   /**
-   * Returns {@code true} once every win-condition Great Work has completed — i.e. the board contains
-   * a completed (non-under-construction) card with {@link Card#victory()} {@code == true} for each
-   * of the four seasonal win conditions. Computed dynamically from the board rather than cached,
-   * since a completed Great Work's presence there is itself the source of truth.
+   * Returns {@code true} once every win-condition Great Work has completed — i.e. the board
+   * contains a completed (non-under-construction) card with {@link Card#victory()} {@code == true}
+   * for each of the four seasonal win conditions. Computed dynamically from the board rather than
+   * cached, since a completed Great Work's presence there is itself the source of truth.
    */
   public boolean isVictoryComplete() {
     long completedVictoryCards =
@@ -364,7 +365,8 @@ public class PlayerState {
 
   /**
    * The single rotating Reform/Decree proposal for the current {@link Phase#COUNCIL_MEETING} phase,
-   * or {@code null} (omitted from JSON) if no seated advisor currently has anything left to propose.
+   * or {@code null} (omitted from JSON) if no seated advisor currently has anything left to
+   * propose.
    */
   @JsonProperty("currentProposal")
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -377,9 +379,9 @@ public class PlayerState {
   }
 
   /**
-   * Cumulative permanent free-reroll count granted by Decrees (Reeve Aldwin's "Found the Town Hall",
-   * Lady Iseult Varn's "Plant an Informant"). Stacks across advisors and survives them being removed
-   * from the council (a Decree, once enacted, is a permanent civic change).
+   * Cumulative permanent free-reroll count granted by Decrees (Reeve Aldwin's "Found the Town
+   * Hall", Lady Iseult Varn's "Plant an Informant"). Stacks across advisors and survives them being
+   * removed from the council (a Decree, once enacted, is a permanent civic change).
    */
   @JsonProperty("permanentFreeRerolls")
   public int getPermanentFreeRerolls() {

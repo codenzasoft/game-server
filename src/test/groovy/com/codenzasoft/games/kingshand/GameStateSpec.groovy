@@ -353,4 +353,56 @@ class GameStateSpec extends Specification {
         state.discardPile.get(Season.FALL).isEmpty()
         state.discardPile.get(Season.WINTER).isEmpty()
     }
+
+    // ----- two-player match structure -----
+
+    def "newTwoPlayerState creates two independent kingdoms sharing one clock"() {
+        when:
+        GameState state = GameState.newTwoPlayerState()
+
+        then:
+        state.getPlayers().size() == 2
+        state.getPlayer(0) !== state.getPlayer(1)
+        state.getPlayer(0).getBoard() !== state.getPlayer(1).getBoard()
+        state.getPlayer(0).getResources().population() == 100
+        state.getPlayer(1).getResources().population() == 100
+        state.time.season == Season.SPRING
+        state.time.year == 1
+    }
+
+    def "mutating one seat's table does not affect the other seat"() {
+        setup:
+        def card  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
+        GameState state = GameState.newTwoPlayerState()
+
+        when:
+        state.getPlayer(0).addToTable(Season.SPRING, card)
+
+        then:
+        state.getPlayer(0).getTable(Season.SPRING) == [card]
+        state.getPlayer(1).getTable(Season.SPRING).isEmpty()
+    }
+
+    def "primary() and the delegating accessors target seat 0"() {
+        setup:
+        def card  = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
+        GameState state = GameState.newTwoPlayerState()
+
+        when:
+        state.addToTable(card)   // flat/delegating API acts on the active player
+
+        then:
+        state.primary() === state.getPlayer(0)
+        state.getCurrentTable() == [card]
+        state.getPlayer(1).getTable(Season.SPRING).isEmpty()
+    }
+
+    def "newMultiplayer rejects a player count below one"() {
+        when:
+        GameState.newMultiplayer(0)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "a match needs at least one player"
+    }
 }
