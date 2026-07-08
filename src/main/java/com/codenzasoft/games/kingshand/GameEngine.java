@@ -361,65 +361,35 @@ public class GameEngine implements Game<GameEngine> {
     for (int i = 0; i < snapshot.size(); i++) {
       final Card card = snapshot.get(i);
       final StaffingTier tier = staffing.get(i).tier();
-      final ResourceState before = state.getResources();
-
-      card.play(state, tier);
-      log.add(
-          new ResolutionStep(
-              card.name(), tier, card.isEngineBoost(), state.getResources().getDelta(before)));
+      final PlayedCard playedCard = card.play(state, tier);
+      log.add(playedCard.getResolutionStep());
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
       }
     }
 
-    // 4.5. Seated council resolution — advisors bypass staffing entirely: every seated advisor's
+    // 5. Seated council resolution — advisors bypass staffing entirely: every seated advisor's
     // card effects fire unconditionally, at full value, every season. See class javadoc.
     for (SeatedAdvisor seated : state.getCouncil()) {
-      Card card = seated.getCard();
-      ResourceState before = state.getResources();
-
-      card.play(state, StaffingTier.FULL);
-      log.add(
-          new ResolutionStep(
-              card.name(), StaffingTier.FULL, false, state.getResources().getDelta(before)));
+      final Card card = seated.getCard();
+      final PlayedCard playedCard = card.play(state, StaffingTier.FULL);
+      log.add(playedCard.getResolutionStep());
     }
 
-    // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
+    // 6. Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the
+    // first
     // matching Production card on the season table that is just about to resolve next time around.
     final Optional<Card> advisorBoost = getSeatedAdvisorBoost();
     if (advisorBoost.isPresent()) {
       final Card card = advisorBoost.get();
-      final ResourceState before = state.getResources();
-      card.play(state, StaffingTier.FULL, state.getCurrentTable());
-      log.add(
-          new ResolutionStep(
-              card.name(), StaffingTier.FULL, true, state.getResources().getDelta(before)));
+      final PlayedCard play = card.play(state, StaffingTier.FULL, state.getCurrentTable());
+      if (!play.boosted().isEmpty()) {
+        log.add(play.getResolutionStep());
+      }
     }
 
-    //    double crossTableBoost = seatedCrossTableBoost();
-    //    if (crossTableBoost > 0) {
-    //      List<Card> currentTable = state.getCurrentTable();
-    //      for (int j = 0; j < currentTable.size(); j++) {
-    //        final Card target = currentTable.get(j);
-    //        boolean hasMatch =
-    //            target.effects().stream()
-    //                .anyMatch(
-    //                    e ->
-    //                        e.target() == ResourceTarget.PRODUCTION
-    //                            && e.valueType() == ValueType.INTEGER);
-    //        if (hasMatch) {
-    //          currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
-    //          log.add(
-    //              new ResolutionStep(
-    //                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true,
-    // ResourceState.empty()));
-    //          break;
-    //        }
-    //      }
-    //    }
-
-    // 5. Food consumption / starvation / growth — captured as a tail step.
+    // 7. Food consumption / starvation / growth — captured as a tail step.
     final ResourceState before = state.getResources();
     consumeFood();
     log.add(new ResolutionStep(null, null, false, state.getResources().getDelta(before)));
@@ -430,7 +400,7 @@ public class GameEngine implements Game<GameEngine> {
       notifyListeners(GAME_OVER_NOTIFICATION);
       notifyLifecycleObservers(GameLifecycleObserver::gameOver);
     }
-    // 6. Advance to the next phase (ADD for next season, or stay put if game is over / won).
+    // 8. Advance to the next phase (ADD for next season, or stay put if game is over / won).
     if (!state.isVictoryComplete()) {
       advancePhase();
     }

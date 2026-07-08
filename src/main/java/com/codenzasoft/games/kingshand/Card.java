@@ -1,9 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -249,62 +246,74 @@ public record Card(
 
   /**
    * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
-   * by the provided {@link StaffingTier}. A card is only played if its required {@link
-   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
-   * great works, as they have negative effect modifiers (costs). By default, cards targeted by the
-   * played card are those on the board after this card.
+   * by the provided {@link StaffingTier}, returning a {@link PlayedCard}. A card is only played if
+   * its required {@link StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is
+   * only an issue for great works, as they have costs (negative effect modifiers). By default,
+   * cards that target other cards will be evaluated against any following cards on the table.
    *
    * @param state A {@link GameState} to apply effects to.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
-  public void play(final GameState state, final StaffingTier tier) {
-    play(state, tier, state.getCardsOnBoardAfter(this));
+  public PlayedCard play(final GameState state, final StaffingTier tier) {
+    return play(state, tier, state.getCardsOnBoardAfter(this));
   }
 
   /**
    * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
-   * by the provided {@link StaffingTier}. A card is only played if its required {@link
-   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
-   * great works, as they have negative effect modifiers (costs)
+   * by the provided {@link StaffingTier}, returning a {@link PlayedCard}. A card is only played if
+   * its required {@link StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is
+   * only an issue for great works, as they have costs (negative effect modifiers). If this card
+   * targets other cards it will be evaluated against the provided targets.
    *
    * @param state A {@link GameState} to apply effects to.
    * @param tier The {@link StaffingTier} to use when applying effects.
+   * @param targets The {@link Card}s to consider as targets for any {@link CardTarget} effect this
+   *     card has.
    */
-  public void play(final GameState state, final StaffingTier tier, final List<Card> targets) {
-    if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
-      return;
-    }
-    if (!state.canAfford(effects())) {
-      return;
-    }
-
-    for (Effect effect : getTierEffects(tier)) {
-      if (effect.target() instanceof ResourceTarget rt) {
-        state.apply(effect);
-      } else if (effect.target() instanceof CardTarget ct) {
-        for (final Card card : targets) {
-          final Optional<Card> boosted = boost(card, effect, ct);
-          boosted.ifPresent(value -> state.replaceTableCard(card, value));
-          if (ct.adjacentOnly()) {
-            break;
+  public PlayedCard play(final GameState state, final StaffingTier tier, final List<Card> targets) {
+    if (tier.greaterThanOrEqualTo(getRequiredStaffingTier()) && state.canAfford(effects())) {
+      final ResourceState before = state.getResources();
+      final List<Card> boostedCards = new ArrayList<>();
+      for (Effect effect : getTierEffects(tier)) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          state.apply(effect);
+        } else if (effect.target() instanceof CardTarget ct) {
+          for (final Card card : targets) {
+            final Optional<Card> boosted = boost(card, effect, ct);
+            if (boosted.isPresent()) {
+              state.replaceTableCard(card, boosted.get());
+              boostedCards.add(boosted.get());
+            }
+            if (ct.adjacentOnly()) {
+              break;
+            }
           }
         }
       }
+
+      if (isGreatWork()) {
+        int newPeriod = constructionPeriod() - 1;
+        if (newPeriod == 0) {
+          // ── Construction COMPLETE — swap for the completed card ──────────
+          state.replaceTableCard(this, completedCard());
+          // Unlock any new resource types this Great Work grants.
+          state.unlock(this);
+        } else {
+          // Decrement: replace the card on the table with the same card minus one period.
+          Card decremented = withConstructionPeriod(newPeriod);
+          state.replaceTableCard(this, decremented);
+        }
+      }
+
+      return new PlayedCard(
+          this,
+          tier,
+          true,
+          state.getResources().getDelta(before),
+          Collections.unmodifiableList(boostedCards));
     }
 
-    if (isGreatWork()) {
-      int newPeriod = constructionPeriod() - 1;
-      if (newPeriod == 0) {
-        // ── Construction COMPLETE — swap for the completed card ──────────
-        state.replaceTableCard(this, completedCard());
-        // Unlock any new resource types this Great Work grants.
-        state.unlock(this);
-      } else {
-        // Decrement: replace the card on the table with the same card minus one period.
-        Card decremented = withConstructionPeriod(newPeriod);
-        state.replaceTableCard(this, decremented);
-      }
-    }
+    return new PlayedCard(this, tier, false, ResourceState.empty(), List.of());
   }
 
   public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {
