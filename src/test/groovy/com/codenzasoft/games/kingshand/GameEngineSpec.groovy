@@ -2229,4 +2229,21 @@ class GameEngineSpec extends Specification {
         def e = thrown(IllegalArgumentException)
         e.message == "no such seat: 1"
     }
+
+    def "seatOf maps player usernames to seats and returns -1 for a non-player"() {
+        setup:
+        def alice = new Player(UUID.randomUUID(), "alice")
+        def bob   = new Player(UUID.randomUUID(), "bob")
+        def engine = new GameEngine.Builder()
+                .withId(UUID.randomUUID())
+                .withPlayers([alice, bob])
+                .withState(GameState.newTwoPlayerState())
+                .build()
+
+        expect:
+        engine.getPlayers() == [alice, bob]
+        engine.seatOf("alice") == 0
+        engine.seatOf("bob") == 1
+        engine.seatOf("carol") == -1
+    }
 }
