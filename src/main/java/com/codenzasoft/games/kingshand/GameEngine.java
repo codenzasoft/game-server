@@ -367,12 +367,10 @@ public class GameEngine implements Game<GameEngine> {
       final StaffingTier tier = staffing.get(i).tier();
       final ResourceState before = state.getResources();
 
-      boolean isEngineBoost = card.isEngineBoost();
-
       card.play(state, tier);
       log.add(
           new ResolutionStep(
-              card.name(), tier, isEngineBoost, state.getResources().getDelta(before)));
+              card.name(), tier, card.isEngineBoost(), state.getResources().getDelta(before)));
 
       if (card.frequencyType() == FrequencyType.SINGLE) {
         state.discardFromTable(card);
