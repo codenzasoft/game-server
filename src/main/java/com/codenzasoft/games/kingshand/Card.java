@@ -251,12 +251,26 @@ public record Card(
    * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
    * by the provided {@link StaffingTier}. A card is only played if its required {@link
    * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
-   * great works, as they have negative effect modifiers (costs)
+   * great works, as they have negative effect modifiers (costs). By default, cards targeted by the
+   * played card are those on the board after this card.
    *
    * @param state A {@link GameState} to apply effects to.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
   public void play(final GameState state, final StaffingTier tier) {
+    play(state, tier, state.getCardsOnBoardAfter(this));
+  }
+
+  /**
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
+   * by the provided {@link StaffingTier}. A card is only played if its required {@link
+   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
+   * great works, as they have negative effect modifiers (costs)
+   *
+   * @param state A {@link GameState} to apply effects to.
+   * @param tier The {@link StaffingTier} to use when applying effects.
+   */
+  public void play(final GameState state, final StaffingTier tier, final List<Card> targets) {
     if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
       return;
     }
@@ -268,8 +282,7 @@ public record Card(
       if (effect.target() instanceof ResourceTarget rt) {
         state.apply(effect);
       } else if (effect.target() instanceof CardTarget ct) {
-        final List<Card> followingCards = state.getCardsOnBoardAfter(this);
-        for (final Card card : followingCards) {
+        for (final Card card : targets) {
           final Optional<Card> boosted = boost(card, effect, ct);
           boosted.ifPresent(value -> state.replaceTableCard(card, value));
           if (ct.adjacentOnly()) {

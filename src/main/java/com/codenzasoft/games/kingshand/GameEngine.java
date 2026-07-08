@@ -7,11 +7,7 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhNotification;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 
@@ -391,26 +387,37 @@ public class GameEngine implements Game<GameEngine> {
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
     // matching Production card on the season table that is just about to resolve next time around.
-    double crossTableBoost = seatedCrossTableBoost();
-    if (crossTableBoost > 0) {
-      List<Card> currentTable = state.getCurrentTable();
-      for (int j = 0; j < currentTable.size(); j++) {
-        final Card target = currentTable.get(j);
-        boolean hasMatch =
-            target.effects().stream()
-                .anyMatch(
-                    e ->
-                        e.target() == ResourceTarget.PRODUCTION
-                            && e.valueType() == ValueType.INTEGER);
-        if (hasMatch) {
-          currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
-          log.add(
-              new ResolutionStep(
-                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true, ResourceState.empty()));
-          break;
-        }
-      }
+    final Optional<Card> advisorBoost = getSeatedAdvisorBoost();
+    if (advisorBoost.isPresent()) {
+      final Card card = advisorBoost.get();
+      final ResourceState before = state.getResources();
+      card.play(state, StaffingTier.FULL, state.getCurrentTable());
+      log.add(
+          new ResolutionStep(
+              card.name(), StaffingTier.FULL, true, state.getResources().getDelta(before)));
     }
+
+    //    double crossTableBoost = seatedCrossTableBoost();
+    //    if (crossTableBoost > 0) {
+    //      List<Card> currentTable = state.getCurrentTable();
+    //      for (int j = 0; j < currentTable.size(); j++) {
+    //        final Card target = currentTable.get(j);
+    //        boolean hasMatch =
+    //            target.effects().stream()
+    //                .anyMatch(
+    //                    e ->
+    //                        e.target() == ResourceTarget.PRODUCTION
+    //                            && e.valueType() == ValueType.INTEGER);
+    //        if (hasMatch) {
+    //          currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
+    //          log.add(
+    //              new ResolutionStep(
+    //                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true,
+    // ResourceState.empty()));
+    //          break;
+    //        }
+    //      }
+    //    }
 
     // 5. Food consumption / starvation / growth — captured as a tail step.
     final ResourceState before = state.getResources();
@@ -1360,5 +1367,22 @@ public class GameEngine implements Game<GameEngine> {
       total += advisor.crossTableBoostAmount() + seated.getBonusCrossTableBoost();
     }
     return total;
+  }
+
+  private Optional<Card> getSeatedAdvisorBoost() {
+    final double boost = seatedCrossTableBoost();
+    if (boost > 0) {
+      return Optional.of(
+          new Card(
+              "COUNCIL_CROSS_TABLE_BOOST",
+              0,
+              0,
+              FrequencyType.RECURRING,
+              List.of(
+                  new Effect(
+                      new CardTarget(ResourceTarget.PRODUCTION, true), boost, ValueType.INTEGER))));
+    } else {
+      return Optional.empty();
+    }
   }
 }
