@@ -1,35 +1,25 @@
 package com.codenzasoft.games.kingshand;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
  * Match-level state for a King's Hand game: the shared clock ({@link TimeState}) plus the list of
- * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and
- * the client is sent.
+ * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and the
+ * client is sent.
  *
- * <p><b>History.</b> This class used to hold a single kingdom's data directly. In the two-player
- * refactor it became the container: the per-player fields moved to {@link PlayerState} and the
- * clock moved here so both players share one authoritative season/phase/year. For a single-player
- * game {@code players} has exactly one element.
+ * <p><b>Responsibilities.</b> {@code GameState} owns only what is shared or cross-cutting across the
+ * match: the collection of kingdoms (addressed by <em>seat</em>), the single authoritative
+ * season/phase/year clock, and the match outcome (who has won / been knocked out). It deliberately
+ * does <em>not</em> re-expose per-player operations — those live on {@link PlayerState} and are
+ * reached via {@link #getPlayer(int)}. The engine is seat-aware and operates on the relevant
+ * {@link PlayerState} directly, so this class no longer delegates to a single "primary" kingdom.
  *
- * <p><b>Backward compatibility.</b> Every accessor the old flat {@code GameState} exposed still
- * exists here, delegating to the <em>active</em> player ({@link #primary()}, currently seat 0) and
- * resolving "the current season" from the shared {@link TimeState}. This keeps {@link GameEngine},
- * {@link Card#play}, the notification/broadcast layer, and the existing test suite working
- * unchanged while the second seat and seat-aware engine paths are built out in later passes. The
- * only additions to the wire payload are the {@code time} object and the {@code players} array; the
- * previously flat properties (resources, board, hand, …) are still emitted for the active player,
- * so existing single-player clients are unaffected.
+ * <p>For a single-player game {@code players} has exactly one element (seat 0).
  */
 public class GameState {
-
-  /** Seat index of the primary/active player. Fixed at 0 until seat-aware paths are added. */
-  public static final int PRIMARY_SEAT = 0;
 
   private final List<PlayerState> players;
   private TimeState time;
@@ -48,9 +38,7 @@ public class GameState {
     return new Builder();
   }
 
-  /**
-   * Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match.
-   */
+  /** Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match. */
   public static GameState singlePlayer(PlayerState player, TimeState time) {
     return multiPlayer(List.of(player), time);
   }
@@ -108,10 +96,12 @@ public class GameState {
     return players.get(seat);
   }
 
-  /** The primary/active player kingdom (seat {@link #PRIMARY_SEAT}). */
-  public PlayerState primary() {
-    return players.get(PRIMARY_SEAT);
+  /** Number of seats (kingdoms) in this match. */
+  public int playerCount() {
+    return players.size();
   }
+
+  // ----- Shared clock -----
 
   @JsonProperty("time")
   public TimeState getTime() {
@@ -119,229 +109,63 @@ public class GameState {
   }
 
   /**
-   * Advances the shared clock, deciding the next phase from the active player's unlocked resources
-   * (whether the Council opens after Winter). Seat-aware council rules for two players are handled
-   * in a later pass.
+   * Advances the shared clock. The Council opens after Winter's PLAY when <em>either</em> kingdom
+   * has unlocked GOLD (the two-player council rule), so a player with a gold economy always gets
+   * their council turn even if their opponent has none.
    */
   public void advanceTime() {
-    time = time.advance(primary().getResources());
+    boolean anyGoldUnlocked =
+        players.stream().anyMatch(p -> p.getResources().isUnlocked(ResourceTarget.GOLD));
+    time = time.advance(anyGoldUnlocked);
   }
 
-  private Season season() {
-    return time.season();
+  // ----- Match outcome (cross-player) -----
+
+  /** {@code true} if {@code seat}'s population has collapsed (knocked out / forfeit by starvation). */
+  public boolean isPlayerOut(int seat) {
+    return getPlayer(seat).isGameOver();
   }
 
-  // ----- Delegating accessors (active player) -----
-
-  @JsonProperty("resources")
-  public ResourceState getResources() {
-    return primary().getResources();
+  /** {@code true} if {@code seat} has completed all of their win-condition Great Works. */
+  public boolean isPlayerVictorious(int seat) {
+    return getPlayer(seat).isVictoryComplete();
   }
 
-  @JsonProperty("board")
-  public Map<Season, List<Card>> getBoard() {
-    return primary().getBoard();
+  /**
+   * {@code true} once the match is decided: some seat has completed all Great Works, or a seat has
+   * been knocked out. Callers use {@link #winnerSeat()} to find who (if anyone) won.
+   */
+  @JsonProperty("matchOver")
+  public boolean isMatchOver() {
+    for (int seat = 0; seat < players.size(); seat++) {
+      if (isPlayerVictorious(seat) || isPlayerOut(seat)) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  /** Convenience accessor for the active player's table in the current season. */
-  public List<Card> getCurrentTable() {
-    return primary().getTable(season());
-  }
-
-  public boolean tableContains(Card card) {
-    return primary().tableContains(season(), card);
-  }
-
-  public Card findTableCard(String name) {
-    return primary().findTableCard(season(), name);
-  }
-
-  public void replaceTableCard(Card oldCard, Card newCard) {
-    primary().replaceTableCard(season(), oldCard, newCard);
-  }
-
-  public void addToTable(Card card) {
-    primary().addToTable(season(), card);
-  }
-
-  public void removeFromTable(Card card) {
-    primary().removeFromTable(season(), card);
-  }
-
-  public void removeFromTableAt(int slot) {
-    primary().removeFromTableAt(season(), slot);
-  }
-
-  public void discardFromTable(Card card) {
-    primary().discardFromTable(season(), card);
-  }
-
-  public void discardHand() {
-    primary().discardHand(season());
-  }
-
-  @JsonProperty("discardPile")
-  public Map<Season, List<Card>> getDiscardPile() {
-    return primary().getDiscardPile();
-  }
-
-  @JsonProperty("drawPile")
-  public Map<Season, List<Card>> getDrawPile() {
-    return primary().getDrawPile();
-  }
-
-  @JsonProperty("hand")
-  public List<Card> getHand() {
-    return primary().getHand();
-  }
-
-  public boolean isCardInPlay(String name) {
-    return primary().isCardInPlay(name);
-  }
-
-  public boolean isCardInPlay(Card card) {
-    return primary().isCardInPlay(card);
-  }
-
-  @JsonProperty("addChoices")
-  public List<Card> getAddChoices() {
-    return primary().getAddChoices();
-  }
-
-  @JsonProperty("rerollCount")
-  public int getRerollCount() {
-    return primary().getRerollCount();
-  }
-
-  public void setAddChoices(List<Card> addChoices) {
-    primary().setAddChoices(addChoices);
-  }
-
-  public void setRerollCount(int rerollCount) {
-    primary().setRerollCount(rerollCount);
-  }
-
-  @JsonProperty("gameOver")
-  public boolean isGameOver() {
-    return primary().isGameOver();
-  }
-
-  /** Staffing for the active player's current-season table. */
-  @JsonProperty("tableStaffing")
-  public List<CardStaffing> getTableStaffing() {
-    return primary().getTableStaffing(season());
-  }
-
-  @JsonProperty("resolutionLog")
-  public List<ResolutionStep> getResolutionLog() {
-    return primary().getResolutionLog();
-  }
-
-  public void setResolutionLog(List<ResolutionStep> log) {
-    primary().setResolutionLog(log);
-  }
-
-  public void unlock(Card card) {
-    primary().unlock(card);
-  }
-
-  public boolean areRequiredResourcesUnlocked(Card card) {
-    return primary().areRequiredResourcesUnlocked(card);
-  }
-
-  public boolean canAfford(List<Effect> effects) {
-    return primary().canAfford(effects);
-  }
-
-  public boolean isVictoryComplete() {
-    return primary().isVictoryComplete();
-  }
-
-  @JsonProperty("gameWon")
-  public boolean isGameWon() {
-    return primary().isGameWon();
-  }
-
-  @JsonProperty("council")
-  public List<SeatedAdvisor> getCouncil() {
-    return primary().getCouncil();
-  }
-
-  public void addToCouncil(SeatedAdvisor seated) {
-    primary().addToCouncil(seated);
-  }
-
-  public void removeFromCouncil(String advisorId) {
-    primary().removeFromCouncil(advisorId);
-  }
-
-  public SeatedAdvisor findSeatedAdvisor(String advisorId) {
-    return primary().findSeatedAdvisor(advisorId);
-  }
-
-  @JsonProperty("councilOfferChoices")
-  public List<Advisor> getCouncilOfferChoices() {
-    return primary().getCouncilOfferChoices();
-  }
-
-  public void setCouncilOfferChoices(List<Advisor> councilOfferChoices) {
-    primary().setCouncilOfferChoices(councilOfferChoices);
-  }
-
-  @JsonProperty("currentProposal")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
-  public CouncilProposal getCurrentProposal() {
-    return primary().getCurrentProposal();
-  }
-
-  public void setCurrentProposal(CouncilProposal currentProposal) {
-    primary().setCurrentProposal(currentProposal);
-  }
-
-  @JsonProperty("permanentFreeRerolls")
-  public int getPermanentFreeRerolls() {
-    return primary().getPermanentFreeRerolls();
-  }
-
-  public void setPermanentFreeRerolls(int permanentFreeRerolls) {
-    primary().setPermanentFreeRerolls(permanentFreeRerolls);
-  }
-
-  public void incrementPermanentFreeRerolls(int delta) {
-    primary().incrementPermanentFreeRerolls(delta);
-  }
-
-  @JsonProperty("acceleratedGreatWorkNames")
-  public Set<String> getAcceleratedGreatWorkNames() {
-    return primary().getAcceleratedGreatWorkNames();
-  }
-
-  public void markGreatWorkAccelerated(String greatWorkName) {
-    primary().markGreatWorkAccelerated(greatWorkName);
-  }
-
-  public void apply(Effect effect) {
-    primary().apply(effect);
-  }
-
-  public void consumeFood(double rate) {
-    primary().consumeFood(rate);
-  }
-
-  public void addProduction(double value) {
-    primary().addProduction(value);
-  }
-
-  public void addGold(double value) {
-    primary().addGold(value);
-  }
-
-  public void addPopulationCap(double value) {
-    primary().addPopulationCap(value);
-  }
-
-  public List<Card> getCardsOnBoardAfter(final Card card) {
-    return primary().getCardsOnBoardAfter(season(), card);
+  /**
+   * Seat of the winner, or {@code -1} if the match is not yet decided (or, in a solo game, if the
+   * lone player was knocked out). Completing all Great Works wins outright; failing that, the last
+   * kingdom still standing wins once every opponent has been knocked out.
+   */
+  @JsonProperty("winnerSeat")
+  public int winnerSeat() {
+    for (int seat = 0; seat < players.size(); seat++) {
+      if (isPlayerVictorious(seat)) {
+        return seat;
+      }
+    }
+    int survivors = 0;
+    int lastSurvivor = -1;
+    for (int seat = 0; seat < players.size(); seat++) {
+      if (!isPlayerOut(seat)) {
+        survivors++;
+        lastSurvivor = seat;
+      }
+    }
+    return (players.size() > 1 && survivors == 1) ? lastSurvivor : -1;
   }
 
   // ----- Builder -----
@@ -349,8 +173,9 @@ public class GameState {
   /**
    * Builds a single-player match. Mirrors the old flat {@code GameState.Builder} fluent API: the
    * clock setters ({@link #season}, {@link #phase}, {@link #year}) live here, and every per-player
-   * setter forwards to an embedded {@link PlayerState.Builder}. This keeps existing call sites
-   * (both production and tests) compiling without change.
+   * setter forwards to an embedded {@link PlayerState.Builder}. This keeps existing single-kingdom
+   * call sites (production and tests) compiling without change; multi-kingdom matches are assembled
+   * via {@link #newMultiplayer(int)} / {@link #multiPlayer(List, TimeState)}.
    */
   public static final class Builder {
     private final PlayerState.Builder player = PlayerState.builder();
@@ -358,7 +183,7 @@ public class GameState {
     private Phase phase = Phase.ADD;
     private int year = 1;
 
-    // Set directly by singlePlayer(...).
+    // Set directly by multiPlayer(...).
     private List<PlayerState> players;
     private TimeState time;
 
@@ -485,7 +310,7 @@ public class GameState {
     }
 
     public GameState build() {
-      // singlePlayer(...) pre-populates players/time directly.
+      // multiPlayer(...) pre-populates players/time directly.
       if (players != null && time != null) {
         return new GameState(this);
       }

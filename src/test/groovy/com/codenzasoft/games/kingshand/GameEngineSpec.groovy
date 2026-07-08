@@ -71,7 +71,7 @@ class GameEngineSpec extends Specification {
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)]
         )
 
-        state.board.get(Season.SUMMER).add(card)
+        state.getPlayer(0).board.get(Season.SUMMER).add(card)
 
         when:
         engine.state.advanceTime() // add -> play (spring)
@@ -79,7 +79,7 @@ class GameEngineSpec extends Specification {
 
         then:
         engine.state.time.season == Season.SUMMER
-        state.resources.food == 750   // unchanged because the effect is SINGLE
+        state.getPlayer(0).resources.food == 750   // unchanged because the effect is SINGLE
     }
 
     // ----- table mutations -----
@@ -94,7 +94,7 @@ class GameEngineSpec extends Specification {
         engine.addCard(Season.FALL, card)
 
         then:
-        state.board.get(Season.FALL) == [card]
+        state.getPlayer(0).board.get(Season.FALL) == [card]
     }
 
     def "addCard throws when the table is full"() {
@@ -123,7 +123,7 @@ class GameEngineSpec extends Specification {
         engine.removeCard(Season.WINTER, card)
 
         then:
-        state.board.get(Season.WINTER) == []
+        state.getPlayer(0).board.get(Season.WINTER) == []
     }
 
     // ----- pile mutations: addToDeck -----
@@ -140,10 +140,10 @@ class GameEngineSpec extends Specification {
         engine.addToDeck(Season.SPRING, card)
 
         then:
-        state.drawPile.get(Season.SPRING) == [card]
-        state.drawPile.get(Season.SUMMER).isEmpty()
-        state.drawPile.get(Season.FALL).isEmpty()
-        state.drawPile.get(Season.WINTER).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.SPRING) == [card]
+        state.getPlayer(0).drawPile.get(Season.SUMMER).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.FALL).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.WINTER).isEmpty()
     }
 
     def "addToDeck adds multiple cards to the correct season's draw pile"() {
@@ -161,12 +161,12 @@ class GameEngineSpec extends Specification {
         engine.addToDeck(Season.SUMMER, [card1, card2])
 
         then:
-        state.drawPile.get(Season.SUMMER).size() == 2
-        state.drawPile.get(Season.SUMMER).contains(card1)
-        state.drawPile.get(Season.SUMMER).contains(card2)
-        state.drawPile.get(Season.SPRING).isEmpty()
-        state.drawPile.get(Season.FALL).isEmpty()
-        state.drawPile.get(Season.WINTER).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.SUMMER).size() == 2
+        state.getPlayer(0).drawPile.get(Season.SUMMER).contains(card1)
+        state.getPlayer(0).drawPile.get(Season.SUMMER).contains(card2)
+        state.getPlayer(0).drawPile.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.FALL).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.WINTER).isEmpty()
     }
 
     def "addToDeck (single) throws when season is null"() {
@@ -219,8 +219,8 @@ class GameEngineSpec extends Specification {
         def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
         )
 
-        state.drawPile.get(Season.SPRING).add(card1)
-        state.drawPile.get(Season.SPRING).add(card2)
+        state.getPlayer(0).drawPile.get(Season.SPRING).add(card1)
+        state.getPlayer(0).drawPile.get(Season.SPRING).add(card2)
 
         when:
         def drawnCards = engine.draw(Season.SPRING, 1)
@@ -229,11 +229,11 @@ class GameEngineSpec extends Specification {
         drawnCards.size() == 1
         drawnCards.contains(card1)
 
-        state.hand.size() == 1
-        state.hand.contains(card1)
+        state.getPlayer(0).hand.size() == 1
+        state.getPlayer(0).hand.contains(card1)
 
-        state.drawPile.get(Season.SPRING).size() == 1
-        state.drawPile.get(Season.SPRING).contains(card2)
+        state.getPlayer(0).drawPile.get(Season.SPRING).size() == 1
+        state.getPlayer(0).drawPile.get(Season.SPRING).contains(card2)
     }
 
     def "draw can draw multiple cards"() {
@@ -250,9 +250,9 @@ class GameEngineSpec extends Specification {
         def card3 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.POPULATION, 1, ValueType.INTEGER)]
         )
 
-        state.drawPile.get(Season.SUMMER).add(card1)
-        state.drawPile.get(Season.SUMMER).add(card2)
-        state.drawPile.get(Season.SUMMER).add(card3)
+        state.getPlayer(0).drawPile.get(Season.SUMMER).add(card1)
+        state.getPlayer(0).drawPile.get(Season.SUMMER).add(card2)
+        state.getPlayer(0).drawPile.get(Season.SUMMER).add(card3)
 
         when:
         def drawnCards = engine.draw(Season.SUMMER, 2)
@@ -262,12 +262,12 @@ class GameEngineSpec extends Specification {
         drawnCards.contains(card1)
         drawnCards.contains(card2)
 
-        state.hand.size() == 2
-        state.hand.contains(card1)
-        state.hand.contains(card2)
+        state.getPlayer(0).hand.size() == 2
+        state.getPlayer(0).hand.contains(card1)
+        state.getPlayer(0).hand.contains(card2)
 
-        state.drawPile.get(Season.SUMMER).size() == 1
-        state.drawPile.get(Season.SUMMER).contains(card3)
+        state.getPlayer(0).drawPile.get(Season.SUMMER).size() == 1
+        state.getPlayer(0).drawPile.get(Season.SUMMER).contains(card3)
     }
 
     def "draw reshuffles the discard pile into the draw pile when draw pile is empty"() {
@@ -281,20 +281,20 @@ class GameEngineSpec extends Specification {
         def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
         )
 
-        state.discardPile.get(Season.FALL).add(card1)
-        state.discardPile.get(Season.FALL).add(card2)
+        state.getPlayer(0).discardPile.get(Season.FALL).add(card1)
+        state.getPlayer(0).discardPile.get(Season.FALL).add(card2)
 
         when:
         def drawnCards = engine.draw(Season.FALL, 1)
 
         then:
         drawnCards.size() == 1
-        state.hand.size() == 1
+        state.getPlayer(0).hand.size() == 1
 
-        state.discardPile.get(Season.FALL).size() == 0
-        state.drawPile.get(Season.FALL).size() == 1
+        state.getPlayer(0).discardPile.get(Season.FALL).size() == 0
+        state.getPlayer(0).drawPile.get(Season.FALL).size() == 1
 
-        state.hand.get(0) == card1 || state.hand.get(0) == card2
+        state.getPlayer(0).hand.get(0) == card1 || state.getPlayer(0).hand.get(0) == card2
     }
 
     def "draw stops when no cards are available"() {
@@ -307,9 +307,9 @@ class GameEngineSpec extends Specification {
 
         then:
         drawnCards.size() == 0
-        state.hand.size() == 0
-        state.drawPile.get(Season.WINTER).size() == 0
-        state.discardPile.get(Season.WINTER).size() == 0
+        state.getPlayer(0).hand.size() == 0
+        state.getPlayer(0).drawPile.get(Season.WINTER).size() == 0
+        state.getPlayer(0).discardPile.get(Season.WINTER).size() == 0
     }
 
     def "draw throws exception when season is null"() {
@@ -386,9 +386,9 @@ class GameEngineSpec extends Specification {
         def choices = engine.offerAddChoices()
 
         then:
-        state.addChoices == choices
-        state.rerollCount == 1        // incremented from 0
-        state.resources.production  == 100.0   // no charge on first call
+        state.getPlayer(0).addChoices == choices
+        state.getPlayer(0).rerollCount == 1        // incremented from 0
+        state.getPlayer(0).resources.production  == 100.0   // no charge on first call
     }
 
     def "second call costs 50 production (first reroll)"() {
@@ -401,8 +401,8 @@ class GameEngineSpec extends Specification {
         engine.offerAddChoices()   // first paid reroll
 
         then:
-        state.resources.production == 950.0
-        state.rerollCount == 2
+        state.getPlayer(0).resources.production == 950.0
+        state.getPlayer(0).rerollCount == 2
     }
 
     def "reroll cost escalates with each subsequent call within the same ADD phase"() {
@@ -414,29 +414,29 @@ class GameEngineSpec extends Specification {
         engine.offerAddChoices()
 
         then:
-        state.resources.production == 1000.0
-        state.rerollCount == 1
+        state.getPlayer(0).resources.production == 1000.0
+        state.getPlayer(0).rerollCount == 1
 
         when: "first reroll costs 50"
         engine.offerAddChoices()
 
         then:
-        state.resources.production == 950.0
-        state.rerollCount == 2
+        state.getPlayer(0).resources.production == 950.0
+        state.getPlayer(0).rerollCount == 2
 
         when: "second reroll costs 100"
         engine.offerAddChoices()
 
         then:
-        state.resources.production == 850.0
-        state.rerollCount == 3
+        state.getPlayer(0).resources.production == 850.0
+        state.getPlayer(0).rerollCount == 3
 
         when: "third reroll costs 150"
         engine.offerAddChoices()
 
         then:
-        state.resources.production == 700.0
-        state.rerollCount == 4
+        state.getPlayer(0).resources.production == 700.0
+        state.getPlayer(0).rerollCount == 4
     }
 
     def "offerAddChoices throws when player cannot afford a reroll"() {
@@ -464,8 +464,8 @@ class GameEngineSpec extends Specification {
 
         then:
         thrown(IllegalStateException)
-        state.resources.production  == 25.0  // unchanged
-        state.rerollCount == 1     // unchanged
+        state.getPlayer(0).resources.production  == 25.0  // unchanged
+        state.getPlayer(0).rerollCount == 1     // unchanged
     }
 
     def "offerAddChoices throws when phase is not ADD"() {
@@ -493,7 +493,7 @@ class GameEngineSpec extends Specification {
 
         then:
         // startPlay() runs synchronously after pickCard and may draw the card straight into hand.
-        (state.drawPile.get(Season.SPRING) + state.hand).contains(card)
+        (state.getPlayer(0).drawPile.get(Season.SPRING) + state.getPlayer(0).hand).contains(card)
     }
 
     def "pickCard advances the phase to PLAY"() {
@@ -516,14 +516,14 @@ class GameEngineSpec extends Specification {
                 .build()
         def engine = engine(state)
         // pre-populate some choices so we can verify they're cleared
-        state.addChoices = [CardCatalog.FARM]
+        state.getPlayer(0).addChoices = [CardCatalog.FARM]
 
         when:
         engine.pickCard(CardCatalog.FARM)
 
         then:
-        state.addChoices.isEmpty()
-        state.rerollCount == 0
+        state.getPlayer(0).addChoices.isEmpty()
+        state.getPlayer(0).rerollCount == 0
     }
 
     def "pickCard throws when phase is not ADD"() {
@@ -553,10 +553,10 @@ class GameEngineSpec extends Specification {
 
         then:
         state.time.phase == Phase.PLAY
-        state.drawPile.get(Season.SPRING).isEmpty()
-        state.drawPile.get(Season.SUMMER).isEmpty()
-        state.drawPile.get(Season.FALL).isEmpty()
-        state.drawPile.get(Season.WINTER).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.SUMMER).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.FALL).isEmpty()
+        state.getPlayer(0).drawPile.get(Season.WINTER).isEmpty()
     }
 
     def "skipAdd clears addChoices and resets reroll count"() {
@@ -565,15 +565,15 @@ class GameEngineSpec extends Specification {
                 .phase(Phase.ADD)
                 .rerollCount(2)
                 .build()
-        state.addChoices = [CardCatalog.SEEDS]
+        state.getPlayer(0).addChoices = [CardCatalog.SEEDS]
         def engine = engine(state)
 
         when:
         engine.skipAdd()
 
         then:
-        state.addChoices.isEmpty()
-        state.rerollCount == 0
+        state.getPlayer(0).addChoices.isEmpty()
+        state.getPlayer(0).rerollCount == 0
     }
 
     def "skipAdd throws when phase is not ADD"() {
@@ -629,8 +629,8 @@ class GameEngineSpec extends Specification {
 
         then:
         drawn.size() == GameEngine.MAX_HAND_SIZE
-        state.hand.size() == GameEngine.MAX_HAND_SIZE
-        state.drawPile.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).hand.size() == GameEngine.MAX_HAND_SIZE
+        state.getPlayer(0).drawPile.get(Season.SPRING).isEmpty()
     }
 
     def "startPlay respects MAX_HAND_SIZE — draws at most three even when more cards are available"() {
@@ -648,8 +648,8 @@ class GameEngineSpec extends Specification {
 
         then:
         drawn.size() == GameEngine.MAX_HAND_SIZE
-        state.hand.size() == GameEngine.MAX_HAND_SIZE
-        state.drawPile.get(Season.SUMMER).size() == 5  // 8 cards - 3 drawn = 5 remaining
+        state.getPlayer(0).hand.size() == GameEngine.MAX_HAND_SIZE
+        state.getPlayer(0).drawPile.get(Season.SUMMER).size() == 5  // 8 cards - 3 drawn = 5 remaining
     }
 
     def "startPlay reshuffles the discard pile into the draw pile when the draw pile runs dry"() {
@@ -672,8 +672,8 @@ class GameEngineSpec extends Specification {
 
         then:
         drawn.size() == 3
-        state.hand.size() == 3
-        state.discardPile.get(Season.FALL).size() == 0
+        state.getPlayer(0).hand.size() == 3
+        state.getPlayer(0).discardPile.get(Season.FALL).size() == 0
     }
 
     def "startPlay returns whatever is available when combined draw + discard is less than MAX_HAND_SIZE"() {
@@ -694,7 +694,7 @@ class GameEngineSpec extends Specification {
 
         then:
         drawn.size() == 2
-        state.hand.size() == 2
+        state.getPlayer(0).hand.size() == 2
     }
 
     def "startPlay throws when the current phase is not PLAY"() {
@@ -791,7 +791,7 @@ class GameEngineSpec extends Specification {
 
         then:
         notThrown(IllegalStateException)
-        state.getCurrentTable().contains(CardCatalog.FARM)
+        state.getPlayer(0).getTable(state.time.season()).contains(CardCatalog.FARM)
     }
 
     def "placeCard throws when the current phase is not PLAY"() {
@@ -829,9 +829,9 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        state.hand.isEmpty()
-        state.board.get(Season.SPRING) == [CardCatalog.FARM]
-        state.resources.production == 410.0   // 500 - 90
+        state.getPlayer(0).hand.isEmpty()
+        state.getPlayer(0).board.get(Season.SPRING) == [CardCatalog.FARM]
+        state.getPlayer(0).resources.production == 410.0   // 500 - 90
     }
 
     def "placeCard is allowed when the table is full but the card is a duplicate of another on the board, for upgrading"() {
@@ -853,9 +853,9 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        state.hand.isEmpty()
-        state.board.get(Season.SPRING).size() == GameEngine.MAX_TABLE_SIZE  // no new slot
-        state.resources.production == 410.0   // 500 - 90
+        state.getPlayer(0).hand.isEmpty()
+        state.getPlayer(0).board.get(Season.SPRING).size() == GameEngine.MAX_TABLE_SIZE  // no new slot
+        state.getPlayer(0).resources.production == 410.0   // 500 - 90
     }
 
     // ----- PLAY phase: placeCard — upgrade by duplicate -----
@@ -877,7 +877,7 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        def upgraded = state.board.get(Season.SPRING).get(0)
+        def upgraded = state.getPlayer(0).board.get(Season.SPRING).get(0)
         upgraded.effects().size() == 1
         upgraded.effects().get(0).modifier() == 100.0   // doubled from 50
     }
@@ -900,7 +900,7 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.TRADING_POST)
 
         then:
-        def upgraded = state.board.get(Season.SUMMER).get(0)
+        def upgraded = state.getPlayer(0).board.get(Season.SUMMER).get(0)
         upgraded.effects().size() == 2
         upgraded.effects().every { it.modifier() == 10.0 }   // table(5)+hand(5)
     }
@@ -916,13 +916,13 @@ class GameEngineSpec extends Specification {
                 .hand([CardCatalog.FARM])
                 .build()
         def engine = engine(state)
-        def sizeBefore = state.board.get(Season.SPRING).size()
+        def sizeBefore = state.getPlayer(0).board.get(Season.SPRING).size()
 
         when:
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        state.board.get(Season.SPRING).size() == sizeBefore
+        state.getPlayer(0).board.get(Season.SPRING).size() == sizeBefore
     }
 
     def "placing a duplicate onto an engine-boosted table card merges modifiers rather than doubling the hand card"() {
@@ -943,7 +943,7 @@ class GameEngineSpec extends Specification {
         engine.placeCard(CardCatalog.FARM)
 
         then:
-        def upgraded = state.board.get(Season.SPRING).get(0)
+        def upgraded = state.getPlayer(0).board.get(Season.SPRING).get(0)
         upgraded.name() == "FARM II"
         upgraded.effects().size() == 1
         upgraded.effects().get(0).modifier() == 120.0   // boosted(70) + base(50)
@@ -964,7 +964,7 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["MINE", "SEEDS", "FARM"])
 
         then:
-        def table = state.board.get(Season.SPRING)
+        def table = state.getPlayer(0).board.get(Season.SPRING)
         table[0] == CardCatalog.MINE
         table[1] == CardCatalog.SEEDS  // untouched
         table[2] == CardCatalog.FARM
@@ -983,7 +983,7 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["MINE", "FARM"])
 
         then:
-        def table = state.board.get(Season.SUMMER)
+        def table = state.getPlayer(0).board.get(Season.SUMMER)
         table[0] == CardCatalog.MINE
         table[1] == CardCatalog.FARM
     }
@@ -1001,7 +1001,7 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["FARM", "FERTILIZER", "SEEDS"])
 
         then:
-        def table = state.board.get(Season.FALL)
+        def table = state.getPlayer(0).board.get(Season.FALL)
         table[0] == CardCatalog.FARM
         table[1] == CardCatalog.FERTILIZER  // untouched
         table[2] == CardCatalog.SEEDS
@@ -1021,7 +1021,7 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["MINE", "FARM", "FERTILIZER", "SEEDS"])
 
         then:
-        def table = state.board.get(Season.SPRING)
+        def table = state.getPlayer(0).board.get(Season.SPRING)
         table.size() == 4
         table.containsAll(cards)
     }
@@ -1034,13 +1034,13 @@ class GameEngineSpec extends Specification {
                 .table(Season.WINTER, [CardCatalog.FARM, CardCatalog.MINE, CardCatalog.SEEDS])
                 .build()
         def engine = engine(state)
-        def sizeBefore = state.board.get(Season.WINTER).size()
+        def sizeBefore = state.getPlayer(0).board.get(Season.WINTER).size()
 
         when:
         engine.reorderTable(["MINE", "FARM", "SEEDS"])
 
         then:
-        state.board.get(Season.WINTER).size() == sizeBefore
+        state.getPlayer(0).board.get(Season.WINTER).size() == sizeBefore
     }
 
     def "reorderTable throws when list size does not match table size"() {
@@ -1130,9 +1130,9 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["MINE", "FARM"])
 
         then:
-        state.resources.population == 5.0
-        state.resources.production == 100.0
-        state.resources.food       == 50.0
+        state.getPlayer(0).resources.population == 5.0
+        state.getPlayer(0).resources.production == 100.0
+        state.getPlayer(0).resources.food       == 50.0
     }
 
     def "reorderTable does not affect the hand, draw pile, or discard pile"() {
@@ -1151,9 +1151,9 @@ class GameEngineSpec extends Specification {
         engine.reorderTable(["SEEDS", "FARM"])
 
         then:
-        state.hand == [CardCatalog.FERTILIZER]
-        state.drawPile.get(Season.SPRING)    == [CardCatalog.MINE]
-        state.discardPile.get(Season.SPRING) == [CardCatalog.SEEDS]
+        state.getPlayer(0).hand == [CardCatalog.FERTILIZER]
+        state.getPlayer(0).drawPile.get(Season.SPRING)    == [CardCatalog.MINE]
+        state.getPlayer(0).discardPile.get(Season.SPRING) == [CardCatalog.SEEDS]
     }
 
     // ----- PLAY phase: demolishCard -----
@@ -1173,8 +1173,8 @@ class GameEngineSpec extends Specification {
         engine.demolishCard(0)
 
         then:
-        state.board.get(Season.SPRING).isEmpty()
-        state.resources.production == 482.0   // 500 - 18
+        state.getPlayer(0).board.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).resources.production == 482.0   // 500 - 18
     }
 
     def "demolishCard removes the correct card when multiple cards are on the table"() {
@@ -1192,12 +1192,12 @@ class GameEngineSpec extends Specification {
         engine.demolishCard(1)   // remove SEEDS
 
         then:
-        def table = state.board.get(Season.SPRING)
+        def table = state.getPlayer(0).board.get(Season.SPRING)
         table.size() == 2
         table.contains(CardCatalog.FARM)
         !table.contains(CardCatalog.SEEDS)
         table.contains(CardCatalog.FERTILIZER)
-        state.resources.production == 490.0   // 500 - 10
+        state.getPlayer(0).resources.production == 490.0   // 500 - 10
     }
 
     def "demolishCard throws when the slot index is out of range"() {
@@ -1292,12 +1292,12 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.hand.isEmpty()
-        state.discardPile.get(Season.SPRING).containsAll([card1, card2])
+        state.getPlayer(0).hand.isEmpty()
+        state.getPlayer(0).discardPile.get(Season.SPRING).containsAll([card1, card2])
         // other seasons' discard piles untouched
-        state.discardPile.get(Season.SUMMER).isEmpty()
-        state.discardPile.get(Season.FALL).isEmpty()
-        state.discardPile.get(Season.WINTER).isEmpty()
+        state.getPlayer(0).discardPile.get(Season.SUMMER).isEmpty()
+        state.getPlayer(0).discardPile.get(Season.FALL).isEmpty()
+        state.getPlayer(0).discardPile.get(Season.WINTER).isEmpty()
     }
 
     def "endAndRun with an empty hand still resolves the table without error"() {
@@ -1316,8 +1316,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.hand.isEmpty()
-        state.resources.food == 50.0   // card +5 → 55, then consume floor(5)*1=5 → 50
+        state.getPlayer(0).hand.isEmpty()
+        state.getPlayer(0).resources.food == 50.0   // card +5 → 55, then consume floor(5)*1=5 → 50
     }
 
     // ----- PLAY phase: endAndRun — single vs recurring discard behaviour -----
@@ -1338,9 +1338,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
-        state.board.get(Season.SUMMER).isEmpty()
-        state.discardPile.get(Season.SUMMER) == [singleCard]
+        state.getPlayer(0).resources.food == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
+        state.getPlayer(0).board.get(Season.SUMMER).isEmpty()
+        state.getPlayer(0).discardPile.get(Season.SUMMER) == [singleCard]
     }
 
     def "endAndRun leaves a RECURRING-only card on the table after its effect fires"() {
@@ -1358,9 +1358,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.production == 105.0
-        state.board.get(Season.SPRING) == [recurringCard]
-        state.discardPile.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).resources.production == 105.0
+        state.getPlayer(0).board.get(Season.SPRING) == [recurringCard]
+        state.getPlayer(0).discardPile.get(Season.SPRING).isEmpty()
     }
 
     def "endAndRun mixed table: SINGLE card discarded, RECURRING card kept, both effects fire"() {
@@ -1380,10 +1380,10 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food       == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
-        state.resources.production == 105.0
-        state.board.get(Season.FALL) == [recurringCard]
-        state.discardPile.get(Season.FALL) == [singleCard]
+        state.getPlayer(0).resources.food       == 55.0   // card +10 → 60, then consume floor(5)*1=5 → 55
+        state.getPlayer(0).resources.production == 105.0
+        state.getPlayer(0).board.get(Season.FALL) == [recurringCard]
+        state.getPlayer(0).discardPile.get(Season.FALL) == [singleCard]
     }
 
     // ----- PLAY phase: endAndRun — left-to-right ordering / card-to-card effect chain -----
@@ -1409,10 +1409,10 @@ class GameEngineSpec extends Specification {
 
         then:
         // 50 + 10 = 60  (card A), then 60 + 60*0.10 = 66  (card B), then consume floor(5)*1=5 → 61
-        state.resources.food == 61.0
+        state.getPlayer(0).resources.food == 61.0
         // both were SINGLE — both discarded
-        state.board.get(Season.SPRING).isEmpty()
-        state.discardPile.get(Season.SPRING).containsAll([cardA, cardB])
+        state.getPlayer(0).board.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).discardPile.get(Season.SPRING).containsAll([cardA, cardB])
     }
 
     def "endAndRun card-to-card effect chain: card B sees production boosted by card A"() {
@@ -1434,10 +1434,10 @@ class GameEngineSpec extends Specification {
 
         then:
         // 100 + 50 = 150  (card A), then 150 + 150*0.10 = 165  (card B)
-        state.resources.production == 165.0
+        state.getPlayer(0).resources.production == 165.0
         // both RECURRING — both stay
-        state.board.get(Season.SPRING) == [cardA, cardB]
-        state.discardPile.get(Season.SPRING).isEmpty()
+        state.getPlayer(0).board.get(Season.SPRING) == [cardA, cardB]
+        state.getPlayer(0).discardPile.get(Season.SPRING).isEmpty()
     }
 
     // ----- PLAY phase: endAndRun — food consumption and starvation -----
@@ -1458,8 +1458,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food       == 34.0   // 40 - 6; surplus food is not further consumed
-        state.resources.population == 7.2    // 6.0 * 1.2 after 20% surplus growth cap
+        state.getPlayer(0).resources.food       == 34.0   // 40 - 6; surplus food is not further consumed
+        state.getPlayer(0).resources.population == 7.2    // 6.0 * 1.2 after 20% surplus growth cap
     }
 
     def "endAndRun consumes floor(pop) × 2 food in winter"() {
@@ -1478,8 +1478,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food       == 42.0   // 50 - 8; surplus food is not further consumed
-        state.resources.population == 4.8    // 4.0 * 1.2 after 20% surplus growth cap
+        state.getPlayer(0).resources.food       == 42.0   // 50 - 8; surplus food is not further consumed
+        state.getPlayer(0).resources.population == 4.8    // 4.0 * 1.2 after 20% surplus growth cap
     }
 
     def "endAndRun clamps food to zero and reduces population by half the deficit on starvation"() {
@@ -1497,8 +1497,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food       == 0.0
-        state.resources.population == 7.0   // 10 - 0.5*6
+        state.getPlayer(0).resources.food       == 0.0
+        state.getPlayer(0).resources.population == 7.0   // 10 - 0.5*6
     }
 
     def "endAndRun starvation in winter: double rate magnifies deficit"() {
@@ -1516,8 +1516,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.food       == 0.0
-        state.resources.population == 1.0   // 6 - 0.5*10
+        state.getPlayer(0).resources.food       == 0.0
+        state.getPlayer(0).resources.population == 1.0   // 6 - 0.5*10
     }
 
     // ----- Game Over: population reaching zero -----
@@ -1536,8 +1536,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.gameOver   == true
-        state.resources.population == 0.0
+        state.getPlayer(0).gameOver   == true
+        state.getPlayer(0).resources.population == 0.0
     }
 
     def "population driven below zero by a card is clamped to zero and triggers GAME_OVER"() {
@@ -1554,8 +1554,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.gameOver   == true
-        state.resources.population == 0.0
+        state.getPlayer(0).gameOver   == true
+        state.getPlayer(0).resources.population == 0.0
     }
 
     def "GAME_OVER is not set when population stays above zero after resolution"() {
@@ -1575,8 +1575,8 @@ class GameEngineSpec extends Specification {
 
         then:
         state.time.phase   == Phase.ADD   // normal transition: SPRING isn't WINTER, so PLAY -> ADD
-        state.gameOver   == false
-        state.resources.population == 3.0
+        state.getPlayer(0).gameOver   == false
+        state.getPlayer(0).resources.population == 3.0
     }
 
     def "population dropping to zero by starvation triggers GAME_OVER"() {
@@ -1591,9 +1591,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.gameOver   == true
-        state.resources.population == 0.0
-        state.resources.food       == 0.0
+        state.getPlayer(0).gameOver   == true
+        state.getPlayer(0).resources.population == 0.0
+        state.getPlayer(0).resources.food       == 0.0
     }
 
     def "sufficient food after endAndRun does not trigger GAME_OVER"() {
@@ -1611,8 +1611,8 @@ class GameEngineSpec extends Specification {
 
         then:
         state.time.phase   == Phase.ADD   // endAndRun advances phase internally
-        state.gameOver   == false
-        state.resources.population == 6.0    // 5.0 * 1.2 after 20% surplus growth cap
+        state.getPlayer(0).gameOver   == false
+        state.getPlayer(0).resources.population == 6.0    // 5.0 * 1.2 after 20% surplus growth cap
     }
 
     // ----- CardCatalog: Great Work indexing -----
@@ -1831,7 +1831,7 @@ class GameEngineSpec extends Specification {
 
         then:
         notThrown(IllegalStateException)
-        state.board.get(season).any { it.name() == name }
+        state.getPlayer(0).board.get(season).any { it.name() == name }
 
         where:
         name                                | season
@@ -1853,7 +1853,7 @@ class GameEngineSpec extends Specification {
 
         then:
         notThrown(IllegalStateException)
-        state.board.get(Season.SUMMER).any { it.name() == "THE_GREAT_ROAD_CONSTRUCTION" }
+        state.getPlayer(0).board.get(Season.SUMMER).any { it.name() == "THE_GREAT_ROAD_CONSTRUCTION" }
     }
 
     def "commissionGreatWork deducts the commission cost and places the construction card on the season's table"() {
@@ -1867,8 +1867,8 @@ class GameEngineSpec extends Specification {
         engine.commissionGreatWork("THE_GREAT_RESERVOIR_CONSTRUCTION")
 
         then:
-        state.resources.production == 2000.0   // 2500 - 500 commission cost
-        state.board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
+        state.getPlayer(0).resources.production == 2000.0   // 2500 - 500 commission cost
+        state.getPlayer(0).board.get(Season.SPRING) == [CardCatalog.THE_GREAT_RESERVOIR_CONSTRUCTION]
     }
 
     // ----- availableGreatWorks -----
@@ -1951,10 +1951,10 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        def tableCard = state.board.get(Season.SPRING)[0]
+        def tableCard = state.getPlayer(0).board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR_CONSTRUCTION"
         tableCard.constructionPeriod() == 1
-        state.resources.production == 200.0   // 500 - 300 construction cost
+        state.getPlayer(0).resources.production == 200.0   // 500 - 300 construction cost
     }
 
     def "endAndRun does not progress a Great Work's construction when staffing is below FULL"() {
@@ -1971,9 +1971,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        def tableCard = state.board.get(Season.SPRING)[0]
+        def tableCard = state.getPlayer(0).board.get(Season.SPRING)[0]
         tableCard.constructionPeriod() == 6   // unchanged (catalog default)
-        state.resources.production == 500.0             // construction cost never applied
+        state.getPlayer(0).resources.production == 500.0             // construction cost never applied
     }
 
     def "endAndRun does not progress a Great Work's construction when its costs cannot be afforded, even if fully staffed"() {
@@ -1990,9 +1990,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        def tableCard = state.board.get(Season.SPRING)[0]
+        def tableCard = state.getPlayer(0).board.get(Season.SPRING)[0]
         tableCard.constructionPeriod() == 6   // unchanged (catalog default) — costs not affordable, construction stalls
-        state.resources.production == 0.0               // unchanged; effects never applied
+        state.getPlayer(0).resources.production == 0.0               // unchanged; effects never applied
     }
 
     def "endAndRun completes a Great Work's construction and swaps in the completed card when the period reaches zero"() {
@@ -2010,7 +2010,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        def tableCard = state.board.get(Season.SPRING)[0]
+        def tableCard = state.getPlayer(0).board.get(Season.SPRING)[0]
         tableCard.name() == "THE_GREAT_RESERVOIR"
         tableCard.isGreatWork() == false
         tableCard.victory() == true
@@ -2034,7 +2034,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.populationCap == 125.0   // 100 + 25
+        state.getPlayer(0).resources.populationCap == 125.0   // 100 + 25
     }
 
     def "endAndRun applies THE_GREAT_ROAD_CONSTRUCTION's POPULATION_CAP effect, raising the cap"() {
@@ -2056,7 +2056,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.populationCap == 150.0   // 100 + 50
+        state.getPlayer(0).resources.populationCap == 150.0   // 100 + 50
     }
 
     def "endAndRun applies BARRACKS_CONSTRUCTION's POPULATION effect, reducing population"() {
@@ -2079,7 +2079,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.population == 130.0   // 150 - 20 construction cost; consumption/growth net to zero by design
+        state.getPlayer(0).resources.population == 130.0   // 150 - 20 construction cost; consumption/growth net to zero by design
     }
 
     def "completing a win-condition Great Work does not unlock GOLD or STRENGTH and does not win the game alone"() {
@@ -2096,9 +2096,9 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        !state.getResources().isUnlocked(ResourceTarget.GOLD)
-        !state.getResources().isUnlocked(ResourceTarget.STRENGTH)
-        !state.isGameWon()
+        !state.getPlayer(0).getResources().isUnlocked(ResourceTarget.GOLD)
+        !state.getPlayer(0).getResources().isUnlocked(ResourceTarget.STRENGTH)
+        !state.getPlayer(0).isGameWon()
     }
 
     def "completing TREASURY's construction unlocks GOLD"() {
@@ -2115,8 +2115,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.getResources().isUnlocked(ResourceTarget.GOLD)
-        state.board.get(Season.SUMMER)[0].name() == "TREASURY"
+        state.getPlayer(0).getResources().isUnlocked(ResourceTarget.GOLD)
+        state.getPlayer(0).board.get(Season.SUMMER)[0].name() == "TREASURY"
     }
 
     def "completing BARRACKS's construction unlocks STRENGTH"() {
@@ -2133,8 +2133,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.getResources().isUnlocked(ResourceTarget.STRENGTH)
-        state.board.get(Season.FALL)[0].name() == "BARRACKS"
+        state.getPlayer(0).getResources().isUnlocked(ResourceTarget.STRENGTH)
+        state.getPlayer(0).board.get(Season.FALL)[0].name() == "BARRACKS"
     }
 
     def "completing the fourth and final win-condition Great Work sets gameWon to true"() {
@@ -2156,7 +2156,7 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.gameWon == true
+        state.getPlayer(0).gameWon == true
     }
 
     // ----- TAX_COLLECTION: gold effect -----
@@ -2175,12 +2175,12 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.gold == 400.0   // TAX_COLLECTION: GOLD +400
-        state.resources.production == 250.0   // unaffected — no PRODUCTION effect on this card
+        state.getPlayer(0).resources.gold == 400.0   // TAX_COLLECTION: GOLD +400
+        state.getPlayer(0).resources.production == 250.0   // unaffected — no PRODUCTION effect on this card
         // POPULATION -60 fires before food consumption/growth (150 -> 90); growth then applies on
         // top of that, so just assert it dropped well below the 150 starting point rather than
         // re-deriving the food-consumption/growth formula already covered by dedicated tests.
-        state.resources.population < 125.0
+        state.getPlayer(0).resources.population < 125.0
     }
 
     def "TAX_COLLECTION does not affect GOLD when GOLD has not been unlocked yet"() {
@@ -2196,6 +2196,37 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.resources.gold == 0.0   // applyGold no-ops while GOLD is locked
+        state.getPlayer(0).resources.gold == 0.0   // applyGold no-ops while GOLD is locked
+    }
+
+    // ----- seat awareness -----
+
+    def "setActiveSeat routes an action onto that seat's kingdom, leaving other seats untouched"() {
+        setup:
+        def seat0 = PlayerState.newPlayer()
+        def seat1 = PlayerState.builder().production(500).hand([CardCatalog.FARM]).build()
+        def state = GameState.multiPlayer([seat0, seat1], new TimeState(Season.SPRING, Phase.PLAY, 1))
+        def engine = engine(state)
+
+        when:
+        engine.setActiveSeat(1)
+        engine.placeCard(CardCatalog.FARM)
+
+        then:
+        engine.getActiveSeat() == 1
+        state.getPlayer(1).getTable(Season.SPRING).contains(CardCatalog.FARM)
+        state.getPlayer(0).getTable(Season.SPRING).isEmpty()
+    }
+
+    def "setActiveSeat rejects a seat that does not exist"() {
+        setup:
+        def engine = engine(GameState.newState())   // single-kingdom match, only seat 0
+
+        when:
+        engine.setActiveSeat(1)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message == "no such seat: 1"
     }
 }
