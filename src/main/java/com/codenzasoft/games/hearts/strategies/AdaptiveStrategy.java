@@ -274,11 +274,15 @@ public class AdaptiveStrategy extends DefensiveStrategy {
   private Optional<Card> selectSaboteurLeadCard(
       final RoundState round, final Player player, final Set<Card> validCards) {
     final List<Card> myHand = round.getHand(player);
+    final boolean queenPlayed = StrategyHelper.hasQueenBeenPlayed(round);
     // Lead the highest non-hearts card we're guaranteed to win (no opponent holds a higher card
     // of that suit), so the saboteur takes the trick and the shooter doesn't.
+    // Exclude A♠/K♠ while Q♠ is still live — the "guaranteed win" check only considers whether
+    // an opponent holds a higher spade, not whether they're void and could dump Q♠ on the trick.
     return validCards.stream()
         .filter(c -> c.getSuit() != Suit.HEARTS)
         .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .filter(c -> !(c.getSuit() == Suit.SPADES && c.outRanks(Rank.QUEEN) && !queenPlayed))
         .filter(
             c ->
                 StrategyHelper.filterSuit(round.getRemainingCards(), c.getSuit())
