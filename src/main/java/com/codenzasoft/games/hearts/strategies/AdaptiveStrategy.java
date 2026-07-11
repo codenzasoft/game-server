@@ -266,7 +266,11 @@ public class AdaptiveStrategy extends DefensiveStrategy {
             .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
             .min(Comparator.comparing(Card::getRank));
     if (safeCard.isPresent()) return safeCard;
-    return validCards.stream().min(Comparator.comparing(Card::getRank));
+    // Prefer any heart over Q♠ — giving the shooter 13 pts accelerates their moon shot
+    return validCards.stream()
+        .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .min(Comparator.comparing(Card::getRank))
+        .or(() -> validCards.stream().min(Comparator.comparing(Card::getRank)));
   }
 
   // ── Saboteur lead ────────────────────────────────────────────────────────────

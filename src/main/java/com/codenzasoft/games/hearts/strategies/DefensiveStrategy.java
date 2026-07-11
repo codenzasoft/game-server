@@ -118,12 +118,23 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
 
     if (trick.cards().size() == 3
         || isQueenPassedToOpponentPlayingBefore(hearts, round, player, trick)) {
-      // play my highest spade since the queen is before me and was not played
+      // When points are already in the trick, try to duck under the current winner
+      if (StrategyHelper.getPoints(trick) > 0) {
+        final Optional<Card> duck =
+            StrategyHelper.getMaxTrump(trick)
+                .flatMap(max -> StrategyHelper.getMaxLessThan(legalCards, max));
+        if (duck.isPresent()) return duck;
+      }
       return StrategyHelper.getMaxRank(legalCards, trump);
     }
 
-    Optional<Card> lower = StrategyHelper.getMaxLessThan(legalCards, HeartsGame.QUEEN_OF_SPADES);
-    return lower.or(() -> StrategyHelper.getMaxRank(legalCards, trump));
+    // Duck under the current trick winner rather than comparing against Q♠ as a fixed threshold
+    final Optional<Card> duck =
+        StrategyHelper.getMaxTrump(trick)
+            .flatMap(max -> StrategyHelper.getMaxLessThan(legalCards, max));
+    if (duck.isPresent()) return duck;
+    // Can't duck — play lowest to leave room for remaining players to beat us
+    return StrategyHelper.getMinRank(legalCards, trump);
   }
 
   private boolean isQueenPassedToOpponentPlayingBefore(
