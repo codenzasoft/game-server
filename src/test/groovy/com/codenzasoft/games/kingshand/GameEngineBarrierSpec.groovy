@@ -84,7 +84,7 @@ class GameEngineBarrierSpec extends Specification {
         k0.resolutionLog.isEmpty()
     }
 
-    def "PLAY: second seat's endAndRun releases the barrier — both tables resolve, clock advances exactly once"() {
+    def "PLAY: second seat's endAndRun resolves both tables but holds the clock until both Continue"() {
         setup:
         def farm0 = new Card("FARM_T", 0, 0, FrequencyType.RECURRING, [ResourceTarget.PRODUCTION.integer(100)])
         def farm1 = new Card("FIELD_T", 0, 0, FrequencyType.RECURRING, [ResourceTarget.PRODUCTION.integer(40)])
@@ -105,12 +105,23 @@ class GameEngineBarrierSpec extends Specification {
         !k0.resolutionLog.isEmpty()
         !k1.resolutionLog.isEmpty()
 
-        and: "the shared clock advanced exactly once (spring PLAY -> summer ADD)"
+        and: "but the shared clock is held on the resolved season pending Continue"
+        state.resolutionPending
+        state.time.phase == Phase.PLAY
+        state.time.season == Season.SPRING
+        state.submittedSeats == []
+
+        when: "both seats acknowledge the resolution screen"
+        engine.setActiveSeat(0)
+        engine.continueResolution()
+        engine.setActiveSeat(1)
+        engine.continueResolution()
+
+        then: "now the shared clock advances exactly once (spring PLAY -> summer ADD) and seeds ADD"
+        !state.resolutionPending
         state.time.phase == Phase.ADD
         state.time.season == Season.SUMMER
         state.time.year == 1
-
-        and: "the barrier reset and the next phase was seeded for every seat"
         state.submittedSeats == []
         !k0.addChoices.isEmpty()
         !k1.addChoices.isEmpty()
@@ -211,11 +222,25 @@ class GameEngineBarrierSpec extends Specification {
         engine.setActiveSeat(0)
         engine.endAndRun()
 
-        then: "the round resolved and the next season's ADD began"
-        state.time.phase == Phase.ADD
-        state.time.season == Season.SUMMER
+        then: "both tables resolved, but the clock is held for Continue and the bot has auto-continued"
+        state.resolutionPending
+        state.time.phase == Phase.PLAY
+        state.time.season == Season.SPRING
         !state.getPlayer(0).resolutionLog.isEmpty()
         !state.getPlayer(1).resolutionLog.isEmpty()
+        state.isSubmitted(1)
+        !state.isSubmitted(0)
+
+        when: "the human clicks Continue on the resolution screen"
+        engine.setActiveSeat(0)
+        engine.continueResolution()
+
+        then: "the clock advances to the next season's ADD and the bot has already taken its ADD turn"
+        !state.resolutionPending
+        state.time.phase == Phase.ADD
+        state.time.season == Season.SUMMER
+        state.isSubmitted(1)
+        !state.isSubmitted(0)
     }
 
     // ----- Slice 3: sabotage resolves against a pre-resolution snapshot -----

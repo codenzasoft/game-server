@@ -24,7 +24,8 @@ public record KhMatchView(
     @JsonProperty("time") TimeState time,
     @JsonProperty("matchOver") boolean matchOver,
     @JsonProperty("winnerSeat") int winnerSeat,
-    @JsonProperty("submittedSeats") List<Integer> submittedSeats) {
+    @JsonProperty("submittedSeats") List<Integer> submittedSeats,
+    @JsonProperty("resolutionPending") boolean resolutionPending) {
 
   /** Builds the match view for the client seated at {@code viewerSeat}. */
   public static KhMatchView forSeat(final GameState state, final int viewerSeat) {
@@ -40,6 +41,7 @@ public record KhMatchView(
         state.getTime(),
         state.isMatchOver(),
         state.winnerSeat(),
-        state.getSubmittedSeats());
+        state.getSubmittedSeats(),
+        state.isResolutionPending());
   }
 }

@@ -512,11 +512,14 @@ public class GameEngine implements Game<GameEngine> {
           notifyLifecycleObservers(GameLifecycleObserver::gameOver);
           return; // the clock stops with the match
         }
-        state.advanceTime(); // PLAY -> COUNCIL_ADD (post-Winter, gold unlocked) or ADD
-        switch (state.getTime().phase()) {
-          case COUNCIL_ADD -> forEachLiveSeat(seat -> offerCouncilChoices());
-          case ADD -> forEachLiveSeat(seat -> offerAddChoices());
-          default -> {}
+        if (state.playerCount() > 1) {
+          // Multiplayer: the tables have resolved, but hold the shared clock on the resolved season
+          // until every seat clicks Continue on the resolution screen (see continueResolution()).
+          // driveBots() below auto-continues bot seats, leaving only human seats to acknowledge.
+          state.setResolutionPending(true);
+        } else {
+          // Single-player: advance immediately — unchanged behavior.
+          advancePlayClock();
         }
       }
       case COUNCIL_ADD -> {
@@ -529,6 +532,55 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
     driveBots();
+  }
+
+  /**
+   * Advances the clock out of a resolved PLAY phase and seeds the next phase for every live seat.
+   */
+  private void advancePlayClock() {
+    // Deferred single-use discard: SINGLE-frequency cards leave the resolved season's table only
+    // now — on Continue in multiplayer — so they stay visible on the resolution screen while it is
+    // shown. (In single-player this runs in the same endAndRun call, so the net state is
+    // unchanged.)
+    final Season resolved = state.getTime().season();
+    forEachLiveSeat(seat -> discardSpentSingles(seat, resolved));
+
+    state.advanceTime(); // PLAY -> COUNCIL_ADD (post-Winter, gold unlocked) or ADD
+    switch (state.getTime().phase()) {
+      case COUNCIL_ADD -> forEachLiveSeat(seat -> offerCouncilChoices());
+      case ADD -> forEachLiveSeat(seat -> offerAddChoices());
+      default -> {}
+    }
+  }
+
+  /** Moves every SINGLE-frequency card off {@code seat}'s {@code season} table into the discard. */
+  private void discardSpentSingles(final int seat, final Season season) {
+    final PlayerState p = state.getPlayer(seat);
+    for (final Card card : new ArrayList<>(p.getTable(season))) {
+      if (card.frequencyType() == FrequencyType.SINGLE) {
+        p.discardFromTable(season, card);
+      }
+    }
+  }
+
+  /**
+   * Acknowledges the multiplayer resolution screen for the active seat ("Continue"). While a PLAY
+   * resolution is held (see {@link #resolvePhaseAndAdvance()}), this marks the seat done; once
+   * every live seat has acknowledged, the held clock finally advances out of the resolved season
+   * and the next phase is seeded. No-op when no resolution is pending or the seat has already
+   * acknowledged, so a double-click is harmless.
+   */
+  public synchronized void continueResolution() {
+    if (!state.isResolutionPending() || state.isSubmitted(activeSeat)) {
+      return;
+    }
+    state.markSubmitted(activeSeat);
+    if (state.allSubmitted()) {
+      state.setResolutionPending(false);
+      state.clearSubmitted();
+      advancePlayClock();
+      driveBots();
+    }
   }
 
   // ----- Bot driving -----
@@ -561,18 +613,26 @@ public class GameEngine implements Game<GameEngine> {
       final int saved = activeSeat;
       try {
         activeSeat = seat;
-        try {
-          entry.getValue().act(this, seat);
-        } catch (final RuntimeException e) {
-          log.error("Bot strategy failed for seat {}: {}", seat, e.getMessage(), e);
-        }
-        // Safety net: the strategy must end its phase. Only force the default completion if the
-        // clock hasn't moved (its own submit may have released the barrier and advanced the phase).
-        if (state.getTime().equals(before)
-            && !state.isMatchOver()
-            && !state.getPlayer(seat).isGameOver()
-            && !state.isSubmitted(seat)) {
-          defaultSubmit();
+        if (state.isResolutionPending()) {
+          // Held PLAY resolution: the bot acknowledges the Continue barrier instantly, so only
+          // human
+          // seats keep the resolution screen open.
+          continueResolution();
+        } else {
+          try {
+            entry.getValue().act(this, seat);
+          } catch (final RuntimeException e) {
+            log.error("Bot strategy failed for seat {}: {}", seat, e.getMessage(), e);
+          }
+          // Safety net: the strategy must end its phase. Only force the default completion if the
+          // clock hasn't moved (its own submit may have released the barrier and advanced the
+          // phase).
+          if (state.getTime().equals(before)
+              && !state.isMatchOver()
+              && !state.getPlayer(seat).isGameOver()
+              && !state.isSubmitted(seat)) {
+            defaultSubmit();
+          }
         }
       } finally {
         activeSeat = saved;
@@ -710,9 +770,10 @@ public class GameEngine implements Game<GameEngine> {
           new ResolutionStep(
               card.name(), tier, isEngineBoost, activePlayer().getResources().getDelta(before)));
 
-      if (card.frequencyType() == FrequencyType.SINGLE) {
-        activePlayer().discardFromTable(season(), card);
-      }
+      // NOTE: SINGLE-frequency cards are NOT discarded here. They leave the table only when the
+      // clock advances (advancePlayClock → discardSpentSingles), so they stay on the table — and
+      // therefore visible on the multiplayer resolution screen — for the whole held-resolution
+      // window.
     }
 
     // 4.5. Seated council resolution — advisors bypass staffing entirely: every seated advisor's
