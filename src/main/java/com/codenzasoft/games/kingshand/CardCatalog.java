@@ -452,6 +452,49 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(ResourceTarget.STRENGTH.integer(90)));
 
+  // ----- Sabotage cards (cross-seat effects; require STRENGTH unlocked) -----
+  //
+  // Each sabotage card spends the attacker's own STRENGTH (a normal ResourceTarget cost, so the
+  // card is gated behind the BARRACKS unlock and checked by canAfford) and carries an
+  // OpponentResourceTarget effect that drains the opposing kingdom. Sabotage resolves against a
+  // pre-resolution snapshot of the opponent — see GameEngine#resolvePlayForAllSeats.
+
+  /** Summer: a one-shot raid on the opponent's workshops — drains their production. */
+  public static final Card SABOTEURS =
+      new Card(
+          "SABOTEURS",
+          40.0,
+          350.0,
+          FrequencyType.SINGLE,
+          List.of(
+              ResourceTarget.STRENGTH.integer(-25),
+              new Effect(
+                  new OpponentResourceTarget(ResourceTarget.PRODUCTION), -200, ValueType.INTEGER)));
+
+  /** Fall: a one-shot raid on the opponent's granaries — burns their food stores. */
+  public static final Card CROP_RAID =
+      new Card(
+          "CROP_RAID",
+          50.0,
+          300.0,
+          FrequencyType.SINGLE,
+          List.of(
+              ResourceTarget.STRENGTH.integer(-30),
+              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -250, ValueType.INTEGER)));
+
+  /** Winter: recurring raiders that harry the opponent's economy every winter. */
+  public static final Card WINTER_RAIDERS =
+      new Card(
+          "WINTER_RAIDERS",
+          80.0,
+          550.0,
+          FrequencyType.RECURRING,
+          List.of(
+              ResourceTarget.STRENGTH.integer(-40),
+              new Effect(
+                  new OpponentResourceTarget(ResourceTarget.PRODUCTION), -100, ValueType.INTEGER),
+              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -100, ValueType.INTEGER)));
+
   // ----- Great Work cards -----
   // Completed cards are defined first because construction cards reference them.
 
@@ -704,6 +747,7 @@ public class CardCatalog {
             MERCHANT_GUILD,
             TRADE_ROUTES, // available only when GOLD unlocked
             GUARD_POST, // available only when STRENGTH unlocked
+            SABOTEURS, // sabotage — available only when STRENGTH unlocked
             THE_GREAT_ROAD_CONSTRUCTION // available only when GOLD unlocked
             ));
 
@@ -722,6 +766,7 @@ public class CardCatalog {
             BLACKSMITH,
             GOLD_MINE, // available only when GOLD unlocked
             ARMORY, // available only when STRENGTH unlocked
+            CROP_RAID, // sabotage — available only when STRENGTH unlocked
             THE_GREAT_CAPITAL_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
 
@@ -738,6 +783,7 @@ public class CardCatalog {
             DESPERATE_TIMES,
             FOREIGN_AID, // available only when GOLD unlocked
             FORTRESS_WALL, // available only when STRENGTH unlocked
+            WINTER_RAIDERS, // sabotage — available only when STRENGTH unlocked
             THE_GREAT_CONQUEST_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
 

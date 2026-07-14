@@ -7,7 +7,7 @@
 import { GameState, Season } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier, resourceIcon, resourceLabel, resourceShortLabel } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
-import { Card, CardTarget } from "./kingshand.ts";
+import { Card, CardTarget, OpponentTarget } from "./kingshand.ts";
 import { getMusicVolume, setMusicVolume } from "./audio.ts";
 
 // ── Shared style injection ────────────────────────────────────────────────────
@@ -511,6 +511,10 @@ function buildCompactCard(card: Card): string {
         const label = resourceShortLabel(res);
         const scope = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
         return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${scope} +${e.modifier}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      }
+      if (e.target instanceof OpponentTarget) {
+        const label = resourceShortLabel(e.target.targetResource);
+        return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
       }
       const targetStr = typeof e.target === "string" ? e.target : "CARD";
       return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;

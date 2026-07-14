@@ -193,7 +193,22 @@ public class KhController {
       return;
     }
     final UUID id = UUID.fromString(gameId);
-    gameService.getOrBuildKhGame(id).ifPresent(GameEngine::quit);
+    // In a multi-seat match, giving up forfeits: the quitter's kingdom is marked out, the match
+    // outcome is settled for the remaining seat (they win), and gameOver fires so stats record.
+    // A solo game keeps the original quit semantics (no counted result).
+    gameService
+        .getOrBuildKhGame(id)
+        .ifPresent(
+            game -> {
+              final int seat = game.seatOf(userEntity.get().getUsername());
+              if (seat >= 0
+                  && game.getState().playerCount() > 1
+                  && !game.getState().isMatchOver()) {
+                game.forfeit(seat);
+              } else {
+                game.quit();
+              }
+            });
     try {
       gameService.quitGame(id, userEntity.get());
     } catch (final IllegalStateException e) {
