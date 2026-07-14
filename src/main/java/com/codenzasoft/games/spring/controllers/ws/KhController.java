@@ -186,6 +186,16 @@ public class KhController {
     act(gameId, principal, "endAndRun", GameEngine::endAndRun);
   }
 
+  /**
+   * Acknowledges the multiplayer resolution screen ("Continue"). The tables have already resolved;
+   * the shared clock is held on the resolved season until every seat continues, at which point it
+   * advances to the next phase.
+   */
+  @MessageMapping("/kh/{gameId}/play/continue")
+  public void continueResolution(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "continueResolution", GameEngine::continueResolution);
+  }
+
   @MessageMapping("/kh/{gameId}/quit")
   public void quit(@DestinationVariable String gameId, Principal principal) {
     final Optional<UserEntity> userEntity = findUser(principal);

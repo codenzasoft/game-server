@@ -245,6 +245,7 @@ interface MatchStateData {
   matchOver: boolean;
   winnerSeat: number;
   submittedSeats: number[];
+  resolutionPending: boolean;
 }
 
 interface GameStateData {
@@ -607,6 +608,8 @@ export class MatchState {
   matchOver: boolean;
   winnerSeat: number;
   submittedSeats: number[];
+  /** True while a multiplayer PLAY resolution is held on-screen until every seat clicks Continue. */
+  resolutionPending: boolean;
 
   constructor(data: MatchStateData) {
     this.players = data.players;
@@ -614,6 +617,7 @@ export class MatchState {
     this.matchOver = data.matchOver;
     this.winnerSeat = data.winnerSeat;
     this.submittedSeats = data.submittedSeats;
+    this.resolutionPending = data.resolutionPending;
   }
 
   /** True once `seat` has submitted the current phase (is waiting on others). */
@@ -973,6 +977,8 @@ export const MatchStateSchema = z
     winnerSeat: z.number().int().default(-1),
     // Seats that have completed the current phase — drives "waiting for other player…".
     submittedSeats: z.array(z.number().int()).default([]),
+    // True while a resolved PLAY phase is held until every seat clicks Continue.
+    resolutionPending: z.boolean().default(false),
   })
   .transform((data) => new MatchState(data as MatchStateData));
 
@@ -1214,6 +1220,16 @@ export class GameEventHandler {
   public endAndRun(): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/end`,
+    });
+  }
+
+  /**
+   * Acknowledges the multiplayer resolution screen ("Continue"). The clock is held on the resolved
+   * season until every seat continues, at which point the server advances to the next phase.
+   */
+  public continueResolution(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/continue`,
     });
   }
 

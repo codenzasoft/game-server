@@ -32,6 +32,14 @@ public class GameState {
    */
   private final Set<Integer> submittedSeats = new HashSet<>();
 
+  /**
+   * {@code true} while a multiplayer PLAY phase has resolved but the shared clock is being held on
+   * the resolved season until every seat clicks "Continue" on the resolution screen. During this
+   * window {@code submittedSeats} accumulates continue acknowledgements (a second barrier). Always
+   * {@code false} in single-player, where the clock advances immediately after resolution.
+   */
+  private boolean resolutionPending;
+
   private GameState(Builder b) {
     this.players = b.players;
     this.time = b.time;
@@ -172,6 +180,20 @@ public class GameState {
   @JsonProperty("submittedSeats")
   public List<Integer> getSubmittedSeats() {
     return submittedSeats.stream().sorted().toList();
+  }
+
+  /**
+   * {@code true} while the resolved season's clock is being held until every seat clicks Continue
+   * on the multiplayer resolution screen. The client shows the dual resolution while this is set
+   * and sends {@code /play/continue} when the player clicks Continue.
+   */
+  @JsonProperty("resolutionPending")
+  public boolean isResolutionPending() {
+    return resolutionPending;
+  }
+
+  public void setResolutionPending(final boolean resolutionPending) {
+    this.resolutionPending = resolutionPending;
   }
 
   // ----- Match outcome (cross-player) -----

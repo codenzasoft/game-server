@@ -227,15 +227,16 @@ const getGameId = (): string | undefined => {
         if (currentScene instanceof AddPhaseScene) {
           // Same phase — just refresh content.
           currentScene.update(state);
-        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
-          // PLAY → ADD transition with resolution data: animate first, then switch.
-          // Multiplayer: the dual-kingdom resolution screen — both tables firing
-          // left-to-right at the same time. Single-player: the in-scene animation.
+        } else if (
+          currentScene instanceof PlayPhaseScene &&
+          state.resolutionLog.length > 0 &&
+          !isMultiplayer
+        ) {
+          // Single-player PLAY → ADD: animate the in-scene resolution first, then switch. (In
+          // multiplayer the resolution already played during the held resolutionPending window, so
+          // this ADD message just switches scenes — handled by the else branch below.)
           const playScene = currentScene;
-          const animation = isMultiplayer
-            ? playDualResolution(match, context.seat)
-            : playScene.animateFromResolutionLog(state, playScene.getState());
-          animation.then(() => {
+          playScene.animateFromResolutionLog(state, playScene.getState()).then(() => {
             playScene.unmount();
             const addScene = new AddPhaseScene(state, {
               reroll:   () => handler.reroll(),
@@ -269,15 +270,16 @@ const getGameId = (): string | undefined => {
           // and the COUNCIL_ADD → COUNCIL_MEETING transition within one council
           // turn, so the roster panel never flickers between the two steps.
           currentScene.update(state);
-        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
-          // PLAY → COUNCIL transition with resolution data (Winter just ended and gold is
-          // unlocked): animate the end-and-run resolution first, exactly like the PLAY → ADD
-          // case above, instead of cutting straight to the council screen.
+        } else if (
+          currentScene instanceof PlayPhaseScene &&
+          state.resolutionLog.length > 0 &&
+          !isMultiplayer
+        ) {
+          // Single-player PLAY → COUNCIL (Winter ended, gold unlocked): animate the resolution
+          // first, like the PLAY → ADD case. In multiplayer the resolution already played during
+          // the held resolutionPending window, so this message just switches scenes (else branch).
           const playScene = currentScene;
-          const animation = isMultiplayer
-            ? playDualResolution(match, context.seat)
-            : playScene.animateFromResolutionLog(state, playScene.getState());
-          animation.then(() => {
+          playScene.animateFromResolutionLog(state, playScene.getState()).then(() => {
             playScene.unmount();
             const councilScene = new CouncilScene(state, {
               hireAdvisor:           (id) => handler.hireAdvisor(id),
@@ -311,8 +313,21 @@ const getGameId = (): string | undefined => {
 
       case Phase.PLAY: {
         if (currentScene instanceof PlayPhaseScene) {
-          // Already in PLAY (e.g. after a placeCard or demolishCard refresh).
-          currentScene.update(state);
+          if (isMultiplayer && match.resolutionPending) {
+            // The tables have resolved but the shared clock is held on this season until every seat
+            // clicks Continue. Play the dual resolution once (this seat hasn't continued yet and the
+            // screen isn't already up); Continue tells the server this seat is ready.
+            if (!state.isWaitingOnOthers() && !document.getElementById("kh-dual-resolution")) {
+              playDualResolution(match, context.seat, () => handler.continueResolution()).then(
+                () => syncWaitingOverlay(), // opponent may still be watching — show "waiting…"
+              );
+            }
+            // else: already continued (waiting on the opponent) — leave the frozen board under the
+            // overlays and don't refresh it with post-resolution data.
+          } else {
+            // Ordinary PLAY refresh (e.g. after a placeCard or demolishCard).
+            currentScene.update(state);
+          }
         } else {
           if (currentScene) {
             currentScene.unmount();
