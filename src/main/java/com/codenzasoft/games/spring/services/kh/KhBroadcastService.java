@@ -21,10 +21,10 @@ import org.springframework.stereotype.Service;
 
 /**
  * Pushes King's Hand match state to clients over websockets. Registered on each {@link GameEngine}
- * as a {@link KhObserver}, so state pushes are driven by the engine's lifecycle/update events rather
- * than the controller. Each human seat receives its own {@link KhMessage} carrying the full match
- * {@link GameState} plus a {@link KhContext} that tells the client which seat it occupies; bot seats
- * are skipped (they have no client).
+ * as a {@link KhObserver}, so state pushes are driven by the engine's lifecycle/update events
+ * rather than the controller. Each human seat receives its own {@link KhMessage} carrying the full
+ * match {@link GameState} plus a {@link KhContext} that tells the client which seat it occupies;
+ * bot seats are skipped (they have no client).
  */
 @Service
 public class KhBroadcastService implements KhObserver {

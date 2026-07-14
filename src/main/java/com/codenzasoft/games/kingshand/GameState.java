@@ -8,15 +8,15 @@ import java.util.Set;
 
 /**
  * Match-level state for a King's Hand game: the shared clock ({@link TimeState}) plus the list of
- * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and the
- * client is sent.
+ * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and
+ * the client is sent.
  *
- * <p><b>Responsibilities.</b> {@code GameState} owns only what is shared or cross-cutting across the
- * match: the collection of kingdoms (addressed by <em>seat</em>), the single authoritative
+ * <p><b>Responsibilities.</b> {@code GameState} owns only what is shared or cross-cutting across
+ * the match: the collection of kingdoms (addressed by <em>seat</em>), the single authoritative
  * season/phase/year clock, and the match outcome (who has won / been knocked out). It deliberately
  * does <em>not</em> re-expose per-player operations — those live on {@link PlayerState} and are
- * reached via {@link #getPlayer(int)}. The engine is seat-aware and operates on the relevant
- * {@link PlayerState} directly, so this class no longer delegates to a single "primary" kingdom.
+ * reached via {@link #getPlayer(int)}. The engine is seat-aware and operates on the relevant {@link
+ * PlayerState} directly, so this class no longer delegates to a single "primary" kingdom.
  *
  * <p>For a single-player game {@code players} has exactly one element (seat 0).
  */
@@ -46,7 +46,9 @@ public class GameState {
     return new Builder();
   }
 
-  /** Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match. */
+  /**
+   * Wraps an already-built {@link PlayerState} and {@link TimeState} into a single-player match.
+   */
   public static GameState singlePlayer(PlayerState player, TimeState time) {
     return multiPlayer(List.of(player), time);
   }
@@ -130,8 +132,8 @@ public class GameState {
   // ----- Readiness barrier (per-phase submit tracking) -----
 
   /**
-   * Marks {@code seat} as having completed the current phase. The seat may take no further
-   * phase actions until the barrier releases (all live seats submitted) and the clock advances.
+   * Marks {@code seat} as having completed the current phase. The seat may take no further phase
+   * actions until the barrier releases (all live seats submitted) and the clock advances.
    */
   public void markSubmitted(int seat) {
     submittedSeats.add(seat);
@@ -143,8 +145,8 @@ public class GameState {
   }
 
   /**
-   * {@code true} once every live (not knocked-out / forfeited) seat has submitted the current
-   * phase — the readiness barrier releases and the shared clock may advance exactly once.
+   * {@code true} once every live (not knocked-out / forfeited) seat has submitted the current phase
+   * — the readiness barrier releases and the shared clock may advance exactly once.
    */
   public boolean allSubmitted() {
     for (int seat = 0; seat < players.size(); seat++) {
@@ -174,7 +176,9 @@ public class GameState {
 
   // ----- Match outcome (cross-player) -----
 
-  /** {@code true} if {@code seat}'s population has collapsed (knocked out / forfeit by starvation). */
+  /**
+   * {@code true} if {@code seat}'s population has collapsed (knocked out / forfeit by starvation).
+   */
   public boolean isPlayerOut(int seat) {
     return getPlayer(seat).isGameOver();
   }

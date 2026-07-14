@@ -32,9 +32,9 @@ import org.slf4j.LoggerFactory;
  * phase-completing action below is seat-scoped and gated by the <em>readiness barrier</em>: it
  * performs the acting seat's work, marks that seat submitted, and only when every live seat has
  * submitted does the shared clock advance (exactly once) and the next phase get seeded for every
- * seat. With a single seat the barrier releases immediately, preserving single-player behavior.
- * The Council is inserted once per year, immediately after Winter's {@link Phase#PLAY} ends, but
- * only once GOLD has been unlocked (TREASURY completed) in <em>either</em> kingdom:
+ * seat. With a single seat the barrier releases immediately, preserving single-player behavior. The
+ * Council is inserted once per year, immediately after Winter's {@link Phase#PLAY} ends, but only
+ * once GOLD has been unlocked (TREASURY completed) in <em>either</em> kingdom:
  *
  * <ol>
  *   <li>{@link Phase#ADD} → {@link Phase#PLAY} via {@link #pickCard(Card)} / {@link #skipAdd()}.
@@ -106,8 +106,8 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     /**
-     * Registers the seat-ordered player identities for a multi-seat match (seat {@code i} =
-     * {@code players.get(i)}). Takes precedence over {@link #withPlayer(Player)} when both are set.
+     * Registers the seat-ordered player identities for a multi-seat match (seat {@code i} = {@code
+     * players.get(i)}). Takes precedence over {@link #withPlayer(Player)} when both are set.
      */
     public Builder withPlayers(final List<Player> players) {
       this.players = players;
@@ -203,12 +203,28 @@ public class GameEngine implements Game<GameEngine> {
 
   /** Convenience constructor for tests: injects state and RNG. */
   public GameEngine(GameState state, Random rng) {
-    this(null, List.<Player>of(), state, CardCatalog.defaultCatalog(), rng, List.of(), Runnable::run, List.of());
+    this(
+        null,
+        List.<Player>of(),
+        state,
+        CardCatalog.defaultCatalog(),
+        rng,
+        List.of(),
+        Runnable::run,
+        List.of());
   }
 
   /** Constructor for restoring a persisted single-player game with its id and player. */
   public GameEngine(UUID id, Player player, GameState state) {
-    this(id, seatList(player), state, CardCatalog.defaultCatalog(), new Random(), List.of(), Runnable::run, List.of());
+    this(
+        id,
+        seatList(player),
+        state,
+        CardCatalog.defaultCatalog(),
+        new Random(),
+        List.of(),
+        Runnable::run,
+        List.of());
   }
 
   /** Full constructor with all dependencies injected, no listeners. */
@@ -708,7 +724,10 @@ public class GameEngine implements Game<GameEngine> {
       card.play(activePlayer(), season(), StaffingTier.FULL, sabotage);
       log.add(
           new ResolutionStep(
-              card.name(), StaffingTier.FULL, false, activePlayer().getResources().getDelta(before)));
+              card.name(),
+              StaffingTier.FULL,
+              false,
+              activePlayer().getResources().getDelta(before)));
     }
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
@@ -1389,7 +1408,8 @@ public class GameEngine implements Game<GameEngine> {
               + (int) activePlayer().getResources().gold());
     }
     activePlayer().addGold(0.0 - advisor.hiringCost());
-    activePlayer().addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getTime().year()));
+    activePlayer()
+        .addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getTime().year()));
     clearCouncilAddState();
     submitActiveSeat();
   }
@@ -1532,13 +1552,15 @@ public class GameEngine implements Game<GameEngine> {
       return;
     }
     if (isDecreeAvailable(chosen, chosenAdvisor.decree())) {
-      activePlayer().setCurrentProposal(
-          new CouncilProposal(
-              chosen.getAdvisorId(), ProposalKind.DECREE, chosenAdvisor.decree().name()));
+      activePlayer()
+          .setCurrentProposal(
+              new CouncilProposal(
+                  chosen.getAdvisorId(), ProposalKind.DECREE, chosenAdvisor.decree().name()));
     } else {
-      activePlayer().setCurrentProposal(
-          new CouncilProposal(
-              chosen.getAdvisorId(), ProposalKind.REFORM, chosenAdvisor.reform().name()));
+      activePlayer()
+          .setCurrentProposal(
+              new CouncilProposal(
+                  chosen.getAdvisorId(), ProposalKind.REFORM, chosenAdvisor.reform().name()));
     }
   }
 

@@ -480,7 +480,8 @@ public class CardCatalog {
           FrequencyType.SINGLE,
           List.of(
               ResourceTarget.STRENGTH.integer(-30),
-              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -250, ValueType.INTEGER)));
+              new Effect(
+                  new OpponentResourceTarget(ResourceTarget.FOOD), -250, ValueType.INTEGER)));
 
   /** Winter: recurring raiders that harry the opponent's economy every winter. */
   public static final Card WINTER_RAIDERS =
@@ -493,7 +494,8 @@ public class CardCatalog {
               ResourceTarget.STRENGTH.integer(-40),
               new Effect(
                   new OpponentResourceTarget(ResourceTarget.PRODUCTION), -100, ValueType.INTEGER),
-              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -100, ValueType.INTEGER)));
+              new Effect(
+                  new OpponentResourceTarget(ResourceTarget.FOOD), -100, ValueType.INTEGER)));
 
   // ----- Great Work cards -----
   // Completed cards are defined first because construction cards reference them.

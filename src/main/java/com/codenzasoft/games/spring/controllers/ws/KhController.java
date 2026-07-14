@@ -105,8 +105,8 @@ public class KhController {
   }
 
   /**
-   * Passes on the current COUNCIL_MEETING proposal without applying it. Advances the phase to {@link
-   * com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
+   * Passes on the current COUNCIL_MEETING proposal without applying it. Advances the phase to
+   * {@link com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
    */
   @MessageMapping("/kh/{gameId}/council/pass")
   public void councilPass(@DestinationVariable String gameId, Principal principal) {

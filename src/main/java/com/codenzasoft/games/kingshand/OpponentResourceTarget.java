@@ -7,9 +7,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <p>Resolution rule (locked, see KH-MULTIPLAYER-PLAN.md Slice 3): during PLAY resolution every
  * kingdom is snapshotted <em>before</em> any table resolves; sabotage effects are evaluated against
- * the frozen opponent snapshot, collected as flat deltas, and applied only after all self-resolution
- * completes. This keeps simultaneous resolution deterministic and order-independent — a sabotage
- * effect never reads a mid-resolution value.
+ * the frozen opponent snapshot, collected as flat deltas, and applied only after all
+ * self-resolution completes. This keeps simultaneous resolution deterministic and order-independent
+ * — a sabotage effect never reads a mid-resolution value.
  *
  * @param targetResource the opponent resource this effect drains or boosts
  */
