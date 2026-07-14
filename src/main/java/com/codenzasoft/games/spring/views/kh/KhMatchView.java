@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Wire view of the whole match as sent to one client seat: every kingdom (the viewer's own in
- * full, opponents redacted — see {@link KhKingdomView}) plus the shared clock, the readiness
- * barrier's {@code submittedSeats}, and the match outcome fields.
+ * Wire view of the whole match as sent to one client seat: every kingdom (the viewer's own in full,
+ * opponents redacted — see {@link KhKingdomView}) plus the shared clock, the readiness barrier's
+ * {@code submittedSeats}, and the match outcome fields.
  *
  * @param players kingdom views ordered by seat; the client reads {@code players[context.seat]} as
  *     "you" and the other index as the opponent
@@ -36,6 +36,10 @@ public record KhMatchView(
               : KhKingdomView.redacted(state.getPlayer(seat)));
     }
     return new KhMatchView(
-        players, state.getTime(), state.isMatchOver(), state.winnerSeat(), state.getSubmittedSeats());
+        players,
+        state.getTime(),
+        state.isMatchOver(),
+        state.winnerSeat(),
+        state.getSubmittedSeats());
   }
 }

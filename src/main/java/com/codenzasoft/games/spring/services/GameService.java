@@ -25,8 +25,8 @@ import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
-import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
+import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Line;
@@ -557,8 +557,7 @@ public class GameService {
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
     log.debug("Building KH game from entity: {}", entity.getId());
     // Seat-ordered player identities (seat i = players.get(i)); seat 0 is the creator.
-    final List<Player> players =
-        entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
+    final List<Player> players = entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
     final boolean isOver = entity.isOver() || entity.isQuit();
     // One kingdom per seat, sharing a clock. Both kingdoms are seeded with the standard starting
     // deck by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per
@@ -745,9 +744,9 @@ public class GameService {
 
   /**
    * Records KH games-played outcomes from the match result: {@code winnerSeat()} decides win vs
-   * loss for each human seat. Covers every {@code gameOver} path — victory (all win-condition
-   * Great Works completed), starvation knock-out, and forfeit (last kingdom standing wins). A
-   * {@code winnerSeat} of {@code -1} (solo knock-out) records a loss.
+   * loss for each human seat. Covers every {@code gameOver} path — victory (all win-condition Great
+   * Works completed), starvation knock-out, and forfeit (last kingdom standing wins). A {@code
+   * winnerSeat} of {@code -1} (solo knock-out) records a loss.
    */
   private void recordKhGamesPlayed(final GameEngine game) {
     final int winnerSeat = game.getState().winnerSeat();

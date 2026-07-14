@@ -9,8 +9,8 @@ public interface KhObserver {
   void gameStarted(final GameEngine game, final GameState state);
 
   /**
-   * Fired after an action mutates the match state, so listeners can push the fresh state to clients.
-   * Triggered by {@link GameEngine#notifyUpdated()} at the request boundary.
+   * Fired after an action mutates the match state, so listeners can push the fresh state to
+   * clients. Triggered by {@link GameEngine#notifyUpdated()} at the request boundary.
    */
   void gameUpdated(final GameEngine game, final GameState state);
 
