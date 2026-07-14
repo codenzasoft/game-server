@@ -253,6 +253,23 @@ public record Card(
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
   public void play(final PlayerState state, final Season season, final StaffingTier tier) {
+    play(state, season, tier, SabotageContext.none());
+  }
+
+  /**
+   * Plays this card exactly like {@link #play(PlayerState, Season, StaffingTier)}, additionally
+   * resolving any {@link OpponentResourceTarget} (sabotage) effects against the frozen opponent
+   * snapshot carried by {@code sabotage}. Sabotage deltas are only <em>collected</em> here; the
+   * engine applies them to the live opponent after every table has resolved (two-phase apply).
+   *
+   * @param sabotage the cross-seat resolution context; use {@link SabotageContext#none()} when the
+   *     match has no live opponent
+   */
+  public void play(
+      final PlayerState state,
+      final Season season,
+      final StaffingTier tier,
+      final SabotageContext sabotage) {
     if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
       return;
     }
@@ -263,6 +280,8 @@ public record Card(
     for (Effect effect : getTierEffects(tier)) {
       if (effect.target() instanceof ResourceTarget rt) {
         state.apply(effect);
+      } else if (effect.target() instanceof OpponentResourceTarget) {
+        sabotage.collect(effect);
       } else if (effect.target() instanceof CardTarget ct) {
         final List<Card> followingCards = state.getCardsOnBoardAfter(season, this);
         for (final Card card : followingCards) {

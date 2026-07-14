@@ -9,6 +9,7 @@ import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
+import com.codenzasoft.games.kingshand.strategies.KhHeuristicStrategy;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
@@ -567,14 +568,23 @@ public class GameService {
     // registered. Registering khBroadcastService as a KhObserver makes state pushes engine-driven:
     // initialize() fires gameStarted, each action fires gameUpdated (via GameEngine#notifyUpdated),
     // and resolution fires gameOver — all broadcast per-seat.
-    final GameEngine engine =
+    final GameEngine.Builder builder =
         new GameEngine.Builder()
             .withId(entity.getId())
             .withPlayers(players)
             .withState(state)
             .addListener(khBroadcastService)
-            .addLifecycleObserver(new GameLifecycleListener<>())
-            .build();
+            .addLifecycleObserver(new GameLifecycleListener<>());
+    // Bot seats get a strategy driver (mirrors Hearts' addPlayerObserver(player, strategy)); the
+    // engine auto-drives them after every phase seed so the readiness barrier never stalls on a
+    // bot. Bots go through the same seat-aware actions as humans — only the trigger differs.
+    final List<UserEntity> seatedUsers = entity.getPlayers();
+    for (int seat = 0; seat < seatedUsers.size(); seat++) {
+      if (seatedUsers.get(seat).isBot()) {
+        builder.withStrategy(seat, new KhHeuristicStrategy());
+      }
+    }
+    final GameEngine engine = builder.build();
     // Delegate initialization to the engine — it owns the knowledge of how a game starts.
     engine.initialize();
     return engine;
@@ -734,16 +744,25 @@ public class GameService {
   }
 
   /**
-   * Records KH games-played outcomes. KH's only production {@code gameOver} trigger today is
-   * population reaching zero (starvation) — always a loss for the single player. Victory completion
-   * ({@code GameState#isVictoryComplete}) does not yet fire {@code gameOver}; that gap is
-   * pre-existing and out of scope for GAME-117.
+   * Records KH games-played outcomes from the match result: {@code winnerSeat()} decides win vs
+   * loss for each human seat. Covers every {@code gameOver} path — victory (all win-condition
+   * Great Works completed), starvation knock-out, and forfeit (last kingdom standing wins). A
+   * {@code winnerSeat} of {@code -1} (solo knock-out) records a loss.
    */
   private void recordKhGamesPlayed(final GameEngine game) {
+    final int winnerSeat = game.getState().winnerSeat();
     for (final Player player : game.getPlayers()) {
+      final int seat = game.seatOf(player.name());
       findUser(player.id())
           .filter(user -> !user.isBot())
-          .ifPresent(user -> updateGamesPlayed(user, GameType.KH, 0, 1, 0));
+          .ifPresent(
+              user -> {
+                if (seat >= 0 && seat == winnerSeat) {
+                  updateGamesPlayed(user, GameType.KH, 1, 0, 0);
+                } else {
+                  updateGamesPlayed(user, GameType.KH, 0, 1, 0);
+                }
+              });
     }
   }
 

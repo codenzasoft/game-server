@@ -8,13 +8,19 @@ import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameUpdatedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhNotification;
+import com.codenzasoft.games.kingshand.strategies.KhPlayerStrategy;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Owns all rule-based mutations of a {@link GameState}: phase/season advancement, table mutations,
@@ -22,9 +28,13 @@ import java.util.function.BiConsumer;
  * system. {@code GameState} is a passive data carrier; this engine is the only place that should
  * mutate it.
  *
- * <p><b>Phase flow.</b> There is no generic phase cycle — see {@link Phase}'s javadoc. The Council
- * is inserted once per year, immediately after Winter's {@link Phase#PLAY} ends, but only once GOLD
- * has been unlocked (TREASURY completed):
+ * <p><b>Phase flow.</b> There is no generic phase cycle — see {@link Phase}'s javadoc. Every
+ * phase-completing action below is seat-scoped and gated by the <em>readiness barrier</em>: it
+ * performs the acting seat's work, marks that seat submitted, and only when every live seat has
+ * submitted does the shared clock advance (exactly once) and the next phase get seeded for every
+ * seat. With a single seat the barrier releases immediately, preserving single-player behavior.
+ * The Council is inserted once per year, immediately after Winter's {@link Phase#PLAY} ends, but
+ * only once GOLD has been unlocked (TREASURY completed) in <em>either</em> kingdom:
  *
  * <ol>
  *   <li>{@link Phase#ADD} → {@link Phase#PLAY} via {@link #pickCard(Card)} / {@link #skipAdd()}.
@@ -82,6 +92,7 @@ public class GameEngine implements Game<GameEngine> {
     private Random rng;
     private final List<KhObserver> listeners = new ArrayList<>();
     private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers = new ArrayList<>();
+    private final Map<Integer, KhPlayerStrategy> strategies = new LinkedHashMap<>();
     private Executor executor;
 
     public Builder withId(final UUID id) {
@@ -137,20 +148,35 @@ public class GameEngine implements Game<GameEngine> {
       return this;
     }
 
+    /**
+     * Registers a {@link KhPlayerStrategy} to drive {@code seat}'s kingdom (a bot seat). Mirrors
+     * {@code HeartsGame.Builder.addPlayerObserver(player, strategy)}. Seats with a strategy are
+     * auto-driven by the engine after every phase seed (see {@link GameEngine#driveBots()}).
+     */
+    public Builder withStrategy(final int seat, final KhPlayerStrategy strategy) {
+      strategies.put(seat, strategy);
+      return this;
+    }
+
     public GameEngine build() {
       final List<Player> seatPlayers =
           players != null ? players : (player != null ? List.of(player) : List.of());
-      return new GameEngine(
-          id,
-          seatPlayers,
-          state,
-          cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
-          rng != null ? rng : new Random(),
-          listeners,
-          executor != null ? executor : Runnable::run,
-          lifecycleObservers);
+      final GameEngine engine =
+          new GameEngine(
+              id,
+              seatPlayers,
+              state,
+              cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
+              rng != null ? rng : new Random(),
+              listeners,
+              executor != null ? executor : Runnable::run,
+              lifecycleObservers);
+      strategies.forEach(engine::registerStrategy);
+      return engine;
     }
   }
+
+  private static final Logger log = LoggerFactory.getLogger(GameEngine.class);
 
   private final UUID id;
   private final List<Player> players;
@@ -160,6 +186,12 @@ public class GameEngine implements Game<GameEngine> {
   private final List<KhObserver> listeners;
   private final List<GameLifecycleObserver<GameEngine>> lifecycleObservers;
   private final Executor executor;
+
+  /**
+   * Per-seat bot drivers ({@link KhPlayerStrategy}), keyed by seat. Seats without an entry are
+   * human-driven via the WS layer. See {@link #driveBots()}.
+   */
+  private final Map<Integer, KhPlayerStrategy> strategies = new HashMap<>();
 
   /**
    * Seat whose kingdom the engine is currently acting on. Actions are per-kingdom (each player
@@ -259,9 +291,17 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void initialize() {
     if (activePlayer().isGameOver()) return;
     seedStartingDeck();
-    if (state.getTime().phase() == Phase.ADD && activePlayer().getAddChoices().isEmpty()) {
-      offerAddChoices();
+    if (state.getTime().phase() == Phase.ADD) {
+      forEachLiveSeat(
+          seat -> {
+            if (activePlayer().getAddChoices().isEmpty()) {
+              offerAddChoices();
+            }
+          });
     }
+    // Bot seats act (and submit) as soon as the first phase is seeded, so the initial broadcast
+    // already shows them ready and a lone human is never blocked on an idle bot.
+    driveBots();
     notifyListeners(GAME_STARTED_NOTIFICATION);
     // TODO: KH does not yet persist mid-game state (GameService.buildKhGame always rebuilds a
     // fresh GameState), so there is no reliable signal to distinguish a true resume from this
@@ -279,6 +319,29 @@ public class GameEngine implements Game<GameEngine> {
   public synchronized void quit() {
     if (activePlayer().isGameOver()) return;
     notifyLifecycleObservers(GameLifecycleObserver::gameQuit);
+  }
+
+  /**
+   * Forfeits {@code seat}'s kingdom (the "gives up → forfeits" rule): the seat is marked out,
+   * removed from the readiness barrier, and — since a forfeited seat counts as knocked out — the
+   * match outcome is settled for the remaining seat(s). Fires {@code gameOver} when the forfeit
+   * decides the match. No-ops if the seat is already out or the match is already over.
+   */
+  public synchronized void forfeit(final int seat) {
+    if (seat < 0 || seat >= state.playerCount()) {
+      throw new IllegalArgumentException("no such seat: " + seat);
+    }
+    if (state.getPlayer(seat).isGameOver() || state.isMatchOver()) {
+      return;
+    }
+    state.getPlayer(seat).forfeit();
+    if (state.isMatchOver()) {
+      notifyListeners(GAME_OVER_NOTIFICATION);
+      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
+    } else if (state.allSubmitted()) {
+      // The forfeiting seat may have been the last one the barrier was waiting on.
+      resolvePhaseAndAdvance();
+    }
   }
 
   @Override
@@ -359,6 +422,161 @@ public class GameEngine implements Game<GameEngine> {
     return state.getTime().season();
   }
 
+  /**
+   * Runs {@code perSeat} once for every live (not knocked-out) seat, with {@link #activeSeat}
+   * temporarily pointed at that seat so the seat-scoped helpers act on the right kingdom. Restores
+   * the previous active seat afterwards.
+   */
+  private void forEachLiveSeat(final java.util.function.IntConsumer perSeat) {
+    final int saved = activeSeat;
+    try {
+      for (int seat = 0; seat < state.playerCount(); seat++) {
+        if (state.getPlayer(seat).isGameOver()) {
+          continue;
+        }
+        activeSeat = seat;
+        perSeat.accept(seat);
+      }
+    } finally {
+      activeSeat = saved;
+    }
+  }
+
+  // ----- Turn coordination: the readiness barrier -----
+  //
+  // The clock is shared, but each seat acts on its own board independently and asynchronously, so
+  // the clock must not advance until ALL live seats have finished the current phase. Every
+  // phase-completing action (pickCard/skipAdd, endAndRun, hireAdvisor/skipCouncilAdd,
+  // accept/passCouncilProposal) therefore performs its seat-scoped work, marks the seat submitted,
+  // and stops. Only when every live seat has submitted does resolvePhaseAndAdvance() run: it
+  // advances the shared clock exactly once and seeds the next phase for every seat. With a single
+  // seat the barrier releases immediately, so single-player behavior is unchanged.
+
+  /**
+   * Throws if the active seat has already submitted the current phase — a submitted seat may take
+   * no further phase actions until the barrier releases.
+   */
+  private void requireNotSubmitted(final String operation) {
+    if (state.isSubmitted(activeSeat)) {
+      throw new IllegalStateException(
+          operation + " rejected: seat " + activeSeat + " has already submitted this phase");
+    }
+  }
+
+  /**
+   * Marks the active seat as done with the current phase and, if that releases the barrier (every
+   * live seat submitted), resolves the phase and advances the shared clock once.
+   */
+  private void submitActiveSeat() {
+    state.markSubmitted(activeSeat);
+    if (state.allSubmitted()) {
+      resolvePhaseAndAdvance();
+    }
+  }
+
+  /**
+   * Runs once per completed phase, after every live seat has submitted: clears the submit marks,
+   * performs the phase's shared resolution (for PLAY: every table resolves left-to-right against
+   * pre-resolution opponent snapshots, then cross-seat sabotage deltas apply), advances the shared
+   * clock exactly once, seeds the next phase for every live seat, and lets bot seats take their
+   * next-phase actions. Fires {@code gameOver} (and stops the clock) when the match is decided.
+   */
+  private void resolvePhaseAndAdvance() {
+    final Phase completed = state.getTime().phase();
+    state.clearSubmitted();
+    switch (completed) {
+      case ADD -> {
+        state.advanceTime(); // ADD -> PLAY
+        forEachLiveSeat(seat -> startPlay());
+      }
+      case PLAY -> {
+        resolvePlayForAllSeats();
+        if (state.isMatchOver()) {
+          notifyListeners(GAME_OVER_NOTIFICATION);
+          notifyLifecycleObservers(GameLifecycleObserver::gameOver);
+          return; // the clock stops with the match
+        }
+        state.advanceTime(); // PLAY -> COUNCIL_ADD (post-Winter, gold unlocked) or ADD
+        switch (state.getTime().phase()) {
+          case COUNCIL_ADD -> forEachLiveSeat(seat -> offerCouncilChoices());
+          case ADD -> forEachLiveSeat(seat -> offerAddChoices());
+          default -> {}
+        }
+      }
+      case COUNCIL_ADD -> {
+        state.advanceTime(); // COUNCIL_ADD -> COUNCIL_MEETING
+        forEachLiveSeat(seat -> offerCouncilProposal());
+      }
+      case COUNCIL_MEETING -> {
+        state.advanceTime(); // COUNCIL_MEETING -> ADD
+        forEachLiveSeat(seat -> offerAddChoices());
+      }
+    }
+    driveBots();
+  }
+
+  // ----- Bot driving -----
+
+  /**
+   * Registers a {@link KhPlayerStrategy} to drive {@code seat}'s kingdom. Bot seats go through the
+   * exact same seat-aware action methods as humans; the only difference is who triggers them.
+   */
+  public synchronized void registerStrategy(final int seat, final KhPlayerStrategy strategy) {
+    strategies.put(seat, strategy);
+  }
+
+  /**
+   * Lets every strategy-driven (bot) seat that still owes an action in the current phase take its
+   * turn and submit, so the readiness barrier never stalls on a bot. Invoked after the first phase
+   * is seeded ({@link #initialize()}) and after every phase change. If a strategy fails to submit
+   * (or throws), the seat's phase is force-completed with the default action so the match can
+   * always proceed.
+   */
+  public synchronized void driveBots() {
+    if (state.isMatchOver()) {
+      return;
+    }
+    for (final Map.Entry<Integer, KhPlayerStrategy> entry : strategies.entrySet()) {
+      final int seat = entry.getKey();
+      if (seat < 0 || seat >= state.playerCount()) continue;
+      if (state.getPlayer(seat).isGameOver()) continue;
+      if (state.isSubmitted(seat)) continue;
+      final TimeState before = state.getTime();
+      final int saved = activeSeat;
+      try {
+        activeSeat = seat;
+        try {
+          entry.getValue().act(this, seat);
+        } catch (final RuntimeException e) {
+          log.error("Bot strategy failed for seat {}: {}", seat, e.getMessage(), e);
+        }
+        // Safety net: the strategy must end its phase. Only force the default completion if the
+        // clock hasn't moved (its own submit may have released the barrier and advanced the phase).
+        if (state.getTime().equals(before)
+            && !state.isMatchOver()
+            && !state.getPlayer(seat).isGameOver()
+            && !state.isSubmitted(seat)) {
+          defaultSubmit();
+        }
+      } finally {
+        activeSeat = saved;
+      }
+      if (state.isMatchOver()) {
+        return;
+      }
+    }
+  }
+
+  /** Completes the active seat's current phase with the default no-frills action. */
+  private void defaultSubmit() {
+    switch (state.getTime().phase()) {
+      case ADD -> skipAdd();
+      case PLAY -> endAndRun();
+      case COUNCIL_ADD -> skipCouncilAdd();
+      case COUNCIL_MEETING -> passCouncilProposal();
+    }
+  }
+
   // ----- Phase / season progression -----
 
   /**
@@ -430,6 +648,23 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     requirePhase(Phase.PLAY, "endAndRun");
+    requireNotSubmitted("endAndRun");
+
+    // Seat-scoped completion intent only: mark this seat done with PLAY. The actual table
+    // resolution (resolveSeat) runs for every kingdom at once when the barrier releases, so both
+    // tables "fire left-to-right at the same time". With a single seat this is immediate.
+    submitActiveSeat();
+  }
+
+  /**
+   * Resolves the active seat's current-season table — the body of the old single-player {@code
+   * endAndRun}, minus the phase advance. Discards the hand, resolves the table left-to-right under
+   * the worker staffing system, fires seated advisors, applies the cross-table council boost, and
+   * consumes food. Sabotage ({@link OpponentResourceTarget}) effects are resolved against {@code
+   * sabotage}'s frozen opponent snapshot and only <em>collected</em>; the caller applies them after
+   * every kingdom's self-resolution completes.
+   */
+  private void resolveSeat(final SabotageContext sabotage) {
 
     // 1. Discard everything remaining in hand.
     activePlayer().discardHand(season());
@@ -454,7 +689,7 @@ public class GameEngine implements Game<GameEngine> {
           tier != StaffingTier.NONE
               && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
 
-      card.play(activePlayer(), season(), tier);
+      card.play(activePlayer(), season(), tier, sabotage);
       log.add(
           new ResolutionStep(
               card.name(), tier, isEngineBoost, activePlayer().getResources().getDelta(before)));
@@ -470,7 +705,7 @@ public class GameEngine implements Game<GameEngine> {
       Card card = seated.getCard();
       ResourceState before = activePlayer().getResources();
 
-      card.play(activePlayer(), season(), StaffingTier.FULL);
+      card.play(activePlayer(), season(), StaffingTier.FULL, sabotage);
       log.add(
           new ResolutionStep(
               card.name(), StaffingTier.FULL, false, activePlayer().getResources().getDelta(before)));
@@ -505,15 +740,71 @@ public class GameEngine implements Game<GameEngine> {
     log.add(new ResolutionStep(null, null, false, activePlayer().getResources().getDelta(before)));
 
     activePlayer().setResolutionLog(log);
+  }
 
-    if (activePlayer().isGameOver()) {
-      notifyListeners(GAME_OVER_NOTIFICATION);
-      notifyLifecycleObservers(GameLifecycleObserver::gameOver);
+  /**
+   * Shared PLAY resolution for the whole match, run once when the readiness barrier releases.
+   * Implements the locked sabotage rule: snapshot every kingdom <em>before</em> any table resolves,
+   * resolve each table against the frozen opponent snapshot, then apply the collected cross-seat
+   * deltas only after all self-resolution completes — deterministic and order-independent.
+   */
+  private void resolvePlayForAllSeats() {
+    final int seatCount = state.playerCount();
+
+    // Pre-resolution snapshot of every kingdom's resources.
+    final List<ResourceState> snapshots = new ArrayList<>(seatCount);
+    for (int seat = 0; seat < seatCount; seat++) {
+      snapshots.add(state.getPlayer(seat).getResources());
     }
-    // 6. Advance to the next phase (ADD for next season, or stay put if game is over / won).
-    if (!activePlayer().isVictoryComplete()) {
-      advancePhase();
+
+    // Per-victim-seat collected sabotage deltas.
+    final List<List<Effect>> deltasBySeat = new ArrayList<>(seatCount);
+    for (int seat = 0; seat < seatCount; seat++) {
+      deltasBySeat.add(new ArrayList<>());
     }
+
+    // Phase one: every live kingdom resolves its own table against frozen opponent snapshots.
+    forEachLiveSeat(
+        seat -> {
+          final int opponent = opponentOf(seat);
+          final SabotageContext sabotage =
+              opponent < 0
+                  ? SabotageContext.none()
+                  : new SabotageContext(snapshots.get(opponent), deltasBySeat.get(opponent));
+          resolveSeat(sabotage);
+        });
+
+    // Phase two: apply the collected cross-seat deltas, appending a sabotage tail step to each
+    // victim's resolution log so the client can animate the incoming hit.
+    for (int seat = 0; seat < seatCount; seat++) {
+      final List<Effect> deltas = deltasBySeat.get(seat);
+      if (deltas.isEmpty()) {
+        continue;
+      }
+      final PlayerState victim = state.getPlayer(seat);
+      final ResourceState before = victim.getResources();
+      for (final Effect delta : deltas) {
+        victim.apply(delta);
+      }
+      final List<ResolutionStep> log = new ArrayList<>(victim.getResolutionLog());
+      log.add(
+          new ResolutionStep(
+              "SABOTAGE", StaffingTier.FULL, false, victim.getResources().getDelta(before)));
+      victim.setResolutionLog(log);
+    }
+  }
+
+  /**
+   * The single live opposing seat of {@code seat}, or {@code -1} if none (single-player, or every
+   * opponent already knocked out). Two-player matches have at most one opponent; revisit for N>2.
+   */
+  private int opponentOf(final int seat) {
+    for (int other = 0; other < state.playerCount(); other++) {
+      if (other != seat && !state.getPlayer(other).isGameOver()) {
+        return other;
+      }
+    }
+    return -1;
   }
 
   /**
@@ -544,6 +835,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized List<Card> offerAddChoices() {
     requirePhase(Phase.ADD, "offerAddChoices");
+    requireNotSubmitted("offerAddChoices");
     // The first (1 + permanent + seated-bonus) calls each ADD phase are free; every call after that
     // is a paid reroll, escalating by REROLL_COST_STEP per paid call.
     int freeCalls = 1 + activePlayer().getPermanentFreeRerolls() + seatedFreeRerollBonus();
@@ -581,10 +873,12 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void pickCard(Card card) {
     requirePhase(Phase.ADD, "pickCard");
+    requireNotSubmitted("pickCard");
     addToDeck(state.getTime().season(), card);
     clearAddState();
-    state.advanceTime();
-    startPlay();
+    // Readiness barrier: the pick completes this seat's ADD phase; the clock advances (and every
+    // seat draws its PLAY hand) only once all live seats have picked or skipped.
+    submitActiveSeat();
   }
 
   /**
@@ -609,9 +903,9 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void skipAdd() {
     requirePhase(Phase.ADD, "skipAdd");
+    requireNotSubmitted("skipAdd");
     clearAddState();
-    state.advanceTime();
-    startPlay();
+    submitActiveSeat();
   }
 
   // ----- ADD helpers -----
@@ -779,6 +1073,7 @@ public class GameEngine implements Game<GameEngine> {
   // we will eventually want to be able to choose where this card is placed with an index parameter.
   public synchronized void placeCard(Card card) {
     requirePhase(Phase.PLAY, "placeCard");
+    requireNotSubmitted("placeCard");
 
     if (card == null) {
       throw new IllegalArgumentException("card cannot be null");
@@ -866,6 +1161,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void reorderTable(List<String> cardNames) {
     requirePhase(Phase.PLAY, "reorderTable");
+    requireNotSubmitted("reorderTable");
 
     List<Card> table = activePlayer().getTable(season());
 
@@ -907,6 +1203,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void demolishCard(int slot) {
     requirePhase(Phase.PLAY, "demolishCard");
+    requireNotSubmitted("demolishCard");
 
     List<Card> table = activePlayer().getTable(season());
 
@@ -959,6 +1256,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void commissionGreatWork(String name) {
     requirePhase(Phase.PLAY, "commissionGreatWork");
+    requireNotSubmitted("commissionGreatWork");
 
     Card gw = cardCatalog.getByName(name);
     if (gw == null || !gw.isGreatWork()) {
@@ -1068,6 +1366,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void hireAdvisor(Advisor advisor) {
     requirePhase(Phase.COUNCIL_ADD, "hireAdvisor");
+    requireNotSubmitted("hireAdvisor");
     if (advisor == null) {
       throw new IllegalArgumentException("advisor cannot be null");
     }
@@ -1092,8 +1391,7 @@ public class GameEngine implements Game<GameEngine> {
     activePlayer().addGold(0.0 - advisor.hiringCost());
     activePlayer().addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getTime().year()));
     clearCouncilAddState();
-    state.advanceTime();
-    offerCouncilProposal();
+    submitActiveSeat();
   }
 
   /**
@@ -1118,9 +1416,9 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void skipCouncilAdd() {
     requirePhase(Phase.COUNCIL_ADD, "skipCouncilAdd");
+    requireNotSubmitted("skipCouncilAdd");
     clearCouncilAddState();
-    state.advanceTime();
-    offerCouncilProposal();
+    submitActiveSeat();
   }
 
   private void clearCouncilAddState() {
@@ -1144,6 +1442,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void dismissAdvisor(String advisorId) {
     requireCouncilPhase("dismissAdvisor");
+    requireNotSubmitted("dismissAdvisor");
     SeatedAdvisor seated = activePlayer().findSeatedAdvisor(advisorId);
     if (seated == null) {
       throw new IllegalStateException("advisor is not seated: " + advisorId);
@@ -1253,6 +1552,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void acceptCouncilProposal() {
     requirePhase(Phase.COUNCIL_MEETING, "acceptCouncilProposal");
+    requireNotSubmitted("acceptCouncilProposal");
     CouncilProposal proposal = activePlayer().getCurrentProposal();
     if (proposal == null) {
       throw new IllegalStateException("no current proposal to accept");
@@ -1271,8 +1571,7 @@ public class GameEngine implements Game<GameEngine> {
     }
     seated.setLastProposalYear(state.getTime().year());
     activePlayer().setCurrentProposal(null);
-    state.advanceTime();
-    offerAddChoices();
+    submitActiveSeat();
   }
 
   /**
@@ -1285,6 +1584,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public synchronized void passCouncilProposal() {
     requirePhase(Phase.COUNCIL_MEETING, "passCouncilProposal");
+    requireNotSubmitted("passCouncilProposal");
     CouncilProposal proposal = activePlayer().getCurrentProposal();
     if (proposal != null) {
       SeatedAdvisor seated = activePlayer().findSeatedAdvisor(proposal.advisorId());
@@ -1293,8 +1593,7 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
     activePlayer().setCurrentProposal(null);
-    state.advanceTime();
-    offerAddChoices();
+    submitActiveSeat();
   }
 
   /** Returns {@code true} if {@code seated} currently has an available Reform stack or Decree. */

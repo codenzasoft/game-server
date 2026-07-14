@@ -10,5 +10,8 @@ package com.codenzasoft.games.kingshand;
  *
  * <p>The hierarchy is sealed so callers can exhaustively pattern-match without leaving room for an
  * unhandled target kind to silently slip through.
+ *
+ * <p>{@link OpponentResourceTarget} is the sabotage branch: it acts on the opponent's kingdom and
+ * is resolved against a pre-resolution snapshot (see {@code GameEngine}'s PLAY resolution).
  */
-public sealed interface EffectTarget permits ResourceTarget, CardTarget {}
+public sealed interface EffectTarget permits ResourceTarget, CardTarget, OpponentResourceTarget {}

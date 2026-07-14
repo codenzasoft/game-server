@@ -8,6 +8,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
+import com.codenzasoft.games.spring.views.kh.KhMatchView;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -82,7 +83,8 @@ public class KhBroadcastService implements KhObserver {
         continue; // bots have no client to receive state
       }
       final KhContext context = new KhContext(user.getUsername(), game.getId(), seat);
-      final KhMessage message = new KhMessage(context, state);
+      // Per-seat view: the recipient's own kingdom in full, opponents redacted (hidden info).
+      final KhMessage message = new KhMessage(context, KhMatchView.forSeat(state, seat));
       messagingTemplate.convertAndSendToUser(
           user.getUsername(), "/queue/games/" + game.getId(), message);
       log.debug("Sent game state to user '{}' (seat {})", user.getUsername(), seat);

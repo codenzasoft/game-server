@@ -2,6 +2,7 @@ package com.codenzasoft.games.kingshand;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -23,6 +24,13 @@ public class GameState {
 
   private final List<PlayerState> players;
   private TimeState time;
+
+  /**
+   * Seats that have completed ("submitted") the current phase. The shared clock must not advance
+   * until every live seat has submitted — see {@code GameEngine}'s readiness barrier. Reset
+   * whenever the phase changes.
+   */
+  private final Set<Integer> submittedSeats = new HashSet<>();
 
   private GameState(Builder b) {
     this.players = b.players;
@@ -117,6 +125,51 @@ public class GameState {
     boolean anyGoldUnlocked =
         players.stream().anyMatch(p -> p.getResources().isUnlocked(ResourceTarget.GOLD));
     time = time.advance(anyGoldUnlocked);
+  }
+
+  // ----- Readiness barrier (per-phase submit tracking) -----
+
+  /**
+   * Marks {@code seat} as having completed the current phase. The seat may take no further
+   * phase actions until the barrier releases (all live seats submitted) and the clock advances.
+   */
+  public void markSubmitted(int seat) {
+    submittedSeats.add(seat);
+  }
+
+  /** {@code true} if {@code seat} has already submitted the current phase. */
+  public boolean isSubmitted(int seat) {
+    return submittedSeats.contains(seat);
+  }
+
+  /**
+   * {@code true} once every live (not knocked-out / forfeited) seat has submitted the current
+   * phase — the readiness barrier releases and the shared clock may advance exactly once.
+   */
+  public boolean allSubmitted() {
+    for (int seat = 0; seat < players.size(); seat++) {
+      if (isPlayerOut(seat)) {
+        continue;
+      }
+      if (!submittedSeats.contains(seat)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Clears all submit marks. Called whenever the phase changes. */
+  public void clearSubmitted() {
+    submittedSeats.clear();
+  }
+
+  /**
+   * Seats that have submitted the current phase, sorted for a stable wire order. The client uses
+   * this to show "waiting for other player…" once its own seat has submitted but others haven't.
+   */
+  @JsonProperty("submittedSeats")
+  public List<Integer> getSubmittedSeats() {
+    return submittedSeats.stream().sorted().toList();
   }
 
   // ----- Match outcome (cross-player) -----

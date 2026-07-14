@@ -54,6 +54,9 @@ public class PlayerState {
   // names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree;
   // prevents that Decree from being used more than once on the same distinct Great Work
   private Set<String> acceleratedGreatWorkNames;
+  // true once this kingdom's player has given up — a forfeited kingdom is treated exactly like a
+  // knocked-out one for match outcome and readiness-barrier purposes
+  private boolean forfeited;
 
   private PlayerState(Builder b) {
     this.board = b.board;
@@ -228,7 +231,21 @@ public class PlayerState {
 
   @JsonProperty("gameOver")
   public boolean isGameOver() {
-    return resources.population() < 1.0;
+    return forfeited || resources.population() < 1.0;
+  }
+
+  /** {@code true} once this kingdom's player has given up (the "gives up → forfeits" rule). */
+  @JsonProperty("forfeited")
+  public boolean isForfeited() {
+    return forfeited;
+  }
+
+  /**
+   * Marks this kingdom as forfeited. Irreversible; the kingdom counts as knocked out for match
+   * outcome ({@code GameState#isPlayerOut}) and is skipped by the readiness barrier.
+   */
+  public void forfeit() {
+    this.forfeited = true;
   }
 
   /** Returns staffing for {@code season}'s table. */
