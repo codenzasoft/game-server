@@ -68,7 +68,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)]
+        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 10)]
         )
 
         state.getPlayer(0).board.get(Season.SUMMER).add(card)
@@ -133,7 +133,7 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
+        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)]
         )
 
         when:
@@ -151,10 +151,10 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
+        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)]
         )
 
-        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
+        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10)]
         )
 
         when:
@@ -213,10 +213,10 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
+        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)]
         )
 
-        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
+        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10)]
         )
 
         state.getPlayer(0).drawPile.get(Season.SPRING).add(card1)
@@ -241,13 +241,13 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
+        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)]
         )
 
-        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
+        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10)]
         )
 
-        def card3 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.POPULATION, 1, ValueType.INTEGER)]
+        def card3 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.POPULATION, 1)]
         )
 
         state.getPlayer(0).drawPile.get(Season.SUMMER).add(card1)
@@ -275,10 +275,10 @@ class GameEngineSpec extends Specification {
         def state = GameState.newState()
         def engine = engine(state)
 
-        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)]
+        def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)]
         )
 
-        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)]
+        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10)]
         )
 
         state.getPlayer(0).discardPile.get(Season.FALL).add(card1)
@@ -655,9 +655,9 @@ class GameEngineSpec extends Specification {
     def "startPlay reshuffles the discard pile into the draw pile when the draw pile runs dry"() {
         setup:
         // 1 in draw pile + 2 in discard = 3 total = MAX_HAND_SIZE; all should be drawn
-        def drawCard   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 1, ValueType.INTEGER)])
-        def discard1   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 4, ValueType.INTEGER)])
-        def discard2   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
+        def drawCard   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 1)])
+        def discard1   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 4)])
+        def discard2   = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)])
 
         def state = GameState.builder()
                 .phase(Phase.PLAY)
@@ -679,7 +679,7 @@ class GameEngineSpec extends Specification {
     def "startPlay returns whatever is available when combined draw + discard is less than MAX_HAND_SIZE"() {
         setup:
         def card1 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
-        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 1, ValueType.INTEGER)])
+        def card2 = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 1)])
 
         def state = GameState.builder()
                 .phase(Phase.PLAY)
@@ -1302,7 +1302,7 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun with an empty hand still resolves the table without error"() {
         setup:
-        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
+        def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 5)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.SUMMER)
@@ -1324,7 +1324,7 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun moves a SINGLE-frequency card to the discard pile after its effect fires"() {
         setup:
-        def singleCard = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def singleCard = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.SUMMER)
@@ -1345,7 +1345,7 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun leaves a RECURRING-only card on the table after its effect fires"() {
         setup:
-        def recurringCard = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 5, ValueType.INTEGER)])
+        def recurringCard = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 5)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.SPRING)
@@ -1365,8 +1365,8 @@ class GameEngineSpec extends Specification {
 
     def "endAndRun mixed table: SINGLE card discarded, RECURRING card kept, both effects fire"() {
         setup:
-        def singleCard    = new Card("TEST", 0, 0, FrequencyType.SINGLE,    [new Effect(ResourceTarget.FOOD,       10, ValueType.INTEGER)])
-        def recurringCard = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION,  5, ValueType.INTEGER)])
+        def singleCard    = new Card("TEST", 0, 0, FrequencyType.SINGLE,    [new Effect(ResourceTarget.FOOD,       10)])
+        def recurringCard = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION,  5)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.FALL)
@@ -1388,13 +1388,12 @@ class GameEngineSpec extends Specification {
 
     // ----- PLAY phase: endAndRun — left-to-right ordering / card-to-card effect chain -----
 
-    def "endAndRun fires effects left-to-right: each card sees resources already mutated by cards to its left"() {
-        // Card A (slot 0): FOOD +10 INTEGER SINGLE  →  food goes 50 → 60
-        // Card B (slot 1): FOOD +10 PERCENTAGE SINGLE  →  fires on 60, result 66
-        // If order were reversed the PERCENTAGE card would fire on 50 and result would be 65.
+    def "endAndRun fires every table card: both SINGLE cards resolve and are discarded"() {
+        // Effects are flat additive, so end values are order-independent; this asserts that every
+        // slot fires exactly once and SINGLE cards are discarded after firing.
         setup:
-        def cardA = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10,   ValueType.INTEGER)])
-        def cardB = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10.0, ValueType.PERCENTAGE)])
+        def cardA = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10)])
+        def cardB = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 6)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.SPRING)
@@ -1408,19 +1407,17 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        // 50 + 10 = 60  (card A), then 60 + 60*0.10 = 66  (card B), then consume floor(5)*1=5 → 61
+        // 50 + 10 (card A) + 6 (card B), then consume floor(5)*1=5 → 61
         state.getPlayer(0).resources.food == 61.0
         // both were SINGLE — both discarded
         state.getPlayer(0).board.get(Season.SPRING).isEmpty()
         state.getPlayer(0).discardPile.get(Season.SPRING).containsAll([cardA, cardB])
     }
 
-    def "endAndRun card-to-card effect chain: card B sees production boosted by card A"() {
-        // Card A (slot 0): PRODUCTION +50 RECURRING — stays on table
-        // Card B (slot 1): PRODUCTION +10% RECURRING — fires on 150, not 100
+    def "endAndRun fires every RECURRING card and keeps them on the table"() {
         setup:
-        def cardA = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 50,   ValueType.INTEGER)])
-        def cardB = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10.0, ValueType.PERCENTAGE)])
+        def cardA = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 50)])
+        def cardB = new Card("TEST", 0, 0, FrequencyType.RECURRING, [new Effect(ResourceTarget.PRODUCTION, 10)])
         def state = GameState.builder()
                 .phase(Phase.PLAY)
                 .season(Season.SPRING)
@@ -1433,8 +1430,8 @@ class GameEngineSpec extends Specification {
         engine.endAndRun()
 
         then:
-        // 100 + 50 = 150  (card A), then 150 + 150*0.10 = 165  (card B)
-        state.getPlayer(0).resources.production == 165.0
+        // 100 + 50 (card A) + 10 (card B)
+        state.getPlayer(0).resources.production == 160.0
         // both RECURRING — both stay
         state.getPlayer(0).board.get(Season.SPRING) == [cardA, cardB]
         state.getPlayer(0).discardPile.get(Season.SPRING).isEmpty()
@@ -2236,7 +2233,8 @@ class GameEngineSpec extends Specification {
         def bob   = new Player(UUID.randomUUID(), "bob")
         def engine = new GameEngine.Builder()
                 .withId(UUID.randomUUID())
-                .withPlayers([alice, bob])
+                .withPlayer(alice)
+                .withPlayer(bob)
                 .withState(GameState.newTwoPlayerState())
                 .build()
 

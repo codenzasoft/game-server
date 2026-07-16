@@ -7,15 +7,14 @@ import java.util.List;
  * Carries the frozen opponent snapshot into {@link Card#play} during PLAY resolution and collects
  * the cross-seat (sabotage) deltas produced by {@link OpponentResourceTarget} effects.
  *
- * <p>Deltas are resolved against {@link #opponentSnapshot()} at collection time (percentages are
- * flattened to integer deltas against the snapshot value) and applied to the live opponent kingdom
+ * <p>Deltas are collected during each table's resolution and applied to the live opponent kingdom
  * only after every table has finished its own resolution — the two-phase apply that keeps
  * simultaneous resolution order-independent.
  *
  * @param opponentSnapshot the opponent's resources frozen before any table resolved; {@code null}
  *     when the match has no live opponent (single-player), in which case sabotage effects no-op
- * @param opponentDeltas flat {@link ValueType#INTEGER} effects to apply to the live opponent after
- *     all self-resolution completes
+ * @param opponentDeltas flat additive effects to apply to the live opponent after all
+ *     self-resolution completes
  */
 public record SabotageContext(ResourceState opponentSnapshot, List<Effect> opponentDeltas) {
 
@@ -30,8 +29,8 @@ public record SabotageContext(ResourceState opponentSnapshot, List<Effect> oppon
   }
 
   /**
-   * Resolves {@code effect} (whose target is an {@link OpponentResourceTarget}) against the frozen
-   * snapshot and records the resulting flat delta. No-ops when there is no opponent.
+   * Records the flat delta of {@code effect} (whose target is an {@link OpponentResourceTarget})
+   * for the post-resolution apply. No-ops when there is no opponent.
    */
   public void collect(Effect effect) {
     if (opponentSnapshot == null) {
@@ -40,25 +39,6 @@ public record SabotageContext(ResourceState opponentSnapshot, List<Effect> oppon
     if (!(effect.target() instanceof OpponentResourceTarget target)) {
       return;
     }
-    final ResourceTarget resource = target.targetResource();
-    final double delta;
-    if (effect.valueType() == ValueType.PERCENTAGE) {
-      // Flatten the percentage against the frozen snapshot value, never a live mid-resolution one.
-      delta = snapshotValue(resource) * (effect.modifier() * 0.01);
-    } else {
-      delta = effect.modifier();
-    }
-    opponentDeltas.add(new Effect(resource, delta, ValueType.INTEGER));
-  }
-
-  private double snapshotValue(ResourceTarget resource) {
-    return switch (resource) {
-      case POPULATION -> opponentSnapshot.population();
-      case PRODUCTION -> opponentSnapshot.production();
-      case FOOD -> opponentSnapshot.food();
-      case POPULATION_CAP -> opponentSnapshot.populationCap();
-      case GOLD -> opponentSnapshot.gold();
-      case STRENGTH -> opponentSnapshot.strength();
-    };
+    opponentDeltas.add(new Effect(target.targetResource(), effect.modifier()));
   }
 }

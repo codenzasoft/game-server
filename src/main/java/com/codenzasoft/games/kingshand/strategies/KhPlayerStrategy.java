@@ -4,9 +4,9 @@ import com.codenzasoft.games.kingshand.GameEngine;
 
 /**
  * Drives one seat of a King's Hand match — the KH counterpart of Hearts' {@code AdaptiveStrategy}.
- * Registered per bot seat via {@code GameEngine.Builder#withStrategy} (see {@code
- * GameService.buildKhGame}); the engine invokes it whenever the seat still owes an action in the
- * current phase (see {@code GameEngine#driveBots()}).
+ * Registered per bot seat via {@code GameEngine.Builder#withPlayer(Player, KhPlayerStrategy)} (see
+ * {@code GameService.buildKhGame}); the engine invokes it whenever the seat still owes an action in
+ * the current phase (see {@code GameEngine#driveBots()}).
  *
  * <p>Contract: {@link #act} must complete the seat's current phase by calling one of the engine's
  * phase-completing actions ({@code pickCard}/{@code skipAdd}, {@code endAndRun}, {@code

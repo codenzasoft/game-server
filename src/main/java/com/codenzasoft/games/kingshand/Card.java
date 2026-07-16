@@ -100,10 +100,10 @@ public record Card(
   }
 
   /**
-   * Returns a new {@link Card} with the modifier of every {@link ValueType#INTEGER} effect whose
-   * target equals {@code resource} increased by {@code delta}. All other effects are preserved
-   * unchanged. Used by the engine-builder pass to permanently boost cards to the right of an
-   * engine-builder card during {@link Phase#PLAY} resolution.
+   * Returns a new {@link Card} with the modifier of every effect whose target equals {@code
+   * resource} increased by {@code delta}. All other effects are preserved unchanged. Used by the
+   * engine-builder pass to permanently boost cards to the right of an engine-builder card during
+   * {@link Phase#PLAY} resolution.
    *
    * @param resource the resource target to boost
    * @param delta the flat amount to add to each matching effect's modifier
@@ -111,11 +111,7 @@ public record Card(
   public Card boostEffect(ResourceTarget resource, double delta) {
     List<Effect> boosted =
         effects.stream()
-            .map(
-                e ->
-                    (e.target() == resource && e.valueType() == ValueType.INTEGER)
-                        ? new Effect(e.target(), e.modifier() + delta, e.valueType())
-                        : e)
+            .map(e -> (e.target() == resource) ? new Effect(e.target(), e.modifier() + delta) : e)
             .toList();
     return new Card(
         name,
@@ -131,10 +127,9 @@ public record Card(
   }
 
   /**
-   * Returns a new {@link Card} with the modifier of every matching {@link ValueType#INTEGER} effect
-   * increased by {@code delta}, exactly like {@link #boostEffect}, except that if no effect
-   * targeting {@code resource} exists yet, a brand-new {@code INTEGER} effect of {@code delta} is
-   * appended instead of being silently dropped.
+   * Returns a new {@link Card} with the modifier of every matching effect increased by {@code
+   * delta}, exactly like {@link #boostEffect}, except that if no effect targeting {@code resource}
+   * exists yet, a brand-new effect of {@code delta} is appended instead of being silently dropped.
    *
    * <p>Used by Reform/Decree resolution on advisor cards: some advisors (e.g. Joric Wren, Brynn
    * Ostlar) start with an empty effects list because their base Specialty is meta-only, but a later
@@ -146,14 +141,12 @@ public record Card(
    * @param delta the flat amount to add to the matching effect, or the modifier of the new effect
    */
   public Card withEffectBoostOrAdd(ResourceTarget resource, double delta) {
-    boolean hasMatch =
-        effects.stream()
-            .anyMatch(e -> e.target() == resource && e.valueType() == ValueType.INTEGER);
+    boolean hasMatch = effects.stream().anyMatch(e -> e.target() == resource);
     if (hasMatch) {
       return boostEffect(resource, delta);
     }
     List<Effect> withAdded = new ArrayList<>(effects);
-    withAdded.add(new Effect(resource, delta, ValueType.INTEGER));
+    withAdded.add(new Effect(resource, delta));
     return new Card(
         name,
         staffRequirement,
@@ -222,8 +215,7 @@ public record Card(
       Effect mine = effects.get(i);
       if (i < other.effects().size()) {
         Effect theirs = other.effects().get(i);
-        merged.add(
-            new Effect(mine.target(), mine.modifier() + theirs.modifier(), mine.valueType()));
+        merged.add(new Effect(mine.target(), mine.modifier() + theirs.modifier()));
       } else {
         merged.add(mine);
       }
@@ -310,10 +302,7 @@ public record Card(
   }
 
   public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {
-    boolean hasMatch =
-        card.effects().stream()
-            .anyMatch(
-                e -> e.target() == target.targetResource() && e.valueType() == ValueType.INTEGER);
+    boolean hasMatch = card.effects().stream().anyMatch(e -> e.target() == target.targetResource());
     if (hasMatch) {
       return Optional.of(card.boostEffect(target.targetResource(), effect.modifier()));
     }
@@ -341,11 +330,11 @@ public record Card(
 
   /**
    * Returns a new effect list with every modifier floored to half, used when a card resolves at
-   * {@link StaffingTier#HALF}. Both INTEGER and PERCENTAGE modifiers are halved.
+   * {@link StaffingTier#HALF}.
    */
   private List<Effect> halveEffects(List<Effect> effects) {
     return effects.stream()
-        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0), e.valueType()))
+        .map(e -> new Effect(e.target(), Math.floor(e.modifier() / 2.0)))
         .toList();
   }
 

@@ -290,7 +290,7 @@ export class AddPhaseScene {
           return `
             <div class="kh-effect-row">
               <span class="kh-effect-target kh-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
-              <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
+              <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
               <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
             </div>
           `;
@@ -301,7 +301,7 @@ export class AddPhaseScene {
         return `
           <div class="kh-effect-row">
             <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;

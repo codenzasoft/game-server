@@ -111,7 +111,7 @@ public class CardCatalog {
           25.0,
           150.0,
           FrequencyType.RECURRING,
-          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 15.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 15.0)));
   public static final Card MINE =
       new Card(
           "MINE",
@@ -139,9 +139,7 @@ public class CardCatalog {
           75.0,
           300.0,
           FrequencyType.RECURRING,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, false), 10.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 10.0)));
   public static final Card COMMUNITY_WELL =
       new Card(
           "COMMUNITY_WELL",
@@ -155,7 +153,7 @@ public class CardCatalog {
           75.0,
           375.0,
           FrequencyType.SINGLE,
-          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, false), 50.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, false), 50.0)));
 
   // Summer
   public static final Card FARMSTEAD =
@@ -182,8 +180,8 @@ public class CardCatalog {
           200.0,
           FrequencyType.RECURRING,
           List.of(
-              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 5.0, ValueType.INTEGER),
-              new Effect(new CardTarget(ResourceTarget.FOOD, false), 5.0, ValueType.INTEGER)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 5.0),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 5.0)));
   public static final Card FISHING_VILLAGE =
       new Card(
           "FISHING_VILLAGE",
@@ -197,9 +195,7 @@ public class CardCatalog {
           75.0,
           300.0,
           FrequencyType.SINGLE,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, false), 50.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 50.0)));
   public static final Card EARLY_HARVEST =
       new Card(
           "EARLY_HARVEST",
@@ -213,7 +209,7 @@ public class CardCatalog {
           40.0,
           300.0,
           FrequencyType.RECURRING,
-          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 25.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.FOOD, true), 25.0)));
   public static final Card CARAVAN =
       new Card(
           "CARAVAN",
@@ -242,8 +238,8 @@ public class CardCatalog {
           625.0,
           FrequencyType.RECURRING,
           List.of(
-              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 25.0, ValueType.INTEGER),
-              new Effect(new CardTarget(ResourceTarget.FOOD, false), 25.0, ValueType.INTEGER)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 25.0),
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 25.0)));
 
   // Fall
   public static final Card WORKSHOP =
@@ -269,9 +265,7 @@ public class CardCatalog {
           60.0,
           300.0,
           FrequencyType.RECURRING,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, true), 25.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 25.0)));
   public static final Card BAKERY =
       new Card(
           "BAKERY",
@@ -280,7 +274,7 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(
               ResourceTarget.FOOD.integer(60),
-              new Effect(new CardTarget(ResourceTarget.FOOD, false), 5.0, ValueType.INTEGER)));
+              new Effect(new CardTarget(ResourceTarget.FOOD, false), 5.0)));
   public static final Card TAX_COLLECTION =
       new Card(
           "TAX_COLLECTION",
@@ -295,8 +289,8 @@ public class CardCatalog {
           325.0,
           FrequencyType.RECURRING,
           List.of(
-              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 20.0, ValueType.INTEGER),
-              new Effect(new CardTarget(ResourceTarget.FOOD, true), 20.0, ValueType.INTEGER)));
+              new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 20.0),
+              new Effect(new CardTarget(ResourceTarget.FOOD, true), 20.0)));
   public static final Card BARN =
       new Card(
           "BARN", 90.0, 250.0, FrequencyType.RECURRING, List.of(ResourceTarget.FOOD.integer(125)));
@@ -306,27 +300,21 @@ public class CardCatalog {
           80.0,
           450.0,
           FrequencyType.SINGLE,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, false), 60.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 60.0)));
   public static final Card METALWORKING =
       new Card(
           "METALWORKING",
           75.0,
           250.0,
           FrequencyType.RECURRING,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, false), 10.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, false), 10.0)));
   public static final Card BLACKSMITH =
       new Card(
           "BLACKSMITH",
           110.0,
           750.0,
           FrequencyType.RECURRING,
-          List.of(
-              new Effect(
-                  new CardTarget(ResourceTarget.PRODUCTION, true), 45.0, ValueType.INTEGER)));
+          List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), 45.0)));
 
   // Winter
   public static final Card FORGE =
@@ -468,8 +456,7 @@ public class CardCatalog {
           FrequencyType.SINGLE,
           List.of(
               ResourceTarget.STRENGTH.integer(-25),
-              new Effect(
-                  new OpponentResourceTarget(ResourceTarget.PRODUCTION), -200, ValueType.INTEGER)));
+              new Effect(new OpponentResourceTarget(ResourceTarget.PRODUCTION), -200)));
 
   /** Fall: a one-shot raid on the opponent's granaries — burns their food stores. */
   public static final Card CROP_RAID =
@@ -480,8 +467,7 @@ public class CardCatalog {
           FrequencyType.SINGLE,
           List.of(
               ResourceTarget.STRENGTH.integer(-30),
-              new Effect(
-                  new OpponentResourceTarget(ResourceTarget.FOOD), -250, ValueType.INTEGER)));
+              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -250)));
 
   /** Winter: recurring raiders that harry the opponent's economy every winter. */
   public static final Card WINTER_RAIDERS =
@@ -492,10 +478,8 @@ public class CardCatalog {
           FrequencyType.RECURRING,
           List.of(
               ResourceTarget.STRENGTH.integer(-40),
-              new Effect(
-                  new OpponentResourceTarget(ResourceTarget.PRODUCTION), -100, ValueType.INTEGER),
-              new Effect(
-                  new OpponentResourceTarget(ResourceTarget.FOOD), -100, ValueType.INTEGER)));
+              new Effect(new OpponentResourceTarget(ResourceTarget.PRODUCTION), -100),
+              new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -100)));
 
   // ----- Great Work cards -----
   // Completed cards are defined first because construction cards reference them.

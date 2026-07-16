@@ -514,10 +514,10 @@ function buildCompactCard(card: Card): string {
       }
       if (e.target instanceof OpponentTarget) {
         const label = resourceShortLabel(e.target.targetResource);
-        return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+        return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
       }
       const targetStr = typeof e.target === "string" ? e.target : "CARD";
-      return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+      return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}${card.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
     })
     .join("");
 

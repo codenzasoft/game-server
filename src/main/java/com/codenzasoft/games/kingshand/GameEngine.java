@@ -85,8 +85,7 @@ public class GameEngine implements Game<GameEngine> {
    */
   public static class Builder {
     private UUID id;
-    private Player player;
-    private List<Player> players;
+    private final List<Player> players = new ArrayList<>();
     private GameState state;
     private CardCatalog cardCatalog;
     private Random rng;
@@ -100,17 +99,32 @@ public class GameEngine implements Game<GameEngine> {
       return this;
     }
 
+    /**
+     * Appends a human-driven player; their seat is the insertion order (first call = seat 0). Use
+     * {@link #withPlayer(Player, KhPlayerStrategy)} for a bot seat.
+     */
     public Builder withPlayer(final Player player) {
-      this.player = player;
+      players.add(player);
       return this;
     }
 
     /**
-     * Registers the seat-ordered player identities for a multi-seat match (seat {@code i} = {@code
-     * players.get(i)}). Takes precedence over {@link #withPlayer(Player)} when both are set.
+     * Appends a strategy-driven (bot) player, binding the {@link KhPlayerStrategy} to the seat the
+     * player lands on — seat and strategy can never drift apart. The seat is the insertion order,
+     * exactly like {@link #withPlayer(Player)}. Mirrors {@code
+     * HeartsGame.Builder.addPlayerObserver(player, strategy)}. Strategy-driven seats are
+     * auto-played by the engine after every phase seed (see {@link GameEngine#driveBots()}).
+     *
+     * @throws IllegalArgumentException if {@code strategy} is null (use the 1-arg form for humans)
      */
-    public Builder withPlayers(final List<Player> players) {
-      this.players = players;
+    public Builder withPlayer(final Player player, final KhPlayerStrategy strategy) {
+      if (strategy == null) {
+        throw new IllegalArgumentException(
+            "strategy cannot be null — use withPlayer(player) for a human seat");
+      }
+      final int seat = players.size();
+      players.add(player);
+      strategies.put(seat, strategy);
       return this;
     }
 
@@ -148,23 +162,11 @@ public class GameEngine implements Game<GameEngine> {
       return this;
     }
 
-    /**
-     * Registers a {@link KhPlayerStrategy} to drive {@code seat}'s kingdom (a bot seat). Mirrors
-     * {@code HeartsGame.Builder.addPlayerObserver(player, strategy)}. Seats with a strategy are
-     * auto-driven by the engine after every phase seed (see {@link GameEngine#driveBots()}).
-     */
-    public Builder withStrategy(final int seat, final KhPlayerStrategy strategy) {
-      strategies.put(seat, strategy);
-      return this;
-    }
-
     public GameEngine build() {
-      final List<Player> seatPlayers =
-          players != null ? players : (player != null ? List.of(player) : List.of());
       final GameEngine engine =
           new GameEngine(
               id,
-              seatPlayers,
+              players,
               state,
               cardCatalog != null ? cardCatalog : CardCatalog.defaultCatalog(),
               rng != null ? rng : new Random(),
@@ -589,8 +591,9 @@ public class GameEngine implements Game<GameEngine> {
    * Registers a {@link KhPlayerStrategy} to drive {@code seat}'s kingdom. Bot seats go through the
    * exact same seat-aware action methods as humans; the only difference is who triggers them.
    *
-   * <p>Internal: strategies are supplied at construction via {@code Builder#withStrategy} and copied
-   * onto the engine here during {@code build()}. Not part of the public runtime API.
+   * <p>Internal: strategies are supplied at construction via {@code Builder#withPlayer(Player,
+   * KhPlayerStrategy)} and copied onto the engine here during {@code build()}. Not part of the
+   * public runtime API.
    */
   private void registerStrategy(final int seat, final KhPlayerStrategy strategy) {
     strategies.put(seat, strategy);
@@ -810,11 +813,7 @@ public class GameEngine implements Game<GameEngine> {
       for (int j = 0; j < currentTable.size(); j++) {
         final Card target = currentTable.get(j);
         boolean hasMatch =
-            target.effects().stream()
-                .anyMatch(
-                    e ->
-                        e.target() == ResourceTarget.PRODUCTION
-                            && e.valueType() == ValueType.INTEGER);
+            target.effects().stream().anyMatch(e -> e.target() == ResourceTarget.PRODUCTION);
         if (hasMatch) {
           currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
           log.add(
