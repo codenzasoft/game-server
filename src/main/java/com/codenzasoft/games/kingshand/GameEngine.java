@@ -588,9 +588,20 @@ public class GameEngine implements Game<GameEngine> {
   /**
    * Registers a {@link KhPlayerStrategy} to drive {@code seat}'s kingdom. Bot seats go through the
    * exact same seat-aware action methods as humans; the only difference is who triggers them.
+   *
+   * <p>Internal: strategies are supplied at construction via {@code Builder#withStrategy} and copied
+   * onto the engine here during {@code build()}. Not part of the public runtime API.
    */
-  public synchronized void registerStrategy(final int seat, final KhPlayerStrategy strategy) {
+  private void registerStrategy(final int seat, final KhPlayerStrategy strategy) {
     strategies.put(seat, strategy);
+  }
+
+  /**
+   * True if {@code seat} is bot-driven (has a registered strategy), and therefore has no connected
+   * client to receive state broadcasts.
+   */
+  public synchronized boolean isBotSeat(final int seat) {
+    return strategies.containsKey(seat);
   }
 
   /**
