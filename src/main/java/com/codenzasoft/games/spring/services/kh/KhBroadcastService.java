@@ -4,14 +4,11 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.kingshand.KhObserver;
-import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
-import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.views.kh.KhMatchView;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +27,6 @@ import org.springframework.stereotype.Service;
 public class KhBroadcastService implements KhObserver {
   private static final Logger log = LoggerFactory.getLogger(KhBroadcastService.class);
 
-  @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private SimpMessagingTemplate messagingTemplate;
 
   // ----- KhObserver: engine-driven pushes -----
@@ -71,23 +67,18 @@ public class KhBroadcastService implements KhObserver {
     }
     final GameState state = game.getState();
     for (int seat = 0; seat < seats.size(); seat++) {
-      final String playerName = seats.get(seat).name();
-      final Optional<UserEntity> userOpt =
-          gamesUserDetailsService.getUserByUsernameOrEmail(playerName);
-      if (userOpt.isEmpty()) {
-        log.warn("broadcast: could not find user for player '{}'", playerName);
-        continue;
-      }
-      final UserEntity user = userOpt.get();
-      if (user.isBot()) {
+      if (game.isBotSeat(seat)) {
         continue; // bots have no client to receive state
       }
-      final KhContext context = new KhContext(user.getUsername(), game.getId(), seat);
+      // A player's name is their username (validated when the game was created), so it can address
+      // the STOMP user destination directly — no per-broadcast user lookup needed.
+      final String username = seats.get(seat).name();
+      final KhContext context = new KhContext(username, game.getId(), seat);
       // Per-seat view: the recipient's own kingdom in full, opponents redacted (hidden info).
       final KhMessage message = new KhMessage(context, KhMatchView.forSeat(state, seat));
       messagingTemplate.convertAndSendToUser(
-          user.getUsername(), "/queue/games/" + game.getId(), message);
-      log.debug("Sent game state to user '{}' (seat {})", user.getUsername(), seat);
+          username, "/queue/games/" + game.getId(), message);
+      log.debug("Sent game state to user '{}' (seat {})", username, seat);
     }
   }
 
