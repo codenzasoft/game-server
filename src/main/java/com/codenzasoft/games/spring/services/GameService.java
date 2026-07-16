@@ -556,13 +556,11 @@ public class GameService {
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
     log.debug("Building KH game from entity: {}", entity.getId());
-    // Seat-ordered player identities (seat i = players.get(i)); seat 0 is the creator.
-    final List<Player> players = entity.getPlayers().stream().map(UserEntity::toPlayer).toList();
-    final boolean isOver = entity.isOver() || entity.isQuit();
+    final List<UserEntity> seatedUsers = entity.getPlayers();
     // One kingdom per seat, sharing a clock. Both kingdoms are seeded with the standard starting
     // deck by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per
     // request by KhController based on the acting user's seat.
-    final GameState state = GameState.newMultiplayer(Math.max(players.size(), 1));
+    final GameState state = GameState.newMultiplayer(Math.max(seatedUsers.size(), 1));
     // Built via the Builder so the lifecycle listener and the KH broadcast observer can be
     // registered. Registering khBroadcastService as a KhObserver makes state pushes engine-driven:
     // initialize() fires gameStarted, each action fires gameUpdated (via GameEngine#notifyUpdated),
@@ -570,17 +568,19 @@ public class GameService {
     final GameEngine.Builder builder =
         new GameEngine.Builder()
             .withId(entity.getId())
-            .withPlayers(players)
             .withState(state)
             .addListener(khBroadcastService)
             .addLifecycleObserver(new GameLifecycleListener<>());
-    // Bot seats get a strategy driver (mirrors Hearts' addPlayerObserver(player, strategy)); the
-    // engine auto-drives them after every phase seed so the readiness barrier never stalls on a
-    // bot. Bots go through the same seat-aware actions as humans — only the trigger differs.
-    final List<UserEntity> seatedUsers = entity.getPlayers();
-    for (int seat = 0; seat < seatedUsers.size(); seat++) {
-      if (seatedUsers.get(seat).isBot()) {
-        builder.withStrategy(seat, new KhHeuristicStrategy());
+    // Seat i = i-th withPlayer call; seat 0 is the creator. Bot seats bind their strategy driver
+    // right here (mirrors Hearts' addPlayerObserver(player, strategy)), so seat and strategy can
+    // never drift apart. The engine auto-drives strategy seats after every phase seed so the
+    // readiness barrier never stalls on a bot; bots go through the same seat-aware actions as
+    // humans — only the trigger differs.
+    for (final UserEntity user : seatedUsers) {
+      if (user.isBot()) {
+        builder.withPlayer(user.toPlayer(), new KhHeuristicStrategy());
+      } else {
+        builder.withPlayer(user.toPlayer());
       }
     }
     final GameEngine engine = builder.build();

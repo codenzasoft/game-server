@@ -73,7 +73,7 @@ class PlayerStateSpec extends Specification {
     def "replaceTableCard swaps the matched card with the replacement"() {
         setup:
         def original    = new Card("TEST", 1, 10, FrequencyType.RECURRING, [])
-        def replacement = new Card("TEST", 1, 10, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 20, ValueType.INTEGER)])
+        def replacement = new Card("TEST", 1, 10, FrequencyType.RECURRING, [new Effect(ResourceTarget.FOOD, 20)])
         def p = PlayerState.builder().table(Season.FALL, [original]).build()
 
         when:
@@ -157,8 +157,8 @@ class PlayerStateSpec extends Specification {
 
     def "discardHand moves the hand into the given season's discard pile"() {
         setup:
-        def card1 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 5, ValueType.INTEGER)])
-        def card2 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.PRODUCTION, 10, ValueType.INTEGER)])
+        def card1 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 5)])
+        def card2 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.PRODUCTION, 10)])
         def p = PlayerState.newPlayer()
         p.hand.add(card1)
         p.hand.add(card2)
@@ -192,7 +192,7 @@ class PlayerStateSpec extends Specification {
 
     def "discardFromTable removes from the table and adds to that season's discard pile"() {
         setup:
-        def card  = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10, ValueType.INTEGER)])
+        def card  = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 10)])
         def other = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
         def p = PlayerState.builder().table(Season.SUMMER, [card, other]).build()
 

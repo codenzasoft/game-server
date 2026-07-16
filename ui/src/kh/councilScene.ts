@@ -255,7 +255,7 @@ export class CouncilScene {
     const effectsHTML = seated.card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}/season</span>`;
       })
       .join("");
     return `
@@ -399,20 +399,20 @@ export class CouncilScene {
     let benefitRow: string;
     switch (reform.benefitType) {
       case ReformBenefitType.FREE_REROLL:
-        benefitRow = this.buildEffectRow("🎲", "FREE REROLL", `${formatModifier(reform.benefitPerStack, "INTEGER")}/season`, true);
+        benefitRow = this.buildEffectRow("🎲", "FREE REROLL", `${formatModifier(reform.benefitPerStack)}/season`, true);
         break;
       case ReformBenefitType.EXTRA_ADD_CANDIDATE:
-        benefitRow = this.buildEffectRow("🔍", "ADD CANDIDATES", formatModifier(reform.benefitPerStack, "INTEGER"), true);
+        benefitRow = this.buildEffectRow("🔍", "ADD CANDIDATES", formatModifier(reform.benefitPerStack), true);
         break;
       case ReformBenefitType.CROSS_TABLE_BOOST:
-        benefitRow = this.buildEffectRow("⚡", "CROSS-TABLE BOOST", `${formatModifier(reform.benefitPerStack, "INTEGER")}/season`, true);
+        benefitRow = this.buildEffectRow("⚡", "CROSS-TABLE BOOST", `${formatModifier(reform.benefitPerStack)}/season`, true);
         break;
       case ReformBenefitType.CARD_EFFECT:
       default:
         benefitRow = this.buildEffectRow(
           resourceIcon(reform.benefitResource!),
           resourceLabel(reform.benefitResource!),
-          `${formatModifier(reform.benefitPerStack, "INTEGER")}/season`,
+          `${formatModifier(reform.benefitPerStack)}/season`,
           true,
         );
         break;
@@ -421,7 +421,7 @@ export class CouncilScene {
     const costRow = this.buildEffectRow(
       resourceIcon(reform.costResource),
       resourceLabel(reform.costResource),
-      `${formatModifier(reform.costPerStack, "INTEGER")}/season`,
+      `${formatModifier(reform.costPerStack)}/season`,
       false,
     );
 
@@ -439,18 +439,18 @@ export class CouncilScene {
         return this.buildEffectRow(
           resourceIcon(decree.effectResource!),
           resourceLabel(decree.effectResource!),
-          `${formatModifier(decree.effectAmount, "INTEGER")}/season (permanent)`,
+          `${formatModifier(decree.effectAmount)}/season (permanent)`,
           true,
         );
       case DecreeType.GREAT_WORK_BOOST:
         return this.buildEffectRow(
           resourceIcon(decree.effectResource!),
           resourceLabel(decree.effectResource!),
-          `${formatModifier(decree.effectAmount, "INTEGER")} once, to ${formatGreatWorkName(decree.targetGreatWorkName)}`,
+          `${formatModifier(decree.effectAmount)} once, to ${formatGreatWorkName(decree.targetGreatWorkName)}`,
           true,
         );
       case DecreeType.POPULATION_CAP_BOOST:
-        return this.buildEffectRow("🏠", "POPULATION CAP", `${formatModifier(decree.effectAmount, "INTEGER")} (once)`, true);
+        return this.buildEffectRow("🏠", "POPULATION CAP", `${formatModifier(decree.effectAmount)} (once)`, true);
       case DecreeType.GREAT_WORK_ACCELERATE:
         return this.buildEffectRow("🏗️", "GREAT WORK", "Advances one Great Work under construction by a full season, instantly", true);
       case DecreeType.FREE_REROLL:

@@ -76,8 +76,7 @@ public class KhBroadcastService implements KhObserver {
       final KhContext context = new KhContext(username, game.getId(), seat);
       // Per-seat view: the recipient's own kingdom in full, opponents redacted (hidden info).
       final KhMessage message = new KhMessage(context, KhMatchView.forSeat(state, seat));
-      messagingTemplate.convertAndSendToUser(
-          username, "/queue/games/" + game.getId(), message);
+      messagingTemplate.convertAndSendToUser(username, "/queue/games/" + game.getId(), message);
       log.debug("Sent game state to user '{}' (seat {})", username, seat);
     }
   }

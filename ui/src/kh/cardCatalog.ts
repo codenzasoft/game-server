@@ -414,15 +414,9 @@ export function cardImagePath(cardName: string): string {
   return `/img/${base}.png`;
 }
 
-/** Formats an effect modifier as a signed string, e.g. "+10" or "+10%". */
-export function formatModifier(
-  modifier: number,
-  valueType: "INTEGER" | "PERCENTAGE" | string,
-): string {
-  const sign = modifier >= 0 ? "+" : "";
-  return valueType === "PERCENTAGE"
-    ? `${sign}${modifier}%`
-    : `${sign}${modifier}`;
+/** Formats an effect modifier as a signed string, e.g. "+10" or "-25". */
+export function formatModifier(modifier: number): string {
+  return `${modifier >= 0 ? "+" : ""}${modifier}`;
 }
 
 // ─── Resource display metadata ─────────────────────────────────────────────────

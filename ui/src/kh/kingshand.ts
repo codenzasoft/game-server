@@ -66,11 +66,6 @@ export enum FrequencyType {
   RECURRING = "RECURRING",
 }
 
-export enum ValueType {
-  INTEGER = "INTEGER",
-  PERCENTAGE = "PERCENTAGE",
-}
-
 // ResourceTarget: one branch of the EffectTarget union.  The server serialises
 // this enum as a plain JSON string (e.g. "POPULATION"), which is why the union
 // schema can distinguish it from a CardTarget object without a type tag.
@@ -111,7 +106,6 @@ interface OpponentTargetData {
 interface EffectData {
   target: EffectTarget;
   modifier: number;
-  valueType: ValueType;
 }
 
 interface CardData {
@@ -316,16 +310,14 @@ export class OpponentTarget {
 // wherever rendering code needs to branch on what a card effect acts upon.
 export type EffectTarget = ResourceTarget | CardTarget | OpponentTarget;
 
-// Effect: a single numeric modifier on a Card.
+// Effect: a single flat additive modifier on a Card.
 export class Effect {
   target: EffectTarget;
   modifier: number;
-  valueType: ValueType;
 
   constructor(data: EffectData) {
     this.target = data.target;
     this.modifier = data.modifier;
-    this.valueType = data.valueType;
   }
 }
 
@@ -775,7 +767,6 @@ const EffectSchema = z
   .object({
     target: EffectTargetSchema,
     modifier: z.number(),
-    valueType: z.enum(ValueType),
   })
   .transform((data) => new Effect(data as EffectData));
 

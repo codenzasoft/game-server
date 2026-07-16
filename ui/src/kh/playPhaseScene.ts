@@ -399,7 +399,7 @@ export class PlayPhaseScene {
     const effectsHTML = seated.card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}/season</span>`;
       })
       .join("");
     return `
@@ -529,7 +529,7 @@ export class PlayPhaseScene {
           return `
             <div class="kh-tc-tt-effect">
               <span class="kh-tc-tt-et kh-tc-tt-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
-              <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
+              <span class="kh-tc-tt-mod">${formatModifier(e.modifier)}</span>
               <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
             </div>
           `;
@@ -540,7 +540,7 @@ export class PlayPhaseScene {
         return `
           <div class="kh-tc-tt-effect">
             <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-tc-tt-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;
@@ -699,7 +699,7 @@ export class PlayPhaseScene {
           return `
             <div class="kh-play-hc-effect-row">
               <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
-              <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
+              <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
               <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
             </div>
           `;
@@ -710,7 +710,7 @@ export class PlayPhaseScene {
         return `
           <div class="kh-play-hc-effect-row">
             <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;
@@ -828,10 +828,10 @@ export class PlayPhaseScene {
             }
             if (e.target instanceof OpponentTarget) {
               const label = resourceShortLabel(e.target.targetResource);
-              return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+              return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
