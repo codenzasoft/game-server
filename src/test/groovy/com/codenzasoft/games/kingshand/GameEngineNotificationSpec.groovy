@@ -130,4 +130,19 @@ class GameEngineNotificationSpec extends Specification {
         1 * listener1.gameOver(engine, state)
         1 * listener2.gameOver(engine, state)
     }
+
+    def "notifyUpdated fires gameUpdated on every listener with the current state"() {
+        setup:
+        def listener1 = Mock(KhObserver)
+        def listener2 = Mock(KhObserver)
+        def state = GameState.newState()
+        def engine = engineWith(state, listener1, listener2)
+
+        when:
+        engine.notifyUpdated()
+
+        then:
+        1 * listener1.gameUpdated(engine, state)
+        1 * listener2.gameUpdated(engine, state)
+    }
 }

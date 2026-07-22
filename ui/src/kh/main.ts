@@ -4,6 +4,13 @@ import { AddPhaseScene } from "./addPhaseScene.ts";
 import { CouncilScene } from "./councilScene.ts";
 import { PlayPhaseScene } from "./playPhaseScene.ts";
 import { initMusic, unlockMusicOnFirstInteraction } from "./audio.ts";
+import {
+  hideWaitingOverlay,
+  playDualResolution,
+  removeOpponentHud,
+  showWaitingOverlay,
+  updateOpponentHud,
+} from "./multiplayerOverlays.ts";
 
 const homeUrl = `${window.location.origin}/`;
 const loginUrl =
@@ -60,7 +67,7 @@ const getGameId = (): string | undefined => {
   // completed), regardless of curPhase. Sits on top of everything, same as
   // the game-over overlay below.
 
-  const showGameWon = (): void => {
+  const showGameWon = (subtitle?: string): void => {
     if (currentScene) {
       currentScene.unmount();
       currentScene = null;
@@ -97,7 +104,7 @@ const getGameId = (): string | undefined => {
     overlay.innerHTML = `
       <div class="kh-win-crown">👑</div>
       <h1 class="kh-win-title">YOUR KINGDOM HAS TRIUMPHED</h1>
-      <p class="kh-win-sub">All four Great Works stand complete. Your legacy endures.</p>
+      <p class="kh-win-sub">${subtitle ?? "All four Great Works stand complete. Your legacy endures."}</p>
       <button class="kh-win-btn" id="kh-win-home">Return Home</button>
     `;
     document.body.appendChild(overlay);
@@ -113,7 +120,7 @@ const getGameId = (): string | undefined => {
   // Shown whenever state.gameOver is true, regardless of curPhase.
   // It sits on top of everything and lets the player return to the home screen.
 
-  const showGameOver = (): void => {
+  const showGameOver = (subtitle?: string): void => {
     if (currentScene) {
       currentScene.unmount();
       currentScene = null;
@@ -150,7 +157,7 @@ const getGameId = (): string | undefined => {
     overlay.innerHTML = `
       <div class="kh-go-skull">💀</div>
       <h1 class="kh-go-title">YOUR KINGDOM HAS FALLEN</h1>
-      <p class="kh-go-sub">Your people are gone. The land falls silent.</p>
+      <p class="kh-go-sub">${subtitle ?? "Your people are gone. The land falls silent."}</p>
       <button class="kh-go-btn" id="kh-go-home">Return Home</button>
     `;
     document.body.appendChild(overlay);
@@ -167,35 +174,69 @@ const getGameId = (): string | undefined => {
   const onMessage = (message: GameMessage) => {
     console.log("Processing KH message:", message);
 
-    const { state } = message;
+    const { state, match, context } = message;
+    const isMultiplayer = match.players.length > 1;
 
-    // Victory and game-over both take priority over phase routing — the server
-    // does not advance the phase once either is true (population hits zero, or
-    // all four win-condition Great Works complete), so we must check these first
-    // or the player can end up stuck on the current scene with no way forward.
-    // Victory is checked first: in the rare case a Great Work's final-season
-    // upkeep cost also starves the population in the same turn, winning takes
-    // precedence over losing.
-    if (state.gameWon) {
-      showGameWon();
+    // Match outcome takes priority over phase routing — the server stops the
+    // clock once the match is decided (victory, starvation, or forfeit), so we
+    // must check first or the player gets stuck on the current scene. The
+    // winner's seat decides which overlay each client sees.
+    if (match.matchOver) {
+      removeOpponentHud();
+      hideWaitingOverlay();
+      const opponent = isMultiplayer
+        ? match.players[context.seat === 0 ? 1 : 0]
+        : undefined;
+      if (match.winnerSeat === context.seat) {
+        showGameWon(
+          opponent?.forfeited
+            ? "Your rival has surrendered. The realm is yours."
+            : state.gameWon
+              ? "All four Great Works stand complete. Your legacy endures."
+              : "Your rival's kingdom has fallen. Yours endures.",
+        );
+      } else {
+        showGameOver(
+          isMultiplayer && match.winnerSeat >= 0 && !state.gameOver
+            ? "Your rival's Great Works stand complete. History remembers them, not you."
+            : undefined,
+        );
+      }
       return;
     }
-    if (state.gameOver) {
-      showGameOver();
-      return;
+
+    // Opponent HUD (multiplayer only): public resources + ready state.
+    if (isMultiplayer) {
+      updateOpponentHud(match, context.seat);
     }
+
+    // Waiting overlay: shown once this seat has submitted the current phase but
+    // the barrier hasn't released. Applied after scene routing below so the
+    // fresh scene sits underneath; hidden as soon as a new phase arrives.
+    const syncWaitingOverlay = () => {
+      if (state.isWaitingOnOthers()) {
+        showWaitingOverlay();
+      } else {
+        hideWaitingOverlay();
+      }
+    };
+    syncWaitingOverlay();
 
     switch (state.time.phase) {
       case Phase.ADD: {
         if (currentScene instanceof AddPhaseScene) {
           // Same phase — just refresh content.
           currentScene.update(state);
-        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
-          // PLAY → ADD transition with resolution data: animate first, then switch.
-          // Capture the pre-resolution state (still live in the scene) before anything changes.
-          const preState = currentScene.getState();
+        } else if (
+          currentScene instanceof PlayPhaseScene &&
+          state.resolutionLog.length > 0 &&
+          !isMultiplayer
+        ) {
+          // Single-player PLAY → ADD: animate the in-scene resolution first, then switch. (In
+          // multiplayer the resolution already played during the held resolutionPending window, so
+          // this ADD message just switches scenes — handled by the else branch below.)
           const playScene = currentScene;
-          playScene.animateFromResolutionLog(state, preState).then(() => {
+          playScene.animateFromResolutionLog(state, playScene.getState()).then(() => {
             playScene.unmount();
             const addScene = new AddPhaseScene(state, {
               reroll:   () => handler.reroll(),
@@ -204,6 +245,7 @@ const getGameId = (): string | undefined => {
             });
             currentScene = addScene;
             addScene.mount(mountTarget);
+            syncWaitingOverlay();
           });
         } else {
           // Phase changed to ADD without a resolution log — tear down and switch normally.
@@ -228,13 +270,16 @@ const getGameId = (): string | undefined => {
           // and the COUNCIL_ADD → COUNCIL_MEETING transition within one council
           // turn, so the roster panel never flickers between the two steps.
           currentScene.update(state);
-        } else if (currentScene instanceof PlayPhaseScene && state.resolutionLog.length > 0) {
-          // PLAY → COUNCIL transition with resolution data (Winter just ended and gold is
-          // unlocked): animate the end-and-run resolution first, exactly like the PLAY → ADD
-          // case above, instead of cutting straight to the council screen.
-          const preState = currentScene.getState();
+        } else if (
+          currentScene instanceof PlayPhaseScene &&
+          state.resolutionLog.length > 0 &&
+          !isMultiplayer
+        ) {
+          // Single-player PLAY → COUNCIL (Winter ended, gold unlocked): animate the resolution
+          // first, like the PLAY → ADD case. In multiplayer the resolution already played during
+          // the held resolutionPending window, so this message just switches scenes (else branch).
           const playScene = currentScene;
-          playScene.animateFromResolutionLog(state, preState).then(() => {
+          playScene.animateFromResolutionLog(state, playScene.getState()).then(() => {
             playScene.unmount();
             const councilScene = new CouncilScene(state, {
               hireAdvisor:           (id) => handler.hireAdvisor(id),
@@ -245,6 +290,7 @@ const getGameId = (): string | undefined => {
             });
             currentScene = councilScene;
             councilScene.mount(mountTarget);
+            syncWaitingOverlay();
           });
         } else {
           // Either a fresh mount or switching from ADD/PLAY (no resolution log): tear down the
@@ -267,8 +313,21 @@ const getGameId = (): string | undefined => {
 
       case Phase.PLAY: {
         if (currentScene instanceof PlayPhaseScene) {
-          // Already in PLAY (e.g. after a placeCard or demolishCard refresh).
-          currentScene.update(state);
+          if (isMultiplayer && match.resolutionPending) {
+            // The tables have resolved but the shared clock is held on this season until every seat
+            // clicks Continue. Play the dual resolution once (this seat hasn't continued yet and the
+            // screen isn't already up); Continue tells the server this seat is ready.
+            if (!state.isWaitingOnOthers() && !document.getElementById("kh-dual-resolution")) {
+              playDualResolution(match, context.seat, () => handler.continueResolution()).then(
+                () => syncWaitingOverlay(), // opponent may still be watching — show "waiting…"
+              );
+            }
+            // else: already continued (waiting on the opponent) — leave the frozen board under the
+            // overlays and don't refresh it with post-resolution data.
+          } else {
+            // Ordinary PLAY refresh (e.g. after a placeCard or demolishCard).
+            currentScene.update(state);
+          }
         } else {
           if (currentScene) {
             currentScene.unmount();
@@ -300,6 +359,8 @@ const getGameId = (): string | undefined => {
   // onQuit is called when the server confirms the quit.  Tear down PixiJS and
   // return the player to the home screen.
   const onQuit = () => {
+    removeOpponentHud();
+    hideWaitingOverlay();
     if (currentScene) {
       currentScene.unmount();
       currentScene = null;

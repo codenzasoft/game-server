@@ -1,4 +1,4 @@
-import { GameState, Season, Card, CardTarget, ResourceTarget } from "./kingshand.ts";
+import { GameState, Season, Card, CardTarget, OpponentTarget, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -285,13 +285,23 @@ export class AddPhaseScene {
             </div>
           `;
         }
+        if (e.target instanceof OpponentTarget) {
+          const res = e.target.targetResource;
+          return `
+            <div class="kh-effect-row">
+              <span class="kh-effect-target kh-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
+              <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-effect-row">
             <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-effect-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;

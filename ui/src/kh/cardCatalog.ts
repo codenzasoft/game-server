@@ -279,6 +279,23 @@ const DISPLAY_CATALOG: Record<string, CardDisplayInfo> = {
     tags: ["MILITARY", "STRENGTH"],
   },
 
+  // ── Sabotage (cross-kingdom; requires STRENGTH) ────────────────────────────
+  SABOTEURS: {
+    name: "Saboteurs",
+    description: "Agents slip into the rival kingdom and wreck their workshops — drains the opponent's production.",
+    tags: ["MILITARY", "SABOTAGE"],
+  },
+  CROP_RAID: {
+    name: "Crop Raid",
+    description: "Raiders torch the rival kingdom's granaries — burns the opponent's food stores.",
+    tags: ["MILITARY", "SABOTAGE"],
+  },
+  WINTER_RAIDERS: {
+    name: "Winter Raiders",
+    description: "Hardened raiders harry the rival kingdom's economy every winter they remain in your service.",
+    tags: ["MILITARY", "SABOTAGE"],
+  },
+
   // ── Great Works ────────────────────────────────────────────────────────────
   TREASURY_CONSTRUCTION: {
     name: "Treasury (Under Construction)",
@@ -384,6 +401,10 @@ const IMAGE_NAME_OVERRIDES: Record<string, string> = {
   SCHOOL_HOUSE: "schoolhouse",  // file has no underscore
   MASON_GUILD:  "masons_guild", // file has an extra 's'
   FORTRESS_WALL: "fortress",    // file is named fortress.png, not fortress_wall.png
+  // Sabotage cards reuse military art until dedicated pieces are drawn.
+  SABOTEURS: "guard_post",
+  CROP_RAID: "the_hunt",
+  WINTER_RAIDERS: "desperate_times",
 };
 
 /** Returns the public path to a card's full-art PNG, e.g. "/img/barn.png". */
@@ -393,15 +414,9 @@ export function cardImagePath(cardName: string): string {
   return `/img/${base}.png`;
 }
 
-/** Formats an effect modifier as a signed string, e.g. "+10" or "+10%". */
-export function formatModifier(
-  modifier: number,
-  valueType: "INTEGER" | "PERCENTAGE" | string,
-): string {
-  const sign = modifier >= 0 ? "+" : "";
-  return valueType === "PERCENTAGE"
-    ? `${sign}${modifier}%`
-    : `${sign}${modifier}`;
+/** Formats an effect modifier as a signed string, e.g. "+10" or "-25". */
+export function formatModifier(modifier: number): string {
+  return `${modifier >= 0 ? "+" : ""}${modifier}`;
 }
 
 // ─── Resource display metadata ─────────────────────────────────────────────────

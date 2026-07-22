@@ -66,11 +66,6 @@ export enum FrequencyType {
   RECURRING = "RECURRING",
 }
 
-export enum ValueType {
-  INTEGER = "INTEGER",
-  PERCENTAGE = "PERCENTAGE",
-}
-
 // ResourceTarget: one branch of the EffectTarget union.  The server serialises
 // this enum as a plain JSON string (e.g. "POPULATION"), which is why the union
 // schema can distinguish it from a CardTarget object without a type tag.
@@ -104,10 +99,13 @@ interface CardTargetData {
   adjacentOnly: boolean;
 }
 
+interface OpponentTargetData {
+  targetResource: ResourceTarget;
+}
+
 interface EffectData {
   target: EffectTarget;
   modifier: number;
-  valueType: ValueType;
 }
 
 interface CardData {
@@ -198,6 +196,8 @@ interface ResourceStateData {
 interface GameContextData {
   player: string;
   gameId: string;
+  /** The recipient's seat index — players[seat] in the match state is "you". */
+  seat: number;
 }
 
 interface ResolutionStepData {
@@ -210,6 +210,36 @@ interface ResolutionStepData {
   populationCapDelta: number;
   goldDelta: number;
   strengthDelta: number;
+}
+
+/** One kingdom on the wire — an element of the match's `players[]` array. */
+interface KingdomData {
+  board: Map<Season, Card[]>;
+  resolutionLog: ResolutionStep[];
+  drawPile: Map<Season, Card[]>;
+  discardPile: Map<Season, Card[]>;
+  hand: Card[];
+  resources: ResourceState;
+  addChoices: Card[];
+  rerollCount: number;
+  gameOver: boolean;
+  gameWon: boolean;
+  forfeited: boolean;
+  tableStaffingBySeason: Map<Season, CardStaffing[]>;
+  permanentFreeRerolls: number;
+  council: SeatedAdvisor[];
+  councilOfferChoices: Advisor[];
+  currentProposal: CouncilProposal | undefined;
+}
+
+/** The whole-match wire shape: kingdoms by seat plus the shared clock and outcome. */
+interface MatchStateData {
+  players: Kingdom[];
+  time: TimeState;
+  matchOver: boolean;
+  winnerSeat: number;
+  submittedSeats: number[];
+  resolutionPending: boolean;
 }
 
 interface GameStateData {
@@ -229,11 +259,18 @@ interface GameStateData {
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
+  // ── Multiplayer extras (defaults keep single-player code paths unchanged) ──
+  seat: number;
+  matchOver: boolean;
+  winnerSeat: number;
+  submittedSeats: number[];
+  opponent: Kingdom | undefined;
+  forfeited: boolean;
 }
 
 interface GameMessageData {
   context: GameContext;
-  state: GameState;
+  match: MatchState;
 }
 
 // ─── Domain classes ───────────────────────────────────────────────────────────
@@ -255,21 +292,32 @@ export class CardTarget {
   }
 }
 
-// EffectTarget is either a ResourceTarget string or a CardTarget object.  The
-// union type is used in Effect and wherever rendering code needs to branch on
-// what a card effect actually acts upon.
-export type EffectTarget = ResourceTarget | CardTarget;
+// OpponentTarget: the sabotage branch of the EffectTarget union.  The server
+// serialises this as { targetResource: "PRODUCTION", opponent: true } — the
+// `opponent` flag is the wire discriminator versus CardTarget.  The effect
+// drains (or boosts) the OPPONENT's kingdom, resolved against a pre-resolution
+// snapshot on the server.
+export class OpponentTarget {
+  targetResource: ResourceTarget;
 
-// Effect: a single numeric modifier on a Card.
+  constructor(data: OpponentTargetData) {
+    this.targetResource = data.targetResource;
+  }
+}
+
+// EffectTarget is either a ResourceTarget string, a CardTarget object, or an
+// OpponentTarget (sabotage) object.  The union type is used in Effect and
+// wherever rendering code needs to branch on what a card effect acts upon.
+export type EffectTarget = ResourceTarget | CardTarget | OpponentTarget;
+
+// Effect: a single flat additive modifier on a Card.
 export class Effect {
   target: EffectTarget;
   modifier: number;
-  valueType: ValueType;
 
   constructor(data: EffectData) {
     this.target = data.target;
     this.modifier = data.modifier;
-    this.valueType = data.valueType;
   }
 }
 
@@ -453,15 +501,17 @@ export class ResolutionStep {
   }
 }
 
-// GameContext: identifies the recipient (player) and the game.
-// Mirrors the Java KhContext record.
+// GameContext: identifies the recipient (player), the game, and the seat the
+// recipient occupies in the match. Mirrors the Java KhContext record.
 export class GameContext {
   player: string;
   gameId: string;
+  seat: number;
 
   constructor(data: GameContextData) {
     this.player = data.player;
     this.gameId = data.gameId;
+    this.seat = data.seat;
   }
 }
 
@@ -501,7 +551,76 @@ export class ResourceState {
   }
 }
 
-// GameState: full snapshot of the game at one point in time.
+// Kingdom: one seat's kingdom as sent inside the match's players[] array.
+// Opponent kingdoms arrive REDACTED from the server (empty hand/offers/piles) —
+// the hidden-information model.
+export class Kingdom {
+  board: Map<Season, Card[]>;
+  drawPile: Map<Season, Card[]>;
+  discardPile: Map<Season, Card[]>;
+  hand: Card[];
+  resources: ResourceState;
+  addChoices: Card[];
+  rerollCount: number;
+  gameOver: boolean;
+  gameWon: boolean;
+  forfeited: boolean;
+  tableStaffingBySeason: Map<Season, CardStaffing[]>;
+  resolutionLog: ResolutionStep[];
+  permanentFreeRerolls: number;
+  council: SeatedAdvisor[];
+  councilOfferChoices: Advisor[];
+  currentProposal: CouncilProposal | undefined;
+
+  constructor(data: KingdomData) {
+    this.board = data.board;
+    this.drawPile = data.drawPile;
+    this.discardPile = data.discardPile;
+    this.hand = data.hand;
+    this.resources = data.resources;
+    this.addChoices = data.addChoices;
+    this.rerollCount = data.rerollCount;
+    this.gameOver = data.gameOver;
+    this.gameWon = data.gameWon;
+    this.forfeited = data.forfeited;
+    this.tableStaffingBySeason = data.tableStaffingBySeason;
+    this.resolutionLog = data.resolutionLog;
+    this.permanentFreeRerolls = data.permanentFreeRerolls;
+    this.council = data.council;
+    this.councilOfferChoices = data.councilOfferChoices;
+    this.currentProposal = data.currentProposal;
+  }
+}
+
+// MatchState: the full wire payload — every kingdom by seat, the shared clock,
+// the readiness barrier's submittedSeats, and the match outcome.
+export class MatchState {
+  players: Kingdom[];
+  time: TimeState;
+  matchOver: boolean;
+  winnerSeat: number;
+  submittedSeats: number[];
+  /** True while a multiplayer PLAY resolution is held on-screen until every seat clicks Continue. */
+  resolutionPending: boolean;
+
+  constructor(data: MatchStateData) {
+    this.players = data.players;
+    this.time = data.time;
+    this.matchOver = data.matchOver;
+    this.winnerSeat = data.winnerSeat;
+    this.submittedSeats = data.submittedSeats;
+    this.resolutionPending = data.resolutionPending;
+  }
+
+  /** True once `seat` has submitted the current phase (is waiting on others). */
+  public hasSubmitted(seat: number): boolean {
+    return this.submittedSeats.includes(seat);
+  }
+}
+
+// GameState: the per-seat view the scenes consume — YOUR kingdom flattened
+// together with the shared clock, exactly the shape the scenes were built
+// against, plus multiplayer extras (seat, opponent, submittedSeats, outcome).
 // Season-keyed piles are kept as Maps so rendering code can do a direct
 // state.board.get(Season.SPRING) lookup without scanning arrays.
 export class GameState {
@@ -521,6 +640,13 @@ export class GameState {
   council: SeatedAdvisor[];
   councilOfferChoices: Advisor[];
   currentProposal: CouncilProposal | undefined;
+  // ── Multiplayer extras ──
+  seat: number;
+  matchOver: boolean;
+  winnerSeat: number;
+  submittedSeats: number[];
+  opponent: Kingdom | undefined;
+  forfeited: boolean;
 
   constructor(data: GameStateData) {
     this.board = data.board;
@@ -539,6 +665,48 @@ export class GameState {
     this.council = data.council;
     this.councilOfferChoices = data.councilOfferChoices;
     this.currentProposal = data.currentProposal;
+    this.seat = data.seat;
+    this.matchOver = data.matchOver;
+    this.winnerSeat = data.winnerSeat;
+    this.submittedSeats = data.submittedSeats;
+    this.opponent = data.opponent;
+    this.forfeited = data.forfeited;
+  }
+
+  /** Builds the scene-facing view of `seat`'s kingdom from the match payload. */
+  public static forSeat(match: MatchState, seat: number): GameState {
+    const you = match.players[seat] ?? match.players[0];
+    const opponent =
+      match.players.length > 1 ? match.players[seat === 0 ? 1 : 0] : undefined;
+    return new GameState({
+      board: you.board,
+      drawPile: you.drawPile,
+      discardPile: you.discardPile,
+      hand: you.hand,
+      resources: you.resources,
+      time: match.time,
+      addChoices: you.addChoices,
+      rerollCount: you.rerollCount,
+      gameOver: you.gameOver,
+      tableStaffing: you.tableStaffingBySeason.get(match.time.season) ?? [],
+      resolutionLog: you.resolutionLog,
+      gameWon: you.gameWon,
+      permanentFreeRerolls: you.permanentFreeRerolls,
+      council: you.council,
+      councilOfferChoices: you.councilOfferChoices,
+      currentProposal: you.currentProposal,
+      seat,
+      matchOver: match.matchOver,
+      winnerSeat: match.winnerSeat,
+      submittedSeats: match.submittedSeats,
+      opponent,
+      forfeited: you.forfeited,
+    });
+  }
+
+  /** True when this seat has submitted the current phase and is waiting on others. */
+  public isWaitingOnOthers(): boolean {
+    return !this.matchOver && this.submittedSeats.includes(this.seat);
   }
 
   // Convenience accessor — the current season's table is needed very often.
@@ -547,15 +715,19 @@ export class GameState {
   }
 }
 
-// GameMessage: the envelope that wraps context + state.  Every item placed on
-// the async queue is a GameMessage.  Mirrors the Java KhMessage record.
+// GameMessage: the envelope that wraps context + match state.  Every item
+// placed on the async queue is a GameMessage.  `state` is the recipient's
+// per-seat view (what the scenes consume); `match` carries the whole match for
+// match-level UI (opponent HUD, waiting overlay, dual resolution screen).
 export class GameMessage {
   context: GameContext;
+  match: MatchState;
   state: GameState;
 
   constructor(data: GameMessageData) {
     this.context = data.context;
-    this.state = data.state;
+    this.match = data.match;
+    this.state = GameState.forSeat(data.match, data.context.seat);
   }
 }
 
@@ -574,12 +746,20 @@ const CardTargetSchema = z
   .object({ targetResource: z.enum(ResourceTarget), adjacentOnly: z.boolean() })
   .transform((data) => new CardTarget(data as CardTargetData));
 
-// EffectTarget union: ResourceTarget strings are tried first (the common case)
-// then CardTarget objects.  z.union() evaluates branches in declaration order,
-// so a plain string will pass the enum check immediately; an object will fail
-// the enum check and succeed against the object schema.
+// Sabotage target: distinguished from CardTarget by the `opponent: true`
+// discriminator the server adds (both otherwise carry targetResource).
+const OpponentTargetSchema = z
+  .object({ targetResource: z.enum(ResourceTarget), opponent: z.literal(true) })
+  .transform((data) => new OpponentTarget({ targetResource: data.targetResource }));
+
+// EffectTarget union: ResourceTarget strings are tried first (the common case),
+// then OpponentTarget (requires the `opponent: true` discriminator), then
+// CardTarget objects.  z.union() evaluates branches in declaration order, so a
+// plain string passes the enum check immediately; objects fall through to the
+// matching object schema.
 const EffectTargetSchema = z.union([
   z.enum(ResourceTarget),
+  OpponentTargetSchema,
   CardTargetSchema,
 ]);
 
@@ -587,7 +767,6 @@ const EffectSchema = z
   .object({
     target: EffectTargetSchema,
     modifier: z.number(),
-    valueType: z.enum(ValueType),
   })
   .transform((data) => new Effect(data as EffectData));
 
@@ -702,6 +881,9 @@ export const GameContextSchema = z
   .object({
     player: z.string(),
     gameId: z.string(),
+    // The recipient's seat in the match. Defaulted for safety, though the
+    // server always sends it since the two-player refactor.
+    seat: z.number().int().default(0),
   })
   .transform((data) => new GameContext(data as GameContextData));
 
@@ -734,23 +916,33 @@ const ResourceStateSchema = z
   })
   .transform((data) => new ResourceState(data));
 
-export const GameStateSchema = z
+// Per-season staffing map, computed server-side per kingdom. The client picks
+// the current season's entry as the scene-facing `tableStaffing`.
+const SeasonToStaffingSchema = z.preprocess(
+  (val) => new Map(Object.entries((val ?? {}) as object)),
+  z.map(z.enum(Season), z.array(CardStaffingSchema)),
+);
+
+// One kingdom inside the match's players[] array. Opponent kingdoms arrive
+// redacted (empty hand/offers/piles) — defaults keep parsing safe either way.
+const KingdomSchema = z
   .object({
     board: SeasonToCardsSchema,
     drawPile: SeasonToCardsSchema,
     discardPile: SeasonToCardsSchema,
-    hand: z.array(CardSchema),
+    hand: z.array(CardSchema).default([]),
     resources: ResourceStateSchema,
-    time: TimeStateSchema,
-    addChoices: z.array(CardSchema),
-    rerollCount: z.number().int(),
+    addChoices: z.array(CardSchema).default([]),
+    rerollCount: z.number().int().default(0),
     gameOver: z.boolean(),
-    // tableStaffing is only populated during the PLAY phase; empty array otherwise.
-    tableStaffing: z.array(CardStaffingSchema).default([]),
-    // resolutionLog is populated after endAndRun; empty between seasons.
-    resolutionLog: z.array(ResolutionStepSchema).default([]),
     // true once all four win-condition Great Works are completed.
     gameWon: z.boolean().default(false),
+    // true once this kingdom's player gave up (multi-seat "gives up → forfeits").
+    forfeited: z.boolean().default(false),
+    // Worker staffing per season, computed server-side from board + population.
+    tableStaffingBySeason: SeasonToStaffingSchema.default(new Map()),
+    // resolutionLog is populated after a PLAY resolution; empty between seasons.
+    resolutionLog: z.array(ResolutionStepSchema).default([]),
     // Permanent free-ADD-phase-reroll count from one-time Decrees (e.g. Lady Iseult Varn's
     // "Plant an Informant"). Distinct from a seated advisor's own bonusFreeRerolls (Reform-driven,
     // tied to that seat) — this persists even after the granting advisor is later dismissed.
@@ -765,14 +957,34 @@ export const GameStateSchema = z
     // advisor currently has anything left to propose, not a missing key.
     currentProposal: CouncilProposalSchema.nullish().transform((v) => v ?? undefined),
   })
-  .transform((data) => new GameState(data as GameStateData));
+  .transform((data) => new Kingdom(data as KingdomData));
+
+// The whole-match wire shape: { players: [...], time, matchOver, winnerSeat, submittedSeats }.
+export const MatchStateSchema = z
+  .object({
+    players: z.array(KingdomSchema).min(1),
+    time: TimeStateSchema,
+    matchOver: z.boolean().default(false),
+    winnerSeat: z.number().int().default(-1),
+    // Seats that have completed the current phase — drives "waiting for other player…".
+    submittedSeats: z.array(z.number().int()).default([]),
+    // True while a resolved PLAY phase is held until every seat clicks Continue.
+    resolutionPending: z.boolean().default(false),
+  })
+  .transform((data) => new MatchState(data as MatchStateData));
 
 export const GameMessageSchema = z
   .object({
     context: GameContextSchema,
-    state: GameStateSchema,
+    state: MatchStateSchema,
   })
-  .transform((data) => new GameMessage(data as GameMessageData));
+  .transform(
+    (data) =>
+      new GameMessage({
+        context: data.context as GameContext,
+        match: data.state as MatchState,
+      }),
+  );
 
 // ─── GameEventHandler ─────────────────────────────────────────────────────────
 //
@@ -999,6 +1211,16 @@ export class GameEventHandler {
   public endAndRun(): void {
     this.stompClient.publish({
       destination: `/games/kh/${this.gameId}/play/end`,
+    });
+  }
+
+  /**
+   * Acknowledges the multiplayer resolution screen ("Continue"). The clock is held on the resolved
+   * season until every seat continues, at which point the server advances to the next phase.
+   */
+  public continueResolution(): void {
+    this.stompClient.publish({
+      destination: `/games/kh/${this.gameId}/play/continue`,
     });
   }
 

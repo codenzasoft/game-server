@@ -1,4 +1,4 @@
-import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, SeatedAdvisor, ResourceTarget } from "./kingshand.ts";
+import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, OpponentTarget, SeatedAdvisor, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
   cardImagePath,
@@ -399,7 +399,7 @@ export class PlayPhaseScene {
     const effectsHTML = seated.card.effects
       .map((e) => {
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}/season</span>`;
+        return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}/season</span>`;
       })
       .join("");
     return `
@@ -524,13 +524,23 @@ export class PlayPhaseScene {
             </div>
           `;
         }
+        if (e.target instanceof OpponentTarget) {
+          const res = e.target.targetResource;
+          return `
+            <div class="kh-tc-tt-effect">
+              <span class="kh-tc-tt-et kh-tc-tt-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
+              <span class="kh-tc-tt-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-tc-tt-effect">
             <span class="kh-tc-tt-et kh-tc-tt-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-tc-tt-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-tc-tt-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;
@@ -684,13 +694,23 @@ export class PlayPhaseScene {
             </div>
           `;
         }
+        if (e.target instanceof OpponentTarget) {
+          const res = e.target.targetResource;
+          return `
+            <div class="kh-play-hc-effect-row">
+              <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
+              <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+        }
         const targetStr = typeof e.target === "string" ? e.target : "CARD";
         const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-play-hc-effect-row">
             <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-play-hc-mod">${formatModifier(e.modifier, e.valueType)}</span>
+            <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
             <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
           </div>
         `;
@@ -806,8 +826,12 @@ export class PlayPhaseScene {
               const sc = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
               return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
+            if (e.target instanceof OpponentTarget) {
+              const label = resourceShortLabel(e.target.targetResource);
+              return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            }
             const targetStr = typeof e.target === "string" ? e.target : "CARD";
-            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier, e.valueType)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+            return `<span class="kh-cc-effect">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
           }).join("");
           return `
             <div class="kh-compact-card">
@@ -989,7 +1013,7 @@ export class PlayPhaseScene {
         const table  = state.getCurrentTable();
         const isUpg  = tableNames.has(card.name);
         const hasSlot = table.length < MAX_TABLE_SIZE || isUpg;
-        const canAfford = state.production >= card.productionRequirement;
+        const canAfford = state.resources.production >= card.productionRequirement;
 
         if (!canAfford || !hasSlot) {
           this.showToast(!canAfford ? "⚠ Cannot afford this card." : "⚠ Table is full.");

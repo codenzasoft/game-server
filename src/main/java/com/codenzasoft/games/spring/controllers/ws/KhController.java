@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +29,9 @@ public class KhController {
   @Autowired private KhBroadcastService khBroadcastService;
 
   /**
-   * Loads the current game state and sends it to the player. For a fresh game in the ADD phase with
-   * no choices offered yet, seeds the initial offer before broadcasting so the client receives a
+   * Loads the current game state and sends it to every seated player. For a fresh game in the ADD
+   * phase with no choices offered yet, {@code getOrBuildKhGame} runs {@code initialize()} which
+   * seeds the initial offer and fires the started/updated broadcast, so the client receives a
    * fully-populated state on first load.
    */
   @MessageMapping("/kh/{gameId}/load")
@@ -43,19 +45,8 @@ public class KhController {
    * reroll. The server rejects the request if the player cannot afford it.
    */
   @MessageMapping("/kh/{gameId}/add/offer")
-  public void addOffer(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.offerAddChoices();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("addOffer rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void addOffer(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "addOffer", GameEngine::offerAddChoices);
   }
 
   /**
@@ -63,20 +54,10 @@ public class KhController {
    * season's draw pile and advances to the PLAY phase.
    */
   @MessageMapping("/kh/{gameId}/add/pick")
-  public void addPick(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String name = (String) body.get("name");
-              try {
-                game.pickCardByName(name);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("addPick rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void addPick(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String name = (String) body.get("name");
+    act(gameId, principal, "addPick", game -> game.pickCardByName(name));
   }
 
   /**
@@ -84,19 +65,8 @@ public class KhController {
    * com.codenzasoft.games.kingshand.Phase#PLAY}.
    */
   @MessageMapping("/kh/{gameId}/add/skip")
-  public void addSkip(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.skipAdd();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("addSkip rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void addSkip(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "addSkip", GameEngine::skipAdd);
   }
 
   // ── COUNCIL_ADD / COUNCIL_MEETING phase actions ─────────────────────────────
@@ -108,20 +78,10 @@ public class KhController {
    * project proposal.
    */
   @MessageMapping("/kh/{gameId}/council/hire")
-  public void councilHire(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String id = (String) body.get("id");
-              try {
-                game.hireAdvisorById(id);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("councilHire rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void councilHire(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String id = (String) body.get("id");
+    act(gameId, principal, "councilHire", game -> game.hireAdvisorById(id));
   }
 
   /**
@@ -130,19 +90,8 @@ public class KhController {
    * project proposal.
    */
   @MessageMapping("/kh/{gameId}/council/skip")
-  public void councilSkip(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.skipCouncilAdd();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("councilSkip rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void councilSkip(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "councilSkip", GameEngine::skipCouncilAdd);
   }
 
   /**
@@ -151,19 +100,8 @@ public class KhController {
    * and seeds the next ADD-phase offer.
    */
   @MessageMapping("/kh/{gameId}/council/accept")
-  public void councilAccept(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.acceptCouncilProposal();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("councilAccept rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void councilAccept(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "councilAccept", GameEngine::acceptCouncilProposal);
   }
 
   /**
@@ -171,19 +109,8 @@ public class KhController {
    * {@link com.codenzasoft.games.kingshand.Phase#ADD} and seeds the next ADD-phase offer.
    */
   @MessageMapping("/kh/{gameId}/council/pass")
-  public void councilPass(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.passCouncilProposal();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("councilPass rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void councilPass(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "councilPass", GameEngine::passCouncilProposal);
   }
 
   /**
@@ -193,20 +120,9 @@ public class KhController {
    */
   @MessageMapping("/kh/{gameId}/council/dismiss")
   public void councilDismiss(
-      @DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String id = (String) body.get("id");
-              try {
-                game.dismissAdvisor(id);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("councilDismiss rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String id = (String) body.get("id");
+    act(gameId, principal, "councilDismiss", game -> game.dismissAdvisor(id));
   }
 
   // ── PLAY phase actions ────────────────────────────────────────────────────
@@ -217,20 +133,10 @@ public class KhController {
    * (upgrade) instead of adding a new slot.
    */
   @MessageMapping("/kh/{gameId}/play/card")
-  public void playCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String name = (String) body.get("name");
-              try {
-                game.placeCardByName(name);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("playCard rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void playCard(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String name = (String) body.get("name");
+    act(gameId, principal, "playCard", game -> game.placeCardByName(name));
   }
 
   /**
@@ -238,20 +144,10 @@ public class KhController {
    * GameEngine#DEMOLISH_COST_RATE} × the card's production requirement.
    */
   @MessageMapping("/kh/{gameId}/play/demolish")
-  public void demolishCard(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String name = (String) body.get("name");
-              try {
-                game.demolishCardByName(name);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("demolishCard rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void demolishCard(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String name = (String) body.get("name");
+    act(gameId, principal, "demolishCard", game -> game.demolishCardByName(name));
   }
 
   /**
@@ -260,21 +156,11 @@ public class KhController {
    * the server always applies the player's complete intent in one call.
    */
   @MessageMapping("/kh/{gameId}/play/reorder")
-  public void reorderTable(@DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              @SuppressWarnings("unchecked")
-              final List<String> names = (List<String>) body.get("names");
-              try {
-                game.reorderTable(names);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("reorderTable rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void reorderTable(
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    @SuppressWarnings("unchecked")
+    final List<String> names = (List<String>) body.get("names");
+    act(gameId, principal, "reorderTable", game -> game.reorderTable(names));
   }
 
   /**
@@ -285,20 +171,9 @@ public class KhController {
    */
   @MessageMapping("/kh/{gameId}/play/commission")
   public void commissionGreatWork(
-      @DestinationVariable String gameId, @Payload Map<String, Object> body) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              final String name = (String) body.get("name");
-              try {
-                game.commissionGreatWork(name);
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException | IllegalArgumentException e) {
-                log.error("commissionGreatWork rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+      @DestinationVariable String gameId, @Payload Map<String, Object> body, Principal principal) {
+    final String name = (String) body.get("name");
+    act(gameId, principal, "commissionGreatWork", game -> game.commissionGreatWork(name));
   }
 
   /**
@@ -307,19 +182,18 @@ public class KhController {
    * the game has ended due to starvation, so the game-over state is broadcast cleanly.
    */
   @MessageMapping("/kh/{gameId}/play/end")
-  public void endAndRun(@DestinationVariable String gameId) {
-    gameService
-        .getOrBuildKhGame(UUID.fromString(gameId))
-        .ifPresent(
-            game -> {
-              try {
-                game.endAndRun();
-                khBroadcastService.gameLoaded(game);
-              } catch (final IllegalStateException e) {
-                log.error("endAndRun rejected for game {}: {}", gameId, e.getMessage());
-                NewRelic.noticeError(e);
-              }
-            });
+  public void endAndRun(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "endAndRun", GameEngine::endAndRun);
+  }
+
+  /**
+   * Acknowledges the multiplayer resolution screen ("Continue"). The tables have already resolved;
+   * the shared clock is held on the resolved season until every seat continues, at which point it
+   * advances to the next phase.
+   */
+  @MessageMapping("/kh/{gameId}/play/continue")
+  public void continueResolution(@DestinationVariable String gameId, Principal principal) {
+    act(gameId, principal, "continueResolution", GameEngine::continueResolution);
   }
 
   @MessageMapping("/kh/{gameId}/quit")
@@ -329,7 +203,22 @@ public class KhController {
       return;
     }
     final UUID id = UUID.fromString(gameId);
-    gameService.getOrBuildKhGame(id).ifPresent(GameEngine::quit);
+    // In a multi-seat match, giving up forfeits: the quitter's kingdom is marked out, the match
+    // outcome is settled for the remaining seat (they win), and gameOver fires so stats record.
+    // A solo game keeps the original quit semantics (no counted result).
+    gameService
+        .getOrBuildKhGame(id)
+        .ifPresent(
+            game -> {
+              final int seat = game.seatOf(userEntity.get().getUsername());
+              if (seat >= 0
+                  && game.getState().playerCount() > 1
+                  && !game.getState().isMatchOver()) {
+                game.forfeit(seat);
+              } else {
+                game.quit();
+              }
+            });
     try {
       gameService.quitGame(id, userEntity.get());
     } catch (final IllegalStateException e) {
@@ -338,6 +227,44 @@ public class KhController {
       return;
     }
     khBroadcastService.gameQuit(id, userEntity.get().getUsername());
+  }
+
+  /**
+   * Shared action pipeline: resolves the authenticated user to their seat, points the engine at
+   * that seat, runs the action on that player's kingdom, then fires {@link
+   * GameEngine#notifyUpdated()} so the broadcast observer pushes fresh per-seat state to every
+   * client. Rejections (bad phase, unaffordable, unknown card) are logged and reported without
+   * tearing down the socket.
+   */
+  private void act(
+      final String gameId,
+      final Principal principal,
+      final String op,
+      final Consumer<GameEngine> action) {
+    final Optional<UserEntity> userOpt = findUser(principal);
+    if (userOpt.isEmpty()) {
+      log.warn("{} rejected for game {}: no authenticated user", op, gameId);
+      return;
+    }
+    gameService
+        .getOrBuildKhGame(UUID.fromString(gameId))
+        .ifPresent(
+            game -> {
+              final String username = userOpt.get().getUsername();
+              final int seat = game.seatOf(username);
+              if (seat < 0) {
+                log.warn("{} rejected for game {}: user '{}' is not seated", op, gameId, username);
+                return;
+              }
+              try {
+                game.setActiveSeat(seat);
+                action.accept(game);
+                game.notifyUpdated();
+              } catch (final IllegalStateException | IllegalArgumentException e) {
+                log.error("{} rejected for game {}: {}", op, gameId, e.getMessage());
+                NewRelic.noticeError(e);
+              }
+            });
   }
 
   private Optional<UserEntity> findUser(final Principal principal) {

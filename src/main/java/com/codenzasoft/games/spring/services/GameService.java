@@ -9,6 +9,7 @@ import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
+import com.codenzasoft.games.kingshand.strategies.KhHeuristicStrategy;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
@@ -25,6 +26,7 @@ import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
+import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Line;
@@ -56,6 +58,7 @@ public class GameService {
   @Autowired private XoGamePersistenceService xoGamePersistenceService;
   @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
+  @Autowired private KhBroadcastService khBroadcastService;
   @Autowired private HeartsPersistenceService heartsPersistenceService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
@@ -171,7 +174,13 @@ public class GameService {
   public KhGameEntity createKhGame(final UserEntity user) {
     enforceGameLimit(user);
     KhGameEntity game = new KhGameEntity(UUID.randomUUID());
-    game.setPlayers(List.of(user));
+    // Two-seat match: the creator takes seat 0, a bot fills seat 1. Seat resolution and per-seat
+    // broadcasting are generic, so replacing the bot with a second human later is a game-creation
+    // concern only.
+    final List<UserEntity> players = new ArrayList<>();
+    players.add(user);
+    players.addAll(getBots(1));
+    game.setPlayers(players);
     gamesRepository.save(game);
     return game;
   }
@@ -547,19 +556,34 @@ public class GameService {
 
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
     log.debug("Building KH game from entity: {}", entity.getId());
-    final Player player = entity.getPlayers().get(0).toPlayer();
-    final boolean isOver = entity.isOver() || entity.isQuit();
-    final GameState state = GameState.builder().build();
-    // Built via the Builder (rather than the raw constructor) so a GameLifecycleListener can be
-    // registered; the Builder's defaults (default catalogs, a fresh Random, synchronous executor)
-    // exactly replicate the old constructor's behavior.
-    final GameEngine engine =
+    final List<UserEntity> seatedUsers = entity.getPlayers();
+    // One kingdom per seat, sharing a clock. Both kingdoms are seeded with the standard starting
+    // deck by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per
+    // request by KhController based on the acting user's seat.
+    final GameState state = GameState.newMultiplayer(Math.max(seatedUsers.size(), 1));
+    // Built via the Builder so the lifecycle listener and the KH broadcast observer can be
+    // registered. Registering khBroadcastService as a KhObserver makes state pushes engine-driven:
+    // initialize() fires gameStarted, each action fires gameUpdated (via GameEngine#notifyUpdated),
+    // and resolution fires gameOver — all broadcast per-seat.
+    final GameEngine.Builder builder =
         new GameEngine.Builder()
             .withId(entity.getId())
-            .withPlayer(player)
             .withState(state)
-            .addLifecycleObserver(new GameLifecycleListener<>())
-            .build();
+            .addListener(khBroadcastService)
+            .addLifecycleObserver(new GameLifecycleListener<>());
+    // Seat i = i-th withPlayer call; seat 0 is the creator. Bot seats bind their strategy driver
+    // right here (mirrors Hearts' addPlayerObserver(player, strategy)), so seat and strategy can
+    // never drift apart. The engine auto-drives strategy seats after every phase seed so the
+    // readiness barrier never stalls on a bot; bots go through the same seat-aware actions as
+    // humans — only the trigger differs.
+    for (final UserEntity user : seatedUsers) {
+      if (user.isBot()) {
+        builder.withPlayer(user.toPlayer(), new KhHeuristicStrategy());
+      } else {
+        builder.withPlayer(user.toPlayer());
+      }
+    }
+    final GameEngine engine = builder.build();
     // Delegate initialization to the engine — it owns the knowledge of how a game starts.
     engine.initialize();
     return engine;
@@ -719,16 +743,25 @@ public class GameService {
   }
 
   /**
-   * Records KH games-played outcomes. KH's only production {@code gameOver} trigger today is
-   * population reaching zero (starvation) — always a loss for the single player. Victory completion
-   * ({@code GameState#isVictoryComplete}) does not yet fire {@code gameOver}; that gap is
-   * pre-existing and out of scope for GAME-117.
+   * Records KH games-played outcomes from the match result: {@code winnerSeat()} decides win vs
+   * loss for each human seat. Covers every {@code gameOver} path — victory (all win-condition Great
+   * Works completed), starvation knock-out, and forfeit (last kingdom standing wins). A {@code
+   * winnerSeat} of {@code -1} (solo knock-out) records a loss.
    */
   private void recordKhGamesPlayed(final GameEngine game) {
+    final int winnerSeat = game.getState().winnerSeat();
     for (final Player player : game.getPlayers()) {
+      final int seat = game.seatOf(player.name());
       findUser(player.id())
           .filter(user -> !user.isBot())
-          .ifPresent(user -> updateGamesPlayed(user, GameType.KH, 0, 1, 0));
+          .ifPresent(
+              user -> {
+                if (seat >= 0 && seat == winnerSeat) {
+                  updateGamesPlayed(user, GameType.KH, 1, 0, 0);
+                } else {
+                  updateGamesPlayed(user, GameType.KH, 0, 1, 0);
+                }
+              });
     }
   }
 
