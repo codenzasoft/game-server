@@ -344,6 +344,34 @@ class AdaptiveStrategySpec extends Specification {
         card.get() == _2D
     }
 
+    def "saboteur sluff does not dump Q♠ onto the shooter's winning trick when hearts are available"() {
+        given: "bob leads A♣ and is winning; alice is void in clubs and holds only Q♠ and hearts"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "bob", [new PlayedCard("bob", AC)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when: "valid cards are Q♠, K♥, A♥ — no safe non-point option"
+        def card = strategy.selectSaboteurCard(state, alice, [QS, KH, AH] as Set, "bob")
+
+        then: "sluffs a heart rather than Q♠ to avoid giving the shooter 13 pts"
+        card.get().getSuit() == Suit.HEARTS
+    }
+
+    def "saboteur sluff plays Q♠ only as last resort when it is the only card"() {
+        given: "bob leads A♣ and is winning; alice's only valid card is Q♠"
+        def strategy = new AdaptiveStrategy(false)
+        def trick = new TrickState(1, "bob", [new PlayedCard("bob", AC)])
+        def round = HeartsStateBuilder.inProgressRound(tricks: [trick])
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        def card = strategy.selectSaboteurCard(state, alice, [QS] as Set, "bob")
+
+        then: "has no alternative — plays Q♠"
+        card.get() == QS
+    }
+
     def "saboteur defers to defensive when shooter is not currently winning and trick has no points"() {
         given: "carol (not the shooter) is winning with a pointless club; alice returns empty"
         def strategy = new AdaptiveStrategy(false)
@@ -503,6 +531,71 @@ class AdaptiveStrategySpec extends Specification {
 
         then: "leads A♣ (guaranteed win) rather than 6♠ (defensive spade smoke-out)"
         1 * game.playCard(alice, AC)
+    }
+
+    def "saboteur does not lead A♠ or K♠ while Q♠ is still live"() {
+        given: "bob has 4 hearts (shooter); alice holds A♠ and a low club; Q♠ has not been played"
+        def strategy = new AdaptiveStrategy(false)
+        def game = Mock(HeartsGame)
+        def completedTricks = (1..4).collect { i ->
+            new TrickState(i, "bob", [
+                new PlayedCard("bob",   c(Suit.HEARTS, Rank.values()[Rank.ACE.ordinal() - (i - 1)])),
+                new PlayedCard("carol", _2C),
+                new PlayedCard("dave",  _3C),
+                new PlayedCard("alice", _4C),
+            ])
+        }
+        def currentTrick = new TrickState(5, "alice", [])
+        // alice holds A♠ (guaranteed winner on rank) and 2♦; Q♠ is still in bob's hand
+        def round = new RoundState(
+            1, Pass.KEEPER, "alice",
+            [:], [:], true,
+            completedTricks + [currentTrick],
+            ["alice": [AS, _2D], "bob": [QS, _3D]]
+        )
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [AS, _2D] as Set)
+
+        then: "does not lead A♠ — bob could dump Q♠ on the trick; falls back to defensive"
+        0 * game.playCard(alice, AS)
+        1 * game.playCard(alice, _)
+    }
+
+    def "saboteur may lead A♠ once Q♠ has been played"() {
+        given: "bob wins Q♠ (13 pts) then A♥ (1 pt) — 14 pts meets threat threshold; alice is saboteur"
+        def strategy = new AdaptiveStrategy(false)
+        def game = Mock(HeartsGame)
+        // trick 1: bob leads and wins Q♠ (13 pts)
+        def queenTrick = new TrickState(1, "bob", [
+            new PlayedCard("bob",   QS),
+            new PlayedCard("carol", c(Suit.SPADES, Rank.TWO)),
+            new PlayedCard("dave",  c(Suit.SPADES, Rank.THREE)),
+            new PlayedCard("alice", c(Suit.SPADES, Rank.FOUR)),
+        ])
+        // trick 2: bob wins A♥ (1 pt) — now 14 pts total, meets SHOOT_THREAT_THRESHOLD
+        def heartsTrick = new TrickState(2, "bob", [
+            new PlayedCard("bob",   AH),
+            new PlayedCard("carol", _2C),
+            new PlayedCard("dave",  _3C),
+            new PlayedCard("alice", _4C),
+        ])
+        def currentTrick = new TrickState(3, "alice", [])
+        // alice holds A♠; bob holds A♣ so alice's 2♣ is not a guaranteed win — A♠ is the only one
+        def round = new RoundState(
+            1, Pass.KEEPER, "alice",
+            [:], [:], true,
+            [queenTrick, heartsTrick, currentTrick],
+            ["alice": [AS, _2C], "bob": [AC, c(Suit.CLUBS, Rank.THREE)]]
+        )
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [AS, _2C] as Set)
+
+        then: "leads A♠ — Q♠ is gone so A♠/K♠ guard is bypassed; A♠ is a guaranteed win"
+        1 * game.playCard(alice, AS)
     }
 
     def "saboteur falls back to defensive lead when no guaranteed-win card exists"() {

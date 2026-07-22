@@ -69,6 +69,47 @@ class DefensiveStrategySpec extends Specification {
         1 * game.playCard(alice, _2C)
     }
 
+    // ── followSpades: duck when points are in the trick ──────────────────────────
+
+    def "followSpades ducks under the current trick winner when hearts have been sluffed (last player)"() {
+        given: "bob leads 6♠; carol sluffs 2♥ (void in spades); dave plays 9♠ (winning); alice is last"
+        def strategy = new DefensiveStrategy()
+        def game = Mock(HeartsGame)
+        def trick = new TrickState(2, "bob", [
+            new PlayedCard("bob",   c(Suit.SPADES, Rank.SIX)),
+            new PlayedCard("carol", c(Suit.HEARTS, Rank.TWO)),
+            new PlayedCard("dave",  c(Suit.SPADES, Rank.NINE)),
+        ])
+        // alice has J♠ (beats 9♠) and 3♠ (ducks under 9♠)
+        def round = roundWithTrick("alice", [JS, _3S], trick)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [JS, _3S] as Set)
+
+        then: "plays 3♠ to duck under 9♠ — avoids taking the sluffed heart"
+        1 * game.playCard(alice, _3S)
+    }
+
+    def "followSpades ducks under the actual trick winner mid-trick (not just below Q♠)"() {
+        given: "bob leads 8♠; carol sluffs 2♥; alice plays before dave — must pick a card"
+        def strategy = new DefensiveStrategy()
+        def game = Mock(HeartsGame)
+        def trick = new TrickState(2, "bob", [
+            new PlayedCard("bob",   c(Suit.SPADES, Rank.EIGHT)),
+            new PlayedCard("carol", c(Suit.HEARTS, Rank.TWO)),
+        ])
+        // alice has J♠ (highest below Q♠ but beats 8♠) and 3♠ (ducks under 8♠)
+        def round = roundWithTrick("alice", [JS, _3S], trick)
+        def state = HeartsStateBuilder.state(rounds: [round])
+
+        when:
+        strategy.yourTurnToPlay(game, state, alice, [JS, _3S] as Set)
+
+        then: "plays 3♠ — ducks under 8♠ rather than J♠ (highest below Q♠) which would win the heart"
+        1 * game.playCard(alice, _3S)
+    }
+
     // ── selectSpadesToPass: low-card protection threshold ────────────────────────
 
     def "spades are passed when 4+ spades but fewer than 2 low cards"() {

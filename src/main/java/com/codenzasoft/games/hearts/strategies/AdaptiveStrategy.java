@@ -266,7 +266,11 @@ public class AdaptiveStrategy extends DefensiveStrategy {
             .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
             .min(Comparator.comparing(Card::getRank));
     if (safeCard.isPresent()) return safeCard;
-    return validCards.stream().min(Comparator.comparing(Card::getRank));
+    // Prefer any heart over Q♠ — giving the shooter 13 pts accelerates their moon shot
+    return validCards.stream()
+        .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .min(Comparator.comparing(Card::getRank))
+        .or(() -> validCards.stream().min(Comparator.comparing(Card::getRank)));
   }
 
   // ── Saboteur lead ────────────────────────────────────────────────────────────
@@ -274,11 +278,15 @@ public class AdaptiveStrategy extends DefensiveStrategy {
   private Optional<Card> selectSaboteurLeadCard(
       final RoundState round, final Player player, final Set<Card> validCards) {
     final List<Card> myHand = round.getHand(player);
+    final boolean queenPlayed = StrategyHelper.hasQueenBeenPlayed(round);
     // Lead the highest non-hearts card we're guaranteed to win (no opponent holds a higher card
     // of that suit), so the saboteur takes the trick and the shooter doesn't.
+    // Exclude A♠/K♠ while Q♠ is still live — the "guaranteed win" check only considers whether
+    // an opponent holds a higher spade, not whether they're void and could dump Q♠ on the trick.
     return validCards.stream()
         .filter(c -> c.getSuit() != Suit.HEARTS)
         .filter(c -> !c.equals(HeartsGame.QUEEN_OF_SPADES))
+        .filter(c -> !(c.getSuit() == Suit.SPADES && c.outRanks(Rank.QUEEN) && !queenPlayed))
         .filter(
             c ->
                 StrategyHelper.filterSuit(round.getRemainingCards(), c.getSuit())
