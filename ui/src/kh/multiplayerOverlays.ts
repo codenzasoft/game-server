@@ -13,8 +13,24 @@
 //                         server-computed resolutionLog, with floating resource
 //                         indicators just like the single-player resolve.
 
-import { Card, CardStaffing, Kingdom, MatchState, ResolutionStep, StaffingTier } from "./kingshand.ts";
-import { cardImagePath, getCardDisplayInfo } from "./cardCatalog.ts";
+import {
+  Card,
+  CardStaffing,
+  CardTarget,
+  Kingdom,
+  MatchState,
+  OpponentTarget,
+  ResolutionStep,
+  StaffingTier,
+} from "./kingshand.ts";
+import {
+  cardImagePath,
+  formatModifier,
+  getCardDisplayInfo,
+  resourceIcon,
+  resourceLabel,
+  resourceShortLabel,
+} from "./cardCatalog.ts";
 import { spawnResourceIndicator } from "./sharedOverlays.ts";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
@@ -91,16 +107,20 @@ const injectStyles = (): void => {
     /* Card row — reuses the play-scene card look, read-only. Art is ~2× the compact size. */
     .kh-dr-cards { display: flex; gap: 16px; flex-wrap: wrap; min-height: 260px;
                    align-items: flex-start; }
+    /* overflow is visible (not hidden) so the hover preview can escape the card; the art image
+       carries its own rounding instead. */
     .kh-dr-card { position: relative; width: 188px; height: 256px; border-radius: 14px;
-                  border: 3px solid #6b5a34; overflow: hidden; flex: 0 0 auto;
+                  border: 3px solid #6b5a34; overflow: visible; flex: 0 0 auto;
                   background: #1a1206; transition: box-shadow .2s, transform .2s, border-color .2s; }
-    .kh-dr-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .kh-dr-card img { width: 100%; height: 100%; object-fit: cover; display: block;
+                      border-radius: 11px; }
     .kh-dr-card.tier-full { border-color: #4caf50; }
     .kh-dr-card.tier-half { border-color: #f9a825; }
     .kh-dr-card.tier-none { border-color: #e53935; }
     .kh-dr-card-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 8px;
                        font-size: .82rem; font-weight: 700; text-align: center; color: #fff6dc;
                        background: linear-gradient(0deg, rgba(0,0,0,.85), rgba(0,0,0,0));
+                       border-radius: 0 0 11px 11px;
                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .kh-dr-card-staff { position: absolute; top: 6px; right: 6px; font-size: .72rem;
                         padding: 2px 8px; border-radius: 9px; background: rgba(8,5,2,.82);
@@ -110,6 +130,26 @@ const injectStyles = (): void => {
     .kh-dr-card.is-spent  { opacity: .5; }
     .kh-dr-card.is-sabotaged { border-color: #e0705a; box-shadow: 0 0 18px rgba(220,110,90,.6); }
     .kh-dr-empty { color: #7a6a52; font-style: italic; font-size: .85rem; padding: 44px 0; }
+
+    /* Hover preview — mirrors the play/build-phase card tooltip, for BOTH kingdoms' tables. */
+    .kh-dr-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+                 width: 230px; z-index: 50; display: none;
+                 padding: 10px 12px; border-radius: 10px;
+                 border: 1px solid rgba(196,148,40,.6);
+                 background: linear-gradient(180deg, rgba(34,22,8,.98) 0%, rgba(18,10,4,.98) 100%);
+                 box-shadow: 0 6px 20px rgba(0,0,0,.6); text-align: left; pointer-events: none; }
+    .kh-dr-card:hover .kh-dr-tip { display: block; }
+    .kh-dr-tip-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                      margin-bottom: 6px; }
+    .kh-dr-tip-name { font-weight: 700; color: #f0cc50; font-size: .9rem; }
+    .kh-dr-tip-freq { font-size: .6rem; font-weight: 700; letter-spacing: 1px; padding: 1px 6px;
+                      border-radius: 6px; border: 1px solid rgba(196,148,40,.5); color: #d8c290; }
+    .kh-dr-tip-freq.is-recurring { color: #9fdd8f; border-color: rgba(120,200,110,.5); }
+    .kh-dr-tip-freq.is-single    { color: #d8b46a; }
+    .kh-dr-tip-effs { display: flex; flex-direction: column; gap: 4px; }
+    .kh-dr-tip-eff { font-size: .76rem; color: #e8d4a0; }
+    .kh-dr-tip-eff-engine   { color: #a9c8e8; }
+    .kh-dr-tip-eff-sabotage { color: #f0a08c; }
 
     .kh-dual-continue { margin-top: 22px; padding: 12px 42px; border-radius: 10px;
                         border: 2px solid #f0cc50; cursor: pointer;
@@ -206,6 +246,36 @@ const sumDeltas = (log: ResolutionStep[]): ResTotals => {
 const isHarvestStep = (s: ResolutionStep): boolean =>
   s.cardName === undefined || s.cardName === null;
 
+/** Renders a card's effects as compact spans, matching the play/build-phase tooltip. */
+const cardEffectsHTML = (card: Card): string =>
+  card.effects
+    .map((e) => {
+      if (e.target instanceof CardTarget) {
+        const label = resourceShortLabel(e.target.targetResource);
+        const scope = e.target.adjacentOnly ? `next ${label} card` : `${label} cards`;
+        return `<span class="kh-dr-tip-eff kh-dr-tip-eff-engine">${resourceIcon(e.target.targetResource)} ${scope} ${formatModifier(e.modifier)}${card.frequencyType === "RECURRING" ? "/season" : " once"}</span>`;
+      }
+      if (e.target instanceof OpponentTarget) {
+        return `<span class="kh-dr-tip-eff kh-dr-tip-eff-sabotage">⚔ rival ${resourceShortLabel(e.target.targetResource)} ${formatModifier(e.modifier)}${card.frequencyType === "RECURRING" ? "/season" : " once"}</span>`;
+      }
+      const targetStr = typeof e.target === "string" ? e.target : "CARD";
+      return `<span class="kh-dr-tip-eff">${resourceIcon(targetStr)} ${resourceLabel(targetStr)} ${formatModifier(e.modifier)}${card.frequencyType === "RECURRING" ? "/season" : " once"}</span>`;
+    })
+    .join("");
+
+/** Hover preview shown over a resolution card — the card's name, frequency, and effects. */
+const cardTipHTML = (card: Card): string => {
+  const info = getCardDisplayInfo(card);
+  return `
+    <div class="kh-dr-tip">
+      <div class="kh-dr-tip-head">
+        <span class="kh-dr-tip-name">${info.name}</span>
+        <span class="kh-dr-tip-freq ${card.frequencyType === "RECURRING" ? "is-recurring" : "is-single"}">${card.frequencyType}</span>
+      </div>
+      <div class="kh-dr-tip-effs">${cardEffectsHTML(card) || '<span class="kh-dr-tip-eff">No effects</span>'}</div>
+    </div>`;
+};
+
 /** Builds one kingdom panel: resource bar + full-art current-season table. */
 const buildPanel = (
   parent: HTMLElement,
@@ -251,6 +321,7 @@ const buildPanel = (
                 <img src="${cardImagePath(card.name)}" alt="${info.name}" />
                 ${staffChip}
                 <div class="kh-dr-card-name">${info.name}</div>
+                ${cardTipHTML(card)}
               </div>`;
           })
           .join("");
