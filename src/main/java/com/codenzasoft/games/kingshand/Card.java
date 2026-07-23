@@ -1,9 +1,6 @@
 package com.codenzasoft.games.kingshand;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -77,9 +74,14 @@ public record Card(
     return constructionPeriod > 0;
   }
 
+  /** Returns {@code true} if every effect on this card targets another card (engine-builder). */
+  public boolean isEngineBoost() {
+    return !effects.isEmpty() && effects.stream().allMatch(e -> e.target() instanceof CardTarget);
+  }
+
   /**
    * Returns the set of {@link ResourceTarget}s referenced by this card's effects. Used by {@link
-   * GameState#areRequiredResourcesUnlocked(Card)} to determine whether this card can currently be
+   * PlayerState#areRequiredResourcesUnlocked(Card)} to determine whether this card can currently be
    * offered, drafted, or commissioned — a card naturally "requires" any resource it reads or writes
    * via its effects, regardless of whether that resource is locked by default.
    */
@@ -235,17 +237,40 @@ public record Card(
   }
 
   /**
-   * Plays this card by applying all of its {@link Effect}s to the provided {@link GameState} scaled
-   * by the provided {@link StaffingTier}. A card is only played if its required {@link
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link PlayerState}
+   * scaled by the provided {@link StaffingTier}. A card is only played if its required {@link
    * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
-   * great works, as they have negative effect modifiers (costs)
+   * great works, as they have negative effect modifiers (costs). The card is played with no {@link
+   * SabotageContext} and default target cards (the cards following it on the season's board).
    *
    * @param state The {@link PlayerState} (kingdom) to apply effects to.
    * @param season The season whose table this card is resolving on.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
-  public void play(final PlayerState state, final Season season, final StaffingTier tier) {
-    play(state, season, tier, SabotageContext.none());
+  public PlayedCard play(final PlayerState state, final Season season, final StaffingTier tier) {
+    return play(
+        state, season, tier, SabotageContext.none(), state.getCardsOnBoardAfter(season, this));
+  }
+
+  /**
+   * Plays this card by applying all of its {@link Effect}s to the provided {@link PlayerState}
+   * scaled by the provided {@link StaffingTier}. A card is only played if its required {@link
+   * StaffingTier} is met and its {@link Effect}s can be afforded. Affordance is only an issue for
+   * great works, as they have negative effect modifiers (costs). The card is played with tbe
+   * provided {@link SabotageContext} and default target cards (the cards following it on the
+   * season's board).
+   *
+   * @param state The {@link PlayerState} (kingdom) to apply effects to.
+   * @param season The season whose table this card is resolving on.
+   * @param tier The {@link StaffingTier} to use when applying effects.
+   * @param sabotage The {@link SabotageContext} to apply.
+   */
+  public PlayedCard play(
+      final PlayerState state,
+      final Season season,
+      final StaffingTier tier,
+      final SabotageContext sabotage) {
+    return play(state, season, tier, sabotage, state.getCardsOnBoardAfter(season, this));
   }
 
   /**
@@ -254,51 +279,67 @@ public record Card(
    * snapshot carried by {@code sabotage}. Sabotage deltas are only <em>collected</em> here; the
    * engine applies them to the live opponent after every table has resolved (two-phase apply).
    *
+   * @param state A {@link PlayerState} to apply effects to.
+   * @param season The season whose table this card is resolving on.
+   * @param tier The {@link StaffingTier} to use when applying effects.
    * @param sabotage the cross-seat resolution context; use {@link SabotageContext#none()} when the
    *     match has no live opponent
+   * @param targets The {@link Card}s to consider as targets for any {@link CardTarget} effect this
+   *     card has
    */
-  public void play(
+  public PlayedCard play(
       final PlayerState state,
       final Season season,
       final StaffingTier tier,
-      final SabotageContext sabotage) {
-    if (!tier.greaterThanOrEqualTo(getRequiredStaffingTier())) {
-      return;
-    }
-    if (!state.canAfford(effects())) {
-      return;
-    }
+      final SabotageContext sabotage,
+      final List<Card> targets) {
+    if (tier.greaterThanOrEqualTo(getRequiredStaffingTier()) && state.canAfford(effects())) {
+      final ResourceState before = state.getResources();
+      final List<Card> boostedCards = new ArrayList<>();
 
-    for (Effect effect : getTierEffects(tier)) {
-      if (effect.target() instanceof ResourceTarget rt) {
-        state.apply(effect);
-      } else if (effect.target() instanceof OpponentResourceTarget) {
-        sabotage.collect(effect);
-      } else if (effect.target() instanceof CardTarget ct) {
-        final List<Card> followingCards = state.getCardsOnBoardAfter(season, this);
-        for (final Card card : followingCards) {
-          final Optional<Card> boosted = boost(card, effect, ct);
-          boosted.ifPresent(value -> state.replaceTableCard(season, card, value));
-          if (ct.adjacentOnly()) {
-            break;
+      for (Effect effect : getTierEffects(tier)) {
+        if (effect.target() instanceof ResourceTarget rt) {
+          state.apply(effect);
+        } else if (effect.target() instanceof OpponentResourceTarget) {
+          sabotage.collect(effect);
+        } else if (effect.target() instanceof CardTarget ct) {
+          for (final Card card : targets) {
+            final Optional<Card> boosted = boost(card, effect, ct);
+            boosted.ifPresent(
+                boostedCard -> {
+                  state.replaceTableCard(season, card, boostedCard);
+                  boostedCards.add(boostedCard);
+                });
+            if (ct.adjacentOnly()) {
+              break;
+            }
           }
         }
       }
+
+      if (isGreatWork()) {
+        int newPeriod = constructionPeriod() - 1;
+        if (newPeriod == 0) {
+          // ── Construction COMPLETE — swap for the completed card ──────────
+          state.replaceTableCard(season, this, completedCard());
+          // Unlock any new resource types this Great Work grants.
+          state.unlock(this);
+        } else {
+          // Decrement: replace the card on the table with the same card minus one period.
+          Card decremented = withConstructionPeriod(newPeriod);
+          state.replaceTableCard(season, this, decremented);
+        }
+      }
+
+      return new PlayedCard(
+          this,
+          tier,
+          true,
+          state.getResources().getDelta(before),
+          Collections.unmodifiableList(boostedCards));
     }
 
-    if (isGreatWork()) {
-      int newPeriod = constructionPeriod() - 1;
-      if (newPeriod == 0) {
-        // ── Construction COMPLETE — swap for the completed card ──────────
-        state.replaceTableCard(season, this, completedCard());
-        // Unlock any new resource types this Great Work grants.
-        state.unlock(this);
-      } else {
-        // Decrement: replace the card on the table with the same card minus one period.
-        Card decremented = withConstructionPeriod(newPeriod);
-        state.replaceTableCard(season, this, decremented);
-      }
-    }
+    return new PlayedCard(this, tier, false, ResourceState.empty(), List.of());
   }
 
   public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {
