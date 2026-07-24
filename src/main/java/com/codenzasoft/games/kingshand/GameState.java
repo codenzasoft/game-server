@@ -225,17 +225,30 @@ public class GameState {
   }
 
   /**
-   * Seat of the winner, or {@code -1} if the match is not yet decided (or, in a solo game, if the
-   * lone player was knocked out). Completing all Great Works wins outright; failing that, the last
-   * kingdom still standing wins once every opponent has been knocked out.
+   * Seat of the winner, or {@code -1} if the match is not yet decided or ended in a draw.
+   *
+   * <p>Two equal paths to victory:
+   *
+   * <ul>
+   *   <li><b>Great Works</b> — completing all win-condition Great Works wins outright, <em>provided
+   *       that kingdom is still alive</em>. A kingdom that finishes its monuments but is wiped out
+   *       the same turn does not win from the grave; the win falls through to the conqueror.
+   *   <li><b>Conquest</b> — the last kingdom still standing wins once every opponent has been
+   *       knocked out (population collapsed by combat/sabotage/starvation, or forfeit).
+   * </ul>
+   *
+   * <p>A mutual knockout (every kingdom out in the same resolution) is a draw, returning {@code
+   * -1}.
    */
   @JsonProperty("winnerSeat")
   public int winnerSeat() {
+    // Great Works victory — but only for a kingdom that survived to enjoy it.
     for (int seat = 0; seat < players.size(); seat++) {
-      if (isPlayerVictorious(seat)) {
+      if (isPlayerVictorious(seat) && !isPlayerOut(seat)) {
         return seat;
       }
     }
+    // Conquest victory — sole survivor once every rival is knocked out.
     int survivors = 0;
     int lastSurvivor = -1;
     for (int seat = 0; seat < players.size(); seat++) {
@@ -245,6 +258,20 @@ public class GameState {
       }
     }
     return (players.size() > 1 && survivors == 1) ? lastSurvivor : -1;
+  }
+
+  /**
+   * How the match was won by {@link #winnerSeat()}: {@code "GREAT_WORKS"}, {@code "CONQUEST"}, or
+   * {@code "NONE"} (undecided or a draw). Surfaced to the client so the game-over screen can name
+   * the victory path.
+   */
+  @JsonProperty("victoryType")
+  public String victoryType() {
+    final int winner = winnerSeat();
+    if (winner < 0) {
+      return "NONE";
+    }
+    return isPlayerVictorious(winner) ? "GREAT_WORKS" : "CONQUEST";
   }
 
   // ----- Builder -----

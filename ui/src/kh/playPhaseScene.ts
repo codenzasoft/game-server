@@ -311,7 +311,7 @@ export class PlayPhaseScene {
         <div class="kh-play-resource kh-play-strength">
           <span class="kh-play-res-icon">⚔️</span>
           <div>
-            <div class="kh-play-res-label">Strength</div>
+            <div class="kh-play-res-label">Defense</div>
             <div class="kh-play-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>

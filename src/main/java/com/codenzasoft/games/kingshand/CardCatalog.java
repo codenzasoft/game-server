@@ -481,6 +481,53 @@ public class CardCatalog {
               new Effect(new OpponentResourceTarget(ResourceTarget.PRODUCTION), -100),
               new Effect(new OpponentResourceTarget(ResourceTarget.FOOD), -100)));
 
+  // ----- Damage cards (direct assault on the rival's population) -----
+  //
+  // The combat archetype missing from the base catalog: SINGLE-use cards that deal damage to the
+  // opponent's POPULATION via the existing OpponentResourceTarget cross-seat machinery. They
+  // resolve
+  // during end-of-turn table resolution (like any card) and then move to the discard pile (SINGLE).
+  // STRENGTH acts as the victim's shield — incoming population damage is absorbed by the opponent's
+  // STRENGTH first, and only the remainder reduces population (applied in GameEngine's cross-seat
+  // apply step). Damage magnitudes/costs are first-pass and meant to be tuned against a 100-pop
+  // kingdom.
+
+  /** Spring: a quick raid on the rival's people. */
+  public static final Card RAIDERS_STRIKE =
+      new Card(
+          "RAIDERS_STRIKE",
+          30.0,
+          120.0,
+          FrequencyType.SINGLE,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -10)));
+
+  /** Summer: a war party strikes deeper. */
+  public static final Card WARBAND =
+      new Card(
+          "WARBAND",
+          50.0,
+          220.0,
+          FrequencyType.SINGLE,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -16)));
+
+  /** Fall: siege engines batter the rival's walls and homes. */
+  public static final Card SIEGE_ENGINES =
+      new Card(
+          "SIEGE_ENGINES",
+          70.0,
+          340.0,
+          FrequencyType.SINGLE,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -24)));
+
+  /** Winter: an all-out onslaught. */
+  public static final Card ONSLAUGHT =
+      new Card(
+          "ONSLAUGHT",
+          100.0,
+          480.0,
+          FrequencyType.SINGLE,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -34)));
+
   // ----- Great Work cards -----
   // Completed cards are defined first because construction cards reference them.
 
@@ -711,6 +758,7 @@ public class CardCatalog {
             IRRIGATION,
             MARKETPLACE, // available only when GOLD unlocked
             TRAINING_GROUNDS, // available only when STRENGTH unlocked
+            RAIDERS_STRIKE, // damage card
             THE_GREAT_RESERVOIR_CONSTRUCTION // no gold/strength cost — always available
             ));
 
@@ -734,6 +782,7 @@ public class CardCatalog {
             TRADE_ROUTES, // available only when GOLD unlocked
             GUARD_POST, // available only when STRENGTH unlocked
             SABOTEURS, // sabotage — available only when STRENGTH unlocked
+            WARBAND, // damage card
             THE_GREAT_ROAD_CONSTRUCTION // available only when GOLD unlocked
             ));
 
@@ -753,6 +802,7 @@ public class CardCatalog {
             GOLD_MINE, // available only when GOLD unlocked
             ARMORY, // available only when STRENGTH unlocked
             CROP_RAID, // sabotage — available only when STRENGTH unlocked
+            SIEGE_ENGINES, // damage card
             THE_GREAT_CAPITAL_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
 
@@ -770,6 +820,7 @@ public class CardCatalog {
             FOREIGN_AID, // available only when GOLD unlocked
             FORTRESS_WALL, // available only when STRENGTH unlocked
             WINTER_RAIDERS, // sabotage — available only when STRENGTH unlocked
+            ONSLAUGHT, // damage card
             THE_GREAT_CONQUEST_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
 

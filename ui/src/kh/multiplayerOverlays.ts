@@ -334,7 +334,7 @@ const buildPanel = (
         <span class="kh-dr-res kh-dr-prod">⚒️ <b>${Math.floor(pre.prod)}</b></span>
         <span class="kh-dr-res kh-dr-food">🌾 <b>${Math.floor(pre.food)}</b></span>
         ${showGold ? `<span class="kh-dr-res kh-dr-gold">💰 <b>${Math.floor(pre.gold)}</b></span>` : ""}
-        ${showStrength ? `<span class="kh-dr-res kh-dr-strength">⚔️ <b>${Math.floor(pre.strength)}</b></span>` : ""}
+        ${showStrength ? `<span class="kh-dr-res kh-dr-strength">🛡 <b>${Math.floor(pre.strength)}</b></span>` : ""}
       </span>
     </div>
     <div class="kh-dr-cards">${cardsHTML}</div>

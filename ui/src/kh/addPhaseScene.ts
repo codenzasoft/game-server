@@ -204,7 +204,7 @@ export class AddPhaseScene {
         <div class="kh-resource kh-strength">
           <span class="kh-res-icon">⚔️</span>
           <div>
-            <div class="kh-res-label">Strength</div>
+            <div class="kh-res-label">Defense</div>
             <div class="kh-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>

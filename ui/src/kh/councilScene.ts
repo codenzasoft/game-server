@@ -167,7 +167,7 @@ export class CouncilScene {
         <div class="kh-cs-resource kh-cs-strength">
           <span class="kh-cs-res-icon">⚔️</span>
           <div>
-            <div class="kh-cs-res-label">Strength</div>
+            <div class="kh-cs-res-label">Defense</div>
             <div class="kh-cs-res-value">${Math.floor(state.resources.strength)}</div>
           </div>
         </div>` : "";
