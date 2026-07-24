@@ -86,11 +86,26 @@ public record Card(
    * via its effects, regardless of whether that resource is locked by default.
    */
   public Set<ResourceTarget> requiredResources() {
-    return effects.stream()
-        .map(Effect::target)
-        .filter(target -> target instanceof ResourceTarget)
-        .map(target -> (ResourceTarget) target)
-        .collect(Collectors.toUnmodifiableSet());
+    Set<ResourceTarget> required =
+        effects.stream()
+            .map(Effect::target)
+            .filter(target -> target instanceof ResourceTarget)
+            .map(target -> (ResourceTarget) target)
+            .collect(Collectors.toCollection(HashSet::new));
+    // A direct assault on the enemy's POPULATION (a damage card) requires a standing army, so it is
+    // gated behind STRENGTH — unlocked by BARRACKS — even though the effect targets the opponent
+    // rather than a self resource. This locks the attack cards behind the Barracks Great Work
+    // without charging the player any STRENGTH to play them.
+    boolean attacksPopulation =
+        effects.stream()
+            .anyMatch(
+                e ->
+                    e.target() instanceof OpponentResourceTarget opponent
+                        && opponent.targetResource() == ResourceTarget.POPULATION);
+    if (attacksPopulation) {
+      required.add(ResourceTarget.STRENGTH);
+    }
+    return Set.copyOf(required);
   }
 
   /**

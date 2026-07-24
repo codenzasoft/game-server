@@ -7,7 +7,6 @@ import {
   ProposalKind,
   ReformBenefitType,
   DecreeType,
-  ResourceTarget,
 } from "./kingshand.ts";
 import { formatModifier, resourceIcon, resourceLabel } from "./cardCatalog.ts";
 import {
@@ -24,6 +23,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  buildHealthBar,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -121,7 +121,6 @@ export class CouncilScene {
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
-      ${this.buildPhaseTracker()}
       <main class="kh-cs-scene">
         ${this.buildRosterPanel(state)}
         ${bodyHTML}
@@ -149,12 +148,12 @@ export class CouncilScene {
       ">
         <span class="kh-cs-ornament">❧</span>
         <div class="kh-cs-header-center">
-          <h1>King's Hand</h1>
           <div class="kh-cs-year-badge">
             <span>🏰</span>
             <span>YEAR ${state.time.year} — COUNCIL</span>
             <span>🏰</span>
           </div>
+          ${this.buildPhaseTracker()}
         </div>
         <span class="kh-cs-ornament">❧</span>
       </header>
@@ -162,25 +161,9 @@ export class CouncilScene {
   }
 
   private buildResourcesBar(state: GameState): string {
-    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH) ? `
-        <div class="kh-cs-res-divider"></div>
-        <div class="kh-cs-resource kh-cs-strength">
-          <span class="kh-cs-res-icon">⚔️</span>
-          <div>
-            <div class="kh-cs-res-label">Defense</div>
-            <div class="kh-cs-res-value">${Math.floor(state.resources.strength)}</div>
-          </div>
-        </div>` : "";
+    // Population + Defense live in the shared health bar (buildHealthBar) beneath this strip.
     return `
       <div class="kh-cs-resources">
-        <div class="kh-cs-resource kh-cs-pop">
-          <span class="kh-cs-res-icon">👥</span>
-          <div>
-            <div class="kh-cs-res-label">Population</div>
-            <div class="kh-cs-res-value">${Math.floor(state.resources.population)} <span class="kh-cs-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
-          </div>
-        </div>
-        <div class="kh-cs-res-divider"></div>
         <div class="kh-cs-resource kh-cs-prod">
           <span class="kh-cs-res-icon">⚒️</span>
           <div>
@@ -204,8 +187,8 @@ export class CouncilScene {
             <div class="kh-cs-res-value">${Math.floor(state.resources.gold)}</div>
           </div>
         </div>
-        ${strengthHTML}
       </div>
+      ${buildHealthBar(state)}
     `;
   }
 
@@ -621,8 +604,7 @@ export class CouncilScene {
 
       /* Resources */
       .kh-cs-resources {
-        background: linear-gradient(90deg, #1e1208 0%, #2e1c0c 50%, #1e1208 100%);
-        border-bottom: 3px solid #c49428;
+        background: transparent;
         padding: 10px 48px;
         display: flex;
         justify-content: center;
@@ -642,11 +624,9 @@ export class CouncilScene {
       .kh-cs-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-cs-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
-      /* Phase tracker */
+      /* Phase tracker (now nested under the year/season inside the header) */
       .kh-cs-phase-track {
-        background: rgba(10,5,2,0.65);
-        border-bottom: 2px solid rgba(196,160,96,0.35);
-        padding: 12px 48px;
+        margin-top: 9px;
         display: flex;
         justify-content: center;
         align-items: center;

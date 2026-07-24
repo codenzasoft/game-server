@@ -16,6 +16,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  buildHealthBar,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -126,7 +127,6 @@ export class AddPhaseScene {
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
-      ${this.buildPhaseTracker()}
       <main class="kh-scene">
         <div class="kh-prompt">
           <h2>Choose a Card to Add</h2>
@@ -137,13 +137,11 @@ export class AddPhaseScene {
         </div>
         <div class="kh-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
         <div class="kh-action-bar">
+          <button class="kh-btn-skip" id="kh-btn-skip">Skip</button>
           <button class="kh-btn-reroll" id="kh-btn-reroll"
             ${!canAffordReroll ? "disabled" : ""}>
-            ⟳ &nbsp;Reroll
+            ⟳ Reroll
             <span class="kh-reroll-cost">${isFreeReroll ? "(Free)" : `(${nextRerollCost} ⚒️)`}</span>
-          </button>
-          <button class="kh-btn-skip" id="kh-btn-skip">
-            Pass — Add Nothing
           </button>
         </div>
       </main>
@@ -173,12 +171,12 @@ export class AddPhaseScene {
       ">
         <span class="kh-header-ornament">❧</span>
         <div class="kh-header-center">
-          <h1>King's Hand</h1>
           <div class="kh-year-badge">
             <span>${meta.icon}</span>
             <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
+          ${this.buildPhaseTracker()}
         </div>
         <span class="kh-header-ornament">❧</span>
       </header>
@@ -198,28 +196,9 @@ export class AddPhaseScene {
         </div>
       `
       : "";
-    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
-      ? `
-        <div class="kh-res-divider"></div>
-        <div class="kh-resource kh-strength">
-          <span class="kh-res-icon">⚔️</span>
-          <div>
-            <div class="kh-res-label">Defense</div>
-            <div class="kh-res-value">${Math.floor(state.resources.strength)}</div>
-          </div>
-        </div>
-      `
-      : "";
+    // Population + Defense live in the shared health bar (buildHealthBar) beneath this strip.
     return `
       <div class="kh-resources">
-        <div class="kh-resource kh-pop">
-          <span class="kh-res-icon">👥</span>
-          <div>
-            <div class="kh-res-label">Population</div>
-            <div class="kh-res-value">${Math.floor(state.resources.population)} <span class="kh-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
-          </div>
-        </div>
-        <div class="kh-res-divider"></div>
         <div class="kh-resource kh-prod">
           <span class="kh-res-icon">⚒️</span>
           <div>
@@ -236,8 +215,8 @@ export class AddPhaseScene {
           </div>
         </div>
         ${goldHTML}
-        ${strengthHTML}
       </div>
+      ${buildHealthBar(state)}
     `;
   }
 
@@ -287,6 +266,15 @@ export class AddPhaseScene {
         }
         if (e.target instanceof OpponentTarget) {
           const res = e.target.targetResource;
+          // A hit on the rival's POPULATION is a direct attack — show it as "Attack N".
+          if (res === ResourceTarget.POPULATION) {
+            return `
+            <div class="kh-effect-row">
+              <span class="kh-effect-target kh-et-sabotage">⚔ Attack ${Math.abs(e.modifier)}</span>
+              <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+          }
           return `
             <div class="kh-effect-row">
               <span class="kh-effect-target kh-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
@@ -484,11 +472,9 @@ export class AddPhaseScene {
       .kh-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
-      /* Phase tracker */
+      /* Phase tracker (now nested under the year/season inside the header) */
       .kh-phase-track {
-        background: rgba(10,5,2,0.65);
-        border-bottom: 2px solid rgba(196,160,96,0.35);
-        padding: 12px 48px;
+        margin-top: 9px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -630,40 +616,58 @@ export class AddPhaseScene {
       /* Ornament */
       .kh-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 6px 0 30px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
-      /* Action bar */
-      .kh-action-bar { display: flex; justify-content: center; align-items: center; gap: 18px; }
+      /* Action block — a fixed tab on the right edge, in the same spot as the Play/Continue button.
+         Skip sits on top; Reroll lives directly beneath it in the same block. */
+      .kh-action-bar {
+        position: fixed;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        z-index: 60;
+        border: 3px solid #c49428;
+        border-right: none;
+        border-radius: 14px 0 0 14px;
+        overflow: hidden;
+        box-shadow: -6px 0 30px rgba(0,0,0,.5);
+      }
+      .kh-btn-skip {
+        padding: 26px 84px 26px 52px;
+        background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
+        color: #f0e8c0;
+        border: none;
+        font-family: 'Cinzel', serif;
+        font-size: 1.7rem;
+        font-weight: 700;
+        letter-spacing: 5px;
+        text-align: left;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all .2s ease;
+      }
+      .kh-btn-skip:hover:not(:disabled) { background: linear-gradient(135deg, #7a2222 0%, #5a1414 100%); }
+      .kh-btn-skip:disabled { opacity: .5; cursor: not-allowed; }
+
       .kh-btn-reroll {
-        padding: 12px 34px;
+        padding: 18px 84px 18px 52px;
         background: linear-gradient(135deg, #c49428 0%, #8a6010 100%);
         color: #2a1800;
-        border: 2px solid #f0cc50;
-        border-radius: 9px;
+        border: none;
+        border-top: 3px solid #3a2406;
         font-family: 'Cinzel', serif;
-        font-size: .88rem;
+        font-size: 1.15rem;
         font-weight: 700;
         letter-spacing: 1px;
+        text-align: left;
+        white-space: nowrap;
         cursor: pointer;
-        transition: all .15s;
-        box-shadow: 2px 3px 12px rgba(0,0,0,.2);
+        transition: all .2s ease;
       }
-      .kh-btn-reroll:hover:not(:disabled) { background: linear-gradient(135deg, #e0b040 0%, #a87820 100%); box-shadow: 0 3px 14px rgba(200,160,40,.45); }
-      .kh-btn-reroll:disabled { background: #a09070; border-color: #c0a060; color: #e0d0a0; cursor: not-allowed; opacity: .65; }
-      .kh-reroll-cost { font-weight: 400; }
-
-      .kh-btn-skip {
-        padding: 12px 28px;
-        background: rgba(10,5,2,0.45);
-        color: #c4b08c;
-        border: 2px solid rgba(196,160,96,0.55);
-        border-radius: 9px;
-        font-family: 'Cinzel', serif;
-        font-size: .82rem;
-        letter-spacing: 1px;
-        cursor: pointer;
-        transition: all .15s;
-      }
-      .kh-btn-skip:hover:not(:disabled) { border-color: #c4b08c; color: #f0e8c0; background: rgba(10,5,2,0.6); }
-      .kh-btn-skip:disabled { opacity: .5; cursor: not-allowed; }
+      .kh-btn-reroll:hover:not(:disabled) { background: linear-gradient(135deg, #e0b040 0%, #a87820 100%); }
+      .kh-btn-reroll:disabled { background: #8a8068; color: #ddd0ac; cursor: not-allowed; }
+      .kh-reroll-cost { font-weight: 400; font-size: .92rem; opacity: .9; }
 
       /* Toast */
       .kh-toast {

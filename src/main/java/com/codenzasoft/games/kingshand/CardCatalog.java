@@ -499,7 +499,7 @@ public class CardCatalog {
           30.0,
           120.0,
           FrequencyType.SINGLE,
-          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -10)));
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -15)));
 
   /** Summer: a war party strikes deeper. */
   public static final Card WARBAND =
@@ -508,25 +508,25 @@ public class CardCatalog {
           50.0,
           220.0,
           FrequencyType.SINGLE,
-          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -16)));
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -25)));
 
   /** Fall: siege engines batter the rival's walls and homes. */
-  public static final Card SIEGE_ENGINES =
+  public static final Card SIEGE =
       new Card(
-          "SIEGE_ENGINES",
+          "SIEGE",
           70.0,
           340.0,
-          FrequencyType.SINGLE,
-          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -24)));
+          FrequencyType.RECURRING,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -35)));
 
   /** Winter: an all-out onslaught. */
   public static final Card ONSLAUGHT =
       new Card(
           "ONSLAUGHT",
           100.0,
-          480.0,
-          FrequencyType.SINGLE,
-          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -34)));
+          650.0,
+          FrequencyType.RECURRING,
+          List.of(new Effect(new OpponentResourceTarget(ResourceTarget.POPULATION), -50)));
 
   // ----- Great Work cards -----
   // Completed cards are defined first because construction cards reference them.
@@ -802,7 +802,7 @@ public class CardCatalog {
             GOLD_MINE, // available only when GOLD unlocked
             ARMORY, // available only when STRENGTH unlocked
             CROP_RAID, // sabotage — available only when STRENGTH unlocked
-            SIEGE_ENGINES, // damage card
+            SIEGE, // damage card
             THE_GREAT_CAPITAL_CONSTRUCTION // available only when GOLD + STRENGTH unlocked
             ));
 

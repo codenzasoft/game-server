@@ -31,7 +31,7 @@ import {
   resourceLabel,
   resourceShortLabel,
 } from "./cardCatalog.ts";
-import { spawnResourceIndicator } from "./sharedOverlays.ts";
+import { spawnResourceIndicator, healthBarHtml, injectSharedStyles } from "./sharedOverlays.ts";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
@@ -95,11 +95,13 @@ const injectStyles = (): void => {
                           box-shadow: 0 0 0 1px rgba(240,204,80,.25) inset; }
     .kh-dr-panel.is-out { opacity: .6; }
 
-    .kh-dr-head { display: flex; align-items: center; justify-content: space-between;
-                  gap: 12px; margin-bottom: 10px; }
-    .kh-dr-head-name { font-size: 1.05rem; font-weight: 700; letter-spacing: 2px; color: #f0cc50; }
-    .kh-dr-resbar { display: flex; gap: 16px; font-size: 1.02rem; }
-    .kh-dr-res { display: flex; align-items: center; gap: 5px; }
+    /* Head is stacked + centered: name, then big resource numbers, then the health/defense bars. */
+    .kh-dr-head { display: flex; flex-direction: column; align-items: stretch;
+                  gap: 8px; margin-bottom: 12px; }
+    .kh-dr-head-name { font-size: 1.05rem; font-weight: 700; letter-spacing: 2px; color: #f0cc50;
+                       text-align: center; }
+    .kh-dr-resnums { display: flex; justify-content: center; gap: 30px; font-size: 1.55rem; }
+    .kh-dr-res { display: flex; align-items: center; gap: 8px; }
     .kh-dr-res b { color: #f5e2ac; font-weight: 700; }
     .kh-dr-res.kh-res-flash b { animation: kh-dr-flash .5s ease; }
     @keyframes kh-dr-flash { 0% { color: #fff; text-shadow: 0 0 10px #f0cc50; } 100% {} }
@@ -151,14 +153,34 @@ const injectStyles = (): void => {
     .kh-dr-tip-eff-engine   { color: #a9c8e8; }
     .kh-dr-tip-eff-sabotage { color: #f0a08c; }
 
-    .kh-dual-continue { margin-top: 22px; padding: 12px 42px; border-radius: 10px;
-                        border: 2px solid #f0cc50; cursor: pointer;
-                        background: linear-gradient(135deg, #6a4a10 0%, #3a2406 100%);
-                        color: #fff6dc; font-family: 'Cinzel', serif; font-size: .95rem;
-                        font-weight: 700; letter-spacing: 2px; transition: all .15s; }
-    .kh-dual-continue:hover { background: linear-gradient(135deg, #8a6420 0%, #5a3a10 100%);
-                              box-shadow: 0 3px 16px rgba(240,204,80,.4); }
-    .kh-dual-continue[disabled] { opacity: .35; cursor: default; }
+    /* Continue sits exactly where the play button lives — a fixed tab on the right edge, vertically
+       centered — so the primary action never moves between the play screen and the resolution. */
+    .kh-dual-continue {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 28px 88px 28px 56px;
+      border: 3px solid #c49428;
+      border-right: none;
+      border-radius: 14px 0 0 14px;
+      cursor: pointer;
+      background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
+      color: #f0e8c0;
+      font-family: 'Cinzel', serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      transition: all .2s ease;
+      box-shadow: -6px 0 30px rgba(0,0,0,.5);
+      z-index: 60;
+      white-space: nowrap;
+    }
+    .kh-dual-continue:hover:not([disabled]) {
+      background: linear-gradient(135deg, #7a2222 0%, #5a1414 100%);
+      box-shadow: -6px 0 34px rgba(240,204,80,.35);
+    }
+    .kh-dual-continue[disabled] { opacity: .4; cursor: default; }
   `;
   document.head.appendChild(style);
 };
@@ -329,13 +351,12 @@ const buildPanel = (
   panel.innerHTML = `
     <div class="kh-dr-head">
       <span class="kh-dr-head-name">${title}</span>
-      <span class="kh-dr-resbar">
-        <span class="kh-dr-res kh-dr-pop">👥 <b>${Math.floor(pre.pop)}</b></span>
+      <div class="kh-dr-resnums">
         <span class="kh-dr-res kh-dr-prod">⚒️ <b>${Math.floor(pre.prod)}</b></span>
         <span class="kh-dr-res kh-dr-food">🌾 <b>${Math.floor(pre.food)}</b></span>
         ${showGold ? `<span class="kh-dr-res kh-dr-gold">💰 <b>${Math.floor(pre.gold)}</b></span>` : ""}
-        ${showStrength ? `<span class="kh-dr-res kh-dr-strength">🛡 <b>${Math.floor(pre.strength)}</b></span>` : ""}
-      </span>
+      </div>
+      ${healthBarHtml(pre.pop, r.populationCap, pre.strength, showStrength)}
     </div>
     <div class="kh-dr-cards">${cardsHTML}</div>
   `;
@@ -408,9 +429,17 @@ const animatePanel = async (
 
     let si = 0;
     const anchor = (cls: string): HTMLElement | null => valEl(cls);
+    // Population + Defense render as bars (matching the play phase); the rest stay as numbers.
+    const cap = Math.max(1, r.populationCap);
+    const setBarW = (sel: string, pct: number): void => {
+      const el = panel.querySelector<HTMLElement>(sel);
+      if (el) el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    };
     if (step.populationDelta !== 0) {
-      setVal("kh-dr-pop", sim.pop, true);
-      const a = anchor("kh-dr-pop"); if (a) spawnResourceIndicator(a, step.populationDelta, "👥", si++);
+      const popNum = panel.querySelector<HTMLElement>(".kh-hpbar-pop");
+      if (popNum) popNum.textContent = Math.floor(sim.pop).toString();
+      setBarW(".kh-hpbar-fill", (sim.pop / cap) * 100);
+      if (popNum) spawnResourceIndicator(popNum, step.populationDelta, "👥", si++);
     }
     if (step.productionDelta !== 0) {
       setVal("kh-dr-prod", sim.prod, true);
@@ -425,8 +454,10 @@ const animatePanel = async (
       const a = anchor("kh-dr-gold"); if (a) spawnResourceIndicator(a, step.goldDelta, "💰", si++);
     }
     if (step.strengthDelta !== 0) {
-      setVal("kh-dr-strength", sim.strength, true);
-      const a = anchor("kh-dr-strength"); if (a) spawnResourceIndicator(a, step.strengthDelta, "⚔️", si++);
+      const wallNum = panel.querySelector<HTMLElement>(".kh-hpbar-wallnum");
+      if (wallNum) wallNum.textContent = Math.floor(sim.strength).toString();
+      setBarW(".kh-hpbar-wallfill", (Math.min(sim.strength, cap) / cap) * 100);
+      if (wallNum) spawnResourceIndicator(wallNum, step.strengthDelta, "⚔️", si++);
     }
 
     await delay(isHarvestStep(step) ? 1300 : 950);
@@ -452,6 +483,7 @@ export const playDualResolution = async (
   onContinue: () => void,
 ): Promise<void> => {
   injectStyles();
+  injectSharedStyles(); // ensures the shared health-bar CSS is present for the resolution panels
   hideWaitingOverlay();
   document.getElementById("kh-dual-resolution")?.remove();
 

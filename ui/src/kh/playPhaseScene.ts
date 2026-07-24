@@ -18,6 +18,7 @@ import {
   buildOptionsButton,
   attachOptionsListeners,
   spawnResourceIndicator,
+  buildHealthBar,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -126,10 +127,22 @@ export class PlayPhaseScene {
     const table = state.getCurrentTable();
     const tableNames = new Set(table.map((c) => c.name));
 
+    // Multiplayer readiness badge on the Play button: an encircled checkmark with "N/2" showing how
+    // many players have locked in this phase (yourself and/or your rival). Shown once at least one
+    // seat is ready; the scene re-renders whenever submittedSeats changes.
+    const isMultiplayer = state.opponent !== undefined;
+    const readyCount = state.submittedSeats.length;
+    const readyBadge =
+      isMultiplayer && readyCount > 0
+        ? `<span class="kh-play-ready-badge" title="${readyCount} of 2 players ready">
+             <span class="kh-play-ready-check">✓</span><span class="kh-play-ready-count">${readyCount}/2</span>
+           </span>`
+        : "";
+
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
-      ${this.buildPhaseTracker()}
+      ${buildHealthBar(state)}
       ${this.buildAdvisorRow(state)}
       <main class="kh-play-scene">
         ${this.buildTableSection(state, table, meta, state.tableStaffing)}
@@ -142,7 +155,7 @@ export class PlayPhaseScene {
         </div>
       </main>
       <!-- Fixed Play button — right-centre of viewport -->
-      <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY</button>
+      <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY${readyBadge}</button>
       ${this.buildPileIndicators(state)}
       ${this.buildPileModal()}
       ${buildDeckIndicator(state)}
@@ -172,6 +185,7 @@ export class PlayPhaseScene {
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
+      ${buildHealthBar(state)}
       <div class="kh-play-game-over">
         <div class="kh-play-go-icon">☠</div>
         <h2 class="kh-play-go-title">Your Kingdom Has Fallen</h2>
@@ -226,6 +240,7 @@ export class PlayPhaseScene {
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
+      ${buildHealthBar(state)}
       <div class="kh-play-game-won">
         <div class="kh-play-win-icon">👑</div>
         <h2 class="kh-play-win-title">Your Kingdom Has Triumphed</h2>
@@ -280,12 +295,12 @@ export class PlayPhaseScene {
       ">
         <span class="kh-play-leaf">❧</span>
         <div class="kh-play-header-center">
-          <h1>King's Hand</h1>
           <div class="kh-play-year-badge">
             <span>${meta.icon}</span>
             <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
+          ${this.buildPhaseTracker()}
         </div>
         <span class="kh-play-leaf">❧</span>
       </header>
@@ -305,28 +320,10 @@ export class PlayPhaseScene {
         </div>
       `
       : "";
-    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
-      ? `
-        <div class="kh-play-res-divider"></div>
-        <div class="kh-play-resource kh-play-strength">
-          <span class="kh-play-res-icon">⚔️</span>
-          <div>
-            <div class="kh-play-res-label">Defense</div>
-            <div class="kh-play-res-value">${Math.floor(state.resources.strength)}</div>
-          </div>
-        </div>
-      `
-      : "";
+    // Population + Defense are no longer plain numbers in the strip — they render as the shared
+    // health bar (buildHealthBar) centered beneath this strip in every scene.
     return `
       <div class="kh-play-resources">
-        <div class="kh-play-resource kh-play-pop">
-          <span class="kh-play-res-icon">👥</span>
-          <div>
-            <div class="kh-play-res-label">Population</div>
-            <div class="kh-play-res-value"><span class="kh-play-pop-num">${Math.floor(state.resources.population)}</span> <span class="kh-play-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
-          </div>
-        </div>
-        <div class="kh-play-res-divider"></div>
         <div class="kh-play-resource kh-play-prod">
           <span class="kh-play-res-icon">⚒️</span>
           <div>
@@ -343,7 +340,6 @@ export class PlayPhaseScene {
           </div>
         </div>
         ${goldHTML}
-        ${strengthHTML}
       </div>
     `;
   }
@@ -526,6 +522,14 @@ export class PlayPhaseScene {
         }
         if (e.target instanceof OpponentTarget) {
           const res = e.target.targetResource;
+          if (res === ResourceTarget.POPULATION) {
+            return `
+            <div class="kh-tc-tt-effect">
+              <span class="kh-tc-tt-et kh-tc-tt-et-sabotage">⚔ Attack ${Math.abs(e.modifier)}</span>
+              <span class="kh-tc-tt-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+          }
           return `
             <div class="kh-tc-tt-effect">
               <span class="kh-tc-tt-et kh-tc-tt-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
@@ -696,6 +700,14 @@ export class PlayPhaseScene {
         }
         if (e.target instanceof OpponentTarget) {
           const res = e.target.targetResource;
+          if (res === ResourceTarget.POPULATION) {
+            return `
+            <div class="kh-play-hc-effect-row">
+              <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ Attack ${Math.abs(e.modifier)}</span>
+              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            </div>
+          `;
+          }
           return `
             <div class="kh-play-hc-effect-row">
               <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
@@ -827,6 +839,9 @@ export class PlayPhaseScene {
               return `<span class="kh-cc-effect kh-cc-effect-engine">${icon} ${sc} +${e.modifier}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
             if (e.target instanceof OpponentTarget) {
+              if (e.target.targetResource === ResourceTarget.POPULATION) {
+                return `<span class="kh-cc-effect">⚔ Attack ${Math.abs(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
+              }
               const label = resourceShortLabel(e.target.targetResource);
               return `<span class="kh-cc-effect">⚔ rival ${label} ${formatModifier(e.modifier)}${c.frequencyType === "RECURRING" ? "/s" : " once"}</span>`;
             }
@@ -1073,11 +1088,11 @@ export class PlayPhaseScene {
     strength: HTMLElement | null;
   } {
     return {
-      pop:      this.overlay.querySelector<HTMLElement>(".kh-play-pop-num"),
+      pop:      this.overlay.querySelector<HTMLElement>(".kh-hpbar-pop"),
       prod:     this.overlay.querySelector<HTMLElement>(".kh-play-prod .kh-play-res-value"),
       food:     this.overlay.querySelector<HTMLElement>(".kh-play-food .kh-play-res-value"),
       gold:     this.overlay.querySelector<HTMLElement>(".kh-play-gold .kh-play-res-value"),
-      strength: this.overlay.querySelector<HTMLElement>(".kh-play-strength .kh-play-res-value"),
+      strength: this.overlay.querySelector<HTMLElement>(".kh-hpbar-wallfill"),
     };
   }
 
@@ -1131,16 +1146,26 @@ export class PlayPhaseScene {
 
     const updateBar = (pop: number, prod: number, food: number, gold: number, strength: number,
                        which: { pop: boolean; prod: boolean; food: boolean; gold: boolean; strength: boolean }): void => {
-      flashEl(".kh-play-pop-num",                     pop,      which.pop);
+      flashEl(".kh-hpbar-pop",                        pop,      which.pop);
       flashEl(".kh-play-prod .kh-play-res-value",     prod,     which.prod);
       flashEl(".kh-play-food .kh-play-res-value",     food,     which.food);
       flashEl(".kh-play-gold .kh-play-res-value",     gold,     which.gold);
-      flashEl(".kh-play-strength .kh-play-res-value", strength, which.strength);
+      // Defense/strength no longer has a number field — it drives the wall sub-bar instead.
+      const capNow = simCap > 0 ? simCap : 1;
+      const setW = (sel: string, pct: number): void => {
+        const el = this.overlay.querySelector<HTMLElement>(sel);
+        if (el) el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+      };
+      setW(".kh-hpbar-fill", (pop / capNow) * 100);
+      setW(".kh-hpbar-wallfill", (Math.min(strength, capNow) / capNow) * 100);
+      const wallNum = this.overlay.querySelector<HTMLElement>(".kh-hpbar-wallnum");
+      if (wallNum) wallNum.textContent = Math.floor(strength).toString();
     };
 
     const updateCap = (cap: number): void => {
-      const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
-      if (capEl) capEl.textContent = `/ ${Math.floor(cap)}`;
+      simCap = cap;
+      const capEl = this.overlay.querySelector<HTMLElement>(".kh-hpbar-cap");
+      if (capEl) capEl.textContent = ` / ${Math.floor(cap)}`;
     };
 
     // Initialise the bar at pre-resolution values.
@@ -1220,7 +1245,7 @@ export class PlayPhaseScene {
       if (step.populationCapDelta !== 0) {
         simCap += step.populationCapDelta;
         updateCap(simCap);
-        const capEl = this.overlay.querySelector<HTMLElement>(".kh-play-res-cap");
+        const capEl = this.overlay.querySelector<HTMLElement>(".kh-hpbar-cap");
         if (capEl) spawnResourceIndicator(capEl, step.populationCapDelta, "🏠", si++);
       }
 
@@ -1350,9 +1375,7 @@ export class PlayPhaseScene {
 
       /* ── Phase tracker ───────────────────────────────────────────────── */
       .kh-play-phase-track {
-        background: rgba(10,5,2,0.65);
-        border-bottom: 2px solid rgba(196,160,96,0.35);
-        padding: 12px 48px;
+        margin-top: 9px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -1775,6 +1798,40 @@ export class PlayPhaseScene {
         box-shadow: -6px 0 30px rgba(0,0,0,.5);
         z-index: 50;
         white-space: nowrap;
+      }
+      /* Readiness badge — encircled checkmark + N/2, over the top-left of the Play button. */
+      .kh-play-ready-badge {
+        position: absolute;
+        top: -13px;
+        left: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 12px 3px 6px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #2f6d2a 0%, #1c4a18 100%);
+        border: 2px solid #7ad673;
+        box-shadow: 0 2px 8px rgba(0,0,0,.55);
+        letter-spacing: 0;
+      }
+      .kh-play-ready-check {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        background: #7ad673;
+        color: #113010;
+        font-size: .9rem;
+        font-weight: 900;
+      }
+      .kh-play-ready-count {
+        font-family: 'Cinzel', serif;
+        font-size: .92rem;
+        font-weight: 700;
+        color: #ddf6d4;
+        letter-spacing: 1px;
       }
       .kh-play-btn-end:hover:not(:disabled) {
         background: linear-gradient(135deg, #8b2222 0%, #5e1212 100%);
