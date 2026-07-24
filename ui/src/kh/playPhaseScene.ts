@@ -148,11 +148,6 @@ export class PlayPhaseScene {
         ${this.buildTableSection(state, table, meta, state.tableStaffing)}
         <div class="kh-play-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
         ${this.buildHandSection(state, table, tableNames)}
-        <div class="kh-play-action-bar">
-          <div class="kh-play-end-hint">
-            Cards fire left-to-right when you Play.
-          </div>
-        </div>
       </main>
       <!-- Fixed Play button — right-centre of viewport -->
       <button class="kh-play-btn-end" id="kh-play-btn-end">PLAY${readyBadge}</button>
@@ -434,7 +429,7 @@ export class PlayPhaseScene {
     }
 
     return `
-      <div class="kh-play-section">
+      <div class="kh-play-section kh-play-section-table">
         <div class="kh-play-section-header">
           <div class="kh-play-section-title">
             <span>${meta.icon}</span>
@@ -442,10 +437,6 @@ export class PlayPhaseScene {
           </div>
           <div class="kh-play-table-count">${table.length} / ${MAX_TABLE_SIZE} slots</div>
         </div>
-        <p class="kh-play-section-sub">
-          Cards fire left-to-right when you Play.
-          Demolishing a card costs 20% of its production requirement.
-        </p>
         <div class="kh-play-table-slots">
           ${slots.join("")}
         </div>
@@ -618,7 +609,7 @@ export class PlayPhaseScene {
     const colCount = Math.min(state.hand.length, 3);
 
     return `
-      <div class="kh-play-section">
+      <div class="kh-play-section kh-play-section-hand">
         <div class="kh-play-section-header">
           <div class="kh-play-section-title">
             <span>✋</span>
@@ -626,9 +617,6 @@ export class PlayPhaseScene {
           </div>
           <div class="kh-play-table-count">${state.hand.length} card${state.hand.length !== 1 ? "s" : ""}</div>
         </div>
-        <p class="kh-play-section-sub">
-          You draw 3 cards each phase. Play them onto your table — unplayed cards are discarded when you Play.
-        </p>
         <div class="kh-play-hand-grid kh-play-hand-cols-${colCount}">
           ${cardsHTML}
         </div>
@@ -1306,7 +1294,10 @@ export class PlayPhaseScene {
       #kh-play-phase-overlay {
         position: fixed;
         inset: 0;
-        overflow-y: auto;
+        height: 100dvh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
         z-index: 20;
         font-family: 'Crimson Text', Georgia, serif;
         color: #261408;
@@ -1318,8 +1309,8 @@ export class PlayPhaseScene {
 
       /* ── Header ──────────────────────────────────────────────────────── */
       .kh-play-header {
-        border-bottom: 4px solid #c49428;
-        padding: 18px 48px;
+        border-bottom: 3px solid #c49428;
+        padding: 8px 48px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -1355,7 +1346,7 @@ export class PlayPhaseScene {
       .kh-play-resources {
         background: linear-gradient(90deg, #1e1208 0%, #2e1c0c 50%, #1e1208 100%);
         border-bottom: 3px solid #c49428;
-        padding: 10px 48px;
+        padding: 6px 48px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -1499,11 +1490,33 @@ export class PlayPhaseScene {
         gap: 5px;
       }
 
-      /* ── Scene body ──────────────────────────────────────────────────── */
-      .kh-play-scene { max-width: 1160px; margin: 0 auto; padding: 36px 28px 80px; }
+      /* ── Viewport fit: pin the top strips, let the scene fill the rest ── */
+      #kh-play-phase-overlay > header,
+      #kh-play-phase-overlay > .kh-play-resources,
+      #kh-play-phase-overlay > .kh-hpbar,
+      #kh-play-phase-overlay > .kh-play-advisor-row { flex: 0 0 auto; }
+
+      /* ── Scene body — flex column that fills the remaining height ─────── */
+      .kh-play-scene {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 8px 28px 12px;
+        overflow: hidden;
+      }
+      /* The table keeps its natural height so the full card art is always visible; the hand takes
+         whatever height is left and its cards scale down to fit (art shrinks with the viewport). */
+      .kh-play-section-table { flex: 0 0 auto; display: flex; flex-direction: column; }
+      .kh-play-section-table .kh-play-table-slots { overflow: visible; }
+      .kh-play-section-hand  { flex: 1 1 auto; min-height: 0; margin-bottom: 0; display: flex; flex-direction: column; }
+      .kh-play-section-hand .kh-play-hand-grid { min-height: 0; overflow-y: auto; align-content: start; }
 
       /* ── Section shared layout ───────────────────────────────────────── */
-      .kh-play-section       { margin-bottom: 40px; }
+      .kh-play-section       { margin-bottom: 12px; }
       .kh-play-section-header {
         display: flex;
         align-items: center;
@@ -1623,7 +1636,7 @@ export class PlayPhaseScene {
       .kh-play-empty-slot {
         border: 2px dashed #c4a060;
         border-radius: 12px;
-        min-height: 130px;
+        min-height: clamp(64px, 11vh, 118px);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1636,10 +1649,10 @@ export class PlayPhaseScene {
       .kh-play-empty-label { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1px; }
 
       /* ── Ornament ────────────────────────────────────────────────────── */
-      .kh-play-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 8px 0 32px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
+      .kh-play-ornament { text-align: center; color: #f0cc50; font-size: 1.1rem; letter-spacing: 10px; opacity: .7; margin: 2px 0 6px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
       /* ── Hand grid (max 3 cards) ─────────────────────────────────────── */
-      .kh-play-hand-grid            { display: grid; gap: 22px; }
+      .kh-play-hand-grid            { display: grid; gap: 14px; }
       .kh-play-hand-cols-1          { grid-template-columns: 1fr; max-width: 380px; }
       .kh-play-hand-cols-2          { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
       .kh-play-hand-cols-3          { grid-template-columns: repeat(3, 1fr); }
@@ -1665,10 +1678,10 @@ export class PlayPhaseScene {
       /* Hand card header */
       .kh-play-hc-header {
         background: linear-gradient(135deg, #3d6b46 0%, #274d30 100%);
-        padding: 16px 18px 13px;
+        padding: 9px 16px 8px;
         border-bottom: 2px solid #c49428;
         position: relative;
-        min-height: 70px;
+        min-height: 0;
       }
       .kh-play-hc-header-upgrade {
         background: linear-gradient(135deg, #7a5a10 0%, #5a3e08 100%);
@@ -1685,15 +1698,15 @@ export class PlayPhaseScene {
       .kh-play-tag-upgrade  { background: rgba(200,160,40,.35);  color: #f0d060; }
 
       /* Hand card body */
-      .kh-play-hc-body { padding: 15px 18px; }
+      .kh-play-hc-body { padding: 10px 16px; }
       .kh-play-hc-desc {
         font-style: italic;
         color: #7a6a52;
-        font-size: 1.1rem;
-        line-height: 1.45;
-        padding-bottom: 12px;
+        font-size: .95rem;
+        line-height: 1.35;
+        padding-bottom: 8px;
         border-bottom: 1px dashed #c4a060;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
       }
       .kh-play-hc-effects-title {
         font-family: 'Cinzel', serif;
@@ -1703,7 +1716,7 @@ export class PlayPhaseScene {
         text-transform: uppercase;
         margin-bottom: 7px;
       }
-      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
+      .kh-play-hc-effect-row   { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: .95rem; }
       .kh-play-hc-et           { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
       .kh-play-hc-et-food             { color: #3a7020; }
       .kh-play-hc-et-production       { color: #a07010; }
@@ -1714,10 +1727,10 @@ export class PlayPhaseScene {
       .kh-play-hc-freq  { font-size: .88rem; color: #a09070; font-style: italic; }
 
       /* Costs row */
-      .kh-play-hc-costs { display: flex; align-items: center; gap: 18px; padding: 11px 0 12px; border-top: 1px dashed #c4a060; margin-top: 12px; }
+      .kh-play-hc-costs { display: flex; align-items: center; gap: 18px; padding: 7px 0 8px; border-top: 1px dashed #c4a060; margin-top: 8px; }
       .kh-play-hc-cost-item  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
-      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .72rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
-      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.3rem; font-weight: 700; }
+      .kh-play-hc-cost-label { font-family: 'Cinzel', serif; font-size: .68rem; letter-spacing: 1px; color: #7a6a52; text-transform: uppercase; }
+      .kh-play-hc-cost-val   { font-family: 'Cinzel', serif; font-size: 1.15rem; font-weight: 700; }
       .kh-play-hc-cost-prod  { color: #a07010; }
       .kh-play-hc-cost-pop   { color: #8b2020; }
       .kh-play-hc-unavailable { margin-left: auto; font-family: 'Cinzel', serif; font-size: .78rem; letter-spacing: .5px; color: #c04030; }
@@ -2342,10 +2355,11 @@ export class PlayPhaseScene {
 
       .kh-play-hc-art-header {
         position: relative;
-        height: 200px;
+        height: clamp(84px, 12vh, 190px);
         overflow: hidden;
         border-bottom: 2px solid #c49428;
         border-radius: 14px 14px 0 0;
+        flex-shrink: 0;
       }
       .kh-play-hc-art-header-upgrade {
         border-bottom-color: #e0b040;
@@ -2365,10 +2379,10 @@ export class PlayPhaseScene {
         left: 0;
         right: 0;
         background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
-        padding: 32px 18px 14px;
+        padding: 22px 16px 8px;
       }
       .kh-play-hc-art-overlay .kh-play-hc-name {
-        font-size: 2.1rem;
+        font-size: clamp(1.2rem, 2.4vh, 1.9rem);
       }
     `;
     document.head.appendChild(style);
