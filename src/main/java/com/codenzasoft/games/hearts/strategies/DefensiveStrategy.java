@@ -288,10 +288,17 @@ public class DefensiveStrategy implements HeartsPlayerObserver {
     long remainingCount = 13 - playedCount - inMyHandCount;
     if (remainingCount > 0) {
       if (remainingCount > 4 && !suit.equals(Suit.HEARTS)) {
-        return StrategyHelper.getMaxRank(round.getHand(player), suit);
-      } else {
-        return StrategyHelper.getMinRank(round.getHand(player), suit);
+        final Optional<Card> high = StrategyHelper.getMaxRank(round.getHand(player), suit);
+        if (high.isPresent()) {
+          final Card h = high.get();
+          final boolean opponentCanBeat =
+              StrategyHelper.filterSuit(round.getRemainingCards(), suit)
+                  .filter(r -> !round.getHand(player).contains(r))
+                  .anyMatch(r -> r.outRanks(h));
+          if (opponentCanBeat) return high;
+        }
       }
+      return StrategyHelper.getMinRank(round.getHand(player), suit);
     } else {
       return Optional.empty();
     }
