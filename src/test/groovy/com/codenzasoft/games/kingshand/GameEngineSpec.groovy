@@ -2180,6 +2180,76 @@ class GameEngineSpec extends Specification {
         state.getPlayer(0).resources.population < 125.0
     }
 
+    // ----- PLAY phase: endAndRun — seated cross-table boost (Brynn Ostlar) -----
+
+    def "endAndRun with Brynn Ostlar seated permanently boosts the first production card on the table by 15"() {
+        setup:
+        def prodCard = new Card("TEST", 0, 0, FrequencyType.RECURRING,
+                [new Effect(ResourceTarget.PRODUCTION, 50)])
+        def seated = new SeatedAdvisor("BRYNN_OSTLAR", AdvisorCatalog.BRYNN_OSTLAR.baseCard(), 1)
+        def state = GameState.builder()
+                .phase(Phase.PLAY).season(Season.SPRING)
+                .population(5.0).food(100.0)
+                .council([seated])
+                .table(Season.SPRING, [prodCard])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def boosted = state.getPlayer(0).board.get(Season.SPRING).get(0)
+        boosted.effects().get(0).modifier() == 65.0   // 50 base + 15 cross-table boost
+
+        and:
+        state.getPlayer(0).resolutionLog.any { it.cardName() == "COUNCIL_CROSS_TABLE_BOOST" }
+    }
+
+    def "endAndRun cross-table boost targets only the first production card, leaving subsequent ones unchanged"() {
+        setup:
+        def first  = new Card("FIRST",  0, 0, FrequencyType.RECURRING,
+                [new Effect(ResourceTarget.PRODUCTION, 50)])
+        def second = new Card("SECOND", 0, 0, FrequencyType.RECURRING,
+                [new Effect(ResourceTarget.PRODUCTION, 30)])
+        def seated = new SeatedAdvisor("BRYNN_OSTLAR", AdvisorCatalog.BRYNN_OSTLAR.baseCard(), 1)
+        def state = GameState.builder()
+                .phase(Phase.PLAY).season(Season.SPRING)
+                .population(5.0).food(100.0)
+                .council([seated])
+                .table(Season.SPRING, [first, second])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        def table = state.getPlayer(0).board.get(Season.SPRING)
+        table.get(0).effects().get(0).modifier() == 65.0   // boosted
+        table.get(1).effects().get(0).modifier() == 30.0   // untouched
+    }
+
+    def "endAndRun does not add a cross-table boost step when no production card is on the table"() {
+        setup:
+        def foodCard = new Card("TEST", 0, 0, FrequencyType.RECURRING,
+                [new Effect(ResourceTarget.FOOD, 20)])
+        def seated = new SeatedAdvisor("BRYNN_OSTLAR", AdvisorCatalog.BRYNN_OSTLAR.baseCard(), 1)
+        def state = GameState.builder()
+                .phase(Phase.PLAY).season(Season.SPRING)
+                .population(5.0).food(100.0)
+                .council([seated])
+                .table(Season.SPRING, [foodCard])
+                .build()
+        def engine = engine(state)
+
+        when:
+        engine.endAndRun()
+
+        then:
+        state.getPlayer(0).resolutionLog.every { it.cardName() != "COUNCIL_CROSS_TABLE_BOOST" }
+    }
+
     def "TAX_COLLECTION does not affect GOLD when GOLD has not been unlocked yet"() {
         setup:
         def state = GameState.builder()

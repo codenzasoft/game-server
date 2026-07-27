@@ -9,14 +9,7 @@ import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameUpdatedNotification;
 import com.codenzasoft.games.kingshand.notifications.KhNotification;
 import com.codenzasoft.games.kingshand.strategies.KhPlayerStrategy;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import org.slf4j.Logger;
@@ -772,17 +765,9 @@ public class GameEngine implements Game<GameEngine> {
     for (int i = 0; i < snapshot.size(); i++) {
       final Card card = snapshot.get(i);
       final StaffingTier tier = staffing.get(i).tier();
-      final ResourceState before = activePlayer().getResources();
 
-      // Whether all effects on this card are engine-builder (CardTarget) effects.
-      boolean isEngineBoost =
-          tier != StaffingTier.NONE
-              && card.effects().stream().allMatch(e -> e.target() instanceof CardTarget);
-
-      card.play(activePlayer(), season(), tier, sabotage);
-      log.add(
-          new ResolutionStep(
-              card.name(), tier, isEngineBoost, activePlayer().getResources().getDelta(before)));
+      final PlayedCard play = card.play(activePlayer(), season(), tier, sabotage);
+      log.add(play.getResolutionStep());
 
       // NOTE: SINGLE-frequency cards are NOT discarded here. They leave the table only when the
       // clock advances (advancePlayClock → discardSpentSingles), so they stay on the table — and
@@ -794,33 +779,24 @@ public class GameEngine implements Game<GameEngine> {
     // card effects fire unconditionally, at full value, every season. See class javadoc.
     for (SeatedAdvisor seated : activePlayer().getCouncil()) {
       Card card = seated.getCard();
-      ResourceState before = activePlayer().getResources();
-
-      card.play(activePlayer(), season(), StaffingTier.FULL, sabotage);
-      log.add(
-          new ResolutionStep(
-              card.name(),
-              StaffingTier.FULL,
-              false,
-              activePlayer().getResources().getDelta(before)));
+      final PlayedCard play = card.play(activePlayer(), season(), StaffingTier.FULL, sabotage);
+      log.add(play.getResolutionStep());
     }
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
     // matching Production card on the season table that is just about to resolve next time around.
-    double crossTableBoost = seatedCrossTableBoost();
-    if (crossTableBoost > 0) {
-      List<Card> currentTable = activePlayer().getTable(season());
-      for (int j = 0; j < currentTable.size(); j++) {
-        final Card target = currentTable.get(j);
-        boolean hasMatch =
-            target.effects().stream().anyMatch(e -> e.target() == ResourceTarget.PRODUCTION);
-        if (hasMatch) {
-          currentTable.set(j, target.boostEffect(ResourceTarget.PRODUCTION, crossTableBoost));
-          log.add(
-              new ResolutionStep(
-                  "COUNCIL_CROSS_TABLE_BOOST", StaffingTier.FULL, true, ResourceState.empty()));
-          break;
-        }
+    final Optional<Card> advisorBoost = getSeatedAdvisorBoost();
+    if (advisorBoost.isPresent()) {
+      final Card card = advisorBoost.get();
+      final PlayedCard play =
+          card.play(
+              activePlayer(),
+              season(),
+              StaffingTier.FULL,
+              SabotageContext.none(),
+              activePlayer().getTable(season()));
+      if (!play.boosted().isEmpty()) {
+        log.add(play.getResolutionStep());
       }
     }
 
@@ -895,6 +871,21 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
     return -1;
+  }
+
+  private Optional<Card> getSeatedAdvisorBoost() {
+    final double boost = seatedCrossTableBoost();
+    if (boost > 0) {
+      return Optional.of(
+          new Card(
+              "COUNCIL_CROSS_TABLE_BOOST",
+              0,
+              0,
+              FrequencyType.RECURRING,
+              List.of(new Effect(new CardTarget(ResourceTarget.PRODUCTION, true), boost))));
+    } else {
+      return Optional.empty();
+    }
   }
 
   /**
