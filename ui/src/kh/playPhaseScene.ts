@@ -671,18 +671,18 @@ export class PlayPhaseScene {
       isUpgrade ? `<span class="kh-play-tag kh-play-tag-upgrade">UPGRADES TABLE</span>` : "",
     ].join("");
 
+    // Compact effect rows: "<amount> <emoji>". The card's tag + border already convey recurring vs
+    // single, so no "/ season" here. Card-boosting effects keep a short scope ("to next card").
     const effectsHTML = card.effects
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = resourceIcon(res);
-          const resLabel = resourceShortLabel(res);
-          const scope = (e.target as CardTarget).adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
+          const scope = (e.target as CardTarget).adjacentOnly ? "to next card" : "to all cards";
           return `
             <div class="kh-play-hc-effect-row">
-              <span class="kh-play-hc-et kh-play-hc-et-engine">${resIcon} ${scope}</span>
-              <span class="kh-play-hc-mod">+${e.modifier}</span>
-              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+              <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-play-hc-eicon">${resourceIcon(res)}</span>
+              <span class="kh-play-hc-escope">${scope}</span>
             </div>
           `;
         }
@@ -690,28 +690,25 @@ export class PlayPhaseScene {
           const res = e.target.targetResource;
           if (res === ResourceTarget.POPULATION) {
             return `
-            <div class="kh-play-hc-effect-row">
-              <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ Attack ${Math.abs(e.modifier)}</span>
-              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            <div class="kh-play-hc-effect-row kh-play-hc-attack">
+              <span class="kh-play-hc-mod">${Math.abs(e.modifier)}</span>
+              <span class="kh-play-hc-eicon">⚔️</span>
             </div>
           `;
           }
           return `
             <div class="kh-play-hc-effect-row">
-              <span class="kh-play-hc-et kh-play-hc-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
               <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
-              <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+              <span class="kh-play-hc-eicon">${resourceIcon(res)}</span>
+              <span class="kh-play-hc-escope">rival</span>
             </div>
           `;
         }
-        const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-et kh-play-hc-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
             <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
-            <span class="kh-play-hc-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
+            <span class="kh-play-hc-eicon">${icon}</span>
           </div>
         `;
       })
@@ -720,36 +717,31 @@ export class PlayPhaseScene {
     const dealClass = this.animateDraw ? "kh-deal-in" : "";
     const dealStyle = this.animateDraw ? `style="animation-delay:${index * 180}ms"` : "";
 
+    // Border identity by card kind: single-use → bronze, recurring → silver, Great Work → gold.
+    const typeClass =
+      card.constructionPeriod > 0
+        ? "kh-hc-kind-greatwork"
+        : card.frequencyType === "RECURRING"
+          ? "kh-hc-kind-recurring"
+          : "kh-hc-kind-single";
+
     return `
-      <div class="kh-play-hand-card ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
+      <div class="kh-play-hand-card ${typeClass} ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
            data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-art-header ${isUpgrade ? "kh-play-hc-art-header-upgrade" : ""}">
           <img class="kh-play-hc-art-img" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-play-hc-badge kh-play-hc-popreq" title="Population required">${card.staffRequirement}</div>
+          <div class="kh-play-hc-badge kh-play-hc-cost" title="Production cost">${card.productionRequirement}</div>
           <div class="kh-play-hc-art-overlay">
             <div class="kh-play-hc-name">${info.name}</div>
             <div class="kh-play-hc-tags">${tagsHTML}</div>
           </div>
         </div>
         <div class="kh-play-hc-body">
-          <div class="kh-play-hc-desc">${info.description}</div>
           <div class="kh-play-hc-effects-title">Effects</div>
           ${effectsHTML}
-          <div class="kh-play-hc-costs">
-            <div class="kh-play-hc-cost-item">
-              <span class="kh-play-hc-cost-label">⚒️ Cost</span>
-              <span class="kh-play-hc-cost-val kh-play-hc-cost-prod">${card.productionRequirement}</span>
-            </div>
-            <div class="kh-play-hc-cost-item">
-              <span class="kh-play-hc-cost-label">👥 Pop. Req</span>
-              <span class="kh-play-hc-cost-val kh-play-hc-cost-pop">${card.staffRequirement}</span>
-            </div>
-            ${card.constructionPeriod > 0 ? `
-            <div class="kh-play-hc-cost-item">
-              <span class="kh-play-hc-cost-label">🏗️ Construction</span>
-              <span class="kh-play-hc-cost-val">${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"}</span>
-            </div>` : ""}
-            ${unavailable ? `<span class="kh-play-hc-unavailable">${unavailable}</span>` : ""}
-          </div>
+          ${card.constructionPeriod > 0 ? `<div class="kh-play-hc-construction">🏗️ ${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"} to build</div>` : ""}
+          ${unavailable ? `<div class="kh-play-hc-unavailable">${unavailable}</div>` : ""}
           <button class="kh-play-btn-play ${isUpgrade ? "kh-play-btn-upgrade" : ""}"
                   data-index="${index}" ${btnExtra}>
             ${btnText}
@@ -1356,8 +1348,8 @@ export class PlayPhaseScene {
       .kh-play-res-icon    { font-size: 1.5rem; line-height: 1; }
       .kh-play-res-label   { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-play-res-value   { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
-      .kh-play-pop      .kh-play-res-value { color: #f09090; }
-      .kh-play-prod     .kh-play-res-value { color: #f0cc60; }
+      .kh-play-pop      .kh-play-res-value { color: #7fc86a; }
+      .kh-play-prod     .kh-play-res-value { color: #e8862a; }
       .kh-play-food     .kh-play-res-value { color: #90e060; }
       .kh-play-gold     .kh-play-res-value { color: #ffd700; }
       .kh-play-strength .kh-play-res-value { color: #9ab0d0; }
@@ -1508,12 +1500,12 @@ export class PlayPhaseScene {
         padding: 8px 28px 12px;
         overflow: hidden;
       }
-      /* The table keeps its natural height so the full card art is always visible; the hand takes
-         whatever height is left and its cards scale down to fit (art shrinks with the viewport). */
+      /* No scroll windows: the table and the hand are both their natural (viewport-capped) size, and
+         the ornament between them absorbs any slack. Everything fits on one screen. */
       .kh-play-section-table { flex: 0 0 auto; display: flex; flex-direction: column; }
-      .kh-play-section-table .kh-play-table-slots { overflow: visible; }
-      .kh-play-section-hand  { flex: 1 1 auto; min-height: 0; margin-bottom: 0; display: flex; flex-direction: column; }
-      .kh-play-section-hand .kh-play-hand-grid { min-height: 0; overflow-y: auto; align-content: start; }
+      .kh-play-section-table .kh-play-table-slots { overflow: visible; align-content: start; }
+      .kh-play-section-hand  { flex: 0 0 auto; margin-bottom: 0; }
+      .kh-play-section-hand .kh-play-hand-grid { overflow: visible; }
 
       /* ── Section shared layout ───────────────────────────────────────── */
       .kh-play-section       { margin-bottom: 12px; }
@@ -1649,13 +1641,16 @@ export class PlayPhaseScene {
       .kh-play-empty-label { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1px; }
 
       /* ── Ornament ────────────────────────────────────────────────────── */
-      .kh-play-ornament { text-align: center; color: #f0cc50; font-size: 1.1rem; letter-spacing: 10px; opacity: .7; margin: 2px 0 6px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
+      .kh-play-ornament { flex: 1 1 auto; min-height: 6px; display: flex; align-items: center; justify-content: center; text-align: center; color: #f0cc50; font-size: 1.1rem; letter-spacing: 10px; opacity: .7; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
-      /* ── Hand grid (max 3 cards) ─────────────────────────────────────── */
-      .kh-play-hand-grid            { display: grid; gap: 14px; }
-      .kh-play-hand-cols-1          { grid-template-columns: 1fr; max-width: 380px; }
-      .kh-play-hand-cols-2          { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
-      .kh-play-hand-cols-3          { grid-template-columns: repeat(3, 1fr); }
+      /* ── Hand grid — card WIDTH is tied to viewport height, so on shorter screens the whole card
+         scales down proportionally (art + text together, via container-query units below), which
+         keeps the hand fitting on one screen without scrolling. ─────────────── */
+      /* One constant card width for every hand size — playing a card never resizes the others. */
+      .kh-play-hand-grid            { display: grid; gap: clamp(8px, 1.3vh, 15px); justify-content: center; margin: 0 auto; }
+      .kh-play-hand-cols-1,
+      .kh-play-hand-cols-2,
+      .kh-play-hand-cols-3          { grid-auto-flow: column; grid-auto-columns: clamp(132px, 22vh, 250px); }
 
       /* Hand card — same parchment/green aesthetic as ADD phase */
       .kh-play-hand-card {
@@ -1665,7 +1660,36 @@ export class PlayPhaseScene {
         overflow: hidden;
         box-shadow: 3px 5px 18px rgba(0,0,0,.13), inset 0 0 60px rgba(255,245,210,.4);
         transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        /* Fixed aspect so every card is exactly the same size; content that doesn't fit is clipped
+           rather than making the card taller. Everything inside is sized in cqw so the whole card
+           scales as one unit with its width. */
+        aspect-ratio: 1 / 1.58;
+        display: flex;
+        flex-direction: column;
+        container-type: inline-size;
       }
+      .kh-play-hc-art-header { flex: 0 0 auto; }
+      .kh-play-hc-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+      /* Proportional (container-query) sizing — all tied to the card's own width. */
+      .kh-play-hc-body            { padding: 4cqw 5.5cqw 5cqw; }
+      .kh-play-hc-effects-title   { font-size: 4.2cqw; margin-bottom: 2.5cqw; }
+      .kh-play-hc-effect-row      { display: flex; align-items: center; gap: 2.5cqw; padding: 1.4cqw 0; }
+      .kh-play-hc-mod            { font-size: 8cqw; font-weight: 800; }
+      .kh-play-hc-eicon          { font-size: 8cqw; line-height: 1; }
+      .kh-play-hc-escope         { font-size: 4.2cqw; font-style: italic; color: #8a7654; }
+      .kh-play-hc-attack .kh-play-hc-mod { color: #b23b30; }
+      .kh-play-hc-name           { font-size: 8cqw !important; padding-right: 0; }
+      .kh-play-hc-tags           { gap: 1.6cqw; margin-top: 2cqw; }
+      .kh-play-hc-tags .kh-play-tag { font-size: 3.2cqw; padding: 0.6cqw 1.8cqw; }
+      .kh-play-hc-art-overlay    { padding: 12cqw 5cqw 4cqw; }
+      .kh-play-hc-cost           { width: 22cqw; height: 22cqw; font-size: 9cqw; top: 4cqw; right: 4cqw; border-width: 1.5cqw; }
+      .kh-play-hc-popreq         { width: 21cqw; height: 21cqw; font-size: 8.5cqw; top: 4cqw; left: 4cqw; border-width: 1.5cqw; }
+      .kh-play-hc-construction   { font-size: 3.8cqw; margin-top: 2.5cqw; }
+      .kh-play-btn-play          { font-size: 5.4cqw !important; padding: 3.2cqw 0 !important; margin-top: auto; }
+      /* Border identity by card kind (thicker than the default): bronze / silver / gold. */
+      .kh-play-hand-card.kh-hc-kind-single    { border: 5px solid #bf7a3a; }
+      .kh-play-hand-card.kh-hc-kind-recurring { border: 5px solid #b7bdc4; }
+      .kh-play-hand-card.kh-hc-kind-greatwork { border: 5px solid #e6b53c; }
       .kh-play-hand-card:not(.kh-play-hc-unplayable):hover {
         transform: translateY(-6px) scale(1.012);
         box-shadow: 4px 12px 28px rgba(0,0,0,.2);
@@ -2181,6 +2205,8 @@ export class PlayPhaseScene {
         position: relative;
         width: 100%;
         aspect-ratio: 3 / 4;
+        /* Cap the table-card height on short screens so the whole board + hand fit with no scroll. */
+        max-height: clamp(120px, 24vh, 300px);
         overflow: hidden;
         border-radius: 10px;
       }
@@ -2355,7 +2381,9 @@ export class PlayPhaseScene {
 
       .kh-play-hc-art-header {
         position: relative;
-        height: clamp(84px, 12vh, 190px);
+        width: 100%;
+        /* Square window — reveals the middle of the portrait, uncropped left-to-right. */
+        aspect-ratio: 1 / 1;
         overflow: hidden;
         border-bottom: 2px solid #c49428;
         border-radius: 14px 14px 0 0;
@@ -2369,7 +2397,48 @@ export class PlayPhaseScene {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        object-position: center;
         display: block;
+      }
+
+      /* Corner badges on the art: cost (red circle, top-right) + population req (blue square, top-left) */
+      .kh-play-hc-badge {
+        position: absolute;
+        top: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Cinzel', serif;
+        font-weight: 800;
+        color: #fff;
+        z-index: 3;
+        box-shadow: 0 2px 7px rgba(0,0,0,.55);
+        text-shadow: 0 1px 2px rgba(0,0,0,.6);
+      }
+      .kh-play-hc-cost {
+        right: 9px;
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #f0932e 0%, #a8560c 82%);
+        border: 2px solid #ffdca8;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55);
+        font-size: 1.3rem;
+      }
+      .kh-play-hc-popreq {
+        left: 9px;
+        width: 42px; height: 42px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #4a7fb0 0%, #1e3f66 100%);
+        border: 2px solid #cfe2f0;
+        font-size: 1.25rem;
+      }
+      .kh-play-hc-construction {
+        font-family: 'Cinzel', serif;
+        font-size: .82rem;
+        color: #9a7a4a;
+        margin-top: 6px;
+        letter-spacing: .5px;
       }
 
       /* Gradient overlay + text at bottom of art */

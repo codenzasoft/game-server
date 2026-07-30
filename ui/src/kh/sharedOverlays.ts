@@ -464,7 +464,7 @@ export function injectSharedStyles(): void {
       font-family: 'Cinzel', serif; font-size: .68rem; letter-spacing: 2px;
       text-transform: uppercase; color: #a09070;
     }
-    .kh-hpbar-nums  { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.15rem; color: #f0a0a0; }
+    .kh-hpbar-nums  { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.15rem; color: #a9dd97; }
     .kh-hpbar-cap   { font-weight: 400; font-size: .85rem; color: #9a7a7a; opacity: .85; }
     .kh-hpbar-track {
       width: 100%; height: 26px; border-radius: 14px; overflow: hidden;
@@ -473,8 +473,8 @@ export function injectSharedStyles(): void {
     }
     .kh-hpbar-fill {
       height: 100%; border-radius: 14px;
-      background: linear-gradient(90deg, #7e241b, #e0503f 65%, #f5866a);
-      box-shadow: inset 0 0 10px rgba(255,120,95,.35);
+      background: linear-gradient(90deg, #14431f, #2f7a3a 65%, #46a352);
+      box-shadow: inset 0 0 10px rgba(120,220,140,.3);
       transition: width .4s ease;
     }
     .kh-hpbar-wallhead {

@@ -465,7 +465,7 @@ export class AddPhaseScene {
       .kh-res-label  { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-res-value  { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
       .kh-pop      .kh-res-value { color: #f09090; }
-      .kh-prod     .kh-res-value { color: #f0cc60; }
+      .kh-prod     .kh-res-value { color: #e8862a; }
       .kh-food     .kh-res-value { color: #90e060; }
       .kh-gold     .kh-res-value { color: #ffd700; }
       .kh-strength .kh-res-value { color: #9ab0d0; }

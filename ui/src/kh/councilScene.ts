@@ -617,7 +617,7 @@ export class CouncilScene {
       .kh-cs-res-label   { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-cs-res-value   { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
       .kh-cs-pop  .kh-cs-res-value { color: #f09090; }
-      .kh-cs-prod .kh-cs-res-value { color: #f0cc60; }
+      .kh-cs-prod .kh-cs-res-value { color: #e8862a; }
       .kh-cs-food .kh-cs-res-value { color: #90e060; }
       .kh-cs-gold .kh-cs-res-value { color: #ffd700; }
       .kh-cs-strength .kh-cs-res-value { color: #9ab0d0; }
