@@ -650,25 +650,20 @@ export class PlayPhaseScene {
           ? `👥 ${workers}/${card.staffRequirement} workers — half output`
           : "";
 
-    let btnText    = isUpgrade ? "✦ Upgrade" : "🏗 Build";
-    let btnExtra   = "";
     let unavailable = "";
 
     if (!canAffordProd) {
-      btnExtra    = "disabled";
       unavailable = `⚒️ Need ${card.productionRequirement} production`;
     } else if (!hasSlot) {
-      btnExtra    = "disabled";
       unavailable = "Table is full";
     } else if (staffWarn) {
       unavailable = staffWarn;
     }
 
+    // Only the tags that carry real information: frequency (SINGLE/RECURRING) and ENGINE.
     const tagsHTML = [
-      `<span class="kh-play-tag kh-play-tag-season">${state.time.season}</span>`,
       `<span class="kh-play-tag ${card.frequencyType === "RECURRING" ? "kh-play-tag-recurring" : "kh-play-tag-single"}">${card.frequencyType}</span>`,
-      ...info.tags.map((t) => `<span class="kh-play-tag kh-play-tag-category">${t}</span>`),
-      isUpgrade ? `<span class="kh-play-tag kh-play-tag-upgrade">UPGRADES TABLE</span>` : "",
+      ...info.tags.filter((t) => t === "ENGINE").map((t) => `<span class="kh-play-tag kh-play-tag-category">${t}</span>`),
     ].join("");
 
     // Compact effect rows: "<amount> <emoji>". The card's tag + border already convey recurring vs
@@ -738,14 +733,9 @@ export class PlayPhaseScene {
           </div>
         </div>
         <div class="kh-play-hc-body">
-          <div class="kh-play-hc-effects-title">Effects</div>
           ${effectsHTML}
           ${card.constructionPeriod > 0 ? `<div class="kh-play-hc-construction">🏗️ ${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"} to build</div>` : ""}
           ${unavailable ? `<div class="kh-play-hc-unavailable">${unavailable}</div>` : ""}
-          <button class="kh-play-btn-play ${isUpgrade ? "kh-play-btn-upgrade" : ""}"
-                  data-index="${index}" ${btnExtra}>
-            ${btnText}
-          </button>
         </div>
       </div>
     `;
@@ -1498,7 +1488,9 @@ export class PlayPhaseScene {
         max-width: 1160px;
         margin: 0 auto;
         padding: 8px 28px 12px;
-        overflow: hidden;
+        /* visible so a table card's hover tooltip can pop out; the overlay still clips at the
+           viewport so there's no page scroll. */
+        overflow: visible;
       }
       /* No scroll windows: the table and the hand are both their natural (viewport-capped) size, and
          the ornament between them absorbs any slack. Everything fits on one screen. */
@@ -1671,13 +1663,13 @@ export class PlayPhaseScene {
       .kh-play-hc-art-header { flex: 0 0 auto; }
       .kh-play-hc-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
       /* Proportional (container-query) sizing — all tied to the card's own width. */
-      .kh-play-hc-body            { padding: 4cqw 5.5cqw 5cqw; }
-      .kh-play-hc-effects-title   { font-size: 4.2cqw; margin-bottom: 2.5cqw; }
-      .kh-play-hc-effect-row      { display: flex; align-items: center; gap: 2.5cqw; padding: 1.4cqw 0; }
-      .kh-play-hc-mod            { font-size: 8cqw; font-weight: 800; }
-      .kh-play-hc-eicon          { font-size: 8cqw; line-height: 1; }
-      .kh-play-hc-escope         { font-size: 4.2cqw; font-style: italic; color: #8a7654; }
+      .kh-play-hc-body            { padding: 4cqw 6cqw; justify-content: center; gap: 1cqw; }
+      .kh-play-hc-effect-row      { display: flex; align-items: center; gap: 3cqw; padding: 1.6cqw 0; }
+      .kh-play-hc-mod            { font-size: 10cqw; font-weight: 800; }
+      .kh-play-hc-eicon          { font-size: 10cqw; line-height: 1; }
+      .kh-play-hc-escope         { font-size: 6cqw; font-style: italic; color: #8a7654; line-height: 1.1; }
       .kh-play-hc-attack .kh-play-hc-mod { color: #b23b30; }
+      .kh-play-hc-tags .kh-play-tag { font-size: 4.6cqw; padding: 1cqw 2.4cqw; }
       .kh-play-hc-name           { font-size: 8cqw !important; padding-right: 0; }
       .kh-play-hc-tags           { gap: 1.6cqw; margin-top: 2cqw; }
       .kh-play-hc-tags .kh-play-tag { font-size: 3.2cqw; padding: 0.6cqw 1.8cqw; }
@@ -2287,16 +2279,18 @@ export class PlayPhaseScene {
       .kh-tc-tooltip {
         display: none;
         position: absolute;
-        bottom: calc(100% + 8px);
+        /* Directly below the card (table sits at the top of the scene) with a slight overlap so the
+           hover never drops while moving the cursor onto the Demolish button. */
+        top: calc(100% - 2px);
         left: 50%;
         transform: translateX(-50%);
-        width: 340px;
+        width: min(320px, 92vw);
         background: linear-gradient(160deg, #2a1a08 0%, #1a100a 100%);
         border: 2px solid #c49428;
         border-radius: 12px;
-        padding: 16px 18px 14px;
+        padding: 14px 16px 12px;
         box-shadow: 0 10px 36px rgba(0,0,0,.75);
-        z-index: 30;
+        z-index: 200;
         pointer-events: none;
       }
 
