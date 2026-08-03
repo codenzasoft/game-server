@@ -465,7 +465,7 @@ export function injectSharedStyles(): void {
       text-transform: uppercase; color: #a09070;
     }
     .kh-hpbar-nums  { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.15rem; color: #a9dd97; }
-    .kh-hpbar-cap   { font-weight: 400; font-size: .85rem; color: #9a7a7a; opacity: .85; }
+    .kh-hpbar-cap   { font-weight: 600; font-size: .92rem; color: #8fce7c; }
     .kh-hpbar-track {
       width: 100%; height: 26px; border-radius: 14px; overflow: hidden;
       background: rgba(0,0,0,.5); border: 1px solid rgba(0,0,0,.6);

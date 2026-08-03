@@ -238,9 +238,13 @@ public record Card(
       }
     }
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
+    // Each level raises the population requirement linearly by half the base card's requirement.
+    // {@code other} is always a fresh (base-level) copy from hand, so its staffRequirement is the
+    // original: MINE(50) → MINE II(75) → MINE III(100).
+    double upgradedStaff = staffRequirement + 0.5 * other.staffRequirement();
     return new Card(
         upgradedName,
-        staffRequirement,
+        upgradedStaff,
         productionRequirement,
         frequencyType,
         merged,

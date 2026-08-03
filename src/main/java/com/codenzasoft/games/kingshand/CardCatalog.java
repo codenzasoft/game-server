@@ -132,7 +132,8 @@ public class CardCatalog {
           100.0,
           50.0,
           FrequencyType.SINGLE,
-          List.of(ResourceTarget.POPULATION.integer(125)));
+          List.of(
+              ResourceTarget.POPULATION_CAP.integer(50), ResourceTarget.POPULATION.integer(75)));
   public static final Card LUMBER_YARD =
       new Card(
           "LUMBER_YARD",

@@ -1203,8 +1203,12 @@ public class GameEngine implements Game<GameEngine> {
 
     List<Card> table = activePlayer().getTable(season());
 
+    // The table card this play would upgrade (base-identity match for recurring cards; exact-name
+    // for single-use), or null if it's a fresh placement.
+    final Card upgradeTarget = activePlayer().findUpgradeTarget(season(), card);
+
     // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
-    if (!activePlayer().tableContains(season(), card) && table.size() >= MAX_TABLE_SIZE) {
+    if (upgradeTarget == null && table.size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(state.getTime().season() + " table is full");
     }
 
@@ -1221,12 +1225,10 @@ public class GameEngine implements Game<GameEngine> {
     activePlayer().addProduction(0.0 - card.productionRequirement());
     activePlayer().getHand().remove(card);
 
-    // If a matching card is already on the table, merge the hand card into it so that
-    // engine-boosted modifiers are preserved: Farm(14) + Farm(10) → Farm II(24).
-    // Otherwise just add it to the table as a new slot.
-    if (activePlayer().tableContains(season(), card)) {
-      Card tableCard = activePlayer().findTableCard(season(), card.name());
-      activePlayer().replaceTableCard(season(), tableCard, tableCard.mergeWith(card));
+    // If this play upgrades a card already on the table, merge into it so engine-boosted modifiers
+    // are preserved and the level advances (MINE + MINE II → MINE III). Otherwise add a new slot.
+    if (upgradeTarget != null) {
+      activePlayer().replaceTableCard(season(), upgradeTarget, upgradeTarget.mergeWith(card));
     } else {
       activePlayer().addToTable(season(), card);
     }

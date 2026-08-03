@@ -252,17 +252,17 @@ export class AddPhaseScene {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
           const scope = (e.target as CardTarget).adjacentOnly ? "to next card" : "to all cards";
-          return `<div class="kh-effect-row"><span class="kh-effect-mod">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">${scope}</span></div>`;
+          return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">${scope}</span></div>`;
         }
         if (e.target instanceof OpponentTarget) {
           const res = e.target.targetResource;
           if (res === ResourceTarget.POPULATION) {
             return `<div class="kh-effect-row kh-effect-attack"><span class="kh-effect-mod">${Math.abs(e.modifier)}</span><span class="kh-effect-eicon">⚔️</span></div>`;
           }
-          return `<div class="kh-effect-row"><span class="kh-effect-mod">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">rival</span></div>`;
+          return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">rival</span></div>`;
         }
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
-        return `<div class="kh-effect-row"><span class="kh-effect-mod">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${icon}</span></div>`;
+        return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${icon}</span></div>`;
       })
       .join("");
 
@@ -525,10 +525,16 @@ export class AddPhaseScene {
         font-family: 'Cinzel', serif; font-weight: 800; color: #fff; z-index: 3;
         box-shadow: 0 2px 7px rgba(0,0,0,.55); text-shadow: 0 1px 2px rgba(0,0,0,.6);
       }
-      .kh-add-cost   { right: 4cqw; width: 20cqw; height: 20cqw; border-radius: 50%; font-size: 9cqw;
+      .kh-add-cost   { right: 4cqw; width: 20cqw; height: 20cqw; border-radius: 50%; font-size: 9cqw; overflow: hidden;
         background: radial-gradient(circle at 35% 30%, #f0932e 0%, #a8560c 82%); border: 1.5cqw solid #ffdca8; }
-      .kh-add-popreq { left: 4cqw;  width: 19cqw; height: 19cqw; border-radius: 3cqw; font-size: 8.5cqw;
+      .kh-add-popreq { left: 4cqw;  width: 19cqw; height: 19cqw; border-radius: 3cqw; font-size: 8.5cqw; overflow: hidden;
         background: linear-gradient(135deg, #4a7fb0 0%, #1e3f66 100%); border: 1.5cqw solid #cfe2f0; }
+      .kh-add-cost::before, .kh-add-popreq::before {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        opacity: .34; z-index: -1; pointer-events: none; line-height: 1;
+      }
+      .kh-add-cost::before   { content: "⚒️"; font-size: 15cqw; }
+      .kh-add-popreq::before { content: "👥"; font-size: 14cqw; }
       .kh-add-art-overlay {
         position: absolute; bottom: 0; left: 0; right: 0;
         background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
@@ -549,6 +555,7 @@ export class AddPhaseScene {
       .kh-effect-eicon { font-size: 9.5cqw; line-height: 1; }
       .kh-effect-escope { font-size: 5.6cqw; font-style: italic; color: #8a7654; line-height: 1.1; }
       .kh-effect-attack .kh-effect-mod { color: #b23b30; }
+      .kh-effect-mod-neg { color: #b23b30; }
       .kh-card-construction { font-family: 'Cinzel', serif; font-size: 4.6cqw; color: #9a7a4a; margin-top: 2cqw; }
 
       /* Costs */

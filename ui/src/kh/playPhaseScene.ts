@@ -125,7 +125,10 @@ export class PlayPhaseScene {
 
     const meta = SEASON_META[state.time.season];
     const table = state.getCurrentTable();
-    const tableNames = new Set(table.map((c) => c.name));
+    // Base identity (strip " II"/" III") so a played MINE reads as an upgrade to a MINE II on the table.
+    const baseCardName = (n: string): string =>
+      n.endsWith(" III") ? n.slice(0, -4) : n.endsWith(" II") ? n.slice(0, -3) : n;
+    const tableNames = new Set(table.map((c) => baseCardName(c.name)));
 
     // Multiplayer readiness badge on the Play button: an encircled checkmark with "N/2" showing how
     // many players have locked in this phase (yourself and/or your rival). Shown once at least one
@@ -660,8 +663,10 @@ export class PlayPhaseScene {
       unavailable = staffWarn;
     }
 
-    // Only the tags that carry real information: frequency (SINGLE/RECURRING) and ENGINE.
+    // Only the tags that carry real information: frequency (SINGLE/RECURRING), ENGINE, and — when a
+    // matching card is already on the table — an UPGRADE marker so it's clear this card upgrades it.
     const tagsHTML = [
+      isUpgrade ? `<span class="kh-play-tag kh-play-tag-upgrade">⬆ UPGRADE</span>` : "",
       `<span class="kh-play-tag ${card.frequencyType === "RECURRING" ? "kh-play-tag-recurring" : "kh-play-tag-single"}">${card.frequencyType}</span>`,
       ...info.tags.filter((t) => t === "ENGINE").map((t) => `<span class="kh-play-tag kh-play-tag-category">${t}</span>`),
     ].join("");
@@ -675,7 +680,7 @@ export class PlayPhaseScene {
           const scope = (e.target as CardTarget).adjacentOnly ? "to next card" : "to all cards";
           return `
             <div class="kh-play-hc-effect-row">
-              <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-play-hc-mod${e.modifier < 0 ? " kh-play-hc-mod-neg" : ""}">${formatModifier(e.modifier)}</span>
               <span class="kh-play-hc-eicon">${resourceIcon(res)}</span>
               <span class="kh-play-hc-escope">${scope}</span>
             </div>
@@ -693,7 +698,7 @@ export class PlayPhaseScene {
           }
           return `
             <div class="kh-play-hc-effect-row">
-              <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
+              <span class="kh-play-hc-mod${e.modifier < 0 ? " kh-play-hc-mod-neg" : ""}">${formatModifier(e.modifier)}</span>
               <span class="kh-play-hc-eicon">${resourceIcon(res)}</span>
               <span class="kh-play-hc-escope">rival</span>
             </div>
@@ -702,7 +707,7 @@ export class PlayPhaseScene {
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
         return `
           <div class="kh-play-hc-effect-row">
-            <span class="kh-play-hc-mod">${formatModifier(e.modifier)}</span>
+            <span class="kh-play-hc-mod${e.modifier < 0 ? " kh-play-hc-mod-neg" : ""}">${formatModifier(e.modifier)}</span>
             <span class="kh-play-hc-eicon">${icon}</span>
           </div>
         `;
@@ -880,13 +885,16 @@ export class PlayPhaseScene {
         });
       });
 
-    // Play / Upgrade buttons on hand cards
+    // Click a hand card to build it — or upgrade the matching table card if one is already down.
+    // (Drag-and-drop still works; this makes the action obvious without needing to aim at a slot.)
     this.overlay
-      .querySelectorAll<HTMLButtonElement>(".kh-play-btn-play")
-      .forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const index = Number(btn.dataset.index);
+      .querySelectorAll<HTMLElement>(".kh-play-hand-card[data-index]")
+      .forEach((cardEl) => {
+        if (cardEl.classList.contains("kh-play-hc-unplayable")) return;
+        cardEl.addEventListener("click", () => {
+          const index = Number(cardEl.dataset.index);
           const card  = state.hand[index];
+          if (!card) return;
           const isUpgrade = tableNames.has(card.name);
           if (card.productionRequirement > 0) {
             const { prod } = this.resEls();
@@ -913,6 +921,10 @@ export class PlayPhaseScene {
     this.overlay
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((b) => (b.disabled = true));
+    // Hand cards are clickable divs now — lock them too so you can't build/upgrade twice.
+    this.overlay
+      .querySelectorAll<HTMLElement>(".kh-play-hand-card")
+      .forEach((c) => (c.style.pointerEvents = "none"));
   }
 
   // ─── Drag-and-drop ───────────────────────────────────────────────────────────
@@ -1669,6 +1681,7 @@ export class PlayPhaseScene {
       .kh-play-hc-eicon          { font-size: 10cqw; line-height: 1; }
       .kh-play-hc-escope         { font-size: 6cqw; font-style: italic; color: #8a7654; line-height: 1.1; }
       .kh-play-hc-attack .kh-play-hc-mod { color: #b23b30; }
+      .kh-play-hc-mod-neg { color: #b23b30; }
       .kh-play-hc-tags .kh-play-tag { font-size: 4.6cqw; padding: 1cqw 2.4cqw; }
       .kh-play-hc-name           { font-size: 8cqw !important; padding-right: 0; }
       .kh-play-hc-tags           { gap: 1.6cqw; margin-top: 2cqw; }
@@ -2427,6 +2440,14 @@ export class PlayPhaseScene {
         border: 2px solid #cfe2f0;
         font-size: 1.25rem;
       }
+      /* Faint purpose emoji behind the number: ⚒️ for production cost, 👥 for population req. */
+      .kh-play-hc-cost, .kh-play-hc-popreq { overflow: hidden; }
+      .kh-play-hc-cost::before, .kh-play-hc-popreq::before {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        opacity: .34; z-index: -1; pointer-events: none; line-height: 1;
+      }
+      .kh-play-hc-cost::before   { content: "⚒️"; font-size: 2rem; }
+      .kh-play-hc-popreq::before { content: "👥"; font-size: 1.9rem; }
       .kh-play-hc-construction {
         font-family: 'Cinzel', serif;
         font-size: .82rem;
