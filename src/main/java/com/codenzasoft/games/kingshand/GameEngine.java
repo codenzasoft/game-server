@@ -1212,23 +1212,35 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalStateException(state.getTime().season() + " table is full");
     }
 
+    // The card that will end up on the table (the merged, higher-level card on an upgrade, else the
+    // played card). You pay the cost currently displayed — the target's present cost on an upgrade,
+    // or the played card's cost on a fresh placement. The merged card's higher cost only applies
+    // the
+    // NEXT time it is upgraded.
+    final Card resultCard = upgradeTarget != null ? upgradeTarget.mergeWith(card) : card;
+    final double cost =
+        upgradeTarget != null
+            ? upgradeTarget.productionRequirement()
+            : card.productionRequirement();
+
     // if you cannot afford the production cost, reject
-    if (activePlayer().getResources().production() < card.productionRequirement()) {
+    if (activePlayer().getResources().production() < cost) {
       throw new IllegalStateException(
           "not enough production to place card: need "
-              + (int) card.productionRequirement()
+              + (int) cost
               + ", have "
               + (int) activePlayer().getResources().production());
     }
 
     // Pay the production cost and remove the card from the hand.
-    activePlayer().addProduction(0.0 - card.productionRequirement());
+    activePlayer().addProduction(0.0 - cost);
     activePlayer().getHand().remove(card);
 
-    // If this play upgrades a card already on the table, merge into it so engine-boosted modifiers
-    // are preserved and the level advances (MINE + MINE II → MINE III). Otherwise add a new slot.
+    // If this play upgrades a card already on the table, replace it with the merged (leveled-up)
+    // card so engine-boosted modifiers are preserved (MINE + MINE II → MINE III). Otherwise add a
+    // new slot.
     if (upgradeTarget != null) {
-      activePlayer().replaceTableCard(season(), upgradeTarget, upgradeTarget.mergeWith(card));
+      activePlayer().replaceTableCard(season(), upgradeTarget, resultCard);
     } else {
       activePlayer().addToTable(season(), card);
     }

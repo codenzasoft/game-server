@@ -239,13 +239,19 @@ public record Card(
     }
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
     // Each level raises the population requirement linearly by half the base card's requirement.
-    // {@code other} is always a fresh (base-level) copy from hand, so its staffRequirement is the
-    // original: MINE(50) → MINE II(75) → MINE III(100).
-    double upgradedStaff = staffRequirement + 0.5 * other.staffRequirement();
+    // {@code other} is always a fresh (base-level) copy from hand, so its requirements are the
+    // originals: MINE(50) → MINE II(75) → MINE III(100). Single-use cards escalate their production
+    // cost the same way (they have no ongoing staffing to grow). Both values are clamped to whole
+    // numbers so a card never shows a fractional cost/requirement.
+    double upgradedStaff = Math.floor(staffRequirement + 0.5 * other.staffRequirement());
+    double upgradedProduction =
+        frequencyType == FrequencyType.SINGLE
+            ? Math.floor(productionRequirement + 0.5 * other.productionRequirement())
+            : productionRequirement;
     return new Card(
         upgradedName,
         upgradedStaff,
-        productionRequirement,
+        upgradedProduction,
         frequencyType,
         merged,
         constructionPeriod,

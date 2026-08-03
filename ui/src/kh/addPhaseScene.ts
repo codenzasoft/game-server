@@ -278,8 +278,8 @@ export class AddPhaseScene {
       <div class="kh-card ${typeClass}" data-index="${index}" role="button" tabindex="0" title="Add to your deck">
         <div class="kh-add-art-header">
           <img class="kh-add-art-img" src="${imgSrc}" alt="${info.name}" />
-          <div class="kh-add-badge kh-add-popreq" title="Population required">${card.staffRequirement}</div>
-          <div class="kh-add-badge kh-add-cost" title="Production cost">${card.productionRequirement}</div>
+          <div class="kh-add-badge kh-add-popreq" title="Population required">${Math.round(card.staffRequirement)}</div>
+          <div class="kh-add-badge kh-add-cost" title="Production cost">${Math.round(card.productionRequirement)}</div>
           <div class="kh-add-art-overlay">
             <div class="kh-card-name">${info.name}</div>
             <div class="kh-card-tags">${tagsHTML}</div>

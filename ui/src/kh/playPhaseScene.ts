@@ -475,7 +475,7 @@ export class PlayPhaseScene {
       : staffing?.tier === StaffingTier.NONE ? "kh-tc-chip-none"
       : "";
     const staffChipHTML = staffing
-      ? `<div class="kh-tc-staff-chip ${chipClass}">👥 ${staffing.workersAllocated}/${staffing.workerCost}</div>`
+      ? `<div class="kh-tc-staff-chip ${chipClass}">👥 ${Math.round(staffing.workersAllocated)}/${Math.round(staffing.workerCost)}</div>`
       : "";
 
     // Staffing line inside the hover tooltip.
@@ -484,7 +484,7 @@ export class PlayPhaseScene {
       : staffing?.tier === StaffingTier.HALF ? "Half output"
       : "Won't fire";
     const staffTooltipHTML = staffing
-      ? `<div class="kh-tc-tt-staffing ${chipClass}">👥 ${staffing.workersAllocated} / ${staffing.workerCost} — ${tierLabel}</div>`
+      ? `<div class="kh-tc-tt-staffing ${chipClass}">👥 ${Math.round(staffing.workersAllocated)} / ${Math.round(staffing.workerCost)} — ${tierLabel}</div>`
       : "";
 
     // Construction-period chip/tooltip — only for Great Works still under construction.
@@ -648,15 +648,15 @@ export class PlayPhaseScene {
     const halfThreshold = Math.ceil(card.staffRequirement / 2);
     const staffWarn =
       workers < halfThreshold
-        ? `👥 ${workers}/${card.staffRequirement} workers — won't fire`
+        ? `👥 ${workers}/${Math.round(card.staffRequirement)} workers — won't fire`
         : workers < card.staffRequirement
-          ? `👥 ${workers}/${card.staffRequirement} workers — half output`
+          ? `👥 ${workers}/${Math.round(card.staffRequirement)} workers — half output`
           : "";
 
     let unavailable = "";
 
     if (!canAffordProd) {
-      unavailable = `⚒️ Need ${card.productionRequirement} production`;
+      unavailable = `⚒️ Need ${Math.round(card.productionRequirement)} production`;
     } else if (!hasSlot) {
       unavailable = "Table is full";
     } else if (staffWarn) {
@@ -730,8 +730,8 @@ export class PlayPhaseScene {
            data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-art-header ${isUpgrade ? "kh-play-hc-art-header-upgrade" : ""}">
           <img class="kh-play-hc-art-img" src="${imgSrc}" alt="${info.name}" />
-          <div class="kh-play-hc-badge kh-play-hc-popreq" title="Population required">${card.staffRequirement}</div>
-          <div class="kh-play-hc-badge kh-play-hc-cost" title="Production cost">${card.productionRequirement}</div>
+          <div class="kh-play-hc-badge kh-play-hc-popreq" title="Population required">${Math.round(card.staffRequirement)}</div>
+          <div class="kh-play-hc-badge kh-play-hc-cost" title="Production cost">${Math.round(card.productionRequirement)}</div>
           <div class="kh-play-hc-art-overlay">
             <div class="kh-play-hc-name">${info.name}</div>
             <div class="kh-play-hc-tags">${tagsHTML}</div>
