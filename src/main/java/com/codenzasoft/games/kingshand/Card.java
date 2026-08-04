@@ -86,11 +86,26 @@ public record Card(
    * via its effects, regardless of whether that resource is locked by default.
    */
   public Set<ResourceTarget> requiredResources() {
-    return effects.stream()
-        .map(Effect::target)
-        .filter(target -> target instanceof ResourceTarget)
-        .map(target -> (ResourceTarget) target)
-        .collect(Collectors.toUnmodifiableSet());
+    Set<ResourceTarget> required =
+        effects.stream()
+            .map(Effect::target)
+            .filter(target -> target instanceof ResourceTarget)
+            .map(target -> (ResourceTarget) target)
+            .collect(Collectors.toCollection(HashSet::new));
+    // A direct assault on the enemy's POPULATION (a damage card) requires a standing army, so it is
+    // gated behind STRENGTH — unlocked by BARRACKS — even though the effect targets the opponent
+    // rather than a self resource. This locks the attack cards behind the Barracks Great Work
+    // without charging the player any STRENGTH to play them.
+    boolean attacksPopulation =
+        effects.stream()
+            .anyMatch(
+                e ->
+                    e.target() instanceof OpponentResourceTarget opponent
+                        && opponent.targetResource() == ResourceTarget.POPULATION);
+    if (attacksPopulation) {
+      required.add(ResourceTarget.STRENGTH);
+    }
+    return Set.copyOf(required);
   }
 
   /**
@@ -223,10 +238,20 @@ public record Card(
       }
     }
     String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
+    // Each level raises the population requirement linearly by half the base card's requirement.
+    // {@code other} is always a fresh (base-level) copy from hand, so its requirements are the
+    // originals: MINE(50) → MINE II(75) → MINE III(100). Single-use cards escalate their production
+    // cost the same way (they have no ongoing staffing to grow). Both values are clamped to whole
+    // numbers so a card never shows a fractional cost/requirement.
+    double upgradedStaff = Math.floor(staffRequirement + 0.5 * other.staffRequirement());
+    double upgradedProduction =
+        frequencyType == FrequencyType.SINGLE
+            ? Math.floor(productionRequirement + 0.5 * other.productionRequirement())
+            : productionRequirement;
     return new Card(
         upgradedName,
-        staffRequirement,
-        productionRequirement,
+        upgradedStaff,
+        upgradedProduction,
         frequencyType,
         merged,
         constructionPeriod,

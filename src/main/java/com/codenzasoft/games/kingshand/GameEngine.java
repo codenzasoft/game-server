@@ -810,9 +810,18 @@ public class GameEngine implements Game<GameEngine> {
 
   /**
    * Shared PLAY resolution for the whole match, run once when the readiness barrier releases.
-   * Implements the locked sabotage rule: snapshot every kingdom <em>before</em> any table resolves,
-   * resolve each table against the frozen opponent snapshot, then apply the collected cross-seat
-   * deltas only after all self-resolution completes — deterministic and order-independent.
+   * Implements the locked sabotage/combat rule: snapshot every kingdom <em>before</em> any table
+   * resolves, resolve each table against the frozen opponent snapshot, then apply the collected
+   * cross-seat deltas only after all self-resolution completes — deterministic and
+   * order-independent.
+   *
+   * <p><b>Combat timing (why there is no "who goes first").</b> Resolution is simultaneous. An
+   * attack or sabotage effect's <em>amount</em> is computed from the opponent's frozen pre-turn
+   * snapshot (step one), but the hit <em>lands</em> in step two on the victim's
+   * already-self-resolved, <em>live</em> state — meaning any walls/garrison (STRENGTH) the victim
+   * built <em>this same turn</em> are in place to absorb it (see {@link #applyIncomingDelta}). So
+   * each turn is effectively a simultaneous reveal: fortifying and attacking on the same turn both
+   * count, and there is no first-player advantage — the property we want for symmetric multiplayer.
    */
   private void resolvePlayForAllSeats() {
     final int seatCount = state.playerCount();
@@ -850,13 +859,40 @@ public class GameEngine implements Game<GameEngine> {
       final PlayerState victim = state.getPlayer(seat);
       final ResourceState before = victim.getResources();
       for (final Effect delta : deltas) {
-        victim.apply(delta);
+        applyIncomingDelta(victim, delta);
       }
       final List<ResolutionStep> log = new ArrayList<>(victim.getResolutionLog());
       log.add(
           new ResolutionStep(
               "SABOTAGE", StaffingTier.FULL, false, victim.getResources().getDelta(before)));
       victim.setResolutionLog(log);
+    }
+  }
+
+  /**
+   * Applies one incoming cross-seat delta to a victim, implementing the STRENGTH-as-shield combat
+   * rule: a <em>negative POPULATION</em> delta (an attack from a damage card) is first absorbed by
+   * the victim's standing army (STRENGTH), and only the remainder reduces POPULATION. All other
+   * deltas — economic sabotage of PRODUCTION/FOOD, or any positive effect — apply unchanged.
+   *
+   * <p>STRENGTH only shields once it is unlocked (i.e. the victim has completed BARRACKS); until
+   * then attacks land directly on population.
+   */
+  private void applyIncomingDelta(final PlayerState victim, final Effect delta) {
+    if (!delta.isAttack()) {
+      victim.apply(delta);
+      return;
+    }
+    final ResourceState r = victim.getResources();
+    double damage = -delta.modifier();
+    double absorbed = 0.0;
+    if (r.unlocked().contains(ResourceTarget.STRENGTH) && r.strength() > 0.0) {
+      absorbed = Math.min(r.strength(), damage);
+      victim.apply(new Effect(ResourceTarget.STRENGTH, -absorbed));
+    }
+    final double remainder = damage - absorbed;
+    if (remainder > 0.0) {
+      victim.apply(new Effect(ResourceTarget.POPULATION, -remainder));
     }
   }
 
@@ -1166,30 +1202,44 @@ public class GameEngine implements Game<GameEngine> {
 
     List<Card> table = activePlayer().getTable(season());
 
+    // The table card this play would upgrade (base-identity match for recurring cards; exact-name
+    // for single-use), or null if it's a fresh placement.
+    final Card upgradeTarget = activePlayer().findUpgradeTarget(season(), card);
+
     // if there is no card to upgrade and no space on the table, you cannot play this card, reject.
-    if (!activePlayer().tableContains(season(), card) && table.size() >= MAX_TABLE_SIZE) {
+    if (upgradeTarget == null && table.size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(state.getTime().season() + " table is full");
     }
 
+    // The card that will end up on the table (the merged, higher-level card on an upgrade, else the
+    // played card). You pay the cost currently displayed — the target's present cost on an upgrade,
+    // or the played card's cost on a fresh placement. The merged card's higher cost only applies
+    // the
+    // NEXT time it is upgraded.
+    final Card resultCard = upgradeTarget != null ? upgradeTarget.mergeWith(card) : card;
+    final double cost =
+        upgradeTarget != null
+            ? upgradeTarget.productionRequirement()
+            : card.productionRequirement();
+
     // if you cannot afford the production cost, reject
-    if (activePlayer().getResources().production() < card.productionRequirement()) {
+    if (activePlayer().getResources().production() < cost) {
       throw new IllegalStateException(
           "not enough production to place card: need "
-              + (int) card.productionRequirement()
+              + (int) cost
               + ", have "
               + (int) activePlayer().getResources().production());
     }
 
     // Pay the production cost and remove the card from the hand.
-    activePlayer().addProduction(0.0 - card.productionRequirement());
+    activePlayer().addProduction(0.0 - cost);
     activePlayer().getHand().remove(card);
 
-    // If a matching card is already on the table, merge the hand card into it so that
-    // engine-boosted modifiers are preserved: Farm(14) + Farm(10) → Farm II(24).
-    // Otherwise just add it to the table as a new slot.
-    if (activePlayer().tableContains(season(), card)) {
-      Card tableCard = activePlayer().findTableCard(season(), card.name());
-      activePlayer().replaceTableCard(season(), tableCard, tableCard.mergeWith(card));
+    // If this play upgrades a card already on the table, replace it with the merged (leveled-up)
+    // card so engine-boosted modifiers are preserved (MINE + MINE II → MINE III). Otherwise add a
+    // new slot.
+    if (upgradeTarget != null) {
+      activePlayer().replaceTableCard(season(), upgradeTarget, resultCard);
     } else {
       activePlayer().addToTable(season(), card);
     }

@@ -435,7 +435,7 @@ const RESOURCE_DISPLAY: Record<ResourceTarget, { icon: string; label: string; sh
   [ResourceTarget.FOOD]:           { icon: "🌾",  label: "FOOD",       shortLabel: "food" },
   [ResourceTarget.POPULATION_CAP]: { icon: "🏠",  label: "POP CAP",    shortLabel: "population_cap" },
   [ResourceTarget.GOLD]:           { icon: "💰",  label: "GOLD",       shortLabel: "gold" },
-  [ResourceTarget.STRENGTH]:       { icon: "⚔️", label: "STRENGTH",   shortLabel: "strength" },
+  [ResourceTarget.STRENGTH]:       { icon: "🛡", label: "DEFENSE",    shortLabel: "defense" },
 };
 
 /** Icon for a resource target, e.g. ResourceTarget.GOLD → "💰". Falls back to "❓" for unrecognized values. */

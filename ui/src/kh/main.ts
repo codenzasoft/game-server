@@ -9,7 +9,6 @@ import {
   playDualResolution,
   removeOpponentHud,
   showWaitingOverlay,
-  updateOpponentHud,
 } from "./multiplayerOverlays.ts";
 
 const homeUrl = `${window.location.origin}/`;
@@ -205,10 +204,9 @@ const getGameId = (): string | undefined => {
       return;
     }
 
-    // Opponent HUD (multiplayer only): public resources + ready state.
-    if (isMultiplayer) {
-      updateOpponentHud(match, context.seat);
-    }
+    // The rival's resources are intentionally hidden during normal play — they are revealed only
+    // on the dual resolution screen. (The always-on opponent HUD has been removed.)
+    removeOpponentHud();
 
     // Waiting overlay: shown once this seat has submitted the current phase but
     // the barrier hasn't released. Applied after scene routing below so the

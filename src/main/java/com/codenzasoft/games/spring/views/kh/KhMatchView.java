@@ -16,6 +16,8 @@ import java.util.List;
  * @param time the shared match clock
  * @param matchOver {@code true} once the match is decided
  * @param winnerSeat seat of the winner, or {@code -1} if undecided (or a solo knock-out)
+ * @param victoryType how the match was won: {@code "GREAT_WORKS"}, {@code "CONQUEST"}, or {@code
+ *     "NONE"} — lets the game-over screen name the path to victory
  * @param submittedSeats seats that have completed the current phase; drives the client's "waiting
  *     for other player…" state
  */
@@ -24,6 +26,7 @@ public record KhMatchView(
     @JsonProperty("time") TimeState time,
     @JsonProperty("matchOver") boolean matchOver,
     @JsonProperty("winnerSeat") int winnerSeat,
+    @JsonProperty("victoryType") String victoryType,
     @JsonProperty("submittedSeats") List<Integer> submittedSeats,
     @JsonProperty("resolutionPending") boolean resolutionPending) {
 
@@ -41,6 +44,7 @@ public record KhMatchView(
         state.getTime(),
         state.isMatchOver(),
         state.winnerSeat(),
+        state.victoryType(),
         state.getSubmittedSeats(),
         state.isResolutionPending());
   }

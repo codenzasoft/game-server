@@ -18,6 +18,15 @@ public record Effect(EffectTarget target, double modifier) {
     return value + modifier;
   }
 
+  /**
+   * {@code true} when this effect is an <em>attack</em>: a negative change to a kingdom's
+   * POPULATION. Used during cross-seat resolution to route the hit through the victim's defensive
+   * STRENGTH before it reduces population.
+   */
+  public boolean isAttack() {
+    return target() == ResourceTarget.POPULATION && modifier() < 0.0;
+  }
+
   /** Returns a new {@link Effect} with the modifier scaled by {@code factor}. */
   public Effect upgrade(double factor) {
     return new Effect(target, modifier * factor);

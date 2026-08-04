@@ -4,8 +4,6 @@ import {
   cardImagePath,
   formatModifier,
   resourceIcon,
-  resourceLabel,
-  resourceShortLabel,
 } from "./cardCatalog.ts";
 import { seatedFreeRerollBonus } from "./advisorCatalog.ts";
 import {
@@ -16,6 +14,7 @@ import {
   attachHandbookListeners,
   buildOptionsButton,
   attachOptionsListeners,
+  buildHealthBar,
 } from "./sharedOverlays.ts";
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -126,24 +125,21 @@ export class AddPhaseScene {
     this.overlay.innerHTML = `
       ${this.buildHeader(state, meta)}
       ${this.buildResourcesBar(state)}
-      ${this.buildPhaseTracker()}
       <main class="kh-scene">
         <div class="kh-prompt">
           <h2>Choose a Card to Add</h2>
           <p>Select one card to shuffle into your ${meta.label} deck, or pass.</p>
         </div>
         <div class="kh-cards-grid">
-          ${state.addChoices.map((card, i) => this.buildCard(card, i, state)).join("")}
+          ${state.addChoices.map((card, i) => this.buildCard(card, i)).join("")}
         </div>
         <div class="kh-ornament">✦ &nbsp; ✦ &nbsp; ✦</div>
         <div class="kh-action-bar">
+          <button class="kh-btn-skip" id="kh-btn-skip">Skip</button>
           <button class="kh-btn-reroll" id="kh-btn-reroll"
             ${!canAffordReroll ? "disabled" : ""}>
-            ⟳ &nbsp;Reroll
+            ⟳ Reroll
             <span class="kh-reroll-cost">${isFreeReroll ? "(Free)" : `(${nextRerollCost} ⚒️)`}</span>
-          </button>
-          <button class="kh-btn-skip" id="kh-btn-skip">
-            Pass — Add Nothing
           </button>
         </div>
       </main>
@@ -173,12 +169,12 @@ export class AddPhaseScene {
       ">
         <span class="kh-header-ornament">❧</span>
         <div class="kh-header-center">
-          <h1>King's Hand</h1>
           <div class="kh-year-badge">
             <span>${meta.icon}</span>
             <span>YEAR ${state.time.year} — ${meta.label.toUpperCase()}</span>
             <span>${meta.icon}</span>
           </div>
+          ${this.buildPhaseTracker()}
         </div>
         <span class="kh-header-ornament">❧</span>
       </header>
@@ -198,28 +194,9 @@ export class AddPhaseScene {
         </div>
       `
       : "";
-    const strengthHTML = state.resources.isUnlocked(ResourceTarget.STRENGTH)
-      ? `
-        <div class="kh-res-divider"></div>
-        <div class="kh-resource kh-strength">
-          <span class="kh-res-icon">⚔️</span>
-          <div>
-            <div class="kh-res-label">Strength</div>
-            <div class="kh-res-value">${Math.floor(state.resources.strength)}</div>
-          </div>
-        </div>
-      `
-      : "";
+    // Population + Defense live in the shared health bar (buildHealthBar) beneath this strip.
     return `
       <div class="kh-resources">
-        <div class="kh-resource kh-pop">
-          <span class="kh-res-icon">👥</span>
-          <div>
-            <div class="kh-res-label">Population</div>
-            <div class="kh-res-value">${Math.floor(state.resources.population)} <span class="kh-res-cap">/ ${Math.floor(state.resources.populationCap)}</span></div>
-          </div>
-        </div>
-        <div class="kh-res-divider"></div>
         <div class="kh-resource kh-prod">
           <span class="kh-res-icon">⚒️</span>
           <div>
@@ -236,8 +213,8 @@ export class AddPhaseScene {
           </div>
         </div>
         ${goldHTML}
-        ${strengthHTML}
       </div>
+      ${buildHealthBar(state)}
     `;
   }
 
@@ -259,86 +236,58 @@ export class AddPhaseScene {
     `;
   }
 
-  private buildCard(card: Card, index: number, state: GameState): string {
+  private buildCard(card: Card, index: number): string {
     const info   = getCardDisplayInfo(card);
     const imgSrc = cardImagePath(card.name);
-    const season = state.time.season;
 
+    // Only informative tags: frequency (SINGLE/RECURRING) and ENGINE.
     const tagsHTML = [
-      `<span class="kh-tag kh-tag-season">${season}</span>`,
       `<span class="kh-tag ${card.frequencyType === "RECURRING" ? "kh-tag-recurring" : "kh-tag-single"}">${card.frequencyType}</span>`,
-      ...info.tags.map((t) => `<span class="kh-tag kh-tag-category">${t}</span>`),
+      ...info.tags.filter((t) => t === "ENGINE").map((t) => `<span class="kh-tag kh-tag-category">${t}</span>`),
     ].join("");
 
+    // Compact effect rows: "<amount> <emoji>" (+ scope for card-boosting effects).
     const effectsHTML = card.effects
       .map((e) => {
         if (e.target instanceof CardTarget) {
           const res = e.target.targetResource;
-          const resIcon = resourceIcon(res);
-          const resLabel = resourceShortLabel(res);
-          const scope = e.target.adjacentOnly ? `next ${resLabel} card` : `${resLabel} cards`;
-          return `
-            <div class="kh-effect-row">
-              <span class="kh-effect-target kh-et-engine">${resIcon} ${scope}</span>
-              <span class="kh-effect-mod">+${e.modifier}</span>
-              <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
-            </div>
-          `;
+          const scope = (e.target as CardTarget).adjacentOnly ? "to next card" : "to all cards";
+          return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">${scope}</span></div>`;
         }
         if (e.target instanceof OpponentTarget) {
           const res = e.target.targetResource;
-          return `
-            <div class="kh-effect-row">
-              <span class="kh-effect-target kh-et-sabotage">⚔ rival ${resourceShortLabel(res)}</span>
-              <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
-              <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
-            </div>
-          `;
+          if (res === ResourceTarget.POPULATION) {
+            return `<div class="kh-effect-row kh-effect-attack"><span class="kh-effect-mod">${Math.abs(e.modifier)}</span><span class="kh-effect-eicon">⚔️</span></div>`;
+          }
+          return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${resourceIcon(res)}</span><span class="kh-effect-escope">rival</span></div>`;
         }
-        const targetStr = typeof e.target === "string" ? e.target : "CARD";
-        const displayLabel = typeof e.target === "string" ? resourceLabel(e.target) : targetStr;
         const icon = typeof e.target === "string" ? resourceIcon(e.target) : "";
-        return `
-          <div class="kh-effect-row">
-            <span class="kh-effect-target kh-et-${targetStr.toLowerCase()}">${icon} ${displayLabel}</span>
-            <span class="kh-effect-mod">${formatModifier(e.modifier)}</span>
-            <span class="kh-effect-freq">${card.frequencyType === "RECURRING" ? "/ season" : "once"}</span>
-          </div>
-        `;
+        return `<div class="kh-effect-row"><span class="kh-effect-mod${e.modifier < 0 ? " kh-effect-mod-neg" : ""}">${formatModifier(e.modifier)}</span><span class="kh-effect-eicon">${icon}</span></div>`;
       })
       .join("");
 
+    // Border identity: single-use → bronze, recurring → silver, Great Work → gold.
+    const typeClass =
+      card.constructionPeriod > 0
+        ? "kh-card-kind-greatwork"
+        : card.frequencyType === "RECURRING"
+          ? "kh-card-kind-recurring"
+          : "kh-card-kind-single";
+
     return `
-      <div class="kh-card" data-index="${index}">
+      <div class="kh-card ${typeClass}" data-index="${index}" role="button" tabindex="0" title="Add to your deck">
         <div class="kh-add-art-header">
           <img class="kh-add-art-img" src="${imgSrc}" alt="${info.name}" />
+          <div class="kh-add-badge kh-add-popreq" title="Population required">${Math.round(card.staffRequirement)}</div>
+          <div class="kh-add-badge kh-add-cost" title="Production cost">${Math.round(card.productionRequirement)}</div>
           <div class="kh-add-art-overlay">
             <div class="kh-card-name">${info.name}</div>
             <div class="kh-card-tags">${tagsHTML}</div>
           </div>
         </div>
         <div class="kh-card-body">
-          <div class="kh-card-desc">${info.description}</div>
-          <div class="kh-effects-title">Effects</div>
           ${effectsHTML}
-          <div class="kh-card-costs">
-            <div class="kh-cost-item">
-              <span class="kh-cost-label">Cost</span>
-              <span class="kh-cost-val kh-cost-prod">${card.productionRequirement} ⚒️</span>
-            </div>
-            <div class="kh-cost-item">
-              <span class="kh-cost-label">Workers</span>
-              <span class="kh-cost-val kh-cost-pop">${card.staffRequirement} 👥</span>
-            </div>
-            ${card.constructionPeriod > 0 ? `
-            <div class="kh-cost-item">
-              <span class="kh-cost-label">Construction</span>
-              <span class="kh-cost-val">${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"} 🏗️</span>
-            </div>` : ""}
-          </div>
-          <button class="kh-btn-select" data-index="${index}">
-            Add to Deck
-          </button>
+          ${card.constructionPeriod > 0 ? `<div class="kh-card-construction">🏗️ ${card.constructionPeriod} season${card.constructionPeriod === 1 ? "" : "s"} to build</div>` : ""}
         </div>
       </div>
     `;
@@ -347,15 +296,20 @@ export class AddPhaseScene {
   // ─── Event listeners ────────────────────────────────────────────────────
 
   private attachListeners(state: GameState): void {
-    // Card select buttons
-    this.overlay.querySelectorAll<HTMLButtonElement>(".kh-btn-select").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const index = Number(btn.dataset.index);
+    // Whole card is clickable — pick it into your deck.
+    this.overlay.querySelectorAll<HTMLElement>(".kh-card[data-index]").forEach((cardEl) => {
+      const pick = () => {
+        const index = Number(cardEl.dataset.index);
         const cardName = state.addChoices[index]?.name ?? "";
         this.actions.pickCard(cardName);
         // Optimistic UI: disable all interaction while server responds
         this.disableAllActions();
+        cardEl.classList.add("kh-card-picked");
         this.showToast(`Adding card to your ${SEASON_META[state.time.season].label} deck…`);
+      };
+      cardEl.addEventListener("click", pick);
+      cardEl.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); }
       });
     });
 
@@ -384,6 +338,10 @@ export class AddPhaseScene {
     this.overlay
       .querySelectorAll<HTMLButtonElement>("button")
       .forEach((b) => (b.disabled = true));
+    // Cards are clickable divs now, not buttons — lock them too so you can't pick twice.
+    this.overlay
+      .querySelectorAll<HTMLElement>(".kh-card")
+      .forEach((c) => (c.style.pointerEvents = "none"));
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────
@@ -477,18 +435,16 @@ export class AddPhaseScene {
       .kh-res-label  { font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 1.5px; color: #a09070; text-transform: uppercase; }
       .kh-res-value  { font-family: 'Cinzel', serif; font-size: 1.25rem; font-weight: 700; }
       .kh-pop      .kh-res-value { color: #f09090; }
-      .kh-prod     .kh-res-value { color: #f0cc60; }
+      .kh-prod     .kh-res-value { color: #e8862a; }
       .kh-food     .kh-res-value { color: #90e060; }
       .kh-gold     .kh-res-value { color: #ffd700; }
       .kh-strength .kh-res-value { color: #9ab0d0; }
       .kh-res-cap { font-size: .85rem; font-weight: 400; color: #9a7a7a; opacity: .85; }
       .kh-res-divider { width: 1px; height: 32px; background: rgba(255,255,255,.08); }
 
-      /* Phase tracker */
+      /* Phase tracker (now nested under the year/season inside the header) */
       .kh-phase-track {
-        background: rgba(10,5,2,0.65);
-        border-bottom: 2px solid rgba(196,160,96,0.35);
-        padding: 12px 48px;
+        margin-top: 9px;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -522,82 +478,85 @@ export class AddPhaseScene {
       .kh-prompt p  { color: #c4b08c; font-size: 1.1rem; font-style: italic; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
 
       /* Cards grid */
-      .kh-cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-bottom: 36px; }
-
+      /* Draft cards — one constant, larger size (scaled up; fewer cards on screen), centered. */
+      .kh-cards-grid {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: clamp(210px, 30vh, 330px);
+        gap: clamp(14px, 2.4vh, 30px);
+        justify-content: center;
+        margin: 0 auto 20px;
+      }
       .kh-card {
         background: #fdf6e4;
         border: 2px solid #c4a060;
         border-radius: 14px;
         overflow: hidden;
         cursor: pointer;
-        transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        transition: transform .2s ease, box-shadow .2s ease;
         box-shadow: 3px 5px 18px rgba(0,0,0,.14), inset 0 0 60px rgba(255,245,210,.4);
+        /* Fixed aspect + container so every card is the same size and its contents scale together. */
+        aspect-ratio: 1 / 1.56;
+        display: flex;
+        flex-direction: column;
+        container-type: inline-size;
       }
-      .kh-card:hover { transform: translateY(-7px) scale(1.015); box-shadow: 5px 14px 30px rgba(0,0,0,.22); border-color: #c49428; }
-      .kh-card.kh-card-unaffordable { opacity: .68; filter: saturate(.6); }
-      .kh-card.kh-card-unaffordable:hover { transform: translateY(-3px) scale(1.005); border-color: #cc6644; }
+      .kh-card:hover { transform: translateY(-7px) scale(1.015); box-shadow: 5px 14px 30px rgba(0,0,0,.28); }
+      .kh-card.kh-card-unaffordable { opacity: .7; filter: saturate(.6); }
+      .kh-card.kh-card-picked { outline: 3px solid #6ac06a; }
+      /* Border identity by kind: single → bronze, recurring → silver, Great Work → gold. */
+      .kh-card.kh-card-kind-single    { border: 5px solid #bf7a3a; }
+      .kh-card.kh-card-kind-recurring { border: 5px solid #b7bdc4; }
+      .kh-card.kh-card-kind-greatwork { border: 5px solid #e6b53c; }
 
-      /* Card art header */
+      /* Card art header — square window, middle crop, with corner badges. */
       .kh-add-art-header {
         position: relative;
-        height: 200px;
+        width: 100%;
+        aspect-ratio: 1 / 1;
         overflow: hidden;
         border-bottom: 2px solid #c49428;
         border-radius: 14px 14px 0 0;
+        flex: 0 0 auto;
       }
-      .kh-add-art-img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
+      .kh-add-art-img { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+      .kh-add-badge {
+        position: absolute; top: 4cqw; display: flex; align-items: center; justify-content: center;
+        font-family: 'Cinzel', serif; font-weight: 800; color: #fff; z-index: 3;
+        box-shadow: 0 2px 7px rgba(0,0,0,.55); text-shadow: 0 1px 2px rgba(0,0,0,.6);
       }
+      .kh-add-cost   { right: 4cqw; width: 20cqw; height: 20cqw; border-radius: 50%; font-size: 9cqw; overflow: hidden;
+        background: radial-gradient(circle at 35% 30%, #f0932e 0%, #a8560c 82%); border: 1.5cqw solid #ffdca8; }
+      .kh-add-popreq { left: 4cqw;  width: 19cqw; height: 19cqw; border-radius: 3cqw; font-size: 8.5cqw; overflow: hidden;
+        background: linear-gradient(135deg, #4a7fb0 0%, #1e3f66 100%); border: 1.5cqw solid #cfe2f0; }
+      .kh-add-cost::before, .kh-add-popreq::before {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        opacity: .34; z-index: -1; pointer-events: none; line-height: 1;
+      }
+      .kh-add-cost::before   { content: "⚒️"; font-size: 15cqw; }
+      .kh-add-popreq::before { content: "👥"; font-size: 14cqw; }
       .kh-add-art-overlay {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        position: absolute; bottom: 0; left: 0; right: 0;
         background: linear-gradient(transparent 0%, rgba(10,5,2,.72) 40%, rgba(10,5,2,.92) 100%);
-        padding: 32px 18px 14px;
+        padding: 11cqw 5cqw 4cqw;
       }
-      .kh-card-name { font-family: 'Cinzel', serif; font-size: 2.1rem; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; }
-      .kh-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+      .kh-card-name { font-family: 'Cinzel', serif; font-size: 8cqw; font-weight: 700; color: #f0e8c0; letter-spacing: .5px; }
+      .kh-card-tags { display: flex; flex-wrap: wrap; gap: 2cqw; margin-top: 2cqw; }
 
-      .kh-tag { font-family: 'Cinzel', serif; font-size: .58rem; font-weight: 600; letter-spacing: 1px; padding: 2px 7px; border-radius: 10px; }
-      .kh-tag-season    { background: rgba(255,255,255,.18); color: #c4f0b0; }
-      .kh-tag-recurring { background: rgba(120,200,120,.25); color: #b0f0b0; }
-      .kh-tag-single    { background: rgba(220,140,100,.3);  color: #ffd0b0; }
-      .kh-tag-category  { background: rgba(240,200,80,.22);  color: #f0e090; }
+      .kh-tag { font-family: 'Cinzel', serif; font-size: 4cqw; font-weight: 600; letter-spacing: 1px; padding: 1cqw 2.6cqw; border-radius: 10px; }
+      .kh-tag-recurring { background: rgba(120,200,120,.28); color: #b0f0b0; }
+      .kh-tag-single    { background: rgba(220,140,100,.32);  color: #ffd0b0; }
+      .kh-tag-category  { background: rgba(240,200,80,.24);  color: #f0e090; }
 
-      /* Card body */
-      .kh-card-body { padding: 16px 18px; }
-      .kh-card-desc {
-        font-style: italic;
-        color: #7a6a52;
-        font-size: 1.1rem;
-        line-height: 1.45;
-        padding-bottom: 13px;
-        border-bottom: 1px dashed #c4a060;
-        margin-bottom: 14px;
-      }
-      .kh-effects-title {
-        font-family: 'Cinzel', serif;
-        font-size: .78rem;
-        letter-spacing: 1.5px;
-        color: #7a6a52;
-        text-transform: uppercase;
-        margin-bottom: 7px;
-      }
-      .kh-effect-row   { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 1.05rem; }
-      .kh-effect-target { font-family: 'Cinzel', serif; font-size: .85rem; font-weight: 600; letter-spacing: .8px; min-width: 100px; display: flex; align-items: center; gap: 4px; }
-      .kh-et-food             { color: #3a7020; }
-      .kh-et-production       { color: #a07010; }
-      .kh-et-population       { color: #8b2020; }
-      .kh-et-population_cap   { color: #4a6a9a; }
-      .kh-et-gold             { color: #b8860b; }
-      .kh-et-strength         { color: #4a5a78; }
-      .kh-et-engine           { color: #7a5aaa; }
-      .kh-effect-mod  { font-weight: 700; font-size: 1.2rem; color: #3d6b46; }
-      .kh-effect-freq { font-size: .88rem; color: #a09070; font-style: italic; }
+      /* Card body — just the effects, centered, sized in cqw so it scales with the card. */
+      .kh-card-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 1cqw; padding: 4cqw 6cqw; }
+      .kh-effect-row   { display: flex; align-items: center; gap: 3cqw; padding: 1.4cqw 0; }
+      .kh-effect-mod   { font-weight: 800; font-size: 9.5cqw; color: #3d6b46; }
+      .kh-effect-eicon { font-size: 9.5cqw; line-height: 1; }
+      .kh-effect-escope { font-size: 5.6cqw; font-style: italic; color: #8a7654; line-height: 1.1; }
+      .kh-effect-attack .kh-effect-mod { color: #b23b30; }
+      .kh-effect-mod-neg { color: #b23b30; }
+      .kh-card-construction { font-family: 'Cinzel', serif; font-size: 4.6cqw; color: #9a7a4a; margin-top: 2cqw; }
 
       /* Costs */
       .kh-card-costs { display: flex; align-items: center; gap: 18px; padding: 12px 0 13px; border-top: 1px dashed #c4a060; margin-top: 13px; }
@@ -630,40 +589,58 @@ export class AddPhaseScene {
       /* Ornament */
       .kh-ornament { text-align: center; color: #f0cc50; font-size: 1.4rem; letter-spacing: 10px; opacity: .7; margin: 6px 0 30px; user-select: none; text-shadow: 0 0 12px rgba(240,204,80,.4); }
 
-      /* Action bar */
-      .kh-action-bar { display: flex; justify-content: center; align-items: center; gap: 18px; }
+      /* Action block — a fixed tab on the right edge, in the same spot as the Play/Continue button.
+         Skip sits on top; Reroll lives directly beneath it in the same block. */
+      .kh-action-bar {
+        position: fixed;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        z-index: 60;
+        border: 3px solid #c49428;
+        border-right: none;
+        border-radius: 14px 0 0 14px;
+        overflow: hidden;
+        box-shadow: -6px 0 30px rgba(0,0,0,.5);
+      }
+      .kh-btn-skip {
+        padding: 26px 84px 26px 52px;
+        background: linear-gradient(135deg, #6b1a1a 0%, #4a0e0e 100%);
+        color: #f0e8c0;
+        border: none;
+        font-family: 'Cinzel', serif;
+        font-size: 1.7rem;
+        font-weight: 700;
+        letter-spacing: 5px;
+        text-align: left;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all .2s ease;
+      }
+      .kh-btn-skip:hover:not(:disabled) { background: linear-gradient(135deg, #7a2222 0%, #5a1414 100%); }
+      .kh-btn-skip:disabled { opacity: .5; cursor: not-allowed; }
+
       .kh-btn-reroll {
-        padding: 12px 34px;
+        padding: 18px 84px 18px 52px;
         background: linear-gradient(135deg, #c49428 0%, #8a6010 100%);
         color: #2a1800;
-        border: 2px solid #f0cc50;
-        border-radius: 9px;
+        border: none;
+        border-top: 3px solid #3a2406;
         font-family: 'Cinzel', serif;
-        font-size: .88rem;
+        font-size: 1.15rem;
         font-weight: 700;
         letter-spacing: 1px;
+        text-align: left;
+        white-space: nowrap;
         cursor: pointer;
-        transition: all .15s;
-        box-shadow: 2px 3px 12px rgba(0,0,0,.2);
+        transition: all .2s ease;
       }
-      .kh-btn-reroll:hover:not(:disabled) { background: linear-gradient(135deg, #e0b040 0%, #a87820 100%); box-shadow: 0 3px 14px rgba(200,160,40,.45); }
-      .kh-btn-reroll:disabled { background: #a09070; border-color: #c0a060; color: #e0d0a0; cursor: not-allowed; opacity: .65; }
-      .kh-reroll-cost { font-weight: 400; }
-
-      .kh-btn-skip {
-        padding: 12px 28px;
-        background: rgba(10,5,2,0.45);
-        color: #c4b08c;
-        border: 2px solid rgba(196,160,96,0.55);
-        border-radius: 9px;
-        font-family: 'Cinzel', serif;
-        font-size: .82rem;
-        letter-spacing: 1px;
-        cursor: pointer;
-        transition: all .15s;
-      }
-      .kh-btn-skip:hover:not(:disabled) { border-color: #c4b08c; color: #f0e8c0; background: rgba(10,5,2,0.6); }
-      .kh-btn-skip:disabled { opacity: .5; cursor: not-allowed; }
+      .kh-btn-reroll:hover:not(:disabled) { background: linear-gradient(135deg, #e0b040 0%, #a87820 100%); }
+      .kh-btn-reroll:disabled { background: #8a8068; color: #ddd0ac; cursor: not-allowed; }
+      .kh-reroll-cost { font-weight: 400; font-size: .92rem; opacity: .9; }
 
       /* Toast */
       .kh-toast {

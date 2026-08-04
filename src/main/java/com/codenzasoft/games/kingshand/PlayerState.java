@@ -120,6 +120,36 @@ public class PlayerState {
   }
 
   /**
+   * Returns the table card on {@code season} that {@code handCard} would upgrade, or {@code null}.
+   *
+   * <p><b>Recurring</b> cards upgrade by <em>base identity</em>: a played MINE upgrades whichever
+   * of MINE / MINE II / MINE III is on the table (→ the next level), so single-merging works (a
+   * MINE + a MINE II becomes a MINE III). <b>Single-use</b> cards match by exact name only,
+   * preserving their existing behavior.
+   */
+  public Card findUpgradeTarget(Season season, Card handCard) {
+    if (handCard.frequencyType() == FrequencyType.RECURRING) {
+      final String base = baseCardName(handCard.name());
+      return getTable(season).stream()
+          .filter(c -> baseCardName(c.name()).equals(base))
+          .findFirst()
+          .orElse(null);
+    }
+    return findTableCard(season, handCard.name());
+  }
+
+  /** Strips a trailing level suffix (" II" / " III") to recover a card's base identity. */
+  private static String baseCardName(String name) {
+    if (name.endsWith(" III")) {
+      return name.substring(0, name.length() - 4);
+    }
+    if (name.endsWith(" II")) {
+      return name.substring(0, name.length() - 3);
+    }
+    return name;
+  }
+
+  /**
    * Replaces the first occurrence of {@code oldCard} on {@code season}'s table with {@code
    * newCard}.
    *

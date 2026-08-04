@@ -4,7 +4,7 @@
 // COUNCIL_ADD, COUNCIL_MEETING, PLAY).  This module owns their HTML builders,
 // listener wiring, and CSS injection so scenes never duplicate the logic.
 
-import { GameState, Season } from "./kingshand.ts";
+import { GameState, Season, ResourceTarget } from "./kingshand.ts";
 import { getCardDisplayInfo, formatModifier, resourceIcon, resourceLabel, resourceShortLabel } from "./cardCatalog.ts";
 import { HANDBOOK } from "./handbook.ts";
 import { Card, CardTarget, OpponentTarget } from "./kingshand.ts";
@@ -441,8 +441,114 @@ export function injectSharedStyles(): void {
     }
     .kh-float-pos { color: #6ae66a; }
     .kh-float-neg { color: #f07070; }
+
+    /* ── Population health bar + Defense (wall) sub-bar (shared, all scenes) ── */
+    .kh-hpbar {
+      max-width: 720px;
+      margin: 12px auto 4px;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .kh-hpbar-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 12px;
+    }
+    .kh-hpbar-icon  { font-size: 1.2rem; line-height: 1; }
+    .kh-hpbar-title {
+      font-family: 'Cinzel', serif; font-size: .68rem; letter-spacing: 2px;
+      text-transform: uppercase; color: #a09070;
+    }
+    .kh-hpbar-nums  { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1.15rem; color: #a9dd97; }
+    .kh-hpbar-cap   { font-weight: 600; font-size: .92rem; color: #8fce7c; }
+    .kh-hpbar-track {
+      width: 100%; height: 26px; border-radius: 14px; overflow: hidden;
+      background: rgba(0,0,0,.5); border: 1px solid rgba(0,0,0,.6);
+      box-shadow: inset 0 2px 5px rgba(0,0,0,.6);
+    }
+    .kh-hpbar-fill {
+      height: 100%; border-radius: 14px;
+      background: linear-gradient(90deg, #14431f, #2f7a3a 65%, #46a352);
+      box-shadow: inset 0 0 10px rgba(120,220,140,.3);
+      transition: width .4s ease;
+    }
+    .kh-hpbar-wallhead {
+      display: flex; align-items: baseline; justify-content: center; gap: 10px; margin-top: 3px;
+    }
+    .kh-hpbar-walltitle {
+      font-family: 'Cinzel', serif; font-size: .62rem; letter-spacing: 2px;
+      text-transform: uppercase; color: #8fa8c4;
+    }
+    .kh-hpbar-wallnum { font-family: 'Cinzel', serif; font-weight: 700; font-size: 1rem; color: #9fc4ec; }
+    .kh-hpbar-walltrack {
+      width: 100%; height: 14px; border-radius: 7px; overflow: hidden;
+      background: rgba(0,0,0,.45); border: 1px solid rgba(0,0,0,.55);
+    }
+    .kh-hpbar-wallfill {
+      height: 100%; border-radius: 7px;
+      background: linear-gradient(90deg, #345f86, #7fb0e0);
+      box-shadow: inset 0 0 8px rgba(150,190,230,.3);
+      transition: width .4s ease;
+    }
   `;
   document.head.appendChild(style);
+}
+
+/**
+ * Builds the shared population health bar: a wide, centered bar shown beneath the resource strip in
+ * every scene. Population fills the bar as a percentage of population cap; the thinner blue Defense
+ * (STRENGTH/walls) sub-bar beneath is scaled to the same cap and only appears once STRENGTH is
+ * unlocked (Barracks). Class names are shared so the play scene's resolution animation can drive the
+ * fill widths and anchor floating indicators.
+ */
+/**
+ * Reusable health-bar markup from raw values, so the play scene and the multiplayer resolution
+ * screen render an identical bar. Population fills the main bar as a % of cap; the Defense (STRENGTH
+ * / walls) sub-bar beneath is scaled to the same cap and carries its own numeric readout so the
+ * player can read exactly how much defense they hold.
+ */
+export function healthBarHtml(
+  population: number,
+  populationCap: number,
+  strength: number,
+  strengthUnlocked: boolean,
+): string {
+  const cap = Math.max(1, Math.floor(populationCap));
+  const pop = Math.floor(population);
+  const hpPct = Math.max(0, Math.min(100, (pop / cap) * 100));
+  const wall = Math.floor(strength);
+  const wallPct = Math.max(0, Math.min(100, (Math.min(wall, cap) / cap) * 100));
+  return `
+    <div class="kh-hpbar">
+      <div class="kh-hpbar-head">
+        <span class="kh-hpbar-icon">👥</span>
+        <span class="kh-hpbar-title">Population</span>
+        <span class="kh-hpbar-nums"><span class="kh-hpbar-pop">${pop}</span><span class="kh-hpbar-cap"> / ${cap}</span></span>
+      </div>
+      <div class="kh-hpbar-track"><div class="kh-hpbar-fill" style="width:${hpPct}%"></div></div>
+      ${strengthUnlocked ? `
+      <div class="kh-hpbar-wallhead">
+        <span class="kh-hpbar-walltitle">🛡 Defense</span>
+        <span class="kh-hpbar-wallnum">${wall}</span>
+      </div>
+      <div class="kh-hpbar-walltrack"><div class="kh-hpbar-wallfill" style="width:${wallPct}%"></div></div>
+      ` : ""}
+    </div>
+  `;
+}
+
+export function buildHealthBar(state: GameState): string {
+  return healthBarHtml(
+    state.resources.population,
+    state.resources.populationCap,
+    state.resources.strength,
+    state.resources.isUnlocked(ResourceTarget.STRENGTH),
+  );
 }
 
 // ── Floating resource indicator ───────────────────────────────────────────────

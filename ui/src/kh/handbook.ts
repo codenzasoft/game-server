@@ -88,10 +88,12 @@ export const HANDBOOK: HandbookChapter[] = [
                just like any other resource.`,
       },
       {
-        title: "Strength ⚔️",
-        body: `Strength is unlocked once the Barracks Great Work is completed. From then on it
-               appears in your resource bar and can be earned and spent by cards and advisors
-               just like any other resource.`,
+        title: "Defense 🛡",
+        body: `Defense (your garrison and walls) is unlocked once the Barracks Great Work is
+               completed. It is earned and spent by cards and advisors like any other resource, and
+               it doubles as your shield in war: when a rival attacks your population, your Defense
+               absorbs the blow first and only the overflow costs you people. Rebuild it each turn to
+               weather an assault.`,
       },
     ],
   },
