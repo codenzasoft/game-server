@@ -38,17 +38,56 @@ public record Card(
     /** {@code true} for the four seasonal win-condition Great Works. */
     boolean victory,
     /** The season this Great Work belongs to; {@code null} for normal cards. */
-    Season season) {
+    Season season,
+    /**
+     * The card's upgrade level: {@code 1} for a base card, incrementing by one on every upgrade,
+     * with no upper bound. This is the <em>authoritative</em> representation of "how upgraded" a
+     * card is — the {@link #name()} stays the stable base identity across all levels, and the
+     * roman-numeral display ("Farm IV") is derived from this number at render time. See {@link
+     * CardUpgrades} for how effects and requirements scale with the level.
+     */
+    int level) {
 
   public Card {
     effects = effects == null ? List.of() : List.copyOf(effects);
     unlockedResources = unlockedResources == null ? Set.of() : Set.copyOf(unlockedResources);
     constructionPeriod = Math.max(0, constructionPeriod);
+    level = Math.max(1, level);
   }
 
   /**
-   * Convenience constructor for regular (non-great-work) cards. All Great Work fields default to
-   * their zero/null/empty values.
+   * Convenience constructor for a base (level-1) Great Work or metadata-carrying card. Kept so the
+   * many ten-argument call sites that predate the {@code level} field compile unchanged; they all
+   * describe base cards, which are level 1.
+   */
+  public Card(
+      String name,
+      double staffRequirement,
+      double productionRequirement,
+      FrequencyType frequencyType,
+      List<Effect> effects,
+      int constructionPeriod,
+      Card completedCard,
+      Set<ResourceTarget> unlockedResources,
+      boolean victory,
+      Season season) {
+    this(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        effects,
+        constructionPeriod,
+        completedCard,
+        unlockedResources,
+        victory,
+        season,
+        1);
+  }
+
+  /**
+   * Convenience constructor for regular (non-great-work) base cards. All Great Work fields default
+   * to their zero/null/empty values and the level defaults to 1.
    */
   public Card(
       String name,
@@ -66,7 +105,8 @@ public record Card(
         null,
         Set.of(),
         false,
-        null);
+        null,
+        1);
   }
 
   /** Returns {@code true} if this is a Great Work under-construction card. */
@@ -140,7 +180,8 @@ public record Card(
         completedCard,
         unlockedResources,
         victory,
-        season);
+        season,
+        level);
   }
 
   /**
@@ -174,20 +215,41 @@ public record Card(
         completedCard,
         unlockedResources,
         victory,
-        season);
+        season,
+        level);
   }
 
   /**
-   * Returns a new {@link Card} with identical requirements but every effect's modifier multiplied
-   * by {@code factor}. Used internally when both cards have identical modifiers (no engine boost).
+   * Returns a copy of this card at the given upgrade {@code level}, leaving every other field
+   * (including effects and requirements) untouched. Callers that also need effect/requirement
+   * scaling should go through {@link CardUpgrades} instead — this is a low-level identity helper.
+   */
+  public Card withLevel(int level) {
+    return new Card(
+        name,
+        staffRequirement,
+        productionRequirement,
+        frequencyType,
+        effects,
+        constructionPeriod,
+        completedCard,
+        unlockedResources,
+        victory,
+        season,
+        level);
+  }
+
+  /**
+   * Returns a new {@link Card}, one level higher, with identical requirements but every effect's
+   * modifier multiplied by {@code factor}. The stable identity ({@link #name()}) is preserved and
+   * {@link #level()} is incremented — the level, not the name, records the upgrade.
    *
    * @param factor the multiplier to apply to every effect modifier (e.g. {@code 2} to double)
    */
   public Card amplify(double factor) {
     List<Effect> amplified = effects.stream().map(e -> e.upgrade(factor)).toList();
-    String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
     return new Card(
-        upgradedName,
+        name,
         staffRequirement,
         productionRequirement,
         frequencyType,
@@ -196,17 +258,10 @@ public record Card(
         completedCard,
         unlockedResources,
         victory,
-        season);
+        season,
+        level + 1);
   }
 
-  /**
-   * Returns a new {@link Card} whose effect modifiers are the sum of this card's modifiers and
-   * {@code other}'s modifiers, paired by index. Effects present only in this card are kept
-   * unchanged. Used by the upgrade path so that a boosted table card (e.g. Farm +4 from an engine)
-   * correctly combines with an unmodified hand card: Farm(14) + Farm(10) → Farm II(24).
-   *
-   * @param other the hand card being played onto this table card
-   */
   /**
    * Returns a new {@link Card} identical to this one but with {@link #constructionPeriod()} set to
    * {@code period}. Used by the engine during {@link Phase#PLAY} resolution to track per-season
@@ -223,42 +278,22 @@ public record Card(
         completedCard,
         unlockedResources,
         victory,
-        season);
+        season,
+        level);
   }
 
+  /**
+   * Returns this card upgraded one level by folding in a freshly drawn base copy ({@code other}).
+   * The result keeps this card's stable {@link #name()} identity and any engine boosts already
+   * baked into its effects, bumps {@link #level()} by one, and scales requirements per the rules in
+   * {@link CardUpgrades} — so {@code FARM} (level 1) → {@code FARM} (level 2, "Farm II") rather
+   * than mangling the name. All upgrade arithmetic lives in {@link CardUpgrades} so the single-use
+   * vs. recurring rules aren't duplicated across the engine, factories, and tests.
+   *
+   * @param other the freshly drawn base-level card being played onto this one
+   */
   public Card mergeWith(Card other) {
-    List<Effect> merged = new ArrayList<>(effects.size());
-    for (int i = 0; i < effects.size(); i++) {
-      Effect mine = effects.get(i);
-      if (i < other.effects().size()) {
-        Effect theirs = other.effects().get(i);
-        merged.add(new Effect(mine.target(), mine.modifier() + theirs.modifier()));
-      } else {
-        merged.add(mine);
-      }
-    }
-    String upgradedName = name.endsWith(" II") ? name.replace(" II", " III") : name + " II";
-    // Each level raises the population requirement linearly by half the base card's requirement.
-    // {@code other} is always a fresh (base-level) copy from hand, so its requirements are the
-    // originals: MINE(50) → MINE II(75) → MINE III(100). Single-use cards escalate their production
-    // cost the same way (they have no ongoing staffing to grow). Both values are clamped to whole
-    // numbers so a card never shows a fractional cost/requirement.
-    double upgradedStaff = Math.floor(staffRequirement + 0.5 * other.staffRequirement());
-    double upgradedProduction =
-        frequencyType == FrequencyType.SINGLE
-            ? Math.floor(productionRequirement + 0.5 * other.productionRequirement())
-            : productionRequirement;
-    return new Card(
-        upgradedName,
-        upgradedStaff,
-        upgradedProduction,
-        frequencyType,
-        merged,
-        constructionPeriod,
-        completedCard,
-        unlockedResources,
-        victory,
-        season);
+    return CardUpgrades.merge(this, other);
   }
 
   /**

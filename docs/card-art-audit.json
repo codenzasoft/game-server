@@ -1,0 +1,806 @@
+{
+  "generatedBy": "card-art audit (mirror of CardArtAuditSpec)",
+  "serverCardCount": 68,
+  "pngCount": 60,
+  "categories": {
+    "missingPng_needsArt": [
+      {
+        "id": "ARMORY",
+        "season": "FALL",
+        "expectedFile": "armory.png"
+      },
+      {
+        "id": "RAIDERS_STRIKE",
+        "season": "SPRING",
+        "expectedFile": "raiders_strike.png"
+      },
+      {
+        "id": "WARBAND",
+        "season": "SUMMER",
+        "expectedFile": "warband.png"
+      },
+      {
+        "id": "SIEGE",
+        "season": "FALL",
+        "expectedFile": "siege.png"
+      },
+      {
+        "id": "ONSLAUGHT",
+        "season": "WINTER",
+        "expectedFile": "onslaught.png"
+      }
+    ],
+    "brokenTextureMappings": [],
+    "unusedPng": [],
+    "sharedOrFallbackArt": [
+      {
+        "id": "SABOTEURS",
+        "sharesFile": "guard_post.png"
+      },
+      {
+        "id": "CROP_RAID",
+        "sharesFile": "the_hunt.png"
+      },
+      {
+        "id": "WINTER_RAIDERS",
+        "sharesFile": "desperate_times.png"
+      }
+    ],
+    "intendedArtUnclear": [
+      "RAIDERS_STRIKE",
+      "WARBAND",
+      "SIEGE",
+      "ONSLAUGHT"
+    ]
+  },
+  "cards": [
+    {
+      "id": "BUNKHOUSE",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "bunkhouse",
+      "pngFile": "bunkhouse.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FARM",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "farm",
+      "pngFile": "farm.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "SEEDS",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "seeds",
+      "pngFile": "seeds.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FERTILIZER",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "fertilizer",
+      "pngFile": "fertilizer.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "MINE",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "mine",
+      "pngFile": "mine.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "HUNTING_CAMP",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "hunting_camp",
+      "pngFile": "hunting_camp.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "SETTLERS",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "settlers",
+      "pngFile": "settlers.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "LUMBER_YARD",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "lumber_yard",
+      "pngFile": "lumber_yard.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "COMMUNITY_WELL",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "community_well",
+      "pngFile": "community_well.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "IRRIGATION",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "irrigation",
+      "pngFile": "irrigation.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FARMSTEAD",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "farmstead",
+      "pngFile": "farmstead.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_HUNT",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "the_hunt",
+      "pngFile": "the_hunt.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "LOGGING",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "logging",
+      "pngFile": "logging.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TRADING_POST",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "trading_post",
+      "pngFile": "trading_post.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FISHING_VILLAGE",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "fishing_village",
+      "pngFile": "fishing_village.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "SCHOOL_HOUSE",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "schoolhouse",
+      "pngFile": "schoolhouse.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "EARLY_HARVEST",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "early_harvest",
+      "pngFile": "early_harvest.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "WINDMILL",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "windmill",
+      "pngFile": "windmill.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "CARAVAN",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "caravan",
+      "pngFile": "caravan.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TOWN_FAIR",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "town_fair",
+      "pngFile": "town_fair.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "STONE_QUARRY",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "stone_quarry",
+      "pngFile": "stone_quarry.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "MERCHANT_GUILD",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "merchant_guild",
+      "pngFile": "merchant_guild.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "WORKSHOP",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "workshop",
+      "pngFile": "workshop.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "MANOR",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "manor",
+      "pngFile": "manor.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "HARVEST",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "harvest",
+      "pngFile": "harvest.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TEXTILES",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "textiles",
+      "pngFile": "textiles.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "BAKERY",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "bakery",
+      "pngFile": "bakery.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TAX_COLLECTION",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "tax_collection",
+      "pngFile": "tax_collection.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "STOREHOUSE",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "storehouse",
+      "pngFile": "storehouse.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "BARN",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "barn",
+      "pngFile": "barn.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "MASON_GUILD",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "masons_guild",
+      "pngFile": "masons_guild.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "METALWORKING",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "metalworking",
+      "pngFile": "metalworking.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "BLACKSMITH",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "blacksmith",
+      "pngFile": "blacksmith.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FORGE",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "forge",
+      "pngFile": "forge.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "WOODPILES",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "woodpiles",
+      "pngFile": "woodpiles.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "GRANARY",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "granary",
+      "pngFile": "granary.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "EMERGENCY_RATIONS",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "emergency_rations",
+      "pngFile": "emergency_rations.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "STOCKPILE",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "stockpile",
+      "pngFile": "stockpile.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "CHAPEL",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "chapel",
+      "pngFile": "chapel.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "PRAY",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "pray",
+      "pngFile": "pray.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "DESPERATE_TIMES",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "desperate_times",
+      "pngFile": "desperate_times.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "MARKETPLACE",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "marketplace",
+      "pngFile": "marketplace.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TRAINING_GROUNDS",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "training_grounds",
+      "pngFile": "training_grounds.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TRADE_ROUTES",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "trade_routes",
+      "pngFile": "trade_routes.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "GUARD_POST",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "guard_post",
+      "pngFile": "guard_post.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "GOLD_MINE",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "gold_mine",
+      "pngFile": "gold_mine.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "ARMORY",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "armory",
+      "pngFile": "armory.png",
+      "pngExists": false,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": true
+    },
+    {
+      "id": "FOREIGN_AID",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "foreign_aid",
+      "pngFile": "foreign_aid.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "FORTRESS_WALL",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "fortress",
+      "pngFile": "fortress.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "SABOTEURS",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "guard_post",
+      "pngFile": "guard_post.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": true,
+      "approvedMissing": false
+    },
+    {
+      "id": "CROP_RAID",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "the_hunt",
+      "pngFile": "the_hunt.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": true,
+      "approvedMissing": false
+    },
+    {
+      "id": "WINTER_RAIDERS",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "desperate_times",
+      "pngFile": "desperate_times.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": true,
+      "approvedMissing": false
+    },
+    {
+      "id": "RAIDERS_STRIKE",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "raiders_strike",
+      "pngFile": "raiders_strike.png",
+      "pngExists": false,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": true
+    },
+    {
+      "id": "WARBAND",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "warband",
+      "pngFile": "warband.png",
+      "pngExists": false,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": true
+    },
+    {
+      "id": "SIEGE",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "siege",
+      "pngFile": "siege.png",
+      "pngExists": false,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": true
+    },
+    {
+      "id": "ONSLAUGHT",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "onslaught",
+      "pngFile": "onslaught.png",
+      "pngExists": false,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": true
+    },
+    {
+      "id": "TREASURY",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "treasury",
+      "pngFile": "treasury.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "BARRACKS",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "barracks",
+      "pngFile": "barracks.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_RESERVOIR",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "the_great_reservoir",
+      "pngFile": "the_great_reservoir.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_ROAD",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "the_great_road",
+      "pngFile": "the_great_road.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_CAPITAL",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "the_great_capital",
+      "pngFile": "the_great_capital.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_CONQUEST",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "the_great_conquest",
+      "pngFile": "the_great_conquest.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "TREASURY_CONSTRUCTION",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "treasury_construction",
+      "pngFile": "treasury_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "BARRACKS_CONSTRUCTION",
+      "displayName": null,
+      "season": "-",
+      "textureKey": "barracks_construction",
+      "pngFile": "barracks_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_RESERVOIR_CONSTRUCTION",
+      "displayName": null,
+      "season": "SPRING",
+      "textureKey": "the_great_reservoir_construction",
+      "pngFile": "the_great_reservoir_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_ROAD_CONSTRUCTION",
+      "displayName": null,
+      "season": "SUMMER",
+      "textureKey": "the_great_road_construction",
+      "pngFile": "the_great_road_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_CAPITAL_CONSTRUCTION",
+      "displayName": null,
+      "season": "FALL",
+      "textureKey": "the_great_capital_construction",
+      "pngFile": "the_great_capital_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    },
+    {
+      "id": "THE_GREAT_CONQUEST_CONSTRUCTION",
+      "displayName": null,
+      "season": "WINTER",
+      "textureKey": "the_great_conquest_construction",
+      "pngFile": "the_great_conquest_construction.png",
+      "pngExists": true,
+      "inClientCatalog": true,
+      "sharedArt": false,
+      "approvedMissing": false
+    }
+  ]
+}

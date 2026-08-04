@@ -944,7 +944,8 @@ class GameEngineSpec extends Specification {
 
         then:
         def upgraded = state.getPlayer(0).board.get(Season.SPRING).get(0)
-        upgraded.name() == "FARM II"
+        upgraded.name() == "FARM"   // stable identity — level, not name, records the upgrade
+        upgraded.level() == 2
         upgraded.effects().size() == 1
         upgraded.effects().get(0).modifier() == 120.0   // boosted(70) + base(50)
     }

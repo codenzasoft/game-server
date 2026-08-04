@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" role="img" aria-label="Artwork coming soon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2f3a"/>
+      <stop offset="1" stop-color="#1b1e26"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="300" height="420" fill="url(#bg)"/>
+  <rect x="10" y="10" width="280" height="400" fill="none" stroke="#5a6172" stroke-width="3" stroke-dasharray="10 8" rx="14"/>
+  <text x="150" y="196" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="120" fill="#5a6172">?</text>
+  <text x="150" y="300" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="22" letter-spacing="2" fill="#8b93a7">ARTWORK</text>
+  <text x="150" y="330" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="22" letter-spacing="2" fill="#8b93a7">COMING SOON</text>
+</svg>
