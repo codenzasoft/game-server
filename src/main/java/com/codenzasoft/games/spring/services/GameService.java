@@ -680,6 +680,11 @@ public class GameService {
     @Override
     public void gameOver(final Game<T> game) {
       recordGamesPlayed(game);
+      // Stamp overAt in the DB so the finished game leaves the player's active-games list.
+      // XO/Hearts
+      // set this via their persistence services; KH has none, so without this a completed King's
+      // Hand match (e.g. when the rival kingdom falls) would linger as "active".
+      markGameOver(game.getId());
       gameCache.removeGame(game);
     }
 
@@ -688,6 +693,24 @@ public class GameService {
       // Quitting isn't a counted result, so games-played stats are intentionally left untouched.
       gameCache.removeGame(game);
     }
+  }
+
+  /**
+   * Stamps {@code overAt} on the game's persisted entity so it is treated as complete (and drops
+   * out of the active-games list / is eligible for cleanup). Idempotent: no-ops if the game is
+   * already marked complete.
+   *
+   * @param gameId the id of the game that just ended.
+   */
+  private void markGameOver(final UUID gameId) {
+    gamesRepository
+        .findById(gameId)
+        .filter(entity -> !entity.isComplete())
+        .ifPresent(
+            entity -> {
+              entity.setOverAt(new Date());
+              gamesRepository.save(entity);
+            });
   }
 
   /**

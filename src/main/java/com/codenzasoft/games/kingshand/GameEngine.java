@@ -879,8 +879,7 @@ public class GameEngine implements Game<GameEngine> {
    * then attacks land directly on population.
    */
   private void applyIncomingDelta(final PlayerState victim, final Effect delta) {
-    final boolean isAttack = delta.target() == ResourceTarget.POPULATION && delta.modifier() < 0.0;
-    if (!isAttack) {
+    if (!delta.isAttack()) {
       victim.apply(delta);
       return;
     }
