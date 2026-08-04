@@ -1,7 +1,7 @@
 import { GameState, Card, CardStaffing, StaffingTier, Season, CardTarget, OpponentTarget, SeatedAdvisor, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
-  cardImagePath,
+  cardArtAttrs,
   formatModifier,
   resourceIcon,
   resourceLabel,
@@ -454,7 +454,7 @@ export class PlayPhaseScene {
     staffing: CardStaffing | undefined,
   ): string {
     const info     = getCardDisplayInfo(card);
-    const imgSrc   = cardImagePath(card.name);
+    const imgAttrs = cardArtAttrs(card.name);
     const demolishCost = Math.ceil(card.productionRequirement * DEMOLISH_COST_RATE);
     const canDemolish  = state.resources.production >= demolishCost;
 
@@ -550,7 +550,7 @@ export class PlayPhaseScene {
 
         <!-- ── Art frame ─────────────────────────────────────────────────── -->
         <div class="kh-tc-art-wrapper">
-          <img class="kh-tc-art" src="${imgSrc}" alt="${info.name}" />
+          <img class="kh-tc-art" ${imgAttrs} alt="${info.name}" />
           <div class="kh-tc-freq-pip ${card.frequencyType === "RECURRING" ? "kh-tc-pip-r" : "kh-tc-pip-s"}"></div>
           ${staffChipHTML}
           ${constructionChipHTML}
@@ -635,7 +635,7 @@ export class PlayPhaseScene {
     tableNames: Set<string>,
   ): string {
     const info   = getCardDisplayInfo(card);
-    const imgSrc = cardImagePath(card.name);
+    const imgAttrs = cardArtAttrs(card.name);
     const isUpgrade = tableNames.has(card.name);
     const tableFull = table.length >= MAX_TABLE_SIZE;
 
@@ -729,7 +729,7 @@ export class PlayPhaseScene {
       <div class="kh-play-hand-card ${typeClass} ${!canPlay ? "kh-play-hc-unplayable" : ""} ${isUpgrade ? "kh-play-hc-upgradeable" : ""} ${dealClass}"
            data-index="${index}" draggable="${canPlay ? 'true' : 'false'}" ${dealStyle}>
         <div class="kh-play-hc-art-header ${isUpgrade ? "kh-play-hc-art-header-upgrade" : ""}">
-          <img class="kh-play-hc-art-img" src="${imgSrc}" alt="${info.name}" />
+          <img class="kh-play-hc-art-img" ${imgAttrs} alt="${info.name}" />
           <div class="kh-play-hc-badge kh-play-hc-popreq" title="Population required">${Math.round(card.staffRequirement)}</div>
           <div class="kh-play-hc-badge kh-play-hc-cost" title="Production cost">${Math.round(card.productionRequirement)}</div>
           <div class="kh-play-hc-art-overlay">

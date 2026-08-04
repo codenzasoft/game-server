@@ -1,7 +1,7 @@
 import { GameState, Season, Card, CardTarget, OpponentTarget, ResourceTarget } from "./kingshand.ts";
 import {
   getCardDisplayInfo,
-  cardImagePath,
+  cardArtAttrs,
   formatModifier,
   resourceIcon,
 } from "./cardCatalog.ts";
@@ -238,7 +238,7 @@ export class AddPhaseScene {
 
   private buildCard(card: Card, index: number): string {
     const info   = getCardDisplayInfo(card);
-    const imgSrc = cardImagePath(card.name);
+    const imgAttrs = cardArtAttrs(card.name);
 
     // Only informative tags: frequency (SINGLE/RECURRING) and ENGINE.
     const tagsHTML = [
@@ -277,7 +277,7 @@ export class AddPhaseScene {
     return `
       <div class="kh-card ${typeClass}" data-index="${index}" role="button" tabindex="0" title="Add to your deck">
         <div class="kh-add-art-header">
-          <img class="kh-add-art-img" src="${imgSrc}" alt="${info.name}" />
+          <img class="kh-add-art-img" ${imgAttrs} alt="${info.name}" />
           <div class="kh-add-badge kh-add-popreq" title="Population required">${Math.round(card.staffRequirement)}</div>
           <div class="kh-add-badge kh-add-cost" title="Production cost">${Math.round(card.productionRequirement)}</div>
           <div class="kh-add-art-overlay">

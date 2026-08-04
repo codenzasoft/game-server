@@ -24,7 +24,7 @@ import {
   StaffingTier,
 } from "./kingshand.ts";
 import {
-  cardImagePath,
+  cardArtAttrs,
   formatModifier,
   getCardDisplayInfo,
   resourceIcon,
@@ -340,7 +340,7 @@ const buildPanel = (
               : "";
             return `
               <div class="kh-dr-card ${tierClass}" data-card="${card.name}">
-                <img src="${cardImagePath(card.name)}" alt="${info.name}" />
+                <img ${cardArtAttrs(card.name)} alt="${info.name}" />
                 ${staffChip}
                 <div class="kh-dr-card-name">${info.name}</div>
                 ${cardTipHTML(card)}

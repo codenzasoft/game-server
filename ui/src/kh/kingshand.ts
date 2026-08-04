@@ -116,6 +116,12 @@ interface CardData {
   effects: Effect[];
   /** Seasons of construction remaining; 0 for normal cards and completed Great Works. */
   constructionPeriod: number;
+  /**
+   * Upgrade level: 1 for a base card, unbounded upward. Card identity is `name` (stable across
+   * levels); the "Farm IV" label is derived from this number at render time. Optional on the wire
+   * for backward compatibility — an absent level is treated as 1.
+   */
+  level?: number;
 }
 
 interface CardStaffingData {
@@ -330,6 +336,7 @@ export class Card {
   frequencyType: FrequencyType;
   effects: Effect[];
   constructionPeriod: number;
+  level: number;
 
   constructor(data: CardData) {
     this.name = data.name;
@@ -338,6 +345,7 @@ export class Card {
     this.frequencyType = data.frequencyType;
     this.effects = data.effects;
     this.constructionPeriod = data.constructionPeriod;
+    this.level = data.level ?? 1;
   }
 
   /** True for a Great Work still under construction (as opposed to a normal or completed card). */
@@ -780,6 +788,10 @@ const CardSchema = z
     // > 0 while a Great Work is still under construction; 0 for normal cards and
     // completed Great Works. Defaulted for safety, though the server always sends it.
     constructionPeriod: z.number().int().default(0),
+    // Upgrade level: 1 for a base card, unbounded upward. Must be declared here or zod strips it
+    // from the parsed card, collapsing every upgraded card back to level 1 (so "Mine II" would
+    // render as "Mine"). Defaulted for backward compatibility with pre-level payloads.
+    level: z.number().int().default(1),
   })
   .transform((data) => new Card(data as CardData));
 
