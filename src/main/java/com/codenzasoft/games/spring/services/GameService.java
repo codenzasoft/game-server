@@ -9,7 +9,7 @@ import com.codenzasoft.games.hearts.HeartsState;
 import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
-import com.codenzasoft.games.kingshand.strategies.KhHeuristicStrategy;
+import com.codenzasoft.games.kingshand.strategies.KhBeamSearchStrategy;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
@@ -578,7 +578,7 @@ public class GameService {
     // humans — only the trigger differs.
     for (final UserEntity user : seatedUsers) {
       if (user.isBot()) {
-        builder.withPlayer(user.toPlayer(), new KhHeuristicStrategy());
+        builder.withPlayer(user.toPlayer(), new KhBeamSearchStrategy());
       } else {
         builder.withPlayer(user.toPlayer());
       }
