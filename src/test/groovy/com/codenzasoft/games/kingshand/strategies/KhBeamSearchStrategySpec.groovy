@@ -68,8 +68,8 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "the kingdom survives the upkeep rather than starving down toward 80"
-        !state.getPlayer(0).isGameOver()
-        resources(state).population() >= 95.0
+        !engine.state.getPlayer(0).isGameOver()
+        resources(engine.state).population() >= 95.0
     }
 
     // ---------------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "population is not inflated by SETTLERS"
-        resources(state).population() <= 105.0
+        resources(engine.state).population() <= 105.0
     }
 
     // ---------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "the bot grows the population when it is clearly affordable"
-        resources(state).population() > 100.0
+        resources(engine.state).population() > 100.0
     }
 
     // ---------------------------------------------------------------------------------
@@ -120,7 +120,7 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "the recurring FARM is on the table (it stays; the attack was not chosen)"
-        state.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("FARM")
+        engine.state.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("FARM")
     }
 
     // ---------------------------------------------------------------------------------
@@ -137,7 +137,7 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "the recurring production MINE is built"
-        state.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("MINE")
+        engine.state.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("MINE")
     }
 
     // ---------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "SETTLERS was not played — population is not inflated"
-        resources(state).population() <= 100.0
+        resources(engine.state).population() <= 100.0
     }
 
     // ---------------------------------------------------------------------------------
@@ -178,8 +178,8 @@ class KhBeamSearchStrategySpec extends Specification {
         engine.endAndRun()
 
         then: "the opponent is knocked out and the bot wins by conquest"
-        state.getPlayer(1).isGameOver()
-        state.winnerSeat() == 0
+        engine.state.getPlayer(1).isGameOver()
+        engine.state.winnerSeat() == 0
     }
 
     // ---------------------------------------------------------------------------------
@@ -196,8 +196,8 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then: "SEEDS entered the deck; MINE did not"
-        state.getPlayer(0).isCardInPlay("SEEDS")
-        !state.getPlayer(0).isCardInPlay("MINE")
+        engine.state.getPlayer(0).isCardInPlay("SEEDS")
+        !engine.state.getPlayer(0).isCardInPlay("MINE")
     }
 
     // ---------------------------------------------------------------------------------
@@ -214,8 +214,8 @@ class KhBeamSearchStrategySpec extends Specification {
         bot().act(engine, 0)
 
         then:
-        state.getPlayer(0).isCardInPlay("FARM")
-        !state.getPlayer(0).isCardInPlay("MINE")
+        engine.state.getPlayer(0).isCardInPlay("FARM")
+        !engine.state.getPlayer(0).isCardInPlay("MINE")
     }
 
     // ---------------------------------------------------------------------------------

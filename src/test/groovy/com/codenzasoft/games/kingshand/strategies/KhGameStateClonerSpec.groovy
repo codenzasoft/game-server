@@ -25,25 +25,24 @@ class KhGameStateClonerSpec extends Specification {
         GameState.multiPlayer([player], new TimeState(Season.SPRING, Phase.PLAY, 1))
     }
 
-    def "deep copy is independent — mutating the clone never touches the source"() {
+    def "an engine run never mutates the immutable source; the change lives in the new state"() {
         setup:
         def source = playState([CardCatalog.FARM], [CardCatalog.MINE], 1000.0)
-        def clone = KhGameStateCloner.deepCopy(source)
 
-        when: "the clone is mutated through a throwaway engine"
-        def engine = new GameEngine(clone, new Random(1))
+        when: "an action runs through a throwaway engine wrapping the source"
+        def engine = new GameEngine(source, new Random(1))
         engine.setActiveSeat(0)
         engine.placeCard(CardCatalog.MINE)
 
-        then: "the source's hand, table, and production are all untouched"
+        then: "the source's hand, table, and production are all untouched (immutability guarantees it)"
         source.getPlayer(0).getHand().size() == 1
         source.getPlayer(0).getTable(Season.SPRING).collect { it.name() } == ["FARM"]
         source.getPlayer(0).getResources().production() == 1000.0
 
-        and: "the clone actually changed"
-        clone.getPlayer(0).getHand().isEmpty()
-        clone.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("MINE")
-        clone.getPlayer(0).getResources().production() < 1000.0
+        and: "the engine's new state reflects the change"
+        engine.state.getPlayer(0).getHand().isEmpty()
+        engine.state.getPlayer(0).getTable(Season.SPRING).collect { it.name() }.contains("MINE")
+        engine.state.getPlayer(0).getResources().production() < 1000.0
     }
 
     def "simulatePlay resolves a season on a copy without mutating the live state"() {

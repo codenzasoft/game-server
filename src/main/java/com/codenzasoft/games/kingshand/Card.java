@@ -307,7 +307,7 @@ public record Card(
    * @param season The season whose table this card is resolving on.
    * @param tier The {@link StaffingTier} to use when applying effects.
    */
-  public PlayedCard play(final PlayerState state, final Season season, final StaffingTier tier) {
+  public PlayResult play(final PlayerState state, final Season season, final StaffingTier tier) {
     return play(
         state, season, tier, SabotageContext.none(), state.getCardsOnBoardAfter(season, this));
   }
@@ -325,7 +325,7 @@ public record Card(
    * @param tier The {@link StaffingTier} to use when applying effects.
    * @param sabotage The {@link SabotageContext} to apply.
    */
-  public PlayedCard play(
+  public PlayResult play(
       final PlayerState state,
       final Season season,
       final StaffingTier tier,
@@ -347,7 +347,7 @@ public record Card(
    * @param targets The {@link Card}s to consider as targets for any {@link CardTarget} effect this
    *     card has
    */
-  public PlayedCard play(
+  public PlayResult play(
       final PlayerState state,
       final Season season,
       final StaffingTier tier,
@@ -356,20 +356,21 @@ public record Card(
     if (tier.greaterThanOrEqualTo(getRequiredStaffingTier()) && state.canAfford(effects())) {
       final ResourceState before = state.getResources();
       final List<Card> boostedCards = new ArrayList<>();
+      PlayerState ps = state;
 
       for (Effect effect : getTierEffects(tier)) {
         if (effect.target() instanceof ResourceTarget rt) {
-          state.apply(effect);
+          ps = ps.apply(effect);
         } else if (effect.target() instanceof OpponentResourceTarget) {
           sabotage.collect(effect);
         } else if (effect.target() instanceof CardTarget ct) {
           for (final Card card : targets) {
             final Optional<Card> boosted = boost(card, effect, ct);
-            boosted.ifPresent(
-                boostedCard -> {
-                  state.replaceTableCard(season, card, boostedCard);
-                  boostedCards.add(boostedCard);
-                });
+            if (boosted.isPresent()) {
+              final Card boostedCard = boosted.get();
+              ps = ps.replaceTableCard(season, card, boostedCard);
+              boostedCards.add(boostedCard);
+            }
             if (ct.adjacentOnly()) {
               break;
             }
@@ -381,25 +382,28 @@ public record Card(
         int newPeriod = constructionPeriod() - 1;
         if (newPeriod == 0) {
           // ── Construction COMPLETE — swap for the completed card ──────────
-          state.replaceTableCard(season, this, completedCard());
+          ps = ps.replaceTableCard(season, this, completedCard());
           // Unlock any new resource types this Great Work grants.
-          state.unlock(this);
+          ps = ps.unlock(this);
         } else {
           // Decrement: replace the card on the table with the same card minus one period.
           Card decremented = withConstructionPeriod(newPeriod);
-          state.replaceTableCard(season, this, decremented);
+          ps = ps.replaceTableCard(season, this, decremented);
         }
       }
 
-      return new PlayedCard(
-          this,
-          tier,
-          true,
-          state.getResources().getDelta(before),
-          Collections.unmodifiableList(boostedCards));
+      final PlayedCard played =
+          new PlayedCard(
+              this,
+              tier,
+              true,
+              ps.getResources().getDelta(before),
+              Collections.unmodifiableList(boostedCards));
+      return new PlayResult(ps, played);
     }
 
-    return new PlayedCard(this, tier, false, ResourceState.empty(), List.of());
+    return new PlayResult(
+        state, new PlayedCard(this, tier, false, ResourceState.empty(), List.of()));
   }
 
   public Optional<Card> boost(final Card card, final Effect effect, final CardTarget target) {

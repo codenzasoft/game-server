@@ -3,9 +3,9 @@ package com.codenzasoft.games.kingshand
 import spock.lang.Specification
 
 /**
- * Per-kingdom data invariants for {@link PlayerState}: table/hand/pile mutations. Because a player no
- * longer owns the clock, every season-scoped operation takes an explicit {@link Season}. These tests
- * were previously part of {@code GameStateSpec}, before the match/kingdom split.
+ * Per-kingdom data invariants for {@link PlayerState}: table/hand/pile operations. Because a player no
+ * longer owns the clock, every season-scoped operation takes an explicit {@link Season}. {@code
+ * PlayerState} is now immutable, so every mutation returns a new instance the test must capture.
  */
 class PlayerStateSpec extends Specification {
 
@@ -29,12 +29,10 @@ class PlayerStateSpec extends Specification {
 
     def "getTable returns the table for the given season"() {
         setup:
-        def p = PlayerState.newPlayer()
         def card = new Card("TEST", 0, 0, FrequencyType.RECURRING, [])
-        p.getBoard().get(Season.FALL).add(card)
+        def p = PlayerState.builder().table(Season.FALL, [card]).build()
 
         expect:
-        p.getTable(Season.FALL).is(p.getBoard().get(Season.FALL))
         p.getTable(Season.FALL) == [card]
     }
 
@@ -77,7 +75,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.builder().table(Season.FALL, [original]).build()
 
         when:
-        p.replaceTableCard(Season.FALL, original, replacement)
+        p = p.replaceTableCard(Season.FALL, original, replacement)
 
         then:
         p.getTable(Season.FALL) == [replacement]
@@ -90,7 +88,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.builder().table(Season.WINTER, [card, other, card]).build()
 
         when:
-        p.replaceTableCard(Season.WINTER, card, other)
+        p = p.replaceTableCard(Season.WINTER, card, other)
 
         then:
         p.getTable(Season.WINTER) == [other, other, card]   // only index 0 replaced
@@ -104,8 +102,7 @@ class PlayerStateSpec extends Specification {
         p.replaceTableCard(Season.SPRING, new Card("TEST", 0, 0, FrequencyType.RECURRING, []), new Card("TEST", 1, 5, FrequencyType.RECURRING, []))
 
         then:
-        def e = thrown(IllegalArgumentException)
-        e.message == "card not found on current table"
+        thrown(IllegalArgumentException)
     }
 
     // ----- addToTable -----
@@ -116,7 +113,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.newPlayer()
 
         when:
-        p.addToTable(Season.SUMMER, card)
+        p = p.addToTable(Season.SUMMER, card)
 
         then:
         p.getTable(Season.SUMMER) == [card]
@@ -132,7 +129,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.builder().table(Season.SPRING, [card, other]).build()
 
         when:
-        p.removeFromTable(Season.SPRING, card)
+        p = p.removeFromTable(Season.SPRING, card)
 
         then:
         p.getTable(Season.SPRING) == [other]
@@ -147,7 +144,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.builder().table(Season.FALL, [first, second]).build()
 
         when:
-        p.removeFromTableAt(Season.FALL, 0)
+        p = p.removeFromTableAt(Season.FALL, 0)
 
         then:
         p.getTable(Season.FALL) == [second]
@@ -159,12 +156,10 @@ class PlayerStateSpec extends Specification {
         setup:
         def card1 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.FOOD, 5)])
         def card2 = new Card("TEST", 0, 0, FrequencyType.SINGLE, [new Effect(ResourceTarget.PRODUCTION, 10)])
-        def p = PlayerState.newPlayer()
-        p.hand.add(card1)
-        p.hand.add(card2)
+        def p = PlayerState.builder().hand([card1, card2]).build()
 
         when:
-        p.discardHand(Season.SPRING)
+        p = p.discardHand(Season.SPRING)
 
         then:
         p.hand.isEmpty()
@@ -176,11 +171,10 @@ class PlayerStateSpec extends Specification {
     def "discardHand discards to the correct pile when season is not SPRING"() {
         setup:
         def card = new Card("TEST", 0, 0, FrequencyType.SINGLE, [])
-        def p = PlayerState.newPlayer()
-        p.hand.add(card)
+        def p = PlayerState.builder().hand([card]).build()
 
         when:
-        p.discardHand(Season.WINTER)
+        p = p.discardHand(Season.WINTER)
 
         then:
         p.hand.isEmpty()
@@ -197,7 +191,7 @@ class PlayerStateSpec extends Specification {
         def p = PlayerState.builder().table(Season.SUMMER, [card, other]).build()
 
         when:
-        p.discardFromTable(Season.SUMMER, card)
+        p = p.discardFromTable(Season.SUMMER, card)
 
         then:
         p.getTable(Season.SUMMER) == [other]

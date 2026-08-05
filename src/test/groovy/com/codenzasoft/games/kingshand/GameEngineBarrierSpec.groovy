@@ -11,8 +11,8 @@ import java.util.concurrent.Executor
  * Multiplayer behavior tests: the readiness barrier (KH-MULTIPLAYER-PLAN Slice 1), bot driving
  * (Slice 2), sabotage's snapshot resolution (Slice 3), and forfeit / match outcome (Slice 4).
  *
- * <p>Single-seat parity is covered by the existing {@link GameEngineSpec} suite, which must stay
- * green unchanged: with one seat the barrier releases immediately.
+ * <p>{@link GameState}/{@link PlayerState} are immutable: the engine swaps in new instances, so
+ * post-action assertions read {@code engine.getState()} rather than the local setup reference.
  */
 class GameEngineBarrierSpec extends Specification {
 
@@ -41,25 +41,25 @@ class GameEngineBarrierSpec extends Specification {
         !state.allSubmitted()
 
         when:
-        state.markSubmitted(0)
+        state = state.markSubmitted(0)
 
         then:
         state.isSubmitted(0)
         !state.allSubmitted()
-        state.submittedSeats == [0]
+        state.getSubmittedSeats() == [0]
 
         when:
-        state.getPlayer(1).forfeit()
+        state = state.withPlayer(1, state.getPlayer(1).withForfeited(true))
 
         then: "a forfeited seat no longer blocks the barrier"
         state.allSubmitted()
 
         when:
-        state.clearSubmitted()
+        state = state.clearSubmitted()
 
         then:
         !state.isSubmitted(0)
-        state.submittedSeats == []
+        state.getSubmittedSeats() == []
     }
 
     // ----- Slice 1: the readiness barrier -----
@@ -77,11 +77,13 @@ class GameEngineBarrierSpec extends Specification {
         engine.endAndRun()
 
         then: "phase unchanged, seat 0 waiting, no table resolved yet"
-        state.time.phase == Phase.PLAY
-        state.time.season == Season.SPRING
-        state.submittedSeats == [0]
-        k0.resources.production() == 500.0d
-        k0.resolutionLog.isEmpty()
+        with(engine.state) {
+            time.phase == Phase.PLAY
+            time.season == Season.SPRING
+            getSubmittedSeats() == [0]
+            getPlayer(0).resources.production() == 500.0d
+            getPlayer(0).resolutionLog.isEmpty()
+        }
     }
 
     def "PLAY: second seat's endAndRun resolves both tables but holds the clock until both Continue"() {
@@ -99,17 +101,17 @@ class GameEngineBarrierSpec extends Specification {
         engine.setActiveSeat(1)
         engine.endAndRun()
 
-        then: "both kingdoms resolved"
-        k0.resources.production() == 600.0d
-        k1.resources.production() == 540.0d
-        !k0.resolutionLog.isEmpty()
-        !k1.resolutionLog.isEmpty()
-
-        and: "but the shared clock is held on the resolved season pending Continue"
-        state.resolutionPending
-        state.time.phase == Phase.PLAY
-        state.time.season == Season.SPRING
-        state.submittedSeats == []
+        then: "both kingdoms resolved; the shared clock is held on the resolved season pending Continue"
+        with(engine.state) {
+            getPlayer(0).resources.production() == 600.0d
+            getPlayer(1).resources.production() == 540.0d
+            !getPlayer(0).resolutionLog.isEmpty()
+            !getPlayer(1).resolutionLog.isEmpty()
+            resolutionPending
+            time.phase == Phase.PLAY
+            time.season == Season.SPRING
+            getSubmittedSeats() == []
+        }
 
         when: "both seats acknowledge the resolution screen"
         engine.setActiveSeat(0)
@@ -118,13 +120,15 @@ class GameEngineBarrierSpec extends Specification {
         engine.continueResolution()
 
         then: "now the shared clock advances exactly once (spring PLAY -> summer ADD) and seeds ADD"
-        !state.resolutionPending
-        state.time.phase == Phase.ADD
-        state.time.season == Season.SUMMER
-        state.time.year == 1
-        state.submittedSeats == []
-        !k0.addChoices.isEmpty()
-        !k1.addChoices.isEmpty()
+        with(engine.state) {
+            !resolutionPending
+            time.phase == Phase.ADD
+            time.season == Season.SUMMER
+            time.year == 1
+            getSubmittedSeats() == []
+            !getPlayer(0).addChoices.isEmpty()
+            !getPlayer(1).addChoices.isEmpty()
+        }
     }
 
     def "a seat cannot submit the same phase twice"() {
@@ -172,18 +176,22 @@ class GameEngineBarrierSpec extends Specification {
         engine.pickCard(pick)
 
         then: "seat 0 committed; clock waits for seat 1"
-        state.time.phase == Phase.ADD
-        state.submittedSeats == [0]
-        k0.hand.isEmpty()
+        with(engine.state) {
+            time.phase == Phase.ADD
+            getSubmittedSeats() == [0]
+            getPlayer(0).hand.isEmpty()
+        }
 
         when:
         engine.setActiveSeat(1)
         engine.skipAdd()
 
         then: "barrier releases: ADD -> PLAY once, and seat 0's hand was drawn from its pile"
-        state.time.phase == Phase.PLAY
-        state.submittedSeats == []
-        k0.hand*.name() == ["PICK_T"]
+        with(engine.state) {
+            time.phase == Phase.PLAY
+            getSubmittedSeats() == []
+            getPlayer(0).getHand()*.name() == ["PICK_T"]
+        }
     }
 
     // ----- Slice 2: bot driving -----
@@ -205,42 +213,50 @@ class GameEngineBarrierSpec extends Specification {
         engine.initialize()
 
         then: "the bot has already taken (and submitted) its ADD action"
-        state.time.phase == Phase.ADD
-        state.isSubmitted(1)
-        !state.isSubmitted(0)
+        with(engine.state) {
+            time.phase == Phase.ADD
+            isSubmitted(1)
+            !isSubmitted(0)
+        }
 
         when: "the human completes ADD"
         engine.setActiveSeat(0)
-        engine.pickCard(state.getPlayer(0).addChoices[0])
+        engine.pickCard(engine.state.getPlayer(0).addChoices[0])
 
         then: "the round advanced to PLAY and the bot has already submitted PLAY too"
-        state.time.phase == Phase.PLAY
-        state.isSubmitted(1)
-        !state.isSubmitted(0)
+        with(engine.state) {
+            time.phase == Phase.PLAY
+            isSubmitted(1)
+            !isSubmitted(0)
+        }
 
         when: "the human ends PLAY"
         engine.setActiveSeat(0)
         engine.endAndRun()
 
         then: "both tables resolved, but the clock is held for Continue and the bot has auto-continued"
-        state.resolutionPending
-        state.time.phase == Phase.PLAY
-        state.time.season == Season.SPRING
-        !state.getPlayer(0).resolutionLog.isEmpty()
-        !state.getPlayer(1).resolutionLog.isEmpty()
-        state.isSubmitted(1)
-        !state.isSubmitted(0)
+        with(engine.state) {
+            resolutionPending
+            time.phase == Phase.PLAY
+            time.season == Season.SPRING
+            !getPlayer(0).resolutionLog.isEmpty()
+            !getPlayer(1).resolutionLog.isEmpty()
+            isSubmitted(1)
+            !isSubmitted(0)
+        }
 
         when: "the human clicks Continue on the resolution screen"
         engine.setActiveSeat(0)
         engine.continueResolution()
 
         then: "the clock advances to the next season's ADD and the bot has already taken its ADD turn"
-        !state.resolutionPending
-        state.time.phase == Phase.ADD
-        state.time.season == Season.SUMMER
-        state.isSubmitted(1)
-        !state.isSubmitted(0)
+        with(engine.state) {
+            !resolutionPending
+            time.phase == Phase.ADD
+            time.season == Season.SUMMER
+            isSubmitted(1)
+            !isSubmitted(0)
+        }
     }
 
     // ----- Slice 3: sabotage resolves against a pre-resolution snapshot -----
@@ -259,21 +275,19 @@ class GameEngineBarrierSpec extends Specification {
         engine.endAndRun()
 
         then: "nothing has been drained yet — resolution waits on the barrier"
-        k1.resources.production() == 500.0d
+        engine.state.getPlayer(1).resources.production() == 500.0d
 
         when:
         engine.setActiveSeat(1)
         engine.endAndRun()
 
         then: "the victim's own card fired first, then the flat -200 drain applied"
-        k1.resources.production() == 600.0d    // 500 + 300 (own card) - 200 (sabotage)
-
-        and: "the attacker paid its own strength cost"
-        k0.resources.strength() == 75.0d
-
-        and: "the victim's log ends with the sabotage step for the client animation"
-        k1.resolutionLog.last().cardName() == "SABOTAGE"
-        k1.resolutionLog.last().productionDelta() == -200.0d
+        with(engine.state) {
+            getPlayer(1).resources.production() == 600.0d    // 500 + 300 (own card) - 200 (sabotage)
+            getPlayer(0).resources.strength() == 75.0d       // the attacker paid its own strength cost
+            getPlayer(1).resolutionLog.last().cardName() == "SABOTAGE"
+            getPlayer(1).resolutionLog.last().productionDelta() == -200.0d
+        }
     }
 
     // ----- Slice 4: forfeit and match outcome -----
@@ -297,11 +311,13 @@ class GameEngineBarrierSpec extends Specification {
         engine.forfeit(1)
 
         then:
-        state.getPlayer(1).forfeited
-        state.isPlayerOut(1)
-        state.isMatchOver()
-        state.winnerSeat() == 0
-        1 * observer.gameOver(engine, state)
+        with(engine.state) {
+            getPlayer(1).forfeited
+            isPlayerOut(1)
+            isMatchOver()
+            winnerSeat() == 0
+        }
+        1 * observer.gameOver(engine, _)
         1 * lifecycle.gameOver(engine)
     }
 
@@ -321,8 +337,8 @@ class GameEngineBarrierSpec extends Specification {
         engine.forfeit(0)
 
         then: "the second forfeit is a no-op — seat 0 already won"
-        !state.getPlayer(0).forfeited
-        state.winnerSeat() == 0
+        !engine.state.getPlayer(0).forfeited
+        engine.state.winnerSeat() == 0
     }
 
     def "victory now fires gameOver (single seat): completing the last Great Work ends the match"() {
@@ -350,12 +366,12 @@ class GameEngineBarrierSpec extends Specification {
         engine.endAndRun()
 
         then:
-        state.getPlayer(0).gameWon
-        state.isMatchOver()
-        state.winnerSeat() == 0
-        1 * observer.gameOver(engine, state)
-
-        and: "the clock stopped with the match"
-        state.time.phase == Phase.PLAY
+        with(engine.state) {
+            getPlayer(0).gameWon
+            isMatchOver()
+            winnerSeat() == 0
+            time.phase == Phase.PLAY   // the clock stopped with the match
+        }
+        1 * observer.gameOver(engine, _)
     }
 }

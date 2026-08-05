@@ -187,7 +187,7 @@ class GameEngineLifecycleObserverSpec extends Specification {
         engine.initialize()
 
         then:
-        1 * khObserver.gameStarted(engine, state)
+        1 * khObserver.gameStarted(engine, _)
         1 * lifecycleObserver.gameStarted(engine)
     }
 }

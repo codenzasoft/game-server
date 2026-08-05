@@ -1,49 +1,34 @@
 package com.codenzasoft.games.kingshand;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Match-level state for a King's Hand game: the shared clock ({@link TimeState}) plus the list of
- * per-player kingdoms ({@link PlayerState}). This is the top-level object the engine mutates and
- * the client is sent.
+ * Immutable match-level state for a King's Hand game: the shared clock ({@link TimeState}), the
+ * list of per-player kingdoms ({@link PlayerState}) addressed by seat, the readiness barrier's set
+ * of submitted seats, and the held-resolution flag.
  *
- * <p><b>Responsibilities.</b> {@code GameState} owns only what is shared or cross-cutting across
- * the match: the collection of kingdoms (addressed by <em>seat</em>), the single authoritative
- * season/phase/year clock, and the match outcome (who has won / been knocked out). It deliberately
- * does <em>not</em> re-expose per-player operations — those live on {@link PlayerState} and are
- * reached via {@link #getPlayer(int)}. The engine is seat-aware and operates on the relevant {@link
- * PlayerState} directly, so this class no longer delegates to a single "primary" kingdom.
+ * <p>{@code GameState} owns only what is shared or cross-cutting across the match. Per-player
+ * operations live on {@link PlayerState} and are reached via {@link #getPlayer(int)}. All mutation
+ * is expressed as {@code with*} / delegate methods returning a new instance.
  *
- * <p>For a single-player game {@code players} has exactly one element (seat 0).
+ * <p>For a single-player game {@code players} has exactly one element (seat 0). Read accessors are
+ * exposed as {@code getX()} methods to keep existing call sites unchanged.
  */
-public class GameState {
+public record GameState(
+    List<PlayerState> players,
+    TimeState time,
+    Set<Integer> submittedSeats,
+    boolean resolutionPending) {
 
-  private final List<PlayerState> players;
-  private TimeState time;
-
-  /**
-   * Seats that have completed ("submitted") the current phase. The shared clock must not advance
-   * until every live seat has submitted — see {@code GameEngine}'s readiness barrier. Reset
-   * whenever the phase changes.
-   */
-  private final Set<Integer> submittedSeats = new HashSet<>();
-
-  /**
-   * {@code true} while a multiplayer PLAY phase has resolved but the shared clock is being held on
-   * the resolved season until every seat clicks "Continue" on the resolution screen. During this
-   * window {@code submittedSeats} accumulates continue acknowledgements (a second barrier). Always
-   * {@code false} in single-player, where the clock advances immediately after resolution.
-   */
-  private boolean resolutionPending;
-
-  private GameState(Builder b) {
-    this.players = b.players;
-    this.time = b.time;
+  /** Compact constructor — normalise nulls and defensively copy collections. */
+  public GameState {
+    players = players == null ? List.of() : List.copyOf(players);
+    submittedSeats = submittedSeats == null ? Set.of() : Set.copyOf(submittedSeats);
   }
+
+  // ===== Static factories =====
 
   /** Creates a fresh single-player match: one starting kingdom, spring of year 1, ADD phase. */
   public static GameState newState() {
@@ -62,9 +47,8 @@ public class GameState {
   }
 
   /**
-   * Creates a fresh {@code count}-player match: {@code count} independent starting kingdoms that
-   * share one clock (Spring, year 1, ADD phase). Each kingdom is built separately so their piles,
-   * boards, and hands are fully independent — mutating one seat never touches another.
+   * Creates a fresh {@code count}-player match: {@code count} independent starting kingdoms sharing
+   * one clock (Spring, year 1, ADD phase).
    *
    * @throws IllegalArgumentException if {@code count < 1}
    */
@@ -85,9 +69,7 @@ public class GameState {
   }
 
   /**
-   * Wraps already-built kingdoms and a shared {@link TimeState} into a match. The {@code players}
-   * list is defensively copied; the {@link PlayerState} instances are used as-is, so callers must
-   * pass independent kingdoms (each with its own mutable collections).
+   * Wraps already-built kingdoms and a shared {@link TimeState} into a match.
    *
    * @throws IllegalArgumentException if {@code players} is null or empty
    */
@@ -95,16 +77,12 @@ public class GameState {
     if (players == null || players.isEmpty()) {
       throw new IllegalArgumentException("a match needs at least one player");
     }
-    Builder b = new Builder();
-    b.players = new ArrayList<>(players);
-    b.time = time;
-    return new GameState(b);
+    return new GameState(players, time, Set.of(), false);
   }
 
-  // ----- Match structure -----
+  // ===== Match structure =====
 
   /** All player kingdoms in this match, ordered by seat. Single-player games have one element. */
-  @JsonProperty("players")
   public List<PlayerState> getPlayers() {
     return players;
   }
@@ -119,32 +97,40 @@ public class GameState {
     return players.size();
   }
 
-  // ----- Shared clock -----
+  /** This match with the kingdom at {@code seat} replaced by {@code player}. */
+  public GameState withPlayer(int seat, PlayerState player) {
+    List<PlayerState> next = new ArrayList<>(players);
+    next.set(seat, player);
+    return new GameState(next, time, submittedSeats, resolutionPending);
+  }
 
-  @JsonProperty("time")
+  // ===== Shared clock =====
+
   public TimeState getTime() {
     return time;
   }
 
-  /**
-   * Advances the shared clock. The Council opens after Winter's PLAY when <em>either</em> kingdom
-   * has unlocked GOLD (the two-player council rule), so a player with a gold economy always gets
-   * their council turn even if their opponent has none.
-   */
-  public void advanceTime() {
-    boolean anyGoldUnlocked =
-        players.stream().anyMatch(p -> p.getResources().isUnlocked(ResourceTarget.GOLD));
-    time = time.advance(anyGoldUnlocked);
+  public GameState withTime(TimeState time) {
+    return new GameState(players, time, submittedSeats, resolutionPending);
   }
 
-  // ----- Readiness barrier (per-phase submit tracking) -----
-
   /**
-   * Marks {@code seat} as having completed the current phase. The seat may take no further phase
-   * actions until the barrier releases (all live seats submitted) and the clock advances.
+   * Advances the shared clock. The Council opens after Winter's PLAY when <em>either</em> kingdom
+   * has unlocked GOLD, so a player with a gold economy always gets their council turn.
    */
-  public void markSubmitted(int seat) {
-    submittedSeats.add(seat);
+  public GameState advanceTime() {
+    boolean anyGoldUnlocked =
+        players.stream().anyMatch(p -> p.getResources().isUnlocked(ResourceTarget.GOLD));
+    return withTime(time.advance(anyGoldUnlocked));
+  }
+
+  // ===== Readiness barrier (per-phase submit tracking) =====
+
+  /** This match with {@code seat} marked as having completed the current phase. */
+  public GameState markSubmitted(int seat) {
+    Set<Integer> next = new java.util.HashSet<>(submittedSeats);
+    next.add(seat);
+    return new GameState(players, time, next, resolutionPending);
   }
 
   /** {@code true} if {@code seat} has already submitted the current phase. */
@@ -153,8 +139,8 @@ public class GameState {
   }
 
   /**
-   * {@code true} once every live (not knocked-out / forfeited) seat has submitted the current phase
-   * — the readiness barrier releases and the shared clock may advance exactly once.
+   * {@code true} once every live (not knocked-out / forfeited) seat has submitted the current
+   * phase.
    */
   public boolean allSubmitted() {
     for (int seat = 0; seat < players.size(); seat++) {
@@ -168,39 +154,31 @@ public class GameState {
     return true;
   }
 
-  /** Clears all submit marks. Called whenever the phase changes. */
-  public void clearSubmitted() {
-    submittedSeats.clear();
+  /** This match with all submit marks cleared. Called whenever the phase changes. */
+  public GameState clearSubmitted() {
+    return new GameState(players, time, Set.of(), resolutionPending);
   }
 
-  /**
-   * Seats that have submitted the current phase, sorted for a stable wire order. The client uses
-   * this to show "waiting for other player…" once its own seat has submitted but others haven't.
-   */
-  @JsonProperty("submittedSeats")
+  /** Seats that have submitted the current phase, sorted for a stable wire order. */
   public List<Integer> getSubmittedSeats() {
     return submittedSeats.stream().sorted().toList();
   }
 
   /**
    * {@code true} while the resolved season's clock is being held until every seat clicks Continue
-   * on the multiplayer resolution screen. The client shows the dual resolution while this is set
-   * and sends {@code /play/continue} when the player clicks Continue.
+   * on the multiplayer resolution screen.
    */
-  @JsonProperty("resolutionPending")
   public boolean isResolutionPending() {
     return resolutionPending;
   }
 
-  public void setResolutionPending(final boolean resolutionPending) {
-    this.resolutionPending = resolutionPending;
+  public GameState withResolutionPending(final boolean resolutionPending) {
+    return new GameState(players, time, submittedSeats, resolutionPending);
   }
 
-  // ----- Match outcome (cross-player) -----
+  // ===== Match outcome (cross-player) =====
 
-  /**
-   * {@code true} if {@code seat}'s population has collapsed (knocked out / forfeit by starvation).
-   */
+  /** {@code true} if {@code seat}'s population has collapsed (knocked out / forfeit). */
   public boolean isPlayerOut(int seat) {
     return getPlayer(seat).isGameOver();
   }
@@ -210,11 +188,7 @@ public class GameState {
     return getPlayer(seat).isVictoryComplete();
   }
 
-  /**
-   * {@code true} once the match is decided: some seat has completed all Great Works, or a seat has
-   * been knocked out. Callers use {@link #winnerSeat()} to find who (if anyone) won.
-   */
-  @JsonProperty("matchOver")
+  /** {@code true} once the match is decided: some seat has won, or a seat has been knocked out. */
   public boolean isMatchOver() {
     for (int seat = 0; seat < players.size(); seat++) {
       if (isPlayerVictorious(seat) || isPlayerOut(seat)) {
@@ -225,30 +199,16 @@ public class GameState {
   }
 
   /**
-   * Seat of the winner, or {@code -1} if the match is not yet decided or ended in a draw.
-   *
-   * <p>Two equal paths to victory:
-   *
-   * <ul>
-   *   <li><b>Great Works</b> — completing all win-condition Great Works wins outright, <em>provided
-   *       that kingdom is still alive</em>. A kingdom that finishes its monuments but is wiped out
-   *       the same turn does not win from the grave; the win falls through to the conqueror.
-   *   <li><b>Conquest</b> — the last kingdom still standing wins once every opponent has been
-   *       knocked out (population collapsed by combat/sabotage/starvation, or forfeit).
-   * </ul>
-   *
-   * <p>A mutual knockout (every kingdom out in the same resolution) is a draw, returning {@code
-   * -1}.
+   * Seat of the winner, or {@code -1} if the match is not yet decided or ended in a draw. Great
+   * Works wins outright for a surviving kingdom; otherwise the sole survivor wins by conquest. A
+   * mutual knockout is a draw.
    */
-  @JsonProperty("winnerSeat")
   public int winnerSeat() {
-    // Great Works victory — but only for a kingdom that survived to enjoy it.
     for (int seat = 0; seat < players.size(); seat++) {
       if (isPlayerVictorious(seat) && !isPlayerOut(seat)) {
         return seat;
       }
     }
-    // Conquest victory — sole survivor once every rival is knocked out.
     int survivors = 0;
     int lastSurvivor = -1;
     for (int seat = 0; seat < players.size(); seat++) {
@@ -260,12 +220,7 @@ public class GameState {
     return (players.size() > 1 && survivors == 1) ? lastSurvivor : -1;
   }
 
-  /**
-   * How the match was won by {@link #winnerSeat()}: {@code "GREAT_WORKS"}, {@code "CONQUEST"}, or
-   * {@code "NONE"} (undecided or a draw). Surfaced to the client so the game-over screen can name
-   * the victory path.
-   */
-  @JsonProperty("victoryType")
+  /** How the match was won: {@code "GREAT_WORKS"}, {@code "CONQUEST"}, or {@code "NONE"}. */
   public String victoryType() {
     final int winner = winnerSeat();
     if (winner < 0) {
@@ -274,24 +229,18 @@ public class GameState {
     return isPlayerVictorious(winner) ? "GREAT_WORKS" : "CONQUEST";
   }
 
-  // ----- Builder -----
+  // ===== Builder =====
 
   /**
-   * Builds a single-player match. Mirrors the old flat {@code GameState.Builder} fluent API: the
-   * clock setters ({@link #season}, {@link #phase}, {@link #year}) live here, and every per-player
-   * setter forwards to an embedded {@link PlayerState.Builder}. This keeps existing single-kingdom
-   * call sites (production and tests) compiling without change; multi-kingdom matches are assembled
-   * via {@link #newMultiplayer(int)} / {@link #multiPlayer(List, TimeState)}.
+   * Builds a single-player match. Mirrors the old flat fluent API: clock setters live here and
+   * every per-player setter forwards to an embedded {@link PlayerState.Builder}. Multi-kingdom
+   * matches are assembled via {@link #newMultiplayer(int)} / {@link #multiPlayer(List, TimeState)}.
    */
   public static final class Builder {
     private final PlayerState.Builder player = PlayerState.builder();
     private Season season = Season.SPRING;
     private Phase phase = Phase.ADD;
     private int year = 1;
-
-    // Set directly by multiPlayer(...).
-    private List<PlayerState> players;
-    private TimeState time;
 
     private Builder() {}
 
@@ -416,10 +365,6 @@ public class GameState {
     }
 
     public GameState build() {
-      // multiPlayer(...) pre-populates players/time directly.
-      if (players != null && time != null) {
-        return new GameState(this);
-      }
       if (season == null) {
         throw new IllegalStateException("missing current season");
       }
@@ -429,9 +374,8 @@ public class GameState {
       if (year < 0) {
         throw new IllegalStateException("year cannot be negative");
       }
-      this.players = new ArrayList<>(List.of(player.build()));
-      this.time = new TimeState(season, phase, year);
-      return new GameState(this);
+      List<PlayerState> players = new ArrayList<>(List.of(player.build()));
+      return new GameState(players, new TimeState(season, phase, year), Set.of(), false);
     }
   }
 }

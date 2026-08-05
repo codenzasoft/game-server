@@ -30,7 +30,7 @@ class GameEngineNotificationSpec extends Specification {
         engine.initialize()
 
         then:
-        1 * listener.gameStarted(engine, state)
+        1 * listener.gameStarted(engine, _)
     }
 
     def "initialize does not fire gameStarted when the game is already over"() {
@@ -60,7 +60,7 @@ class GameEngineNotificationSpec extends Specification {
         engine.endAndRun()
 
         then:
-        1 * listener.gameOver(engine, state)
+        1 * listener.gameOver(engine, _)
     }
 
     def "gameOver does not fire again once the game is already over"() {
@@ -108,8 +108,8 @@ class GameEngineNotificationSpec extends Specification {
         engine.initialize()
 
         then:
-        1 * listener1.gameStarted(engine, state)
-        1 * listener2.gameStarted(engine, state)
+        1 * listener1.gameStarted(engine, _)
+        1 * listener2.gameStarted(engine, _)
     }
 
     def "all registered listeners receive gameOver"() {
@@ -127,8 +127,8 @@ class GameEngineNotificationSpec extends Specification {
         engine.endAndRun()
 
         then:
-        1 * listener1.gameOver(engine, state)
-        1 * listener2.gameOver(engine, state)
+        1 * listener1.gameOver(engine, _)
+        1 * listener2.gameOver(engine, _)
     }
 
     def "notifyUpdated fires gameUpdated on every listener with the current state"() {
