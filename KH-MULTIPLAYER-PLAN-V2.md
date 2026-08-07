@@ -1,280 +1,227 @@
-# King's Hand → Multiplayer — Plan V2 (post-immutability)
+# King's Hand → Multiplayer — Step-by-step build plan
 
-> **Status of this document.** This supersedes `KH-MULTIPLAYER-PLAN.md`, which was written *before*
-> the immutable-state refactor and before its own slices 1–4 landed. Most of that plan is now **done**
-> (see §1). This V2 is scoped to what actually remains to turn KH into a real, deployable
-> human-vs-human game. No code has been changed to produce this plan — it is for review.
+Concrete implementation steps in build order. Each step lists the files to touch, what to do, and how
+to verify it. Do the steps in order; each phase ends green (`./gradlew build`) before the next starts.
 
-Audience: the engineer/agent picking this up next. Read §1 to see what already exists, §2 for the
-one architectural decision that gates everything, then §3–§7 for the work in dependency order.
+**Decisions already locked** (don't re-litigate):
+- **Persistence:** serialize the whole immutable `GameState` to a JSON column; **embed full card &
+  advisor objects** (not ids). One owning instance — pin KH to `max-instances=1`.
+- **Human-vs-human:** invite-by-link, mirroring Hearts' pending→join flow; **keep** the one-click
+  vs-bot game. KH is exactly 2 seats, so filling seat 1 auto-starts (no host "start" button).
+- **Disconnect:** auto-forfeit after a reconnect grace window.
+- **Turn timer:** 30s per phase; on expiry auto-submit a safe default (skip ADD / end PLAY / pass
+  COUNCIL).
 
----
-
-## 1. Where things actually stand (much further than the old plan says)
-
-The immutable refactor (`docs/kingshand-immutable-refactor.md`) landed, and it quietly unlocked the
-hard parts of multiplayer. Verified in the current tree:
-
-**Engine & state — done.**
-- `GameState` is an immutable record: `players` (one `PlayerState` kingdom per seat), shared
-  `TimeState`, `submittedSeats`, `resolutionPending`, plus `withPlayer`/`withTime`/`advanceTime`/
-  `markSubmitted`/`allSubmitted`/`clearSubmitted`/`winnerSeat`/`isMatchOver`
-  (`GameState.java:19`).
-- **The readiness barrier is built.** Every seat-scoped action (`pickCard`, `skipAdd`, `endAndRun`,
-  `acceptCouncilProposal`, …) calls `submitActiveSeat()`, which marks the seat and only runs
-  `resolvePhaseAndAdvance()` once **all live seats** have submitted — advancing the shared clock
-  exactly once and reseeding every seat (`GameEngine.java:495`, `:509`). Single-seat parity is
-  preserved (one seat ⇒ barrier releases immediately).
-- **Bots have agency.** `KhPlayerStrategy` + `KhBeamSearchStrategy`; the engine binds a strategy per
-  bot seat and `driveBots()` auto-plays + auto-submits them after every phase seed, so the barrier
-  never stalls on a bot (`GameEngine.java:625`, `buildKhGame` at `GameService.java:579`).
-- **Sabotage / cross-seat combat is built.** `resolvePlayForAllSeats()` snapshots every kingdom,
-  resolves each table against the *frozen* opponent snapshot, then applies collected cross-seat
-  deltas in a second pass — including the STRENGTH-as-shield combat rule in `applyIncomingDelta`
-  (`GameEngine.java:841`, `:896`). `OpponentResourceTarget`/`SabotageContext`/`Effect.isAttack()`
-  exist.
-- **Forfeit** releases the barrier for the remaining seat (`GameEngine.java:342`).
-
-**Transport & views — done.**
-- Per-seat broadcasting with hidden information: `KhBroadcastService` sends each human a
-  `KhMatchView.forSeat(state, seat)` — **own kingdom full, opponents redacted** — and skips bot seats
-  (`KhBroadcastService.java:69`, `KhMatchView.java:34`, `KhKingdomView.full/redacted`).
-- Full WS surface incl. the multiplayer-specific `/play/continue` acknowledge-resolution handler
-  (`KhController.java:194`).
-- `recordKhGamesPlayed` already records win/loss per human seat via `winnerSeat()`
-  (`GameService.java:774`).
-
-**Frontend — substantially present.** `ui/src/kh/` has `multiplayerOverlays.ts`, `playPhaseScene.ts`,
-the "waiting for other player" / dual-table resolution UX, reading `players[context.seat]` as "you".
-
-**Net:** the old plan's Slices 1 (barrier), 2 (bot), 3 (sabotage), 4 (outcome), and most of 6
-(frontend) are effectively **complete**. What is *not* done is everything that makes it a real match
-between **two humans that survives a production deploy** — Slice 5 (human-vs-human) and the
-"persistence gap" the old plan flagged as an afterthought. Those are the whole job now.
+Precedents to copy: Hearts persistence (`getOrBuildHeartsGame`, `GameService.java:407`; restore at
+`:424`) and Hearts lobby (`createPendingHeartsGame`/`joinHeartsGame`/`startHeartsGame`, `:453`–`:518`).
 
 ---
 
-## 2. The gating decision: where does live match state live? ★ read first
+## Phase 0 — Baseline green (prerequisite)
 
-This is the crux and it reorders everything else. Today:
-
-- `GameCache` is a plain in-memory `HashMap<UUID, Game<?>>` (`GameCache.java:14`).
-- `buildKhGame` **rebuilds a fresh `GameState.newMultiplayer(...)` on every cache miss** — it never
-  loads mid-game progress (`GameService.java:563`). There is no `kh_game_state` column; KH persists
-  only the seat roster (`KhGameEntity` carries players, nothing else).
-- Production runs on Cloud Run with `--min-instances=0 --max-instances=2` (`deploy.yml:59`).
-
-For a solo-vs-bot game a cache miss just meant "start over," which nobody noticed. For **two humans**
-it is fatal in two independent ways:
-
-1. **Eviction / restart / scale-to-zero loses the match.** `GameCleanupService` and any redeploy or
-   idle scale-down drops the in-memory engine; the next `/load` silently resets both kingdoms to
-   year 1.
-2. **Two replicas = two divergent games.** With `max-instances=2`, the two humans' WebSocket
-   connections can land on different Cloud Run instances. Each instance builds its *own* in-memory
-   `GameEngine` from the same DB row and they never see each other's moves. The engine's
-   `synchronized` methods only serialize within one JVM.
-
-The immutable refactor is what makes the fix cheap: **`GameState` is now a pure, immutable record
-graph** (`Deck`/`SeasonState`/`ResourceState`/`SeatedAdvisor`/`TimeState` all records), so it
-serializes to/from JSON with no hand-written cloning or mutation hazards. Snapshotting the whole
-match is now `objectMapper.writeValueAsString(state)`.
-
-Two viable strategies — **decide before writing code:**
-
-| | **A. Persist state + single owning instance (recommended v1)** | **B. Persist state + stateless per-action load/save** |
-|---|---|---|
-| Storage | `kh_game_state` JSONB column; write the whole `GameState` after each `resolvePhaseAndAdvance` (and each submit) | same |
-| Concurrency | One instance owns a live game at a time; pin KH matches to a single replica | No in-memory engine kept; each WS action loads state, applies one move under optimistic lock (`version` column), saves |
-| Cloud Run | `max-instances=1` for now, **or** Cloud Run *session affinity* + accept the residual multi-user race | Any number of replicas; DB is the source of truth |
-| Effort | Low — add a column + serialize/deserialize in `buildKhGame`/after-resolve; one infra flag | High — restructure the engine's `synchronized`/in-memory assumptions, add optimistic-lock retry, re-drive bots from loaded state |
-| Correctness | Solid as long as one instance owns the game; the barrier + `synchronized` still hold | Solid across replicas, but every action becomes a load-mutate-save transaction |
-
-**Decided: A.** Ship persistence + single-instance ownership first (a direct, low-risk payoff of
-immutability that unblocks a real two-human match); B (stateless per-action load/save) is the
-scale-out follow-up only if volume ever needs >1 replica. Note session affinity on Cloud Run is
-*per-client cookie* — it does **not** guarantee two different users hit the same instance — so the
-honest interim under A is `max-instances=1` (or a small dedicated service), not affinity.
-
-Everything below assumes **A**.
+**0.1** Run `./gradlew spotlessApply build` and fix any compile/test nits so the tree is green before
+touching anything. Confirm the KH suite passes:
+```bash
+./gradlew test --tests "*Kh*" --tests "*.kingshand.*"
+```
+**Verify:** build passes; note the KH test count as your regression baseline.
 
 ---
 
-## 3. Slice A — Persist live match state (the unblock)
+## Phase 1 — Persist live match state (Slice A)
 
-**Goal:** a KH match survives cache eviction, redeploy, and scale-to-zero.
+Goal: a KH match survives cache eviction, redeploy, and scale-to-zero. This is the unblock — do it
+first.
 
-- **Schema (game-database repo):** new migration adding a nullable `kh_game_state JSONB` (and a
-  `version INT` for later use) to the KH game table. Follow the Flyway `V##__...sql` convention;
-  KH currently has *no* KH-specific migration, so this is the first.
-- **Entity:** add the field to `KhGameEntity` (or a child table) with a JSON converter.
-- **Write path:** after `resolvePhaseAndAdvance()` resolves a phase (and, to be safe, after every
-  `submitActiveSeat()`), serialize `engine.getState()` and persist. Cleanest seam: a lifecycle/observer
-  hook (KH already registers `GameLifecycleListener` + `KhObserver`) or an explicit
-  `GameService.saveKhState(engine)` the controller pipeline calls after `notifyUpdated()`.
-- **Read path:** in `buildKhGame`, if the entity has saved state, `deserialize → GameState` and
-  `GameEngine.Builder.withState(...)` **instead of** `GameState.newMultiplayer(...)`; only seed a
-  fresh state when the column is null (first build). Re-bind bot strategies exactly as today so
-  `driveBots()` resumes correctly from the loaded phase.
-- **Serialization guardrails:**
-  - Round-trip test: `state → JSON → state` equals the original for a mid-game fixture (mid-PLAY with
-    `submittedSeats` populated, a seated advisor mid-proposal, non-empty resolution logs).
-  - Jackson config: records serialize fine, but `Deck`/`SeasonState`/`Map<Season,SeasonState>` and any
-    `Card`/`Advisor` subtyping need explicit checking. **Decided: embed the full card & advisor
-    objects** (not ids) — Jackson walks the record graph directly, no catalog lookup on load. Verify
-    the round-trip below covers boosted/upgraded table cards, since an engine-boosted card differs
-    from its catalog original and must survive save/load byte-for-equal.
-  - **Accepted consequence:** saved cards are frozen at save time; a `CardCatalog` retune does not
-    reach matches already in flight. Not a correctness issue — just expected behavior to document.
-  - The engine's `activeSeat` and `SabotageContext` are per-request scratch — **do not** persist them.
+**1.1 — Migration (game-database repo).** Add `V16__Add_kh_game_state.sql` (next free number) adding a
+nullable column to the `games` table:
+```sql
+ALTER TABLE games ADD COLUMN kh_game_state JSONB;
+```
+(Single-table inheritance — all game types share `games`; the column is null for non-KH rows.)
+**Verify:** migration applies cleanly against local Postgres (`localhost:5435`).
 
-**Risk:** low. The one thing to nail in the round-trip test is boosted/upgraded cards and mid-proposal
-advisor counters, since those are the state that differs from the catalog defaults.
+**1.2 — Jackson round-trip proof (do this before wiring anything).** New Spock spec
+`GameStateSerializationSpec`: build a mid-game `GameState` fixture (mid-PLAY with `submittedSeats`
+populated, a seated advisor mid-proposal, a **boosted/upgraded** table card, non-empty resolution
+logs), serialize with the app's `ObjectMapper`, deserialize, assert equality with the original.
+**Verify:** the spec passes. This is the highest-risk part — boosted cards and advisor counters are
+the state that differs from catalog defaults, so if anything round-trips lossily it shows here.
 
----
+**1.3 — Entity column.** On `KhGameEntity`, add a `String khGameState` field mapped to the new column
+(`@Column(name = "kh_game_state", columnDefinition = "jsonb")`) with getter/setter. Store the JSON
+string; do the object↔JSON conversion in the service (1.4), not via a JPA converter, to keep the
+`ObjectMapper` injectable and shared.
+**Verify:** app boots; entity maps without Hibernate errors.
 
-## 4. Slice B — Human-vs-human creation, lobby & join
+**1.4 — Persistence service.** New `services/kh/KhPersistenceService` (mirror the role of Hearts'
+persistence service):
+- `void save(UUID gameId, GameState state)` — `objectMapper.writeValueAsString(state)` into the
+  entity column, `gamesRepository.save(...)`.
+- `Optional<GameState> reconstruct(UUID gameId)` — read the column; if non-null,
+  `objectMapper.readValue(json, GameState.class)`.
+- Inject the shared Spring `ObjectMapper`.
+**Verify:** unit test save-then-reconstruct returns an equal `GameState`.
 
-**Goal:** two people can get into the same match by invite link, while keeping the one-click vs-bot
-game. **Decided: invite-by-link only, mirror Hearts; no public lobby.**
+**1.5 — Write path.** Persist after every state change that must survive a crash. Cleanest seam: the
+controller's shared action pipeline (`KhController.java:~254`, right after `game.notifyUpdated()`)
+calls `khPersistenceService.save(gameId, game.getState())`. Also persist inside the `/load` path is
+unnecessary (read-only). Bot moves already run through the engine before `notifyUpdated`, so a single
+save after each pipeline run captures them.
+**Verify:** play a few actions in the browser; confirm the `kh_game_state` column updates in Postgres
+after each move.
 
-**Mirror Hearts exactly** — it already has the two-path shape you want:
-- vs-bots: `createHeartsGame` (`GameService.java:197`), one-click via `IndexController:89` /
-  `GamesApiController:40`.
-- human multiplayer: `createPendingHeartsGame` (host only, no bots — `:453`) → `joinHeartsGame`
-  (`:471`) → `startHeartsGame`; MVC at `IndexController:118`, API at
-  `GamesApiController:57` ("creates a pending game … other players join").
+**1.6 — Read path.** In `GameService.buildKhGame` (`:557`), before seeding fresh, call
+`khPersistenceService.reconstruct(entity.getId())`:
+- if present → `GameEngine.Builder.withState(restored)` and **do not** re-seed
+  (`engine.initialize()` currently seeds starting decks — split it so restore skips seeding but still
+  registers observers, binds bot strategies, and calls `driveBots()` to resume). Model this on Hearts'
+  `buildRestoredHeartsGame` + `resumePlay()` split (`GameService.java:426`).
+- if absent → today's fresh path (`GameState.newMultiplayer(...)` + `initialize()`).
+Re-bind bot strategies for bot seats exactly as today either way.
+**Verify:** integration test — build an engine, advance it a couple of phases, save, evict from
+`GameCache`, `getOrBuildKhGame` again, assert it resumes at the same phase/clock/`submittedSeats` (not
+year 1).
 
-Apply the same to KH:
-- **Keep `createKhGame` as the vs-bot path.** It already seats creator + one bot
-  (`GameService.java:174`); that becomes the "Play the AI" button, unchanged.
-- **Add `createPendingKhGame(user)`** — seats only the creator at seat 0, **no bot**, leaves seat 1
-  open (mirror `createPendingHeartsGame`).
-- **Add `joinKhGame(gameId, user)`** — seats a second human at seat 1; reject if full / already
-  started / self-join (mirror `joinHeartsGame`).
-- **Start on fill.** Since KH is exactly 2 seats, filling seat 1 can start immediately (build +
-  `initialize()` + broadcast first offers to both) — no separate host-clicks-start needed (simpler
-  than Hearts, which waits for 4). Confirm you don't want a host "start" button anyway.
-- **Invite link = the game-page URL** for the pending game. Host is redirected there on create (as
-  Hearts does); the friend opens the shared link, which routes through `joinKhGame`. No lobby list,
-  no discovery.
-- **MVC + API routing.** New pending-create + join endpoints alongside the existing vs-bot one
-  (`IndexController:144`, and `GamesApiController` if the client uses the API path).
+**1.7 — Pin to one instance.** In `.github/workflows/deploy.yml:60`, set `--max-instances=1` for the
+KH-serving service (leave a comment tying it to §2 of the design; revisit only if a stateless
+per-action rewrite lands later).
+**Verify:** deploy config diff only; no runtime check needed here.
 
-**Gotcha:** don't fork the gameplay path for "2 humans" vs "human + bot." Seat resolution, the
-barrier, and per-seat broadcast are already seat-count-generic — this is purely a *game-creation*
-concern, exactly as the code comments promise (`GameService.java:177`). A human-vs-human game simply
-has no strategy bound to seat 1, so `driveBots()` no-ops there (verify).
+**Phase 1 done when:** a match reloaded after a simulated restart resumes mid-game in the browser.
 
 ---
 
-## 5. Slice C — Disconnect, timeout & reconnect
+## Phase 2 — Human-vs-human invite & join (Slice B)
 
-**Goal:** the barrier can't hang forever on a human, and a dropped player can come back.
+Goal: two people reach the same match by link; the vs-bot game still works untouched.
 
-With two humans the readiness barrier has a new failure mode the bot path never hit: **a human who
-disconnects mid-phase never submits**, so `resolvePhaseAndAdvance()` never fires and the other player
-is stuck on "waiting for other player…" indefinitely.
+**2.1 — `createPendingKhGame(user)`** in `GameService` (mirror `createPendingHeartsGame`, `:453`):
+seat only the creator (seat 0), **no bot**, save, return the entity. Leave `createKhGame` (`:174`)
+exactly as-is — that stays the "Play the AI" path.
+**Verify:** unit test — pending game has exactly one player, no bot.
 
-- **Reconnect (mostly free).** `/kh/{id}/load` already re-pushes per-seat state
-  (`KhController.java:38`), and with Slice A the state is durable — a returning player resyncs
-  automatically. Verify the client re-subscribes and re-renders mid-phase (incl. the resolution
-  screen and `submittedSeats`).
-- **Per-phase timer — 30s (decided).** Each phase gets a 30-second deadline. On expiry the engine
-  auto-submits a safe default for the seat that hasn't acted — **skip ADD / end PLAY with the current
-  board / pass COUNCIL** — reusing the same submit path bots use, which releases the barrier and
-  advances the clock. Implementation notes:
-  - The timer is a per-game scheduled task keyed to the current phase; reset it on every phase change
-    and cancel it when all seats submit early. It must run on the owning instance (ties to §2 —
-    single-instance ownership makes this trivial; a bare `ScheduledExecutorService` per live game is
-    enough, no distributed scheduler needed).
-  - Send the deadline to the client (e.g. a `phaseDeadline` timestamp on `KhMatchView`) so it can show
-    a countdown; the server clock is authoritative for the actual auto-submit.
-  - Decide whether the timer applies to bot-only phases too (harmless — bots already submit instantly,
-    so the timer just never fires).
-- **Disconnect → auto-forfeit after grace (decided).** Detect WS disconnect via STOMP session events;
-  start a grace window (suggest ~30–60s, tunable) during which the player can reconnect and resume
-  from durable state. If they don't return, `forfeit(seat)` ends the match for the remaining player
-  (`GameEngine.java:342`). This is distinct from the 30s phase timer: the phase timer keeps a
-  *present-but-slow* player's match moving; the grace-then-forfeit handles a *gone* player.
+**2.2 — `joinKhGame(gameId, user)`** in `GameService` (mirror `joinHeartsGame`, `:471`): load the
+entity; reject if complete, if already 2 players, or if the joiner is the host; enforce game limit;
+append the joiner as seat 1; save. Because KH is exactly 2 seats, seat 1 filling means the match is
+ready — no separate start method (unlike Hearts' `startHeartsGame`).
+**Verify:** unit tests — join fills seat 1; second join / self-join / completed-game join all rejected.
 
----
+**2.3 — Start-on-fill.** After `joinKhGame` fills seat 1, `getOrBuildKhGame` should now build a real
+2-human engine (both seats human, no strategy bound → `driveBots()` no-ops). Ensure
+`getOrBuildKhGame` (`:384`) returns `empty` while the game is still pending (1 player), mirroring
+Hearts' pending guard (`:415`), so a premature `/load` doesn't build a half-game.
+**Verify:** unit test — `getOrBuildKhGame` is empty at 1 player, builds at 2.
 
-## 6. Slice D — Match lifecycle & hardening
+**2.4 — Routing.** Add endpoints alongside the existing vs-bot one:
+- MVC in `IndexController` (mirror the Hearts pair at `:82` vs `:118`): keep the vs-bot create; add a
+  pending-create that redirects the host to the game page (the URL *is* the invite link), and a
+  join route the invited link hits.
+- If the client uses the API path, mirror `GamesApiController` Hearts endpoints (`:40` vs-bots vs
+  `:57` pending).
+**Verify:** manually hit the pending-create route → get a game URL; open it as a second account →
+lands in the match.
 
-- **Rematch.** KH has no `again()` equivalent (XO/Hearts do). Add if you want post-game rematch
-  between the same two humans.
-- **Tie-breaking.** `winnerSeat()` returns the first victorious seat by index — revisit for fairness
-  when both complete a Great Work on the same resolved round (old plan §3 flagged this; still open).
-- **Abandonment cleanup.** `GameCleanupService` evicts completed games; make sure a pending
-  human-vs-human game that never fills, and an abandoned mid-match, both get reaped without nuking a
-  live one.
-- **Anti-abuse.** `enforceGameLimit` already caps active games per user; confirm it counts pending
-  invites so a user can't spawn unlimited open lobbies.
+**2.5 — Home/menu UI.** Two KH buttons: "Play the AI" (existing) and "Invite a friend" (pending
+create). On pending create, show the host a "share this link — waiting for opponent…" state.
+**Verify:** both buttons work from the home page.
+
+**Phase 2 done when:** two browser sessions/accounts start a match via a shared link, and the vs-bot
+game is unchanged.
 
 ---
 
-## 7. Slice E — Frontend for two humans
+## Phase 3 — 30s phase timer (Slice C, part 1)
 
-The multiplayer resolution UX largely exists (`multiplayerOverlays.ts`). Remaining, driven by the new
-server states:
+Goal: a present-but-slow player can't stall the barrier.
 
-- **Invite + join** (Slice B): a "share this link / waiting for opponent to join" pre-game state on
-  the host side; the friend's link routes straight into the match. No lobby list to build.
-- **30s phase countdown** (Slice C): a visible timer on your own turn, driven by the `phaseDeadline`
-  the server sends; auto-advance when it hits zero.
-- **Disconnect surfacing** (Slice C): "opponent disconnected — waiting…" with the grace countdown.
-- Confirm the client reads the durable-resume state cleanly after a mid-match reload.
+**3.1 — Auto-submit helper in the engine.** Add `GameEngine.autoSubmit(int seat)` that performs the
+phase-appropriate safe default for a seat that hasn't submitted the current phase: ADD → `skipAdd`,
+PLAY → `endAndRun` with the current board, COUNCIL_ADD → `skipCouncilAdd`, COUNCIL_MEETING →
+`passCouncilProposal`, resolution-pending → `continueResolution`. Reuse the existing seat-scoped
+action bodies (same ones bots call); guard against a seat that already submitted.
+**Verify:** engine test — a seat that never acts gets auto-submitted on demand and the barrier
+releases.
 
-Coordinate with whoever owns the TS client; the wire shape (`KhMatchView`) is stable and already
-seat-relative.
+**3.2 — Per-game scheduler.** Add a `ScheduledExecutorService`-backed 30s timer keyed to the current
+phase, owned per live game (a `KhTurnTimerService` in the Spring layer, or a field on the engine
+driven by the service). On phase change, `(re)schedule`; on all-submitted / phase resolve, `cancel`.
+On fire: for each live human seat not yet in `submittedSeats`, call `autoSubmit(seat)`, then
+`notifyUpdated()` + persist. Single owning instance (Phase 1.7) means a plain in-JVM scheduler is
+sufficient — no distributed scheduler.
+**Verify:** engine/service test with a shortened timeout — a seat that idles past the deadline is
+auto-submitted and the clock advances.
+
+**3.3 — Expose the deadline to the client.** Add `phaseDeadline` (epoch millis) to `KhMatchView`
+(`views/kh/KhMatchView.java`), set when the phase timer is scheduled. Server clock is authoritative;
+the field is display-only.
+**Verify:** `/load` payload includes a future `phaseDeadline` during an active phase.
+
+**Phase 3 done when:** in a 2-human match, one player going idle for 30s auto-advances the phase.
 
 ---
 
-## 8. Recommended order & effort
+## Phase 4 — Disconnect → grace → auto-forfeit (Slice C, part 2)
 
-1. **Slice A — persist state** (small, high-value; the unblock). *Do this first.*
-2. **Infra: pin KH to one instance** (`max-instances=1` or a dedicated path) — one-line, gates §2.
-3. **Slice B — human-vs-human lobby/join** (medium; mirror XO). *This is "multiplayer" to a user.*
-4. **Slice C — timeout/disconnect/reconnect** (medium; required before real players touch it).
-5. **Slice E — frontend lobby/reconnect** (parallel with B/C).
-6. **Slice D — rematch/tie-break/cleanup** (polish).
-7. **(Later) Slice B-scaleout** — stateless per-action load/save with optimistic locking, only if
-   you outgrow a single instance.
+Goal: a *gone* player ends the match instead of hanging it forever. (Distinct from Phase 3: that
+handles slow-but-present; this handles absent.)
 
-## 9. Decisions (locked)
+**4.1 — Presence tracking.** Listen for STOMP connect/disconnect events (`SessionConnectedEvent` /
+`SessionDisconnectEvent`) in a `KhPresenceListener`; map principal → seat → game.
+**Verify:** log shows connect/disconnect mapped to the right seat.
 
-1. **§2 architecture — A (persist state + single owning instance).** In-memory `synchronized`
-   engine stays; state is made durable and KH is pinned to one instance. B (stateless per-action
-   load/save) is the scale-out follow-up only if concurrent volume ever needs >1 replica. The DB
-   persistence itself is a follow-on implementation step (Slice A).
-2. **Persisted blob — embed full card & advisor objects** (not ids). Jackson walks the record graph
-   directly; simplest serializer, no catalog lookup on load.
-   > **Accepted tradeoff:** a match's saved cards are frozen at save time, so retuning the
-   > `CardCatalog`/`AdvisorCatalog` mid-match does **not** affect games already in flight — they keep
-   > the stats they were saved with. Fine for correctness; just don't expect a live balance change to
-   > reach an in-progress match. (If that ever bites, switching to id+rehydrate is a localized change
-   > to the serializer.)
-3. **Matchmaking — invite-by-link only, mirroring Hearts, keeping the vs-bot option.** No public
-   lobby. KH gets a pending/join/start path like Hearts *and* retains today's one-click vs-bot game.
-4. **Disconnect — auto-forfeit after a grace period.** A returning player resyncs from durable state
-   (`/load`); if they don't return within the grace window, `forfeit(seat)` ends the match for the
-   remaining player. (Bot-takeover deferred.)
-5. **Turn timer — 30s per phase, auto-advance on expiry.** Each phase has a 30-second deadline; on
-   expiry the engine auto-submits a safe default for the stalling seat (skip ADD / end PLAY with the
-   current board / pass COUNCIL), releasing the barrier. Same auto-submit plumbing backs #4's timeout.
+**4.2 — Grace-then-forfeit.** On a human seat's disconnect in a live 2-human game, start a grace
+window (config `game.kh.disconnectGraceSeconds`, default ~45s). If the player reconnects (a new
+`/load`, which already re-pushes durable per-seat state — `KhController.java:38`) cancel the timer. If
+the window elapses, call `engine.forfeit(seat)` (`GameEngine.java:342`), `notifyUpdated()`, persist,
+and run the normal game-over path (`recordKhGamesPlayed`).
+**Verify:** integration test — disconnect a seat, don't reconnect, assert the match forfeits to the
+remaining seat after the grace window; reconnect within the window and assert it resumes.
 
-## 10. Verification (per slice)
+**Phase 4 done when:** closing one player's tab ends the match for the other after the grace window,
+and reconnecting inside the window resumes cleanly.
+
+---
+
+## Phase 5 — Frontend for two humans (Slice E)
+
+Wire the new server states into `ui/src/kh/`. The resolution/dual-table UX already exists
+(`multiplayerOverlays.ts`).
+
+- **5.1 Invite/join:** host "share this link / waiting for opponent…" pre-game state; the invited link
+  routes straight into the match.
+- **5.2 Phase countdown:** visible 30s timer driven by `phaseDeadline`; auto-advance visual when it
+  hits zero.
+- **5.3 Disconnect surfacing:** "opponent disconnected — waiting…" with the grace countdown.
+- **5.4 Resume:** confirm a mid-match reload re-renders the correct phase (incl. resolution screen and
+  `submittedSeats`).
+**Verify:** two browsers play a full match through several seasons incl. a sabotage exchange, a
+timeout, a disconnect, and a mid-match reload of each client.
+
+---
+
+## Phase 6 — Lifecycle polish (Slice D, optional)
+
+- **6.1 Rematch:** add an `again()` equivalent for two humans (XO/Hearts have one; KH doesn't).
+- **6.2 Tie-break:** `winnerSeat()` returns the first victorious seat by index — revisit for the case
+  where both complete a Great Work on the same resolved round (`GameState.java:206`).
+- **6.3 Cleanup:** ensure `GameCleanupService` reaps abandoned *pending* invites and abandoned live
+  matches without evicting an active one.
+- **6.4 Anti-abuse:** confirm `enforceGameLimit` counts pending invites so a user can't spawn unlimited
+  open links.
+
+---
+
+## Verification (run per phase)
 
 ```bash
 ./gradlew build                                   # compile + spotless + unit tests
-./gradlew test --tests "*Kh*"                     # KH suite incl. barrier/sabotage specs
-./gradlew test --tests "*.KhSimulationSpec"       # bot arena unchanged (no gameplay regression)
+./gradlew test --tests "*Kh*"                     # KH suite incl. barrier/sabotage/serialization
+./gradlew test --tests "*.KhSimulationSpec"       # bot arena — must be unchanged (no gameplay regression)
 ```
 
-- **Slice A:** round-trip serialization spec; integration test that a built engine, saved and
-  rebuilt, resumes at the same phase/clock/`submittedSeats`.
-- **Slice B:** two-human create→join→first-offer flow; reject join-when-full/started/self.
-- **Slice C:** barrier releases on timeout auto-submit; reconnect re-pushes correct per-seat view.
-- **Manual:** two browsers, two accounts, one match through several seasons incl. a sabotage
-  exchange and a mid-match reload of each client.
+**Regression guard:** the bot-arena aggregate survival stats must be identical before and after
+Phase 1 — a lossy serialize/restore shows up as changed survival years or lost card effects.
+
+**Manual gate before deploy:** two accounts, two browsers, one match through several seasons including
+a sabotage exchange, a 30s timeout, a disconnect+grace, and a mid-match reload of each client.
