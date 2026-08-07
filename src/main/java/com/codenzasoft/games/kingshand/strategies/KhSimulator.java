@@ -9,14 +9,13 @@ import java.util.Random;
 import java.util.function.Function;
 
 /**
- * Runs candidate actions on a <em>deep copy</em> of the live match using the real {@link
- * GameEngine}, so every simulated consequence — production costs, staffing, card effects, recurring
- * effects, food consumption, growth, Great Work construction, cross-seat combat, death/victory
- * checks — is computed by the exact same code that runs a real game. The simulator never mutates
- * the live state: {@link GameState}/{@link com.codenzasoft.games.kingshand.PlayerState} are
- * immutable, so a throwaway {@link GameEngine} run against {@code real} leaves {@code real}
- * untouched and produces the simulated outcome as a new state read back via {@link
- * GameEngine#getState()}.
+ * Runs candidate actions the live match using the real {@link GameEngine}, so every simulated
+ * consequence — production costs, staffing, card effects, recurring effects, food consumption,
+ * growth, Great Work construction, cross-seat combat, death/victory checks — is computed by the
+ * exact same code that runs a real game. The simulator never mutates the live state: {@link
+ * GameState}/{@link com.codenzasoft.games.kingshand.PlayerState} are immutable, so a throwaway
+ * {@link GameEngine} run against {@code real} leaves {@code real} untouched and produces the
+ * simulated outcome as a new state read back via {@link GameEngine#getState()}.
  */
 public final class KhSimulator {
 
