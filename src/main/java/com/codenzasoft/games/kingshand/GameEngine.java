@@ -12,6 +12,7 @@ import com.codenzasoft.games.kingshand.strategies.KhPlayerStrategy;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,7 +176,7 @@ public class GameEngine implements Game<GameEngine> {
 
   private final UUID id;
   private final List<Player> players;
-  private final GameState state;
+  private GameState state;
   private final CardCatalog cardCatalog;
   private final Random rng;
   private final List<KhObserver> listeners;
@@ -345,7 +346,7 @@ public class GameEngine implements Game<GameEngine> {
     if (state.getPlayer(seat).isGameOver() || state.isMatchOver()) {
       return;
     }
-    state.getPlayer(seat).forfeit();
+    updatePlayer(seat, p -> p.withForfeited(true));
     if (state.isMatchOver()) {
       notifyListeners(GAME_OVER_NOTIFICATION);
       notifyLifecycleObservers(GameLifecycleObserver::gameOver);
@@ -428,6 +429,19 @@ public class GameEngine implements Game<GameEngine> {
     return state.getPlayer(activeSeat);
   }
 
+  /**
+   * Replaces the active seat's kingdom with {@code fn} applied to it, threading the new immutable
+   * {@link PlayerState} back into {@link #state}. The single lever every seat-scoped mutation uses.
+   */
+  private void updateActivePlayer(final UnaryOperator<PlayerState> fn) {
+    this.state = state.withPlayer(activeSeat, fn.apply(activePlayer()));
+  }
+
+  /** Replaces {@code seat}'s kingdom with {@code fn} applied to it. */
+  private void updatePlayer(final int seat, final UnaryOperator<PlayerState> fn) {
+    this.state = state.withPlayer(seat, fn.apply(state.getPlayer(seat)));
+  }
+
   /** The current shared season, from the match clock. */
   private Season season() {
     return state.getTime().season();
@@ -479,7 +493,7 @@ public class GameEngine implements Game<GameEngine> {
    * live seat submitted), resolves the phase and advances the shared clock once.
    */
   private void submitActiveSeat() {
-    state.markSubmitted(activeSeat);
+    this.state = state.markSubmitted(activeSeat);
     if (state.allSubmitted()) {
       resolvePhaseAndAdvance();
     }
@@ -494,10 +508,10 @@ public class GameEngine implements Game<GameEngine> {
    */
   private void resolvePhaseAndAdvance() {
     final Phase completed = state.getTime().phase();
-    state.clearSubmitted();
+    this.state = state.clearSubmitted();
     switch (completed) {
       case ADD -> {
-        state.advanceTime(); // ADD -> PLAY
+        this.state = state.advanceTime(); // ADD -> PLAY
         forEachLiveSeat(seat -> startPlay());
       }
       case PLAY -> {
@@ -511,18 +525,18 @@ public class GameEngine implements Game<GameEngine> {
           // Multiplayer: the tables have resolved, but hold the shared clock on the resolved season
           // until every seat clicks Continue on the resolution screen (see continueResolution()).
           // driveBots() below auto-continues bot seats, leaving only human seats to acknowledge.
-          state.setResolutionPending(true);
+          this.state = state.withResolutionPending(true);
         } else {
           // Single-player: advance immediately — unchanged behavior.
           advancePlayClock();
         }
       }
       case COUNCIL_ADD -> {
-        state.advanceTime(); // COUNCIL_ADD -> COUNCIL_MEETING
+        this.state = state.advanceTime(); // COUNCIL_ADD -> COUNCIL_MEETING
         forEachLiveSeat(seat -> offerCouncilProposal());
       }
       case COUNCIL_MEETING -> {
-        state.advanceTime(); // COUNCIL_MEETING -> ADD
+        this.state = state.advanceTime(); // COUNCIL_MEETING -> ADD
         forEachLiveSeat(seat -> offerAddChoices());
       }
     }
@@ -540,7 +554,7 @@ public class GameEngine implements Game<GameEngine> {
     final Season resolved = state.getTime().season();
     forEachLiveSeat(seat -> discardSpentSingles(seat, resolved));
 
-    state.advanceTime(); // PLAY -> COUNCIL_ADD (post-Winter, gold unlocked) or ADD
+    this.state = state.advanceTime(); // PLAY -> COUNCIL_ADD (post-Winter, gold unlocked) or ADD
     switch (state.getTime().phase()) {
       case COUNCIL_ADD -> forEachLiveSeat(seat -> offerCouncilChoices());
       case ADD -> forEachLiveSeat(seat -> offerAddChoices());
@@ -550,12 +564,13 @@ public class GameEngine implements Game<GameEngine> {
 
   /** Moves every SINGLE-frequency card off {@code seat}'s {@code season} table into the discard. */
   private void discardSpentSingles(final int seat, final Season season) {
-    final PlayerState p = state.getPlayer(seat);
+    PlayerState p = state.getPlayer(seat);
     for (final Card card : new ArrayList<>(p.getTable(season))) {
       if (card.frequencyType() == FrequencyType.SINGLE) {
-        p.discardFromTable(season, card);
+        p = p.discardFromTable(season, card);
       }
     }
+    this.state = state.withPlayer(seat, p);
   }
 
   /**
@@ -569,10 +584,10 @@ public class GameEngine implements Game<GameEngine> {
     if (!state.isResolutionPending() || state.isSubmitted(activeSeat)) {
       return;
     }
-    state.markSubmitted(activeSeat);
+    this.state = state.markSubmitted(activeSeat);
     if (state.allSubmitted()) {
-      state.setResolutionPending(false);
-      state.clearSubmitted();
+      this.state = state.withResolutionPending(false);
+      this.state = state.clearSubmitted();
       advancePlayClock();
       driveBots();
     }
@@ -675,7 +690,7 @@ public class GameEngine implements Game<GameEngine> {
     if (state.getTime().phase() != Phase.PLAY) {
       return;
     }
-    state.advanceTime();
+    this.state = state.advanceTime();
     switch (state.getTime().phase()) {
       case COUNCIL_ADD:
         offerCouncilChoices();
@@ -689,15 +704,14 @@ public class GameEngine implements Game<GameEngine> {
   // ----- Table mutations -----
 
   public synchronized void addCard(Season season, Card card) {
-    List<Card> table = activePlayer().getBoard().get(season);
-    if (table.size() >= MAX_TABLE_SIZE) {
+    if (activePlayer().getTable(season).size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(season + " table is full");
     }
-    table.add(card);
+    updateActivePlayer(p -> p.addToTable(season, card));
   }
 
   public synchronized void removeCard(Season season, Card card) {
-    activePlayer().getBoard().get(season).remove(card);
+    updateActivePlayer(p -> p.removeFromTable(season, card));
   }
 
   // ----- End-of-PLAY resolution -----
@@ -748,16 +762,18 @@ public class GameEngine implements Game<GameEngine> {
    * every kingdom's self-resolution completes.
    */
   private void resolveSeat(final SabotageContext sabotage) {
+    final Season season = season();
+    PlayerState ps = activePlayer();
 
     // 1. Discard everything remaining in hand.
-    activePlayer().discardHand(season());
+    ps = ps.discardHand(season);
 
     // 2. Compute staffing based on current population (locked in at End and Run time).
-    final List<CardStaffing> staffing = activePlayer().getTableStaffing(season());
+    final List<CardStaffing> staffing = ps.getTableStaffing(season);
 
     // 3. Snapshot the table order before resolution so that updates during the walk don't
     //    disturb the iteration sequence.
-    final List<Card> snapshot = new ArrayList<>(activePlayer().getTable(season()));
+    final List<Card> snapshot = new ArrayList<>(ps.getTable(season));
 
     // 4. Play each card on the table updating resource state, from left to right.
     final List<ResolutionStep> log = new ArrayList<>();
@@ -766,8 +782,9 @@ public class GameEngine implements Game<GameEngine> {
       final Card card = snapshot.get(i);
       final StaffingTier tier = staffing.get(i).tier();
 
-      final PlayedCard play = card.play(activePlayer(), season(), tier, sabotage);
-      log.add(play.getResolutionStep());
+      final PlayResult result = card.play(ps, season, tier, sabotage);
+      ps = result.state();
+      log.add(result.played().getResolutionStep());
 
       // NOTE: SINGLE-frequency cards are NOT discarded here. They leave the table only when the
       // clock advances (advancePlayClock → discardSpentSingles), so they stay on the table — and
@@ -777,10 +794,11 @@ public class GameEngine implements Game<GameEngine> {
 
     // 4.5. Seated council resolution — advisors bypass staffing entirely: every seated advisor's
     // card effects fire unconditionally, at full value, every season. See class javadoc.
-    for (SeatedAdvisor seated : activePlayer().getCouncil()) {
-      Card card = seated.getCard();
-      final PlayedCard play = card.play(activePlayer(), season(), StaffingTier.FULL, sabotage);
-      log.add(play.getResolutionStep());
+    for (SeatedAdvisor seated : ps.getCouncil()) {
+      final Card card = seated.getCard();
+      final PlayResult result = card.play(ps, season, StaffingTier.FULL, sabotage);
+      ps = result.state();
+      log.add(result.played().getResolutionStep());
     }
 
     // Brynn Ostlar (and any future advisor with a cross-table boost): permanently boosts the first
@@ -788,24 +806,21 @@ public class GameEngine implements Game<GameEngine> {
     final Optional<Card> advisorBoost = getSeatedAdvisorBoost();
     if (advisorBoost.isPresent()) {
       final Card card = advisorBoost.get();
-      final PlayedCard play =
-          card.play(
-              activePlayer(),
-              season(),
-              StaffingTier.FULL,
-              SabotageContext.none(),
-              activePlayer().getTable(season()));
-      if (!play.boosted().isEmpty()) {
-        log.add(play.getResolutionStep());
+      final PlayResult result =
+          card.play(ps, season, StaffingTier.FULL, SabotageContext.none(), ps.getTable(season));
+      ps = result.state();
+      if (!result.played().boosted().isEmpty()) {
+        log.add(result.played().getResolutionStep());
       }
     }
 
     // 5. Food consumption / starvation / growth — captured as a tail step.
-    final ResourceState before = activePlayer().getResources();
-    consumeFood();
-    log.add(new ResolutionStep(null, null, false, activePlayer().getResources().getDelta(before)));
+    final ResourceState before = ps.getResources();
+    final int rate = (season == Season.WINTER) ? 2 : 1;
+    ps = ps.consumeFood(rate);
+    log.add(new ResolutionStep(null, null, false, ps.getResources().getDelta(before)));
 
-    activePlayer().setResolutionLog(log);
+    this.state = state.withPlayer(activeSeat, ps.withResolutionLog(log));
   }
 
   /**
@@ -856,16 +871,16 @@ public class GameEngine implements Game<GameEngine> {
       if (deltas.isEmpty()) {
         continue;
       }
-      final PlayerState victim = state.getPlayer(seat);
+      PlayerState victim = state.getPlayer(seat);
       final ResourceState before = victim.getResources();
       for (final Effect delta : deltas) {
-        applyIncomingDelta(victim, delta);
+        victim = applyIncomingDelta(victim, delta);
       }
       final List<ResolutionStep> log = new ArrayList<>(victim.getResolutionLog());
       log.add(
           new ResolutionStep(
               "SABOTAGE", StaffingTier.FULL, false, victim.getResources().getDelta(before)));
-      victim.setResolutionLog(log);
+      this.state = state.withPlayer(seat, victim.withResolutionLog(log));
     }
   }
 
@@ -878,22 +893,22 @@ public class GameEngine implements Game<GameEngine> {
    * <p>STRENGTH only shields once it is unlocked (i.e. the victim has completed BARRACKS); until
    * then attacks land directly on population.
    */
-  private void applyIncomingDelta(final PlayerState victim, final Effect delta) {
+  private PlayerState applyIncomingDelta(PlayerState victim, final Effect delta) {
     if (!delta.isAttack()) {
-      victim.apply(delta);
-      return;
+      return victim.apply(delta);
     }
     final ResourceState r = victim.getResources();
     double damage = -delta.modifier();
     double absorbed = 0.0;
     if (r.unlocked().contains(ResourceTarget.STRENGTH) && r.strength() > 0.0) {
       absorbed = Math.min(r.strength(), damage);
-      victim.apply(new Effect(ResourceTarget.STRENGTH, -absorbed));
+      victim = victim.apply(new Effect(ResourceTarget.STRENGTH, -absorbed));
     }
     final double remainder = damage - absorbed;
     if (remainder > 0.0) {
-      victim.apply(new Effect(ResourceTarget.POPULATION, -remainder));
+      victim = victim.apply(new Effect(ResourceTarget.POPULATION, -remainder));
     }
+    return victim;
   }
 
   /**
@@ -922,18 +937,6 @@ public class GameEngine implements Game<GameEngine> {
     } else {
       return Optional.empty();
     }
-  }
-
-  /**
-   * Consumes food at the end of every PLAY phase.
-   *
-   * <p>The per-population rate is 2 for {@link Season#WINTER} and 1 for all other seasons. Total
-   * consumption is {@code floor(population) × rate}. If food is sufficient it is simply reduced; if
-   * food is insufficient, food is clamped to 0 and population drops by {@code 0.5 × deficit}.
-   */
-  private void consumeFood() {
-    int rate = (state.getTime().season() == Season.WINTER) ? 2 : 1;
-    activePlayer().consumeFood(rate);
   }
 
   // ----- ADD phase: card offer, pick, skip -----
@@ -965,9 +968,9 @@ public class GameEngine implements Game<GameEngine> {
                 + ", have "
                 + (int) activePlayer().getResources().production());
       }
-      activePlayer().addProduction(0.0 - cost);
+      updateActivePlayer(p -> p.addProduction(0.0 - cost));
     }
-    activePlayer().setRerollCount(activePlayer().getRerollCount() + 1);
+    updateActivePlayer(p -> p.withRerollCount(p.getRerollCount() + 1));
     // Filter out cards whose effects target locked resources (GOLD / STRENGTH), and Great Works
     // that have already been drafted/commissioned/completed — each may only ever exist once.
     List<Card> available =
@@ -978,7 +981,7 @@ public class GameEngine implements Game<GameEngine> {
     // Lady Iseult Varn (and any future advisor with this trait) reveals extra candidates.
     int offerSize = ADD_OFFER_SIZE + seatedExtraAddCandidates();
     List<Card> choices = pickRandom(available, offerSize);
-    activePlayer().setAddChoices(choices);
+    updateActivePlayer(p -> p.withAddChoices(choices));
     return choices;
   }
 
@@ -1066,8 +1069,7 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   private void clearAddState() {
-    activePlayer().setAddChoices(List.of());
-    activePlayer().setRerollCount(0);
+    updateActivePlayer(p -> p.withAddChoices(List.of()).withRerollCount(0));
   }
 
   /** Returns {@code count} distinct cards chosen uniformly at random from {@code source}. */
@@ -1112,8 +1114,11 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalStateException("cards cannot be null");
     }
 
-    activePlayer().getDrawPile().get(season).addAll(cards);
-    Collections.shuffle(activePlayer().getDrawPile().get(season));
+    updateActivePlayer(
+        p -> {
+          final SeasonState ss = p.getSeason(season);
+          return p.withSeason(season, ss.withDrawPile(ss.drawPile().addAll(cards).shuffle(rng)));
+        });
   }
 
   // draw n cards, if drawpile empty, shuffle discard into draw.
@@ -1125,30 +1130,27 @@ public class GameEngine implements Game<GameEngine> {
       throw new IllegalStateException("cannot draw a negative number of cards");
     }
 
-    List<Card> drawnCards = new ArrayList<>();
+    final List<Card> drawnCards = new ArrayList<>();
+    PlayerState p = activePlayer();
 
     for (int i = 0; i < n; i++) {
-      if (activePlayer().getDrawPile().get(season).isEmpty()) {
-        reshuffleDiscardIntoDrawPile(season);
+      SeasonState ss = p.getSeason(season);
+      if (ss.drawPile().isEmpty()) {
+        // Reshuffle the discard pile into the (empty) draw pile.
+        ss = ss.withDrawPile(ss.discardPile().shuffle(rng)).withDiscardPile(Deck.empty());
+        p = p.withSeason(season, ss);
       }
-
-      List<Card> pile = activePlayer().getDrawPile().get(season);
-      if (!pile.isEmpty()) {
-
-        Card drawnCard = pile.remove(0);
-        activePlayer().getHand().add(drawnCard);
+      if (!ss.drawPile().isEmpty()) {
+        final Deck.DrawResult drawResult = ss.drawPile().drawTop(1);
+        final Card drawnCard = drawResult.drawn().get(0);
+        p = p.withSeason(season, ss.withDrawPile(drawResult.remaining()));
+        p = p.withHand(p.hand().add(drawnCard));
         drawnCards.add(drawnCard);
       }
     }
 
+    this.state = state.withPlayer(activeSeat, p);
     return drawnCards;
-  }
-
-  // move discard to draw pile, clear discard pile, shuffle draw pile.
-  private synchronized void reshuffleDiscardIntoDrawPile(Season season) {
-    activePlayer().getDrawPile().get(season).addAll(activePlayer().getDiscardPile().get(season));
-    activePlayer().getDiscardPile().get(season).clear();
-    Collections.shuffle(activePlayer().getDrawPile().get(season));
   }
 
   // ----- PLAY phase: draw hand, place card, demolish card -----
@@ -1231,18 +1233,17 @@ public class GameEngine implements Game<GameEngine> {
               + (int) activePlayer().getResources().production());
     }
 
-    // Pay the production cost and remove the card from the hand.
-    activePlayer().addProduction(0.0 - cost);
-    activePlayer().getHand().remove(card);
-
-    // If this play upgrades a card already on the table, replace it with the merged (leveled-up)
-    // card so engine-boosted modifiers are preserved (MINE + MINE II → MINE III). Otherwise add a
-    // new slot.
-    if (upgradeTarget != null) {
-      activePlayer().replaceTableCard(season(), upgradeTarget, resultCard);
-    } else {
-      activePlayer().addToTable(season(), card);
-    }
+    // Pay the production cost, remove the card from the hand, and place it. If this play upgrades a
+    // card already on the table, replace it with the merged (leveled-up) card so engine-boosted
+    // modifiers are preserved (MINE + MINE II → MINE III). Otherwise add a new slot.
+    final Season season = season();
+    updateActivePlayer(
+        p -> {
+          p = p.addProduction(0.0 - cost).withHand(p.hand().remove(card));
+          return upgradeTarget != null
+              ? p.replaceTableCard(season, upgradeTarget, resultCard)
+              : p.addToTable(season, card);
+        });
   }
 
   /**
@@ -1318,9 +1319,9 @@ public class GameEngine implements Game<GameEngine> {
       remaining.remove(match);
     }
 
-    // Replace table contents in-place so the existing list reference stays valid.
-    table.clear();
-    table.addAll(reordered);
+    final Season season = season();
+    updateActivePlayer(
+        p -> p.withSeason(season, p.getSeason(season).withBoard(Deck.of(reordered))));
   }
 
   /**
@@ -1355,8 +1356,8 @@ public class GameEngine implements Game<GameEngine> {
     }
 
     // else pay and demolish card
-    activePlayer().addProduction(0.0 - cost);
-    activePlayer().removeFromTableAt(season(), slot);
+    final Season season = season();
+    updateActivePlayer(p -> p.addProduction(0.0 - cost).removeFromTableAt(season, slot));
   }
 
   // ----- Great Work commissioning -----
@@ -1413,9 +1414,7 @@ public class GameEngine implements Game<GameEngine> {
           "great work already drafted, commissioned, or completed: " + name);
     }
 
-    List<Card> targetTable = activePlayer().getBoard().get(gw.season());
-
-    if (targetTable.size() >= MAX_TABLE_SIZE) {
+    if (activePlayer().getTable(gw.season()).size() >= MAX_TABLE_SIZE) {
       throw new IllegalStateException(gw.season() + " table is full");
     }
 
@@ -1438,9 +1437,7 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) activePlayer().getResources().production());
     }
-    activePlayer().addProduction(0.0 - cost);
-
-    targetTable.add(gw);
+    updateActivePlayer(p -> p.addProduction(0.0 - cost).addToTable(gw.season(), gw));
   }
 
   // ----- Great Work helpers -----
@@ -1481,7 +1478,7 @@ public class GameEngine implements Game<GameEngine> {
             .filter(this::isAdvisorGateOpen)
             .toList();
     List<Advisor> choices = pickRandomAdvisors(eligible, COUNCIL_OFFER_SIZE);
-    activePlayer().setCouncilOfferChoices(choices);
+    updateActivePlayer(p -> p.withCouncilOfferChoices(choices));
     return choices;
   }
 
@@ -1519,9 +1516,11 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) activePlayer().getResources().gold());
     }
-    activePlayer().addGold(0.0 - advisor.hiringCost());
-    activePlayer()
-        .addToCouncil(new SeatedAdvisor(advisor.id(), advisor.baseCard(), state.getTime().year()));
+    final int hiredYear = state.getTime().year();
+    updateActivePlayer(
+        p ->
+            p.addGold(0.0 - advisor.hiringCost())
+                .addToCouncil(SeatedAdvisor.of(advisor.id(), advisor.baseCard(), hiredYear)));
     clearCouncilAddState();
     submitActiveSeat();
   }
@@ -1554,7 +1553,7 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   private void clearCouncilAddState() {
-    activePlayer().setCouncilOfferChoices(List.of());
+    updateActivePlayer(p -> p.withCouncilOfferChoices(List.of()));
   }
 
   /**
@@ -1590,8 +1589,7 @@ public class GameEngine implements Game<GameEngine> {
               + ", have "
               + (int) activePlayer().getResources().gold());
     }
-    activePlayer().addGold(0.0 - cost);
-    activePlayer().removeFromCouncil(advisorId);
+    updateActivePlayer(p -> p.addGold(0.0 - cost).removeFromCouncil(advisorId));
     CouncilProposal proposal = activePlayer().getCurrentProposal();
     if (state.getTime().phase() == Phase.COUNCIL_MEETING
         && proposal != null
@@ -1660,20 +1658,18 @@ public class GameEngine implements Game<GameEngine> {
       }
     }
     if (chosen == null) {
-      activePlayer().setCurrentProposal(null);
+      updateActivePlayer(p -> p.withCurrentProposal(null));
       return;
     }
-    if (isDecreeAvailable(chosen, chosenAdvisor.decree())) {
-      activePlayer()
-          .setCurrentProposal(
-              new CouncilProposal(
-                  chosen.getAdvisorId(), ProposalKind.DECREE, chosenAdvisor.decree().name()));
-    } else {
-      activePlayer()
-          .setCurrentProposal(
-              new CouncilProposal(
-                  chosen.getAdvisorId(), ProposalKind.REFORM, chosenAdvisor.reform().name()));
-    }
+    final SeatedAdvisor chosenSeated = chosen;
+    final Advisor chosenAdv = chosenAdvisor;
+    final CouncilProposal proposal =
+        isDecreeAvailable(chosenSeated, chosenAdv.decree())
+            ? new CouncilProposal(
+                chosenSeated.getAdvisorId(), ProposalKind.DECREE, chosenAdv.decree().name())
+            : new CouncilProposal(
+                chosenSeated.getAdvisorId(), ProposalKind.REFORM, chosenAdv.reform().name());
+    updateActivePlayer(p -> p.withCurrentProposal(proposal));
   }
 
   /**
@@ -1697,14 +1693,18 @@ public class GameEngine implements Game<GameEngine> {
           "proposing advisor is no longer seated: " + proposal.advisorId());
     }
     Advisor advisor = AdvisorCatalog.byId(seated.getAdvisorId());
+    final String advisorId = seated.getAdvisorId();
+    final int year = state.getTime().year();
+    final SeatedAdvisor updated;
     if (proposal.kind() == ProposalKind.DECREE) {
-      applyDecree(seated, advisor.decree());
-      seated.setDecreeTaken(true);
+      // applyDecree performs any board/player side effects on this.state and returns the (possibly
+      // card-boosted) advisor; the decree-taken + rotation stamps are layered on here.
+      updated =
+          applyDecree(seated, advisor.decree()).withDecreeTaken(true).withLastProposalYear(year);
     } else {
-      applyReform(seated, advisor.reform());
+      updated = applyReform(seated, advisor.reform()).withLastProposalYear(year);
     }
-    seated.setLastProposalYear(state.getTime().year());
-    activePlayer().setCurrentProposal(null);
+    updateActivePlayer(p -> p.updateAdvisor(advisorId, a -> updated).withCurrentProposal(null));
     submitActiveSeat();
   }
 
@@ -1720,13 +1720,12 @@ public class GameEngine implements Game<GameEngine> {
     requirePhase(Phase.COUNCIL_MEETING, "passCouncilProposal");
     requireNotSubmitted("passCouncilProposal");
     CouncilProposal proposal = activePlayer().getCurrentProposal();
-    if (proposal != null) {
-      SeatedAdvisor seated = activePlayer().findSeatedAdvisor(proposal.advisorId());
-      if (seated != null) {
-        seated.setLastProposalYear(state.getTime().year());
-      }
+    if (proposal != null && activePlayer().findSeatedAdvisor(proposal.advisorId()) != null) {
+      final String advisorId = proposal.advisorId();
+      final int year = state.getTime().year();
+      updateActivePlayer(p -> p.updateAdvisor(advisorId, a -> a.withLastProposalYear(year)));
     }
-    activePlayer().setCurrentProposal(null);
+    updateActivePlayer(p -> p.withCurrentProposal(null));
     submitActiveSeat();
   }
 
@@ -1757,30 +1756,35 @@ public class GameEngine implements Game<GameEngine> {
    * card by {@link Reform#costPerStack()} (a negative magnitude), then increments the stack
    * counter.
    */
-  private void applyReform(SeatedAdvisor seated, Reform reform) {
+  private SeatedAdvisor applyReform(SeatedAdvisor seated, Reform reform) {
     switch (reform.benefitType()) {
       case CARD_EFFECT ->
-          seated.setCard(
-              seated
-                  .getCard()
-                  .withEffectBoostOrAdd(reform.benefitResource(), reform.benefitPerStack()));
-      case FREE_REROLL -> seated.addBonusFreeRerolls((int) reform.benefitPerStack());
-      case EXTRA_ADD_CANDIDATE -> seated.addBonusExtraAddCandidates((int) reform.benefitPerStack());
-      case CROSS_TABLE_BOOST -> seated.addBonusCrossTableBoost(reform.benefitPerStack());
+          seated =
+              seated.withCard(
+                  seated
+                      .getCard()
+                      .withEffectBoostOrAdd(reform.benefitResource(), reform.benefitPerStack()));
+      case FREE_REROLL -> seated = seated.addBonusFreeRerolls((int) reform.benefitPerStack());
+      case EXTRA_ADD_CANDIDATE ->
+          seated = seated.addBonusExtraAddCandidates((int) reform.benefitPerStack());
+      case CROSS_TABLE_BOOST -> seated = seated.addBonusCrossTableBoost(reform.benefitPerStack());
     }
-    seated.setCard(
-        seated.getCard().withEffectBoostOrAdd(reform.costResource(), reform.costPerStack()));
-    seated.incrementReformStacksTaken();
+    seated =
+        seated.withCard(
+            seated.getCard().withEffectBoostOrAdd(reform.costResource(), reform.costPerStack()));
+    return seated.incrementReformStacksTaken();
   }
 
-  /** Applies the one-time effect of {@code decree} to {@code seated} / the board. */
-  private void applyDecree(SeatedAdvisor seated, Decree decree) {
+  /**
+   * Applies the one-time effect of {@code decree}: performs any board/player side effect directly
+   * on {@link #state}, and returns the (possibly card-boosted) advisor for the caller to re-seat.
+   */
+  private SeatedAdvisor applyDecree(SeatedAdvisor seated, Decree decree) {
     switch (decree.type()) {
-      case PASSIVE_BOOST ->
-          seated.setCard(
-              seated
-                  .getCard()
-                  .withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
+      case PASSIVE_BOOST -> {
+        return seated.withCard(
+            seated.getCard().withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
+      }
       case GREAT_WORK_BOOST -> {
         Card target = findCardOnBoard(decree.targetGreatWorkName());
         if (target != null) {
@@ -1788,10 +1792,13 @@ public class GameEngine implements Game<GameEngine> {
               target, target.withEffectBoostOrAdd(decree.effectResource(), decree.effectAmount()));
         }
       }
-      case POPULATION_CAP_BOOST -> activePlayer().addPopulationCap(decree.effectAmount());
+      case POPULATION_CAP_BOOST ->
+          updateActivePlayer(p -> p.addPopulationCap(decree.effectAmount()));
       case GREAT_WORK_ACCELERATE -> accelerateOneGreatWork();
-      case FREE_REROLL -> activePlayer().incrementPermanentFreeRerolls((int) decree.effectAmount());
+      case FREE_REROLL ->
+          updateActivePlayer(p -> p.incrementPermanentFreeRerolls((int) decree.effectAmount()));
     }
+    return seated;
   }
 
   /**
@@ -1805,16 +1812,17 @@ public class GameEngine implements Game<GameEngine> {
     Card target = findAcceleratableGreatWork();
     if (target == null) return;
 
-    int newPeriod = target.constructionPeriod() - 1;
+    final Card gw = target;
+    int newPeriod = gw.constructionPeriod() - 1;
     if (newPeriod <= 0) {
-      Card completed = target.completedCard();
-      replaceCardOnBoard(target, completed);
-      activePlayer().unlock(target);
+      Card completed = gw.completedCard();
+      replaceCardOnBoard(gw, completed);
+      updateActivePlayer(p -> p.unlock(gw));
     } else {
-      Card decremented = target.withConstructionPeriod(newPeriod);
-      replaceCardOnBoard(target, decremented);
+      Card decremented = gw.withConstructionPeriod(newPeriod);
+      replaceCardOnBoard(gw, decremented);
     }
-    activePlayer().markGreatWorkAccelerated(target.name());
+    updateActivePlayer(p -> p.markGreatWorkAccelerated(gw.name()));
   }
 
   /**
@@ -1849,10 +1857,10 @@ public class GameEngine implements Game<GameEngine> {
    * Replaces {@code oldCard} with {@code newCard} on whichever season's table currently holds it.
    */
   private void replaceCardOnBoard(Card oldCard, Card newCard) {
-    for (List<Card> table : activePlayer().getBoard().values()) {
-      int idx = table.indexOf(oldCard);
-      if (idx != -1) {
-        table.set(idx, newCard);
+    for (Season s : Season.values()) {
+      if (activePlayer().getSeason(s).board().indexOf(oldCard) != -1) {
+        final Season season = s;
+        updateActivePlayer(p -> p.replaceTableCard(season, oldCard, newCard));
         return;
       }
     }

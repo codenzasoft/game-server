@@ -267,7 +267,7 @@ class CardUpgradeSpec extends Specification {
         3.times { engine.placeCard(CardCatalog.FARM) }
 
         then:
-        def table = state.getPlayer(0).board.get(Season.SPRING)
+        def table = engine.state.getPlayer(0).board.get(Season.SPRING)
         table.size() == 1                 // recurring cards never open a new slot
         def farm = table.get(0)
         farm.name() == "FARM"             // pre-fix this was "FARM III II" → UNKNOWN CARD
@@ -292,7 +292,7 @@ class CardUpgradeSpec extends Specification {
         engine.placeCard(CardCatalog.MINE)
 
         then:
-        def mine = state.getPlayer(0).board.get(Season.SPRING).get(0)
+        def mine = engine.state.getPlayer(0).board.get(Season.SPRING).get(0)
         mine.name() == "MINE"
         mine.level() == 3
     }
@@ -314,7 +314,7 @@ class CardUpgradeSpec extends Specification {
         engine.placeCard(CardCatalog.SEEDS)
 
         then: "the base SEEDS takes its own slot rather than lifting SEEDS II to III"
-        def table = state.getPlayer(0).board.get(Season.SPRING)
+        def table = engine.state.getPlayer(0).board.get(Season.SPRING)
         table.size() == 2
         table.count { it.level() == 2 } == 1
         table.count { it.level() == 1 } == 1

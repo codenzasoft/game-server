@@ -91,53 +91,66 @@ public final class KhBotArena {
 
     int guard = 0;
     final int guardLimit = maxYears * 40 + 100;
-    while (!state.isMatchOver() && state.getTime().year() <= maxYears && guard++ < guardLimit) {
-      if (state.isResolutionPending()) {
+    // State is immutable and the engine swaps in new instances, so re-read engine.getState() every
+    // time rather than caching a (now-stale) reference.
+    while (!engine.getState().isMatchOver()
+        && engine.getState().getTime().year() <= maxYears
+        && guard++ < guardLimit) {
+      if (engine.getState().isResolutionPending()) {
         for (int seat = 0; seat < 2; seat++) {
-          if (!state.isPlayerOut(seat) && !state.isSubmitted(seat)) {
+          if (!engine.getState().isPlayerOut(seat) && !engine.getState().isSubmitted(seat)) {
             engine.setActiveSeat(seat);
             engine.continueResolution();
           }
         }
         continue;
       }
-      final Phase phase = state.getTime().phase();
+      final Phase phase = engine.getState().getTime().phase();
       for (int seat = 0; seat < 2; seat++) {
-        if (state.isPlayerOut(seat) || state.isSubmitted(seat) || state.isMatchOver()) {
+        if (engine.getState().isPlayerOut(seat)
+            || engine.getState().isSubmitted(seat)
+            || engine.getState().isMatchOver()) {
           continue;
         }
         engine.setActiveSeat(seat);
         try {
           strat[seat].act(engine, seat);
         } catch (final RuntimeException e) {
-          forceComplete(engine, state.getTime().phase()); // never let a strategy bug hang the run
+          forceComplete(
+              engine, engine.getState().getTime().phase()); // never hang on a strategy bug
         }
       }
       // Count a starvation season whenever a PLAY resolution dropped population via the food step.
       if (phase == Phase.PLAY) {
+        final GameState afterPlay = engine.getState();
         for (int seat = 0; seat < 2; seat++) {
-          if (droppedPopulationToStarvation(state.getPlayer(seat))) {
+          if (droppedPopulationToStarvation(afterPlay.getPlayer(seat))) {
             starvationSeasons[seat]++;
           }
         }
       }
     }
 
+    final GameState finalState = engine.getState();
     final List<SeatResult> seats = new ArrayList<>(2);
     for (int seat = 0; seat < 2; seat++) {
-      final PlayerState p = state.getPlayer(seat);
+      final PlayerState p = finalState.getPlayer(seat);
       seats.add(
           new SeatResult(
               seat,
               !p.isGameOver(),
-              state.winnerSeat() == seat,
+              finalState.winnerSeat() == seat,
               p.getResources().food(),
               p.getResources().production(),
               p.getResources().population(),
               starvationSeasons[seat]));
     }
     return new GameResult(
-        seed, state.winnerSeat(), state.victoryType(), state.getTime().year(), seats);
+        seed,
+        finalState.winnerSeat(),
+        finalState.victoryType(),
+        finalState.getTime().year(),
+        seats);
   }
 
   /** Plays {@code count} matches with seeds {@code baseSeed..baseSeed+count-1} and aggregates. */

@@ -1,77 +1,51 @@
 package com.codenzasoft.games.kingshand;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.EnumMap;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
- * Pure data carrier for a single King's Hand player's kingdom: their per-season card piles, hand,
- * resources, ADD-phase offer state, and Council/Advisors state. All rule-based mutations live in
- * {@link GameEngine}; this class only holds fields, exposes getters/setters, and validates static
- * invariants on construction via its {@link Builder}.
+ * Immutable per-player kingdom state: the per-season card piles ({@link SeasonState}), the current
+ * {@link Deck} hand, {@link ResourceState}, ADD-phase offer state, and Council/Advisor state. All
+ * mutation is expressed as {@code with*} / delegate methods that return a new {@code PlayerState};
+ * the rule logic that drives those calls lives in {@link GameEngine}.
  *
- * <p>This class was formerly {@code GameState}. In the two-player refactor, the shared clock
- * ({@link TimeState}) and the collection of players moved up to the new match-level {@link
- * GameState}, so everything that remains here is strictly per-player. Because a player no longer
- * owns the clock, every method that operates on "the current season's" table now takes the {@link
- * Season} as an explicit parameter; the match resolves the current season from its shared {@link
+ * <p>Because a player no longer owns the shared clock, every table operation takes the {@link
+ * Season} as an explicit parameter; the match resolves the current season from its {@link
  * TimeState} before delegating.
+ *
+ * <p>Read accessors are exposed as {@code getX()} methods (rather than the record's canonical
+ * {@code x()} accessors) to keep the large number of existing call sites unchanged.
  */
-public class PlayerState {
+public record PlayerState(
+    Map<Season, SeasonState> seasons,
+    Deck hand,
+    ResourceState resources,
+    List<Card> addChoices,
+    int rerollCount,
+    List<ResolutionStep> resolutionLog,
+    List<SeatedAdvisor> council,
+    List<Advisor> councilOfferChoices,
+    CouncilProposal currentProposal,
+    int permanentFreeRerolls,
+    Set<String> acceleratedGreatWorkNames,
+    boolean forfeited) {
 
-  // per season
-  private Map<Season, List<Card>> board;
-  private Map<Season, List<Card>> drawPile;
-  private Map<Season, List<Card>> discardPile;
-  // current hand
-  private List<Card> hand;
-  // resources
-  private ResourceState resources;
-  // ADD-phase offer state
-  private List<Card> addChoices;
-  private int rerollCount;
-  // per-card resolution log from the most recent endAndRun call — empty between seasons
-  private List<ResolutionStep> resolutionLog;
-  // ----- Council / Advisors -----
-  // hired advisors currently seated on the council; max GameEngine.MAX_COUNCIL_SIZE (3)
-  private List<SeatedAdvisor> council;
-  // candidate advisors offered during the current COUNCIL_ADD phase; empty outside that phase
-  private List<Advisor> councilOfferChoices;
-  // the single rotating Reform/Decree proposal for the current COUNCIL_MEETING phase, or null if no
-  // seated advisor currently has anything left to propose
-  private CouncilProposal currentProposal;
-  // cumulative permanent free-reroll count granted by Decrees (Aldwin's "Found the Town Hall",
-  // Varn's "Plant an Informant") — added on top of the base 1 free reroll every ADD phase already
-  // gets, regardless of whether the granting advisor is still seated
-  private int permanentFreeRerolls;
-  // names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree;
-  // prevents that Decree from being used more than once on the same distinct Great Work
-  private Set<String> acceleratedGreatWorkNames;
-  // true once this kingdom's player has given up — a forfeited kingdom is treated exactly like a
-  // knocked-out one for match outcome and readiness-barrier purposes
-  private boolean forfeited;
-
-  private PlayerState(Builder b) {
-    this.board = b.board;
-    this.drawPile = b.drawPile;
-    this.discardPile = b.discardPile;
-    this.hand = b.hand;
-    this.resources = b.resources;
-    this.addChoices = b.addChoices;
-    this.rerollCount = b.rerollCount;
-    this.resolutionLog = b.resolutionLog;
-    this.council = b.council;
-    this.councilOfferChoices = b.councilOfferChoices;
-    this.currentProposal = b.currentProposal;
-    this.permanentFreeRerolls = b.permanentFreeRerolls;
-    this.acceleratedGreatWorkNames = b.acceleratedGreatWorkNames;
+  /** Compact constructor — normalise nulls and defensively copy every collection. */
+  public PlayerState {
+    seasons = seasons == null ? new EnumMap<>(Season.class) : Map.copyOf(seasons);
+    hand = hand == null ? Deck.empty() : hand;
+    addChoices = addChoices == null ? List.of() : List.copyOf(addChoices);
+    resolutionLog = resolutionLog == null ? List.of() : List.copyOf(resolutionLog);
+    council = council == null ? List.of() : List.copyOf(council);
+    councilOfferChoices =
+        councilOfferChoices == null ? List.of() : List.copyOf(councilOfferChoices);
+    acceleratedGreatWorkNames =
+        acceleratedGreatWorkNames == null ? Set.of() : Set.copyOf(acceleratedGreatWorkNames);
   }
 
   /** Creates a fresh player kingdom: empty season tables, starting population/production. */
@@ -83,142 +57,112 @@ public class PlayerState {
     return new Builder();
   }
 
-  // ----- Getters -----
+  /**
+   * Seeds a {@link Builder} pre-populated with this kingdom's current state (basis for {@code
+   * with*}).
+   */
+  public Builder toBuilder() {
+    return new Builder()
+        .seasons(seasons)
+        .hand(hand)
+        .resources(resources)
+        .addChoices(addChoices)
+        .rerollCount(rerollCount)
+        .resolutionLog(resolutionLog)
+        .council(council)
+        .councilOfferChoices(councilOfferChoices)
+        .currentProposal(currentProposal)
+        .permanentFreeRerolls(permanentFreeRerolls)
+        .acceleratedGreatWorkNames(acceleratedGreatWorkNames)
+        .forfeited(forfeited);
+  }
 
-  @JsonProperty("resources")
+  // ===== Read accessors =====
+
   public ResourceState getResources() {
     return resources;
   }
 
-  @JsonProperty("board")
-  public Map<Season, List<Card>> getBoard() {
-    return board;
+  /** The {@link SeasonState} for {@code season}. */
+  public SeasonState getSeason(Season season) {
+    return seasons.get(season);
   }
 
-  /** Convenience accessor for the table belonging to {@code season}. */
+  /** Board piles by season, as {@code List<Card>} (wire-compatible shape for the views). */
+  public Map<Season, List<Card>> getBoard() {
+    Map<Season, List<Card>> m = new EnumMap<>(Season.class);
+    seasons.forEach((s, ss) -> m.put(s, ss.board().asList()));
+    return m;
+  }
+
+  /** Convenience accessor for the table (board) belonging to {@code season}. */
   public List<Card> getTable(Season season) {
-    return board.get(season);
+    return seasons.get(season).board().asList();
   }
 
   /**
    * Returns {@code true} if {@code season}'s table contains a card whose name matches {@code
-   * card}'s name. Matching by name (rather than full record equality) ensures that an
-   * engine-boosted table card — whose effect modifiers differ from the hand card — is still
-   * recognised as the upgrade target.
+   * card}'s name (name match, not full record equality, so an engine-boosted table card still
+   * counts as the upgrade target).
    */
   public boolean tableContains(Season season, Card card) {
-    return getTable(season).stream().anyMatch(c -> c.name().equals(card.name()));
+    return seasons.get(season).board().containsName(card.name());
   }
 
   /**
-   * Returns the first table card on {@code season}'s table whose name equals {@code name}, or
-   * {@code null} if none exists. Used by the upgrade path to retrieve the actual (potentially
-   * boosted) table card before merging.
+   * Returns the first table card on {@code season} whose name equals {@code name}, or {@code null}.
    */
   public Card findTableCard(Season season, String name) {
-    return getTable(season).stream().filter(c -> c.name().equals(name)).findFirst().orElse(null);
+    return seasons.get(season).board().findByName(name).orElse(null);
   }
 
   /**
    * Returns the table card on {@code season} that {@code handCard} would upgrade, or {@code null}.
-   *
-   * <p>Card identity is the stable {@link Card#name()} (upgrade level lives in {@link
-   * Card#level()}, not in the name), so matching is a plain name comparison at every level.
-   *
-   * <p><b>Recurring</b> cards upgrade by identity: a played MINE upgrades whichever MINE — at any
-   * level — is already on the table, so a MINE placed onto a level-2 MINE lifts it to level 3, and
-   * a recurring card only ever occupies one slot. <b>Single-use</b> cards additionally require the
-   * table card to be at the <em>same level</em> as the played (base) card, so a fresh copy folds
-   * into another fresh copy (→ level 2) but not into an already-upgraded one — a duplicate of an
-   * upgraded single-use card takes a new slot instead. This preserves the original single-use
-   * behavior now that the level is explicit rather than baked into the name.
+   * Recurring cards upgrade by identity (any level); single-use cards additionally require the same
+   * level. See the original contract for detail.
    */
   public Card findUpgradeTarget(Season season, Card handCard) {
     if (handCard.frequencyType() == FrequencyType.RECURRING) {
-      return getTable(season).stream()
-          .filter(c -> c.name().equals(handCard.name()))
-          .findFirst()
-          .orElse(null);
+      return seasons.get(season).board().findByName(handCard.name()).orElse(null);
     }
-    return getTable(season).stream()
+    return seasons.get(season).board().stream()
         .filter(c -> c.name().equals(handCard.name()) && c.level() == handCard.level())
         .findFirst()
         .orElse(null);
   }
 
-  /**
-   * Replaces the first occurrence of {@code oldCard} on {@code season}'s table with {@code
-   * newCard}.
-   *
-   * @throws IllegalArgumentException if {@code oldCard} is not present on the table
-   */
-  public void replaceTableCard(Season season, Card oldCard, Card newCard) {
-    List<Card> table = getTable(season);
-    int index = table.indexOf(oldCard);
-    if (index == -1) {
-      throw new IllegalArgumentException("card not found on current table");
-    }
-    table.set(index, newCard);
-  }
-
-  /** Appends {@code card} to {@code season}'s table. */
-  public void addToTable(Season season, Card card) {
-    getTable(season).add(card);
-  }
-
-  /** Removes the first occurrence of {@code card} from {@code season}'s table. */
-  public void removeFromTable(Season season, Card card) {
-    getTable(season).remove(card);
-  }
-
-  /**
-   * Removes the card at {@code slot} from {@code season}'s table.
-   *
-   * @throws IndexOutOfBoundsException if {@code slot} is out of range
-   */
-  public void removeFromTableAt(Season season, int slot) {
-    getTable(season).remove(slot);
-  }
-
-  /**
-   * Removes {@code card} from {@code season}'s table and adds it to {@code season}'s discard pile
-   * in one step.
-   */
-  public void discardFromTable(Season season, Card card) {
-    removeFromTable(season, card);
-    getDiscardPile().get(season).add(card);
-  }
-
-  /** Moves every card in the hand to {@code season}'s discard pile and clears the hand. */
-  public void discardHand(Season season) {
-    getDiscardPile().get(season).addAll(hand);
-    hand.clear();
-  }
-
-  @JsonProperty("discardPile")
   public Map<Season, List<Card>> getDiscardPile() {
-    return discardPile;
+    Map<Season, List<Card>> m = new EnumMap<>(Season.class);
+    seasons.forEach((s, ss) -> m.put(s, ss.discardPile().asList()));
+    return m;
   }
 
-  @JsonProperty("drawPile")
   public Map<Season, List<Card>> getDrawPile() {
-    return drawPile;
+    Map<Season, List<Card>> m = new EnumMap<>(Season.class);
+    seasons.forEach((s, ss) -> m.put(s, ss.drawPile().asList()));
+    return m;
   }
 
-  @JsonProperty("hand")
   public List<Card> getHand() {
-    return hand;
+    return hand.asList();
   }
 
   /**
-   * Returns {@code true} if a card named {@code name} exists anywhere in this player's kingdom —
-   * the hand, any season's table, draw pile, or discard pile. Used to detect whether a Great Work
-   * has already been drafted, commissioned, or completed, since each Great Work may only ever exist
-   * once.
+   * Returns {@code true} if a card named {@code name} exists anywhere in this kingdom — the hand or
+   * any season's board, draw pile, or discard pile.
    */
   public boolean isCardInPlay(String name) {
-    return isCardInPlay(
-        name, List.of(hand), board.values(), drawPile.values(), discardPile.values());
+    if (hand.containsName(name)) {
+      return true;
+    }
+    for (SeasonState ss : seasons.values()) {
+      if (ss.board().containsName(name)
+          || ss.drawPile().containsName(name)
+          || ss.discardPile().containsName(name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Returns {@code true} if {@code card} (matched by name) exists anywhere in the kingdom. */
@@ -226,82 +170,36 @@ public class PlayerState {
     return isCardInPlay(card.name());
   }
 
-  @SafeVarargs
-  private boolean isCardInPlay(final String name, final Collection<List<Card>>... collections) {
-    for (Collection<List<Card>> lists : collections) {
-      for (List<Card> list : lists) {
-        if (list.stream().anyMatch(c -> c.name().equals(name))) return true;
-      }
-    }
-    return false;
-  }
-
-  @JsonProperty("addChoices")
   public List<Card> getAddChoices() {
     return addChoices;
   }
 
-  @JsonProperty("rerollCount")
   public int getRerollCount() {
     return rerollCount;
   }
 
-  // ----- Setters -----
-
-  public void setAddChoices(List<Card> addChoices) {
-    this.addChoices = addChoices;
-  }
-
-  public void setRerollCount(int rerollCount) {
-    this.rerollCount = rerollCount;
-  }
-
-  @JsonProperty("gameOver")
   public boolean isGameOver() {
     return forfeited || resources.population() < 1.0;
   }
 
   /** {@code true} once this kingdom's player has given up (the "gives up → forfeits" rule). */
-  @JsonProperty("forfeited")
   public boolean isForfeited() {
     return forfeited;
   }
 
-  /**
-   * Marks this kingdom as forfeited. Irreversible; the kingdom counts as knocked out for match
-   * outcome ({@code GameState#isPlayerOut}) and is skipped by the readiness barrier.
-   */
-  public void forfeit() {
-    this.forfeited = true;
-  }
-
   /** Returns staffing for {@code season}'s table. */
   public List<CardStaffing> getTableStaffing(Season season) {
-    return CardStaffing.computeStaffing(board.get(season), resources);
+    return CardStaffing.computeStaffing(getTable(season), resources);
   }
 
-  /**
-   * Per-card resolution log from the most recent {@link Phase#PLAY} end-and-run. Empty between
-   * seasons (during ADD, COUNCIL_ADD, and COUNCIL_MEETING phases). The client uses this to drive
-   * indicators and toasts without re-simulating game logic.
-   */
-  @JsonProperty("resolutionLog")
+  /** Per-card resolution log from the most recent PLAY end-and-run; empty between seasons. */
   public List<ResolutionStep> getResolutionLog() {
-    return resolutionLog == null ? List.of() : resolutionLog;
-  }
-
-  public void setResolutionLog(List<ResolutionStep> log) {
-    this.resolutionLog = log == null ? List.of() : List.copyOf(log);
-  }
-
-  /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
-  public void unlock(Card card) {
-    resources = resources.unlock(card);
+    return resolutionLog;
   }
 
   /**
    * Returns {@code true} if every {@link ResourceTarget} referenced by {@code card}'s effects is
-   * currently unlocked. Used to gate the ADD-phase offer pool and Great Work commissioning.
+   * currently unlocked.
    */
   public boolean areRequiredResourcesUnlocked(Card card) {
     return resources.unlocked().containsAll(card.requiredResources());
@@ -309,12 +207,7 @@ public class PlayerState {
 
   /**
    * Returns {@code true} if applying every {@link ResourceTarget} effect in {@code effects} would
-   * leave production, food, gold, and strength all {@code >= 0}. Used to check whether a Great
-   * Work's per-season construction cost is currently affordable.
-   *
-   * <p>Only {@link ResourceTarget} effects are evaluated here; {@link CardTarget} effects are
-   * ignored (they don't appear on construction cards), as are POPULATION/POPULATION_CAP effects
-   * (not construction costs).
+   * leave production, food, gold, and strength all {@code >= 0}.
    */
   public boolean canAfford(List<Effect> effects) {
     double simProd = resources.production();
@@ -338,54 +231,30 @@ public class PlayerState {
   }
 
   /**
-   * Returns {@code true} once every win-condition Great Work has completed — i.e. the board
-   * contains a completed (non-under-construction) card with {@link Card#victory()} {@code == true}
-   * for each of the four seasonal win conditions. Computed dynamically from the board rather than
-   * cached, since a completed Great Work's presence there is itself the source of truth.
+   * Returns {@code true} once every win-condition Great Work has completed — a completed
+   * (non-under-construction) victory card exists for each seasonal win condition.
    */
   public boolean isVictoryComplete() {
     long completedVictoryCards =
-        board.values().stream()
-            .flatMap(List::stream)
+        seasons.values().stream()
+            .flatMap(ss -> ss.board().stream())
             .filter(c -> c.victory() && !c.isGreatWork())
             .count();
     long totalVictoryCards = CardCatalog.ALL_GREAT_WORKS.stream().filter(Card::victory).count();
     return completedVictoryCards >= totalVictoryCards;
   }
 
-  /**
-   * {@code true} once all four win-condition Great Works are completed. Alias for {@link
-   * #isVictoryComplete()} kept under this name for the {@code gameWon} JSON wire property and
-   * existing call sites.
-   */
-  @JsonProperty("gameWon")
+  /** Alias for {@link #isVictoryComplete()} kept for existing call sites. */
   public boolean isGameWon() {
     return isVictoryComplete();
   }
 
   /** Advisors currently seated on the council; never more than {@code MAX_COUNCIL_SIZE} (3). */
-  @JsonProperty("council")
   public List<SeatedAdvisor> getCouncil() {
-    return council == null ? List.of() : council;
+    return council;
   }
 
-  /** Seats {@code seated} onto the council. Caller is responsible for the seat-count check. */
-  public void addToCouncil(SeatedAdvisor seated) {
-    council.add(seated);
-  }
-
-  /**
-   * Removes the seated advisor whose {@code advisorId} equals {@code advisorId}, if present. Caller
-   * is responsible for any cost/affordability check and for refreshing any in-flight proposal that
-   * referenced this advisor.
-   */
-  public void removeFromCouncil(String advisorId) {
-    council.removeIf(s -> s.getAdvisorId().equals(advisorId));
-  }
-
-  /**
-   * Returns the seated advisor whose {@code advisorId} equals {@code advisorId}, or {@code null}.
-   */
+  /** Returns the seated advisor whose id equals {@code advisorId}, or {@code null}. */
   public SeatedAdvisor findSeatedAdvisor(String advisorId) {
     return council.stream()
         .filter(s -> s.getAdvisorId().equals(advisorId))
@@ -393,110 +262,183 @@ public class PlayerState {
         .orElse(null);
   }
 
-  /**
-   * Candidate advisors offered during the current {@link Phase#COUNCIL_ADD} phase; empty outside
-   * that phase.
-   */
-  @JsonProperty("councilOfferChoices")
+  /** Candidate advisors offered during the current COUNCIL_ADD phase; empty outside it. */
   public List<Advisor> getCouncilOfferChoices() {
-    return councilOfferChoices == null ? List.of() : councilOfferChoices;
+    return councilOfferChoices;
   }
 
-  public void setCouncilOfferChoices(List<Advisor> councilOfferChoices) {
-    this.councilOfferChoices =
-        councilOfferChoices == null ? List.of() : List.copyOf(councilOfferChoices);
-  }
-
-  /**
-   * The single rotating Reform/Decree proposal for the current {@link Phase#COUNCIL_MEETING} phase,
-   * or {@code null} (omitted from JSON) if no seated advisor currently has anything left to
-   * propose.
-   */
-  @JsonProperty("currentProposal")
-  @JsonInclude(JsonInclude.Include.NON_NULL)
+  /** The rotating Reform/Decree proposal for the current COUNCIL_MEETING phase, or {@code null}. */
   public CouncilProposal getCurrentProposal() {
     return currentProposal;
   }
 
-  public void setCurrentProposal(CouncilProposal currentProposal) {
-    this.currentProposal = currentProposal;
-  }
-
-  /**
-   * Cumulative permanent free-reroll count granted by Decrees (Reeve Aldwin's "Found the Town
-   * Hall", Lady Iseult Varn's "Plant an Informant"). Stacks across advisors and survives them being
-   * removed from the council (a Decree, once enacted, is a permanent civic change).
-   */
-  @JsonProperty("permanentFreeRerolls")
+  /** Cumulative permanent free-reroll count granted by Decrees. */
   public int getPermanentFreeRerolls() {
     return permanentFreeRerolls;
   }
 
-  public void setPermanentFreeRerolls(int permanentFreeRerolls) {
-    this.permanentFreeRerolls = permanentFreeRerolls;
+  /** Names of Great Works that have already received "Expedite Construction". */
+  public Set<String> getAcceleratedGreatWorkNames() {
+    return acceleratedGreatWorkNames;
   }
 
-  public void incrementPermanentFreeRerolls(int delta) {
-    this.permanentFreeRerolls += delta;
+  /** Cards positioned after {@code card} on {@code season}'s board (empty if absent or last). */
+  public List<Card> getCardsOnBoardAfter(final Season season, final Card card) {
+    return seasons.get(season).board().subListAfter(card);
+  }
+
+  // ===== Mutators (return a new PlayerState) =====
+
+  public PlayerState withSeason(Season season, SeasonState ss) {
+    Map<Season, SeasonState> next = new EnumMap<>(seasons);
+    next.put(season, ss);
+    return toBuilder().seasons(next).build();
+  }
+
+  public PlayerState withHand(Deck hand) {
+    return toBuilder().hand(hand).build();
+  }
+
+  public PlayerState withResources(ResourceState resources) {
+    return toBuilder().resources(resources).build();
+  }
+
+  public PlayerState withAddChoices(List<Card> addChoices) {
+    return toBuilder().addChoices(addChoices).build();
+  }
+
+  public PlayerState withRerollCount(int rerollCount) {
+    return toBuilder().rerollCount(rerollCount).build();
+  }
+
+  public PlayerState withResolutionLog(List<ResolutionStep> log) {
+    return toBuilder().resolutionLog(log).build();
+  }
+
+  public PlayerState withForfeited(boolean forfeited) {
+    return toBuilder().forfeited(forfeited).build();
+  }
+
+  public PlayerState withCouncil(List<SeatedAdvisor> council) {
+    return toBuilder().council(council).build();
+  }
+
+  public PlayerState withCouncilOfferChoices(List<Advisor> councilOfferChoices) {
+    return toBuilder().councilOfferChoices(councilOfferChoices).build();
+  }
+
+  public PlayerState withCurrentProposal(CouncilProposal currentProposal) {
+    return toBuilder().currentProposal(currentProposal).build();
+  }
+
+  public PlayerState withPermanentFreeRerolls(int permanentFreeRerolls) {
+    return toBuilder().permanentFreeRerolls(permanentFreeRerolls).build();
+  }
+
+  // ----- Table shortcuts (same names as the old mutators) -----
+
+  public PlayerState addToTable(Season season, Card card) {
+    return withSeason(season, getSeason(season).addToBoard(card));
+  }
+
+  public PlayerState removeFromTable(Season season, Card card) {
+    return withSeason(season, getSeason(season).removeFromBoard(card));
+  }
+
+  public PlayerState removeFromTableAt(Season season, int slot) {
+    return withSeason(season, getSeason(season).removeFromBoardAt(slot));
+  }
+
+  public PlayerState replaceTableCard(Season season, Card oldCard, Card newCard) {
+    return withSeason(season, getSeason(season).replaceOnBoard(oldCard, newCard));
+  }
+
+  public PlayerState discardFromTable(Season season, Card card) {
+    return withSeason(season, getSeason(season).discardFromBoard(card));
+  }
+
+  /** Moves every card in the hand to {@code season}'s discard pile and clears the hand. */
+  public PlayerState discardHand(Season season) {
+    SeasonState discarded = getSeason(season).discardHand(hand);
+    return withHand(Deck.empty()).withSeason(season, discarded);
+  }
+
+  // ----- Resource shortcuts -----
+
+  /** Permanently unlocks every resource {@code card} unlocks (e.g. on Great Work completion). */
+  public PlayerState unlock(Card card) {
+    return withResources(resources.unlock(card));
+  }
+
+  public PlayerState apply(Effect effect) {
+    return withResources(resources.apply(effect));
+  }
+
+  public PlayerState consumeFood(double rate) {
+    return withResources(resources.consumeFood(rate));
+  }
+
+  public PlayerState addProduction(double value) {
+    return withResources(resources.addProduction(value));
+  }
+
+  public PlayerState addGold(double value) {
+    return withResources(resources.addGold(value));
+  }
+
+  public PlayerState addPopulationCap(double value) {
+    return withResources(resources.addPopulationCap(value));
+  }
+
+  // ----- Council shortcuts -----
+
+  /** Seats {@code seated} onto the council. Caller is responsible for the seat-count check. */
+  public PlayerState addToCouncil(SeatedAdvisor seated) {
+    List<SeatedAdvisor> next = new ArrayList<>(council);
+    next.add(seated);
+    return withCouncil(next);
+  }
+
+  /** Removes the seated advisor whose id equals {@code advisorId}, if present. */
+  public PlayerState removeFromCouncil(String advisorId) {
+    List<SeatedAdvisor> next = new ArrayList<>(council);
+    next.removeIf(s -> s.getAdvisorId().equals(advisorId));
+    return withCouncil(next);
   }
 
   /**
-   * Names of Great Works that have already received Tomas Ferro's "Expedite Construction" Decree.
-   * Prevents that Decree from accelerating the same distinct Great Work more than once, while still
-   * allowing it to recur across different Great Works over the course of a run.
+   * Applies {@code fn} to the seated advisor whose id equals {@code advisorId}, replacing it with
+   * the result; a no-op if no such advisor is seated.
    */
-  @JsonProperty("acceleratedGreatWorkNames")
-  public Set<String> getAcceleratedGreatWorkNames() {
-    return acceleratedGreatWorkNames == null ? Set.of() : acceleratedGreatWorkNames;
-  }
-
-  public void markGreatWorkAccelerated(String greatWorkName) {
-    acceleratedGreatWorkNames.add(greatWorkName);
-  }
-
-  public void apply(Effect effect) {
-    resources = resources.apply(effect);
-  }
-
-  public void consumeFood(double rate) {
-    resources = resources.consumeFood(rate);
-  }
-
-  public void addProduction(double value) {
-    resources = resources.addProduction(value);
-  }
-
-  public void addGold(double value) {
-    resources = resources.addGold(value);
-  }
-
-  public void addPopulationCap(double value) {
-    resources = resources.addPopulationCap(value);
-  }
-
-  public List<Card> getCardsOnBoardAfter(final Season season, final Card card) {
-    final List<Card> cards = getBoard().get(season);
-    final int index = cards.indexOf(card);
-    if (index == -1 || index + 1 == cards.size()) {
-      return List.of();
+  public PlayerState updateAdvisor(String advisorId, UnaryOperator<SeatedAdvisor> fn) {
+    List<SeatedAdvisor> next = new ArrayList<>(council.size());
+    for (SeatedAdvisor s : council) {
+      next.add(s.getAdvisorId().equals(advisorId) ? fn.apply(s) : s);
     }
-    return cards.subList(index + 1, cards.size());
+    return withCouncil(next);
   }
 
-  // ----- Builder -----
+  public PlayerState incrementPermanentFreeRerolls(int delta) {
+    return withPermanentFreeRerolls(permanentFreeRerolls + delta);
+  }
+
+  /** Records that {@code greatWorkName} has received "Expedite Construction". */
+  public PlayerState markGreatWorkAccelerated(String greatWorkName) {
+    Set<String> next = new java.util.HashSet<>(acceleratedGreatWorkNames);
+    next.add(greatWorkName);
+    return toBuilder().acceleratedGreatWorkNames(next).build();
+  }
+
+  // ===== Builder =====
 
   public static final class Builder {
-    private Map<Season, List<Card>> board = new HashMap<>();
-    private Map<Season, List<Card>> discardPile = new HashMap<>();
-    private Map<Season, List<Card>> drawPile = new HashMap<>();
-    private List<Card> hand = new ArrayList<>();
+    private final Map<Season, SeasonState> seasons = new EnumMap<>(Season.class);
+    private Deck hand = Deck.empty();
+    private ResourceState resources; // if set directly, used as-is (the with* / toBuilder path)
     private double population = 100.0;
     private double populationCap = 100.0;
     private double production = 1000.0;
     private double food = 750.0;
-    private List<Card> addChoices = new ArrayList<>();
-    private int rerollCount = 0;
-    private List<ResolutionStep> resolutionLog = List.of();
     private double gold = 0.0;
     private double strength = 0.0;
     private Set<ResourceTarget> unlockedResources =
@@ -505,42 +447,55 @@ public class PlayerState {
             ResourceTarget.PRODUCTION,
             ResourceTarget.FOOD,
             ResourceTarget.POPULATION_CAP);
+    private List<Card> addChoices = new ArrayList<>();
+    private int rerollCount = 0;
+    private List<ResolutionStep> resolutionLog = List.of();
     private List<SeatedAdvisor> council = new ArrayList<>();
     private List<Advisor> councilOfferChoices = new ArrayList<>();
     private CouncilProposal currentProposal = null;
     private int permanentFreeRerolls = 0;
-    private Set<String> acceleratedGreatWorkNames = new HashSet<>();
+    private Set<String> acceleratedGreatWorkNames = new java.util.HashSet<>();
+    private boolean forfeited = false;
 
-    private ResourceState resources =
-        new ResourceState(
-            food, production, population, populationCap, gold, strength, unlockedResources);
-
-    // fill similar data types with seasons
     private Builder() {
       for (Season season : Season.values()) {
-        board.put(season, new ArrayList<>());
-        discardPile.put(season, new ArrayList<>());
-        drawPile.put(season, new ArrayList<>());
+        seasons.put(season, SeasonState.empty());
       }
     }
 
+    /** Sets an entire season map directly (used by {@link PlayerState#toBuilder()}). */
+    public Builder seasons(Map<Season, SeasonState> seasons) {
+      this.seasons.putAll(seasons);
+      return this;
+    }
+
     public Builder table(Season season, List<Card> cards) {
-      board.put(season, new ArrayList<>(cards));
+      seasons.put(season, seasons.get(season).withBoard(Deck.of(cards)));
       return this;
     }
 
     public Builder discardPile(Season season, List<Card> cards) {
-      discardPile.put(season, new ArrayList<>(cards));
+      seasons.put(season, seasons.get(season).withDiscardPile(Deck.of(cards)));
       return this;
     }
 
     public Builder drawPile(Season season, List<Card> cards) {
-      drawPile.put(season, new ArrayList<>(cards));
+      seasons.put(season, seasons.get(season).withDrawPile(Deck.of(cards)));
       return this;
     }
 
     public Builder hand(List<Card> cards) {
-      this.hand = new ArrayList<>(cards);
+      this.hand = Deck.of(cards);
+      return this;
+    }
+
+    public Builder hand(Deck hand) {
+      this.hand = hand;
+      return this;
+    }
+
+    public Builder resources(ResourceState resources) {
+      this.resources = resources;
       return this;
     }
 
@@ -639,17 +594,17 @@ public class PlayerState {
     public Builder acceleratedGreatWorkNames(Set<String> acceleratedGreatWorkNames) {
       this.acceleratedGreatWorkNames =
           acceleratedGreatWorkNames == null
-              ? new HashSet<>()
-              : new HashSet<>(acceleratedGreatWorkNames);
+              ? new java.util.HashSet<>()
+              : new java.util.HashSet<>(acceleratedGreatWorkNames);
+      return this;
+    }
+
+    public Builder forfeited(boolean forfeited) {
+      this.forfeited = forfeited;
       return this;
     }
 
     public PlayerState build() {
-      for (Season s : Season.values()) {
-        if (!board.containsKey(s)) {
-          throw new IllegalStateException("missing table for season " + s.name());
-        }
-      }
       if (population < 0.0) {
         throw new IllegalStateException("population cannot be negative");
       }
@@ -659,10 +614,24 @@ public class PlayerState {
       if (food < 0.0) {
         throw new IllegalStateException("food cannot be negative");
       }
-      resources =
-          new ResourceState(
-              food, production, population, populationCap, gold, strength, unlockedResources);
-      return new PlayerState(this);
+      ResourceState resolved =
+          resources != null
+              ? resources
+              : new ResourceState(
+                  food, production, population, populationCap, gold, strength, unlockedResources);
+      return new PlayerState(
+          seasons,
+          hand,
+          resolved,
+          addChoices,
+          rerollCount,
+          resolutionLog,
+          council,
+          councilOfferChoices,
+          currentProposal,
+          permanentFreeRerolls,
+          acceleratedGreatWorkNames,
+          forfeited);
     }
   }
 }

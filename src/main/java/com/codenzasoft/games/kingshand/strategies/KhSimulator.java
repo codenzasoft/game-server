@@ -9,11 +9,13 @@ import java.util.Random;
 import java.util.function.Function;
 
 /**
- * Runs candidate actions on a <em>deep copy</em> of the live match using the real {@link
- * GameEngine}, so every simulated consequence — production costs, staffing, card effects, recurring
- * effects, food consumption, growth, Great Work construction, cross-seat combat, death/victory
- * checks — is computed by the exact same code that runs a real game. The simulator never mutates
- * the live state; it always clones first (see {@link KhGameStateCloner}).
+ * Runs candidate actions the live match using the real {@link GameEngine}, so every simulated
+ * consequence — production costs, staffing, card effects, recurring effects, food consumption,
+ * growth, Great Work construction, cross-seat combat, death/victory checks — is computed by the
+ * exact same code that runs a real game. The simulator never mutates the live state: {@link
+ * GameState}/{@link com.codenzasoft.games.kingshand.PlayerState} are immutable, so a throwaway
+ * {@link GameEngine} run against {@code real} leaves {@code real} untouched and produces the
+ * simulated outcome as a new state read back via {@link GameEngine#getState()}.
  */
 public final class KhSimulator {
 
@@ -32,15 +34,16 @@ public final class KhSimulator {
    *     return {@code null} to leave the order untouched
    */
   public static GameState simulatePlay(
-      final GameState real,
+      final GameState state,
       final int seat,
       final List<Card> placements,
       final String commission,
       final Function<List<Card>, List<String>> orderChooser,
       final Random rng) {
-    final GameState clone = KhGameStateCloner.deepCopy(real);
-    final GameEngine engine = new GameEngine(clone, rng);
-    final Season season = clone.getTime().season();
+    // real is immutable — the engine wraps it and produces new states internally, never touching
+    // it.
+    final GameEngine engine = new GameEngine(state, rng);
+    final Season season = state.getTime().season();
 
     engine.setActiveSeat(seat);
     for (final Card card : placements) {
@@ -58,8 +61,9 @@ public final class KhSimulator {
       }
     }
     if (orderChooser != null) {
-      final List<String> order = orderChooser.apply(clone.getPlayer(seat).getTable(season));
-      if (order != null && order.size() == clone.getPlayer(seat).getTable(season).size()) {
+      final List<Card> table = engine.getState().getPlayer(seat).getTable(season);
+      final List<String> order = orderChooser.apply(table);
+      if (order != null && order.size() == table.size()) {
         try {
           engine.reorderTable(order);
         } catch (final RuntimeException ignored) {
@@ -68,8 +72,8 @@ public final class KhSimulator {
       }
     }
 
-    resolveAllSeats(engine, clone, seat);
-    return clone;
+    resolveAllSeats(engine, seat);
+    return engine.getState();
   }
 
   /**
@@ -78,9 +82,8 @@ public final class KhSimulator {
    * cloned deck without disturbing the live game.
    */
   public static GameState simulateAdd(
-      final GameState real, final int seat, final Card card, final Random rng) {
-    final GameState clone = KhGameStateCloner.deepCopy(real);
-    final GameEngine engine = new GameEngine(clone, rng);
+      final GameState state, final int seat, final Card card, final Random rng) {
+    final GameEngine engine = new GameEngine(state, rng);
     engine.setActiveSeat(seat);
     try {
       if (card != null) {
@@ -89,16 +92,16 @@ public final class KhSimulator {
         engine.skipAdd();
       }
     } catch (final RuntimeException ignored) {
-      // Leave the clone as-is if the pick was rejected.
+      // Leave the state unchanged if the pick was rejected.
     }
-    return clone;
+    return engine.getState();
   }
 
   /** Ends the season for every live seat so the barrier releases and resolution runs. */
-  private static void resolveAllSeats(
-      final GameEngine engine, final GameState clone, final int seat) {
-    for (int other = 0; other < clone.playerCount(); other++) {
-      if (other == seat || clone.getPlayer(other).isGameOver()) {
+  private static void resolveAllSeats(final GameEngine engine, final int seat) {
+    final int count = engine.getState().playerCount();
+    for (int other = 0; other < count; other++) {
+      if (other == seat || engine.getState().getPlayer(other).isGameOver()) {
         continue;
       }
       engine.setActiveSeat(other);

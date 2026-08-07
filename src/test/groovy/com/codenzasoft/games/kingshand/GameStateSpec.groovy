@@ -181,7 +181,7 @@ class GameStateSpec extends Specification {
         GameState state = GameState.newTwoPlayerState()
 
         when:
-        state.getPlayer(0).addToTable(Season.SPRING, card)
+        state = state.withPlayer(0, state.getPlayer(0).addToTable(Season.SPRING, card))
 
         then:
         state.getPlayer(0).getTable(Season.SPRING) == [card]
@@ -206,7 +206,7 @@ class GameStateSpec extends Specification {
         def state = GameState.multiPlayer([noGold, withGold], new TimeState(Season.WINTER, Phase.PLAY, 1))
 
         when:
-        state.advanceTime()
+        state = state.advanceTime()
 
         then:
         state.time.phase == Phase.COUNCIL_ADD
@@ -220,7 +220,7 @@ class GameStateSpec extends Specification {
                 new TimeState(Season.WINTER, Phase.PLAY, 1))
 
         when:
-        state.advanceTime()
+        state = state.advanceTime()
 
         then:
         state.time.phase == Phase.ADD
