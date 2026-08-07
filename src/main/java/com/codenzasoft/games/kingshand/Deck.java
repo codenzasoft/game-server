@@ -77,7 +77,7 @@ public record Deck(List<Card> cards) {
    * @throws IllegalArgumentException if {@code from} is not present
    */
   public Deck replace(Card from, Card to) {
-    int i = cards.indexOf(from);
+    int i = this.indexOf(from);
     if (i < 0) {
       throw new IllegalArgumentException("card not found in deck: " + from.name());
     }
