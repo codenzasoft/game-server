@@ -34,7 +34,7 @@ public final class KhSimulator {
    *     return {@code null} to leave the order untouched
    */
   public static GameState simulatePlay(
-      final GameState real,
+      final GameState state,
       final int seat,
       final List<Card> placements,
       final String commission,
@@ -42,8 +42,8 @@ public final class KhSimulator {
       final Random rng) {
     // real is immutable — the engine wraps it and produces new states internally, never touching
     // it.
-    final GameEngine engine = new GameEngine(real, rng);
-    final Season season = real.getTime().season();
+    final GameEngine engine = new GameEngine(state, rng);
+    final Season season = state.getTime().season();
 
     engine.setActiveSeat(seat);
     for (final Card card : placements) {
@@ -82,8 +82,8 @@ public final class KhSimulator {
    * cloned deck without disturbing the live game.
    */
   public static GameState simulateAdd(
-      final GameState real, final int seat, final Card card, final Random rng) {
-    final GameEngine engine = new GameEngine(real, rng);
+      final GameState state, final int seat, final Card card, final Random rng) {
+    final GameEngine engine = new GameEngine(state, rng);
     engine.setActiveSeat(seat);
     try {
       if (card != null) {
