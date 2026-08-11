@@ -33,12 +33,18 @@ touching anything. Confirm the KH suite passes:
 Goal: a KH match survives cache eviction, redeploy, and scale-to-zero. This is the unblock — do it
 first.
 
-**1.1 — Migration (game-database repo).** Add `V16__Add_kh_game_state.sql` (next free number) adding a
-nullable column to the `games` table:
+**1.1 — Migration (game-database repo).** Add `V16__Define_kh_game_state.sql` (V15 is the latest;
+follow the `V##__Define_*` convention) creating a dedicated one-row-per-game table:
 ```sql
-ALTER TABLE games ADD COLUMN kh_game_state JSONB;
+CREATE TABLE kh_game_states (
+    game_id    UUID PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+    state      JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
-(Single-table inheritance — all game types share `games`; the column is null for non-KH rows.)
+A separate table (not a column on `games`) keeps KH-only state out of the shared single-table
+`games` rows, and the `ON DELETE CASCADE` means `GameCleanupService`'s existing bulk-delete of `games`
+reaps the state row automatically — same pattern as V9's cascade for the XO child tables.
 **Verify:** migration applies cleanly against local Postgres (`localhost:5435`).
 
 **1.2 — Jackson round-trip proof (do this before wiring anything).** New Spock spec
@@ -48,18 +54,23 @@ logs), serialize with the app's `ObjectMapper`, deserialize, assert equality wit
 **Verify:** the spec passes. This is the highest-risk part — boosted cards and advisor counters are
 the state that differs from catalog defaults, so if anything round-trips lossily it shows here.
 
-**1.3 — Entity column.** On `KhGameEntity`, add a `String khGameState` field mapped to the new column
-(`@Column(name = "kh_game_state", columnDefinition = "jsonb")`) with getter/setter. Store the JSON
-string; do the object↔JSON conversion in the service (1.4), not via a JPA converter, to keep the
-`ObjectMapper` injectable and shared.
+**1.3 — Entity + repository.** New `entities/kh/KhGameStateEntity` (a standalone `@Entity`, **not**
+part of the `games` single-table inheritance):
+- `@Id @Column(name = "game_id") UUID gameId;`
+- `@Column(columnDefinition = "jsonb") String state;` (store the JSON string — conversion happens in
+  the service so the `ObjectMapper` stays injectable/shared)
+- `@Column(name = "updated_at") Instant updatedAt;` with `@PreUpdate`/`@PrePersist`.
+
+New `repositories/kh/KhGameStateRepository extends CrudRepository<KhGameStateEntity, UUID>` (keyed by
+`gameId`).
 **Verify:** app boots; entity maps without Hibernate errors.
 
 **1.4 — Persistence service.** New `services/kh/KhPersistenceService` (mirror the role of Hearts'
-persistence service):
-- `void save(UUID gameId, GameState state)` — `objectMapper.writeValueAsString(state)` into the
-  entity column, `gamesRepository.save(...)`.
-- `Optional<GameState> reconstruct(UUID gameId)` — read the column; if non-null,
-  `objectMapper.readValue(json, GameState.class)`.
+persistence service), backed by `KhGameStateRepository`:
+- `void save(UUID gameId, GameState state)` — `objectMapper.writeValueAsString(state)`, upsert a
+  `KhGameStateEntity(gameId, json)` via the repository.
+- `Optional<GameState> reconstruct(UUID gameId)` — `findById(gameId)`; if present,
+  `objectMapper.readValue(row.getState(), GameState.class)`.
 - Inject the shared Spring `ObjectMapper`.
 **Verify:** unit test save-then-reconstruct returns an equal `GameState`.
 
@@ -68,8 +79,8 @@ controller's shared action pipeline (`KhController.java:~254`, right after `game
 calls `khPersistenceService.save(gameId, game.getState())`. Also persist inside the `/load` path is
 unnecessary (read-only). Bot moves already run through the engine before `notifyUpdated`, so a single
 save after each pipeline run captures them.
-**Verify:** play a few actions in the browser; confirm the `kh_game_state` column updates in Postgres
-after each move.
+**Verify:** play a few actions in the browser; confirm a `kh_game_states` row appears and its `state`
+updates in Postgres after each move.
 
 **1.6 — Read path.** In `GameService.buildKhGame` (`:557`), before seeding fresh, call
 `khPersistenceService.reconstruct(entity.getId())`:
