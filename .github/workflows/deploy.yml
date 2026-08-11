@@ -57,5 +57,5 @@ jobs:
             --service-account=game-server-sa@crafty-dynamics-495319-e2.iam.gserviceaccount.com \
             --allow-unauthenticated \
             --min-instances=0 \
-            --max-instances=2 \
+            --max-instances=1 \
             --port=8080

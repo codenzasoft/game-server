@@ -5,6 +5,7 @@ import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhPersistenceService;
 import com.newrelic.api.agent.NewRelic;
 import java.security.Principal;
 import java.util.List;
@@ -27,6 +28,7 @@ public class KhController {
   @Autowired private GameService gameService;
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
   @Autowired private KhBroadcastService khBroadcastService;
+  @Autowired private KhPersistenceService khPersistenceService;
 
   /**
    * Loads the current game state and sends it to every seated player. For a fresh game in the ADD
@@ -260,6 +262,10 @@ public class KhController {
                 game.setActiveSeat(seat);
                 action.accept(game);
                 game.notifyUpdated();
+                // Persist after the action (and any bot moves it triggered) so the match survives
+                // cache eviction, redeploy, and scale-to-zero. A rejected action throws above and
+                // skips this, leaving the last durable state intact.
+                khPersistenceService.save(UUID.fromString(gameId), game.getState());
               } catch (final IllegalStateException | IllegalArgumentException e) {
                 log.error("{} rejected for game {}: {}", op, gameId, e.getMessage());
                 NewRelic.noticeError(e);

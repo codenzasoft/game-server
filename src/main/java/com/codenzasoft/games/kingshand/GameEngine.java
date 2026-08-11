@@ -323,6 +323,20 @@ public class GameEngine implements Game<GameEngine> {
   }
 
   /**
+   * Resumes a match rebuilt from persisted mid-game state. Unlike {@link #initialize()} it does
+   * <em>not</em> seed starting decks or re-offer the current phase — the restored {@link GameState}
+   * already carries both. It re-drives any bot seat that still owes an action in the current phase
+   * (so the readiness barrier can't stall on a bot after a rebuild), pushes the restored state to
+   * per-seat listeners, and fires the resume lifecycle hook.
+   */
+  public synchronized void resume() {
+    if (activePlayer().isGameOver()) return;
+    driveBots();
+    notifyListeners(GAME_STARTED_NOTIFICATION);
+    notifyLifecycleObservers(GameLifecycleObserver::gameResumed);
+  }
+
+  /**
    * Ends the game because a player quit before it was otherwise over. No-ops if the game is already
    * over. Reuses the existing {@link GameState#isGameOver()} flag rather than tracking a separate
    * quit reason, since nothing in KH's gameplay logic needs to distinguish "ended naturally" from
