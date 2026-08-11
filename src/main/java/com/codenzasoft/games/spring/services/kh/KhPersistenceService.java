@@ -1,7 +1,9 @@
 package com.codenzasoft.games.spring.services.kh;
 
 import com.codenzasoft.games.kingshand.EffectTarget;
+import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
+import com.codenzasoft.games.kingshand.KhObserver;
 import com.codenzasoft.games.kingshand.PlayerState;
 import com.codenzasoft.games.spring.entities.kh.KhGameStateEntity;
 import com.codenzasoft.games.spring.repositories.kh.KhGameStateRepository;
@@ -19,6 +21,14 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Durable mid-game persistence for King's Hand: serializes the whole immutable {@link GameState} to
  * the {@code kh_game_states} table so a match survives cache eviction, redeploy, and scale-to-zero.
+ *
+ * <p>Registered on each {@link GameEngine} as a {@link KhObserver} (alongside the broadcast
+ * service), so saves are engine-driven — every {@code gameStarted}/{@code gameUpdated}/{@code
+ * gameOver} event persists the state snapshot the engine hands to the callback. The controller
+ * never calls this directly. Note the engine dispatches these callbacks on a shared thread pool, so
+ * two rapid updates to the same match may persist out of order; each save is a full-state upsert,
+ * so the store self-heals on the next event, and the single-owner deployment (max-instances=1)
+ * rules out cross-instance races.
  *
  * <p>Serialization uses a <em>dedicated</em> {@link ObjectMapper} — not the shared Spring/MVC one —
  * configured to serialize the record graph by its components only. The KingsHand records expose
@@ -38,7 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
  * GameStateSerializationSpec}.
  */
 @Service
-public class KhPersistenceService {
+public class KhPersistenceService implements KhObserver {
 
   private static final Logger log = LoggerFactory.getLogger(KhPersistenceService.class);
 
@@ -89,6 +99,23 @@ public class KhPersistenceService {
     } catch (final Exception e) {
       throw new IllegalStateException("Failed to deserialize KH GameState", e);
     }
+  }
+
+  // ----- KhObserver: engine-driven durable saves -----
+
+  @Override
+  public void gameStarted(final GameEngine game, final GameState state) {
+    save(game.getId(), state);
+  }
+
+  @Override
+  public void gameUpdated(final GameEngine game, final GameState state) {
+    save(game.getId(), state);
+  }
+
+  @Override
+  public void gameOver(final GameEngine game, final GameState state) {
+    save(game.getId(), state);
   }
 
   /** Upserts the current match state for {@code gameId}. */

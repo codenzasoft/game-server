@@ -578,6 +578,9 @@ public class GameService {
             .withId(entity.getId())
             .withState(state)
             .addListener(khBroadcastService)
+            // Engine-driven durable persistence: khPersistenceService saves the match on every
+            // started/updated/over event (see KhPersistenceService), so no seat's progress is lost.
+            .addListener(khPersistenceService)
             .addLifecycleObserver(new GameLifecycleListener<>());
     // Seat i = i-th withPlayer call; seat 0 is the creator. Bot seats bind their strategy driver
     // right here (mirrors Hearts' addPlayerObserver(player, strategy)), so seat and strategy can
@@ -597,13 +600,12 @@ public class GameService {
       // current phase (the restored GameState already carries both).
       engine.resume();
     } else {
-      // Fresh match: delegate initialization to the engine (it owns how a game starts), then
-      // persist
-      // the seeded state so a rebuild before the first human action resumes the same offer — the
-      // rng
-      // that seeded it is not replayed.
+      // Fresh match: delegate initialization to the engine (it owns how a game starts).
+      // initialize()
+      // fires gameStarted, which the persistence observer saves, so the seeded state is durable and
+      // a rebuild before the first human action resumes the same offer (the seeding rng is not
+      // replayed).
       engine.initialize();
-      khPersistenceService.save(entity.getId(), engine.getState());
     }
     return engine;
   }
