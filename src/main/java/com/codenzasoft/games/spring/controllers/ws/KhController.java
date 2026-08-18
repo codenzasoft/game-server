@@ -2,6 +2,7 @@ package com.codenzasoft.games.spring.controllers.ws;
 
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.spring.entities.UserEntity;
+import com.codenzasoft.games.spring.entities.kh.KhGameEntity;
 import com.codenzasoft.games.spring.services.GameService;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
@@ -35,8 +36,29 @@ public class KhController {
    * fully-populated state on first load.
    */
   @MessageMapping("/kh/{gameId}/load")
-  public void load(@DestinationVariable String gameId) {
-    gameService.getOrBuildKhGame(UUID.fromString(gameId)).ifPresent(khBroadcastService::gameLoaded);
+  public void load(@DestinationVariable String gameId, Principal principal) {
+    final UUID id = UUID.fromString(gameId);
+    final Optional<UserEntity> user = findUser(principal);
+    if (user.isEmpty()) return;
+
+    final Optional<KhGameEntity> entityOpt = gameService.findKhGame(id);
+    if (entityOpt.isEmpty()) {
+      log.warn("load: kh game {} not found", id);
+      return;
+    }
+    // Pending human-vs-human invite: only the host is seated. Auto-join the opener as seat 1 if
+    // there
+    // is room (the invite link is just this game-page URL), which fills the match and lets it
+    // build.
+    // The host opening their own pending game is a no-op join and simply waits for an opponent.
+    if (entityOpt.get().getPlayers().size() < 2) {
+      try {
+        gameService.joinKhGame(id, user.get());
+      } catch (final IllegalStateException e) {
+        log.warn("load: kh join rejected for {}: {}", user.get().getUsername(), e.getMessage());
+      }
+    }
+    gameService.getOrBuildKhGame(id).ifPresent(khBroadcastService::gameLoaded);
   }
 
   /**

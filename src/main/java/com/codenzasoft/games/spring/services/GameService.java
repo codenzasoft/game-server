@@ -188,6 +188,51 @@ public class GameService {
   }
 
   /**
+   * Creates a pending human-vs-human King's Hand game for the host with no bot — the host takes
+   * seat 0 and seat 1 is left open for a second human to {@link #joinKhGame}. The game page URL
+   * doubles as the invite link. Contrast {@link #createKhGame}, which fills seat 1 with a bot for a
+   * solo match.
+   *
+   * @param user The host player.
+   * @return A new pending game entity with exactly one player.
+   * @throws IllegalStateException if the user has reached the active game limit.
+   */
+  @Transactional
+  public KhGameEntity createPendingKhGame(final UserEntity user) {
+    enforceGameLimit(user);
+    final KhGameEntity game = new KhGameEntity(UUID.randomUUID());
+    game.setPlayers(List.of(user));
+    gamesRepository.save(game);
+    return game;
+  }
+
+  /**
+   * Seats a second human at seat 1 of a pending King's Hand game. If the user is already a player
+   * this is a no-op and the unmodified entity is returned. Once seat 1 fills, the match is ready to
+   * build and start (there are exactly two seats). Mirrors {@link #joinHeartsGame}.
+   *
+   * @param gameId The pending game to join.
+   * @param user The user joining.
+   * @return The updated game entity.
+   * @throws IllegalStateException if the game is full, complete, or not found.
+   */
+  @Transactional
+  public KhGameEntity joinKhGame(final UUID gameId, final UserEntity user) {
+    final KhGameEntity game =
+        findGameEntity(gameId, KhGameEntity.class)
+            .orElseThrow(() -> new IllegalStateException("Game not found: " + gameId));
+    if (game.isComplete()) throw new IllegalStateException("Cannot join a completed game");
+    if (game.getPlayers().size() >= 2) throw new IllegalStateException("Game is already full");
+    if (game.getPlayers().stream().anyMatch(p -> p.getId().equals(user.getId()))) return game;
+    enforceGameLimit(user);
+    final List<UserEntity> players = new ArrayList<>(game.getPlayers());
+    players.add(user);
+    game.setPlayers(players);
+    gamesRepository.save(game);
+    return game;
+  }
+
+  /**
    * Returns a new Hearts game for the provided {@link UserEntity} playing against three bots.
    *
    * @param user The human player.
@@ -389,12 +434,30 @@ public class GameService {
       return cached.map(Game::getGame);
     }
     final Optional<KhGameEntity> persisted = findGameEntity(id, KhGameEntity.class);
-    if (persisted.isPresent()) {
-      final GameEngine game = buildKhGame(persisted.get());
-      gameCache.addGame(game);
-      return Optional.of(game);
+    if (persisted.isEmpty()) {
+      return Optional.empty();
     }
-    return Optional.empty();
+    final KhGameEntity entity = persisted.get();
+    // A KH match always has exactly two seats. A pending invite has only the host seated until a
+    // second human joins, so it must not be built/started yet (mirrors Hearts' <4 lobby guard). The
+    // vs-bot game seats creator + bot up front, so it is never pending here.
+    if (entity.getPlayers().size() < 2) {
+      log.warn("getOrBuildKhGame: game {} is pending ({} players)", id, entity.getPlayers().size());
+      return Optional.empty();
+    }
+    final GameEngine game = buildKhGame(entity);
+    gameCache.addGame(game);
+    return Optional.of(game);
+  }
+
+  /**
+   * Returns the {@link KhGameEntity} with the provided ID, or {@code empty} if not found.
+   *
+   * @param id A game {@link UUID}.
+   * @return The entity, or {@code empty}.
+   */
+  public Optional<KhGameEntity> findKhGame(final UUID id) {
+    return findGameEntity(id, KhGameEntity.class);
   }
 
   /**

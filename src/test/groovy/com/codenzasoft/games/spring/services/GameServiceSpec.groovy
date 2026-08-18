@@ -169,6 +169,63 @@ class GameServiceSpec extends Specification {
         gameCache.getGameOfType(gameId, GameType.KH).isPresent()
     }
 
+    def "createPendingKhGame seats only the host with no bot"() {
+        when:
+        def entity = gameService.createPendingKhGame(testUser)
+
+        then:
+        entity instanceof KhGameEntity
+        entity.gameType == GameType.KH
+        entity.players.size() == 1
+        entity.players[0] == testUser
+    }
+
+    def "getOrBuildKhGame is empty while pending and builds a two-human match once joined"() {
+        given:
+        def gameId = gameService.createPendingKhGame(testUser).id
+
+        expect: "a pending invite (one human seated) is not built or started"
+        gameService.getOrBuildKhGame(gameId).isEmpty()
+
+        when: "a second human joins, filling seat 1"
+        gameService.joinKhGame(gameId, testUser2)
+
+        then: "the match now builds with both humans and no bot"
+        def result = gameService.getOrBuildKhGame(gameId)
+        result.isPresent()
+        result.get().players.size() == 2
+        result.get().players[0].id() == testUser.id
+        result.get().players[1].id() == testUser2.id
+        !result.get().players.any { it.name().endsWith("-bot") }
+    }
+
+    def "joinKhGame rejects a third player once the match is full"() {
+        given:
+        def gameId = gameService.createPendingKhGame(testUser).id
+        gameService.joinKhGame(gameId, testUser2)
+        def third = new UserEntity()
+        third.setUserName("third-user")
+        third = usersRepository.save(third)
+
+        when:
+        gameService.joinKhGame(gameId, third)
+
+        then:
+        thrown(IllegalStateException)
+    }
+
+    def "joinKhGame is a no-op when the host opens their own pending game"() {
+        given:
+        def gameId = gameService.createPendingKhGame(testUser).id
+
+        when:
+        def result = gameService.joinKhGame(gameId, testUser)
+
+        then:
+        result.players.size() == 1
+        result.players[0] == testUser
+    }
+
     def "createHeartsGame persists a new Hearts game with the user and three bots as players"() {
         when:
         def entity = gameService.createHeartsGame(testUser)
