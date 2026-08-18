@@ -1,5 +1,6 @@
 import { Application } from "pixi.js";
-import { GameEventHandler, GameMessage, Phase } from "./kingshand.ts";
+import { GameEventHandler, GameMessage, KhLobby, Phase } from "./kingshand.ts";
+import { renderLobbyOverlay } from "../shared/lobby.ts";
 import { AddPhaseScene } from "./addPhaseScene.ts";
 import { CouncilScene } from "./councilScene.ts";
 import { PlayPhaseScene } from "./playPhaseScene.ts";
@@ -168,10 +169,41 @@ const getGameId = (): string | undefined => {
     });
   };
 
+  // ── Lobby / waiting room ───────────────────────────────────────────────────
+  // Shown when a human-vs-human invite still has an open seat: the host waits
+  // here (with the invite link) until a second player opens the URL. The server
+  // sends a { lobby } message; the first real game-state message tears it down.
+
+  let lobbyOverlay: HTMLDivElement | null = null;
+
+  const removeLobbyOverlay = (): void => {
+    lobbyOverlay?.remove();
+    lobbyOverlay = null;
+  };
+
+  const onLobby = (lobby: KhLobby): void => {
+    removeLobbyOverlay();
+    lobbyOverlay = renderLobbyOverlay({
+      title: "King's Hand",
+      gameId: lobby.gameId,
+      players: lobby.players,
+      maxPlayers: 2,
+      bgColor: "rgba(45,90,61,0.96)",
+      // No onStart — the match auto-starts the moment the second player joins.
+      onLeave: () => {
+        window.location.href = homeUrl;
+      },
+    });
+  };
+
   // onMessage is called for every GameMessage dequeued by GameEventHandler.
   // It inspects curPhase and mounts the corresponding scene overlay.
   const onMessage = (message: GameMessage) => {
     console.log("Processing KH message:", message);
+
+    // A real state push means the match has started (or resumed) — drop the
+    // waiting room if it is still up.
+    removeLobbyOverlay();
 
     const { state, match, context } = message;
     const isMultiplayer = match.players.length > 1;
@@ -359,6 +391,7 @@ const getGameId = (): string | undefined => {
   const onQuit = () => {
     removeOpponentHud();
     hideWaitingOverlay();
+    removeLobbyOverlay();
     if (currentScene) {
       currentScene.unmount();
       currentScene = null;
@@ -367,7 +400,7 @@ const getGameId = (): string | undefined => {
     window.location.href = homeUrl;
   };
 
-  const handler = new GameEventHandler(onMessage, onQuit);
+  const handler = new GameEventHandler(onMessage, onQuit, onLobby);
 
   // The quit and save-and-exit buttons live in the HTML overlay layer (sharedOverlays.ts)
   // and communicate via custom DOM events so scenes stay decoupled from the handler.

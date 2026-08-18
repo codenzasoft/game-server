@@ -1011,6 +1011,15 @@ export const GameMessageSchema = z
 // pushed to the end of the array and will be picked up in the same iteration —
 // no extra "kick" is required.
 
+/**
+ * Pending-match waiting-room payload (server `KhBroadcastService.broadcastLobby`). Sent instead of a
+ * game-state message while a human-vs-human invite still has an open seat.
+ */
+export interface KhLobby {
+  gameId: string;
+  players: string[];
+}
+
 export class GameEventHandler {
   private gameId!: string;
   private stompClient!: Client;
@@ -1024,13 +1033,16 @@ export class GameEventHandler {
   // PixiJS scene details that will evolve as the display layer is built out.
   private readonly onMessage: (message: GameMessage) => void;
   private readonly onQuit: () => void;
+  private readonly onLobby: (lobby: KhLobby) => void;
 
   constructor(
     onMessage: (message: GameMessage) => void,
     onQuit: () => void,
+    onLobby: (lobby: KhLobby) => void = () => {},
   ) {
     this.onMessage = onMessage;
     this.onQuit = onQuit;
+    this.onLobby = onLobby;
   }
 
   // Opens the WebSocket connection and subscribes to the player's private queue.
@@ -1247,14 +1259,22 @@ export class GameEventHandler {
       (stompMessage) => {
         const body = JSON.parse(stompMessage.body);
 
-        // The server sends one of two shapes over this channel:
+        // The server sends one of three shapes over this channel:
         //   • { quit: true }           — confirmation after player-initiated quit
+        //   • { lobby: … }             — pending-invite waiting room (no game state yet)
         //   • { context: …, state: … } — normal game-state broadcast
         // The quit signal is handled immediately without going through the queue
         // because it carries no game state and should trigger navigation at once.
         if (body.quit === true) {
           this.subscription.unsubscribe();
           this.onQuit();
+          return;
+        }
+
+        // Waiting room: only the host is seated so far. Show the invite/lobby overlay and wait for a
+        // second human — the join fills the seat and the server follows up with a real state push.
+        if (body.lobby) {
+          this.onLobby(body.lobby as KhLobby);
           return;
         }
 
