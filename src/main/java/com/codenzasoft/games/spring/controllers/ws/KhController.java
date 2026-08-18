@@ -259,6 +259,9 @@ public class KhController {
               try {
                 game.setActiveSeat(seat);
                 action.accept(game);
+                // notifyUpdated() fires gameUpdated, which the persistence observer saves and the
+                // broadcast observer pushes — so both durability and client updates are
+                // engine-driven.
                 game.notifyUpdated();
               } catch (final IllegalStateException | IllegalArgumentException e) {
                 log.error("{} rejected for game {}: {}", op, gameId, e.getMessage());

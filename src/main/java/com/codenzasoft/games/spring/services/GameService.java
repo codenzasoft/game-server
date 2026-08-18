@@ -27,6 +27,7 @@ import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
+import com.codenzasoft.games.spring.services.kh.KhPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
 import com.codenzasoft.games.spring.services.xo.XoGamePersistenceService;
 import com.codenzasoft.games.xo.Line;
@@ -59,6 +60,7 @@ public class GameService {
   @Autowired private HeartsGameRepository heartsGameRepository;
   @Autowired private HeartsBroadcastService heartsBroadcastService;
   @Autowired private KhBroadcastService khBroadcastService;
+  @Autowired private KhPersistenceService khPersistenceService;
   @Autowired private HeartsPersistenceService heartsPersistenceService;
   @Autowired private XoBroadcastService xoBroadcastService;
   @Autowired private ThreadPoolTaskExecutor gameNotificationExecutor;
@@ -557,10 +559,16 @@ public class GameService {
   protected synchronized GameEngine buildKhGame(final KhGameEntity entity) {
     log.debug("Building KH game from entity: {}", entity.getId());
     final List<UserEntity> seatedUsers = entity.getPlayers();
-    // One kingdom per seat, sharing a clock. Both kingdoms are seeded with the standard starting
-    // deck by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per
-    // request by KhController based on the acting user's seat.
-    final GameState state = GameState.newMultiplayer(Math.max(seatedUsers.size(), 1));
+    // Resume from durable state if this match has been played before; otherwise start a fresh
+    // match.
+    // One kingdom per seat, sharing a clock. A fresh match is seeded with the standard starting
+    // deck
+    // by the engine's initialize()/seedStartingDeck(); the engine's activeSeat is set per request
+    // by
+    // KhController based on the acting user's seat.
+    final Optional<GameState> restored = khPersistenceService.reconstruct(entity.getId());
+    final GameState state =
+        restored.orElseGet(() -> GameState.newMultiplayer(Math.max(seatedUsers.size(), 1)));
     // Built via the Builder so the lifecycle listener and the KH broadcast observer can be
     // registered. Registering khBroadcastService as a KhObserver makes state pushes engine-driven:
     // initialize() fires gameStarted, each action fires gameUpdated (via GameEngine#notifyUpdated),
@@ -570,6 +578,9 @@ public class GameService {
             .withId(entity.getId())
             .withState(state)
             .addListener(khBroadcastService)
+            // Engine-driven durable persistence: khPersistenceService saves the match on every
+            // started/updated/over event (see KhPersistenceService), so no seat's progress is lost.
+            .addListener(khPersistenceService)
             .addLifecycleObserver(new GameLifecycleListener<>());
     // Seat i = i-th withPlayer call; seat 0 is the creator. Bot seats bind their strategy driver
     // right here (mirrors Hearts' addPlayerObserver(player, strategy)), so seat and strategy can
@@ -584,8 +595,18 @@ public class GameService {
       }
     }
     final GameEngine engine = builder.build();
-    // Delegate initialization to the engine — it owns the knowledge of how a game starts.
-    engine.initialize();
+    if (restored.isPresent()) {
+      // Rebuilt mid-match from durable state: resume without re-seeding decks or re-offering the
+      // current phase (the restored GameState already carries both).
+      engine.resume();
+    } else {
+      // Fresh match: delegate initialization to the engine (it owns how a game starts).
+      // initialize()
+      // fires gameStarted, which the persistence observer saves, so the seeded state is durable and
+      // a rebuild before the first human action resumes the same offer (the seeding rng is not
+      // replayed).
+      engine.initialize();
+    }
     return engine;
   }
 
