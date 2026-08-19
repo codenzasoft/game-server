@@ -248,31 +248,41 @@ class HeartsPersistenceServiceSpec extends Specification {
         result.get().rounds()[3].pass() == Pass.KEEPER
     }
 
-    // ── reconstructState: isOver flag ────────────────────────────────────────
+    // ── reconstructState: isOver / isQuit flags ──────────────────────────────
 
-    def "reconstructState sets isOver true when cumulative score reaches 100"() {
-        given: """
-            Four complete rounds where player 0 holds all clubs and leads every trick,
-            winning all 13 tricks each round. Player 3 holds all hearts (13 pts) and
-            player 2 holds Q♠ (13 pts), so player 0 takes 26 pts per round — a moon-shot
-            that scores 0 for player 0 and 26 for each other. After 4 rounds the others
-            reach 104 pts ≥ 100, so the game is over.
-        """
+    def "reconstructState sets isOver true when the game entity has overAt set"() {
+        given:
         def entity = gameService.createHeartsGame(testUser)
         def game = dummyGame(entity)
         def playerNames = entity.players*.username
+        def deal = buildDeal(playerNames)
+        persistRoundWithAllTricks(game, entity, playerNames, deal, 1, Pass.LEFT)
 
-        def pass = Pass.LEFT
-        (1..4).each { roundNum ->
-            def deal = buildDeal(playerNames)
-            persistRoundWithAllTricks(game, entity, playerNames, deal, roundNum, pass)
-            pass = pass.nextPass()
-        }
+        // Mark the game complete via the persistence listener — same path as live play
+        heartsPersistenceService.gameOver(game, new HeartsState(playerNames, [], false, null))
 
         when:
         def result = heartsPersistenceService.reconstructState(entity.id, entity.players)
 
         then: "the reconstructed state is present and marked over"
+        result.isPresent()
+        result.get().isOver()
+    }
+
+    def "reconstructState sets isOver true when the game entity has quitAt set"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+        def game = dummyGame(entity)
+        def playerNames = entity.players*.username
+        def deal = buildDeal(playerNames)
+        heartsPersistenceService.roundStarted(game, stateWithDeal(playerNames, deal, 1, Pass.LEFT))
+
+        heartsPersistenceService.gameQuit(game, new HeartsState(playerNames, [], false, null))
+
+        when:
+        def result = heartsPersistenceService.reconstructState(entity.id, entity.players)
+
+        then: "a quit game is also reconstructed as over so play-again can proceed"
         result.isPresent()
         result.get().isOver()
     }

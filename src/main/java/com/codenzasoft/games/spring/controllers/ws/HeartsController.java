@@ -102,8 +102,8 @@ public class HeartsController {
     final UUID id = UUID.fromString(gameId);
     final Optional<HeartsGame> game = gameService.getOrBuildHeartsGame(id);
     if (game.isEmpty()) return;
-    if (!game.get().getGameState().isOver()) {
-      log.warn("again: game {} is not over", id);
+    if (!game.get().getGameState().isComplete()) {
+      log.warn("again: game {} is not complete", id);
       return;
     }
     final HeartsGameEntity nextGame = gameService.createNextHeartsGame(game.get());
