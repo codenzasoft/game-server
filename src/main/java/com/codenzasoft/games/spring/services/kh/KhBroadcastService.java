@@ -4,6 +4,7 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.kingshand.KhObserver;
+import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
 import com.codenzasoft.games.spring.views.kh.KhMatchView;
@@ -92,5 +93,24 @@ public class KhBroadcastService implements KhObserver {
     messagingTemplate.convertAndSendToUser(
         username, "/queue/games/" + gameId, Map.of("quit", true));
     log.debug("Sent quit acknowledgement to user '{}'", username);
+  }
+
+  /**
+   * Sends the pending-match waiting room to each seated human: a lightweight {@code {lobby: …}}
+   * message (no {@link GameState} exists yet) carrying the current roster so the client can show a
+   * "waiting for a friend to join" overlay with the invite link. Mirrors Hearts' lobby broadcast.
+   *
+   * @param gameId The pending game.
+   * @param players The seated users so far (the host, until a second human joins).
+   */
+  public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
+    final List<String> names = players.stream().map(UserEntity::getUsername).toList();
+    final Map<String, Object> payload =
+        Map.of("lobby", Map.of("gameId", gameId.toString(), "players", names));
+    for (final UserEntity player : players) {
+      messagingTemplate.convertAndSendToUser(
+          player.getUsername(), "/queue/games/" + gameId, payload);
+    }
+    log.debug("Sent KH lobby to {} player(s) of game {}", players.size(), gameId);
   }
 }

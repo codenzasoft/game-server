@@ -150,6 +150,28 @@ public class IndexController {
     return "redirect:/";
   }
 
+  /**
+   * Creates a pending human-vs-human King's Hand game and redirects the host to the game page,
+   * whose URL is the invite link — the second human joins by opening it.
+   */
+  @PostMapping("/games/kh/multiplayer")
+  public String newMultiplayerKhGame(@AuthenticationPrincipal UserDetails user) {
+    final Optional<UserEntity> entity =
+        gamesUserDetailsService.getUserByUsernameOrEmail(user.getUsername());
+    if (entity.isPresent()) {
+      try {
+        final KhGameEntity game = gameService.createPendingKhGame(entity.get());
+        return "redirect:/games/kh/" + game.getId();
+      } catch (IllegalStateException e) {
+        log.warn(
+            "Pending KH game creation rejected for {}: {}",
+            entity.get().getUsername(),
+            e.getMessage());
+      }
+    }
+    return "redirect:/";
+  }
+
   /** Deletes (quits) the identified game on behalf of the authenticated user. */
   @PostMapping(
       "/games/{gameId:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}/delete")
