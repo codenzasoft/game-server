@@ -358,17 +358,29 @@ public record Card(
       final List<Card> boostedCards = new ArrayList<>();
       PlayerState ps = state;
 
+      // Track the current (possibly already-boosted this turn) version of each target by position.
+      // A card with multiple CardTarget effects (e.g. TRADING_POST boosts PRODUCTION then FOOD
+      // cards)
+      // may hit the same target twice; after the first effect replaces it on the board with a
+      // boosted
+      // record, the original reference is no longer on the table. Boosting/replacing the live
+      // version
+      // keeps the boosts stacking and avoids a "card not found in deck" crash on the second effect.
+      final List<Card> currentTargets = new ArrayList<>(targets);
+
       for (Effect effect : getTierEffects(tier)) {
         if (effect.target() instanceof ResourceTarget rt) {
           ps = ps.apply(effect);
         } else if (effect.target() instanceof OpponentResourceTarget) {
           sabotage.collect(effect);
         } else if (effect.target() instanceof CardTarget ct) {
-          for (final Card card : targets) {
+          for (int t = 0; t < currentTargets.size(); t++) {
+            final Card card = currentTargets.get(t);
             final Optional<Card> boosted = boost(card, effect, ct);
             if (boosted.isPresent()) {
               final Card boostedCard = boosted.get();
               ps = ps.replaceTableCard(season, card, boostedCard);
+              currentTargets.set(t, boostedCard);
               boostedCards.add(boostedCard);
             }
             if (ct.adjacentOnly()) {
