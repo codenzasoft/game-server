@@ -202,6 +202,7 @@ export class HeartsGameHandler {
 
   private messageQueue: HeartsMessage[] = [];
   private isProcessing = false;
+  private pendingPlay = false;
 
   // Felt background — created in preloadTextures, re-added at index 0 by clearScene.
   private felt: TilingSprite | null = null;
@@ -458,6 +459,8 @@ export class HeartsGameHandler {
   }
 
   private sendPlay(card: Card) {
+    if (this.pendingPlay) return;
+    this.pendingPlay = true;
     this.stompClient.publish({
       destination: `/games/hearts/${this.gameId}/play`,
       body: JSON.stringify(card),
@@ -514,6 +517,7 @@ export class HeartsGameHandler {
   // ── Rendering ─────────────────────────────────────────────────────────────
 
   private async render(message: HeartsMessage): Promise<void> {
+    this.pendingPlay = false;
     const { context, state } = message;
     const prevMessage = this.lastMessage;
     this.lastMessage = message;
@@ -588,6 +592,7 @@ export class HeartsGameHandler {
     this.removeScoreOverlay();
     this.removeLobbyOverlay();
     this.removeMenuOverlay();
+    this.removeSettingsOverlay();
     this.trickContainer = null;
   }
 
@@ -1535,6 +1540,7 @@ export class HeartsGameHandler {
           sprite.cursor = "pointer";
           sprite.on("pointerdown", () => this.togglePassCard(card));
         } else {
+          sprite.eventMode = "none";
           sprite.alpha = 0.5;
         }
       } else if (isPlayable) {
@@ -1542,6 +1548,7 @@ export class HeartsGameHandler {
         sprite.cursor = "pointer";
         sprite.on("pointerdown", () => this.sendPlay(card));
       } else {
+        sprite.eventMode = "none";
         sprite.alpha = !round.passComplete ? 0.7 : 0.5;
       }
 
