@@ -1,7 +1,7 @@
 package com.codenzasoft.games.spring.entities.hearts;
 
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.spring.entities.GameEntity;
+import com.codenzasoft.games.spring.services.GameType;
 import jakarta.persistence.*;
 import java.util.UUID;
 

@@ -6,7 +6,6 @@ import com.codenzasoft.games.spring.entities.UserEntity
 import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity
 import com.codenzasoft.games.spring.repositories.GamesRepository
-import com.codenzasoft.games.common.GameType
 import com.codenzasoft.games.spring.repositories.UsersRepository
 import com.codenzasoft.games.xo.Piece
 import org.springframework.beans.factory.annotation.Autowired

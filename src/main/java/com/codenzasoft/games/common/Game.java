@@ -16,13 +16,6 @@ import java.util.UUID;
 public interface Game<T> {
 
   /**
-   * Returns the type of this game.
-   *
-   * @return A {@link GameType}.
-   */
-  GameType getGameType();
-
-  /**
    * Returns the specific underlying implementation of the game. For example a {@link
    * com.codenzasoft.games.xo.XoGame}.
    *

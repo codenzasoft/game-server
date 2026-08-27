@@ -1,7 +1,6 @@
 package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.common.Game;
-import com.codenzasoft.games.common.GameType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +28,7 @@ public class GameCache {
     final Optional<Game<?>> someGame = Optional.ofNullable(games.get(uuid));
     if (someGame.isPresent()) {
       final Game<?> game = someGame.get();
-      if (game.getGameType().equals(type)) {
+      if (GameType.fromGame(game).equals(type)) {
         // TODO: is there a way to avoid the cast?
         return Optional.of((Game<T>) game);
       }

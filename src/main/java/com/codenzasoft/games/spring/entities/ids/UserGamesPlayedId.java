@@ -1,6 +1,6 @@
 package com.codenzasoft.games.spring.entities.ids;
 
-import com.codenzasoft.games.common.GameType;
+import com.codenzasoft.games.spring.services.GameType;
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

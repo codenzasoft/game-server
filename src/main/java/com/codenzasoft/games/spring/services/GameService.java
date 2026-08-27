@@ -2,7 +2,6 @@ package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameLifecycleObserver;
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsState;
@@ -804,7 +803,7 @@ public class GameService {
    * @param game The game that just ended naturally.
    */
   private void recordGamesPlayed(final Game<?> game) {
-    switch (game.getGameType()) {
+    switch (GameType.fromGame(game)) {
       case XO -> recordXoGamesPlayed((XoGame) game.getGame());
       case HEARTS -> recordHeartsGamesPlayed((HeartsGame) game.getGame());
       case KH -> recordKhGamesPlayed((GameEngine) game.getGame());

@@ -2,7 +2,6 @@ package com.codenzasoft.games.kingshand;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameLifecycleObserver;
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.kingshand.notifications.KhGameOverNotification;
 import com.codenzasoft.games.kingshand.notifications.KhGameStartedNotification;
@@ -368,11 +367,6 @@ public class GameEngine implements Game<GameEngine> {
       // The forfeiting seat may have been the last one the barrier was waiting on.
       resolvePhaseAndAdvance();
     }
-  }
-
-  @Override
-  public GameType getGameType() {
-    return GameType.KH;
   }
 
   @Override

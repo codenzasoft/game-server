@@ -1,6 +1,6 @@
 package com.codenzasoft.games.spring.entities;
 
-import com.codenzasoft.games.common.GameType;
+import com.codenzasoft.games.spring.services.GameType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
