@@ -1,6 +1,6 @@
 package com.codenzasoft.games.spring.entities.xo;
 
-import com.codenzasoft.games.common.GameType;
+import com.codenzasoft.games.spring.GameType;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;

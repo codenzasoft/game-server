@@ -6,7 +6,7 @@ import com.codenzasoft.games.spring.entities.UserEntity
 import com.codenzasoft.games.spring.entities.hearts.HeartsGameEntity
 import com.codenzasoft.games.spring.entities.kh.KhGameEntity
 import com.codenzasoft.games.spring.repositories.GamesRepository
-import com.codenzasoft.games.common.GameType
+import com.codenzasoft.games.spring.GameType
 import com.codenzasoft.games.spring.repositories.UsersRepository
 import com.codenzasoft.games.xo.Piece
 import org.springframework.beans.factory.annotation.Autowired
@@ -166,7 +166,7 @@ class GameServiceSpec extends Specification {
         gameService.getOrBuildKhGame(gameId)
 
         then:
-        gameCache.getGameOfType(gameId, GameType.KH).isPresent()
+        gameCache.getGame(gameId, GameEngine.class).isPresent()
     }
 
     def "createPendingKhGame seats only the host with no bot"() {
@@ -264,7 +264,7 @@ class GameServiceSpec extends Specification {
         gameService.getOrBuildHeartsGame(gameId)
 
         then:
-        gameCache.getGameOfType(gameId, GameType.HEARTS).isPresent()
+        gameCache.getGame(gameId, HeartsGame.class).isPresent()
     }
 
     // ── createPendingHeartsGame ───────────────────────────────────────────────

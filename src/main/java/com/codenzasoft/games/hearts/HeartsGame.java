@@ -2,7 +2,6 @@ package com.codenzasoft.games.hearts;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameLifecycleObserver;
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.common.cards.Deck;
@@ -156,11 +155,6 @@ public class HeartsGame implements Game<HeartsGame> {
 
   public HeartsState getGameState() {
     return gameState;
-  }
-
-  @Override
-  public GameType getGameType() {
-    return GameType.HEARTS;
   }
 
   @Override

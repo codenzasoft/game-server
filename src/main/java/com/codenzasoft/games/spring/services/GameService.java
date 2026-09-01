@@ -2,7 +2,6 @@ package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameLifecycleObserver;
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.hearts.HeartsGame;
 import com.codenzasoft.games.hearts.HeartsState;
@@ -10,6 +9,7 @@ import com.codenzasoft.games.hearts.strategies.AdaptiveStrategy;
 import com.codenzasoft.games.kingshand.GameEngine;
 import com.codenzasoft.games.kingshand.GameState;
 import com.codenzasoft.games.kingshand.strategies.KhBeamSearchStrategy;
+import com.codenzasoft.games.spring.GameType;
 import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.GameEntity;
 import com.codenzasoft.games.spring.entities.GamePlayerEntity;
@@ -399,7 +399,7 @@ public class GameService {
    * @return An {@link XoGame} or <code>empty</code> if a game with the provided id does not exist.
    */
   public Optional<XoGame> getOrBuildXoGame(final UUID id) {
-    final Optional<Game<XoGame>> cached = gameCache.getGameOfType(id, GameType.XO);
+    final Optional<Game<XoGame>> cached = gameCache.getGame(id, XoGame.class);
     if (cached.isPresent()) {
       return cached.map(Game::getGame);
     }
@@ -429,7 +429,7 @@ public class GameService {
    *     exist.
    */
   public Optional<GameEngine> getOrBuildKhGame(final UUID id) {
-    final Optional<Game<GameEngine>> cached = gameCache.getGameOfType(id, GameType.KH);
+    final Optional<Game<GameEngine>> cached = gameCache.getGame(id, GameEngine.class);
     if (cached.isPresent()) {
       return cached.map(Game::getGame);
     }
@@ -470,7 +470,7 @@ public class GameService {
    * @return A {@link HeartsGame} or {@code empty} if the game does not exist or is not yet started.
    */
   public Optional<HeartsGame> getOrBuildHeartsGame(final UUID id) {
-    final Optional<Game<HeartsGame>> cached = gameCache.getGameOfType(id, GameType.HEARTS);
+    final Optional<Game<HeartsGame>> cached = gameCache.getGame(id, HeartsGame.class);
     if (cached.isPresent()) {
       return cached.map(Game::getGame);
     }
@@ -804,10 +804,12 @@ public class GameService {
    * @param game The game that just ended naturally.
    */
   private void recordGamesPlayed(final Game<?> game) {
-    switch (game.getGameType()) {
-      case XO -> recordXoGamesPlayed((XoGame) game.getGame());
-      case HEARTS -> recordHeartsGamesPlayed((HeartsGame) game.getGame());
-      case KH -> recordKhGamesPlayed((GameEngine) game.getGame());
+    if (game.getGame() instanceof XoGame xo) {
+      recordXoGamesPlayed(xo);
+    } else if (game.getGame() instanceof HeartsGame hearts) {
+      recordHeartsGamesPlayed(hearts);
+    } else if (game.getGame() instanceof GameEngine kh) {
+      recordKhGamesPlayed(kh);
     }
   }
 
