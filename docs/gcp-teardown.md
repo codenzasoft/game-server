@@ -131,7 +131,19 @@ In the GitHub repository settings, remove:
 
 ---
 
-## Step 9 — Shut Down the GCP Project (Optional)
+## Step 9 — Remove DNS Records
+
+Delete the `games.dev.codenzasoft.ca` DNS records from the Squarespace DNS settings for `codenzasoft.ca`. Leaving dangling records after the Cloud Run service is deleted creates a subdomain takeover risk — someone else could deploy a service to the same Cloud Run URL and have it resolve under your domain.
+
+Records to remove:
+- Any `CNAME` record pointing `games.dev` to a `*.run.app` address
+- Any `A` / `AAAA` records for `games.dev` if a custom domain mapping was used instead
+
+In Squarespace: **Domains → codenzasoft.ca → DNS Settings**, find and delete the `games.dev` entry.
+
+---
+
+## Step 10 — Shut Down the GCP Project (Optional)
 
 If no other services are running under `crafty-dynamics-495319-e2`, shutting down the project cleans up everything and guarantees no residual billing:
 
