@@ -1,6 +1,6 @@
 package com.codenzasoft.games.spring.repositories;
 
-import com.codenzasoft.games.common.GameType;
+import com.codenzasoft.games.spring.GameType;
 import com.codenzasoft.games.spring.entities.UserGamesPlayedEntity;
 import com.codenzasoft.games.spring.entities.ids.UserGamesPlayedId;
 import java.util.List;

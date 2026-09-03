@@ -2,7 +2,6 @@ package com.codenzasoft.games.xo;
 
 import com.codenzasoft.games.common.Game;
 import com.codenzasoft.games.common.GameLifecycleObserver;
-import com.codenzasoft.games.common.GameType;
 import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.xo.notifications.*;
 import java.util.*;
@@ -178,10 +177,6 @@ public class XoGame implements Game<XoGame> {
         }
       }
     }
-  }
-
-  public GameType getGameType() {
-    return GameType.XO;
   }
 
   public XoGame getGame() {

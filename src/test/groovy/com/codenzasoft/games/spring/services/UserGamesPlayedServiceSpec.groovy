@@ -1,6 +1,6 @@
 package com.codenzasoft.games.spring.services
 
-import com.codenzasoft.games.common.GameType
+import com.codenzasoft.games.spring.GameType
 import com.codenzasoft.games.spring.entities.UserEntity
 import com.codenzasoft.games.spring.repositories.UsersRepository
 import org.springframework.beans.factory.annotation.Autowired

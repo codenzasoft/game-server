@@ -1,7 +1,6 @@
 package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.common.Game;
-import com.codenzasoft.games.common.GameType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -18,18 +17,6 @@ public class GameCache {
     if (someGame.isPresent()) {
       final Game<?> game = someGame.get();
       if (clazz.isInstance(game.getGame())) {
-        // TODO: is there a way to avoid the cast?
-        return Optional.of((Game<T>) game);
-      }
-    }
-    return Optional.empty();
-  }
-
-  public <T> Optional<Game<T>> getGameOfType(final UUID uuid, final GameType type) {
-    final Optional<Game<?>> someGame = Optional.ofNullable(games.get(uuid));
-    if (someGame.isPresent()) {
-      final Game<?> game = someGame.get();
-      if (game.getGameType().equals(type)) {
         // TODO: is there a way to avoid the cast?
         return Optional.of((Game<T>) game);
       }
