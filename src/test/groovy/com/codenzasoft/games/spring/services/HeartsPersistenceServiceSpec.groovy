@@ -248,6 +248,45 @@ class HeartsPersistenceServiceSpec extends Specification {
         result.get().rounds()[3].pass() == Pass.KEEPER
     }
 
+    // ── reconstructState: isOver / isQuit flags ──────────────────────────────
+
+    def "reconstructState sets isOver true when the game entity has overAt set"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+        def game = dummyGame(entity)
+        def playerNames = entity.players*.username
+        def deal = buildDeal(playerNames)
+        persistRoundWithAllTricks(game, entity, playerNames, deal, 1, Pass.LEFT)
+
+        // Mark the game complete via the persistence listener — same path as live play
+        heartsPersistenceService.gameOver(game, new HeartsState(playerNames, [], false, null))
+
+        when:
+        def result = heartsPersistenceService.reconstructState(entity.id, entity.players)
+
+        then: "the reconstructed state is present and marked over"
+        result.isPresent()
+        result.get().isOver()
+    }
+
+    def "reconstructState sets isOver true when the game entity has quitAt set"() {
+        given:
+        def entity = gameService.createHeartsGame(testUser)
+        def game = dummyGame(entity)
+        def playerNames = entity.players*.username
+        def deal = buildDeal(playerNames)
+        heartsPersistenceService.roundStarted(game, stateWithDeal(playerNames, deal, 1, Pass.LEFT))
+
+        heartsPersistenceService.gameQuit(game, new HeartsState(playerNames, [], false, null))
+
+        when:
+        def result = heartsPersistenceService.reconstructState(entity.id, entity.players)
+
+        then: "a quit game is also reconstructed as over so play-again can proceed"
+        result.isPresent()
+        result.get().isOver()
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private HeartsGame dummyGame(def entity) {
@@ -293,5 +332,29 @@ class HeartsPersistenceServiceSpec extends Specification {
 
     private Map<String, List<Card>> emptyHands(List<String> playerNames) {
         playerNames.collectEntries { [it, []] }
+    }
+
+    /**
+     * Persists a complete round: 52 hand rows via roundStarted, then all 13 tricks via
+     * cardPlayed. Each cardPlayed call receives a state whose current trick is the trick
+     * being persisted, so trickNumber is recorded correctly in the DB.
+     */
+    private void persistRoundWithAllTricks(def game, def entity, List<String> playerNames,
+                                           Map<String, List<Card>> deal, int roundNum, Pass pass) {
+        def dealer = playerNames[(roundNum - 1) % playerNames.size()]
+        def startRound = new RoundState(roundNum, pass, dealer, deal, [:], true, [], deal)
+        def startState = new HeartsState(playerNames, [startRound], false, null)
+        heartsPersistenceService.roundStarted(game, startState)
+
+        def completedTricks = buildCompletedTricks(playerNames, deal)
+        completedTricks.each { trick ->
+            def trickState = new HeartsState(playerNames, [
+                new RoundState(roundNum, pass, dealer, deal, [:], true, [trick], emptyHands(playerNames))
+            ], false, null)
+            trick.cards().eachWithIndex { pc, idx ->
+                def player = entity.players.find { it.username == pc.player() }.toPlayer()
+                heartsPersistenceService.cardPlayed(game, trickState, player, pc.card(), idx + 1)
+            }
+        }
     }
 }

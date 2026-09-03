@@ -173,8 +173,10 @@ public class HeartsPersistenceService implements HeartsListener {
     }
 
     log.debug("Reconstructed {} rounds for game {}", rounds.size(), gameId);
-    return Optional.of(
-        new HeartsState(playerNames, Collections.unmodifiableList(rounds), false, null));
+    final List<RoundState> immutableRounds = Collections.unmodifiableList(rounds);
+    final boolean isOver =
+        heartsGameRepository.findById(gameId).map(e -> e.isOver() || e.isQuit()).orElse(false);
+    return Optional.of(new HeartsState(playerNames, immutableRounds, isOver, null));
   }
 
   private RoundState buildRoundState(
