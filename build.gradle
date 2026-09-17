@@ -20,9 +20,20 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven {
+        url = 'https://maven.pkg.github.com/codenzasoft/game-libs'
+        credentials {
+            username = System.getenv('GITHUB_ACTOR') ?: project.findProperty('gpr.user')
+            password = System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
+        }
+    }
 }
 
 dependencies {
+    implementation(
+            'com.codenzasoft.games:game-common:1.0.0-SNAPSHOT',
+            'com.codenzasoft.games:game-hearts:1.0.0-SNAPSHOT',
+    )
     implementation(
             'org.springframework.boot:spring-boot-starter-security',
             'org.springframework.boot:spring-boot-starter-data-jpa',
