@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     services:
       postgres:
         image: postgres:16-alpine
@@ -42,3 +45,6 @@ jobs:
       - name: Build and test
         working-directory: game-server
         run: ./gradlew build
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GPR_TOKEN: ${{ secrets.ORG_PACKAGE_READ_TOKEN }}
