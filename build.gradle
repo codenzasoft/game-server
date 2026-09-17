@@ -24,7 +24,7 @@ repositories {
         url = 'https://maven.pkg.github.com/codenzasoft/game-libs'
         credentials {
             username = System.getenv('GITHUB_ACTOR') ?: project.findProperty('gpr.user')
-            password = System.getenv('GPR_TOKEN') ?: project.findProperty('gpr.key')
+            password = System.getenv('GITHUB_TOKEN') ?: project.findProperty('gpr.key')
         }
     }
 }

@@ -47,4 +47,4 @@ jobs:
         run: ./gradlew build
         env:
           GITHUB_ACTOR: ${{ github.actor }}
-          GPR_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
