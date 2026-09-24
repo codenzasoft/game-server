@@ -162,6 +162,7 @@ const HeartsContextSchema = z.object({
   hand: z.array(CardSchema),
   validCards: z.array(CardSchema),
   passingRequired: z.boolean(),
+  isAdmin: z.boolean().default(false),
   nextGameId: z.string().optional(),
 });
 type HeartsContext = z.infer<typeof HeartsContextSchema>;
@@ -196,6 +197,7 @@ const OPP_BASE_ARC_RADIUS = 600;
 export class HeartsGameHandler {
   private app: Application;
   private gameId = "";
+  private isAdmin = false;
   private stompClient!: Client;
   private subscription!: StompSubscription;
   private wsErrorCount = 0;
@@ -521,6 +523,7 @@ export class HeartsGameHandler {
     const { context, state } = message;
     const prevMessage = this.lastMessage;
     this.lastMessage = message;
+    this.isAdmin = context.isAdmin;
 
     if (context.nextGameId) {
       window.location.href = `/games/hearts/${context.nextGameId}`;
@@ -1593,6 +1596,12 @@ export class HeartsGameHandler {
       { label: "Save and Exit", action: () => { window.location.href = "/"; } },
       { label: "Abandon Game",  action: () => { this.removeMenuOverlay(); this.sendQuit(); } },
     ];
+    if (this.isAdmin) {
+      items.push({ label: "Bot Decisions", action: () => {
+        window.open(`/admin/hearts/${this.gameId}/bot-decisions`, "_blank");
+        this.removeMenuOverlay();
+      }});
+    }
 
     for (const item of items) {
       const btn = document.createElement("button");
