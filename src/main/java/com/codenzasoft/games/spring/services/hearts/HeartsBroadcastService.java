@@ -5,6 +5,7 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.common.cards.Card;
 import com.codenzasoft.games.hearts.*;
 import com.codenzasoft.games.hearts.Pass;
+import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.HeartsContext;
 import com.codenzasoft.games.spring.messages.HeartsMessage;
@@ -80,8 +81,9 @@ public class HeartsBroadcastService implements HeartsListener {
                         && !r.isPassComplete()
                         && !r.passes().containsKey(player.name()))
             .orElse(false);
+    final boolean isAdmin = user.getRoles().stream().anyMatch(r -> r.getRole().equals(Role.ADMIN));
     return new HeartsContext(
-        player.name(), game.getId(), hand, validCards, passingRequired, nextGameId);
+        player.name(), game.getId(), hand, validCards, passingRequired, isAdmin, nextGameId);
   }
 
   private List<UserEntity> getNonBots(final Game<?> game) {

@@ -23,4 +23,5 @@ public record HeartsContext(
     @JsonProperty("hand") List<Card> hand,
     @JsonProperty("validCards") List<Card> validCards,
     @JsonProperty("passingRequired") boolean passingRequired,
+    @JsonProperty("isAdmin") boolean isAdmin,
     @JsonInclude(JsonInclude.Include.NON_NULL) UUID nextGameId) {}

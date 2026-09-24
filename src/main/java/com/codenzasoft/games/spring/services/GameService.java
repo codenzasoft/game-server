@@ -24,8 +24,10 @@ import com.codenzasoft.games.spring.repositories.GamesRepository;
 import com.codenzasoft.games.spring.repositories.UserGamesPlayedRepository;
 import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.repositories.hearts.HeartsGameRepository;
+import com.codenzasoft.games.spring.services.hearts.BotDecisionLogService;
 import com.codenzasoft.games.spring.services.hearts.HeartsBroadcastService;
 import com.codenzasoft.games.spring.services.hearts.HeartsPersistenceService;
+import com.codenzasoft.games.spring.services.hearts.LoggingHeartsBotObserver;
 import com.codenzasoft.games.spring.services.kh.KhBroadcastService;
 import com.codenzasoft.games.spring.services.kh.KhPersistenceService;
 import com.codenzasoft.games.spring.services.xo.XoBroadcastService;
@@ -67,6 +69,7 @@ public class GameService {
   @Autowired private GameCache gameCache;
   @Autowired private UserService userService;
   @Autowired private UserGamesPlayedRepository userGamesPlayedRepository;
+  @Autowired private BotDecisionLogService botDecisionLogService;
 
   /**
    * Returns whether the provided user has reached {@link #MAX_ACTIVE_GAMES} active (incomplete)
@@ -592,7 +595,11 @@ public class GameService {
             .addLifecycleObserver(new GameLifecycleListener<>());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
-        builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
+        final LoggingHeartsBotObserver observer =
+            new LoggingHeartsBotObserver(
+                new AdaptiveStrategy(), entity.getId(), user.toPlayer(), botDecisionLogService);
+        builder.addPlayerObserver(user.toPlayer(), observer);
+        builder.addListener(observer);
       }
     }
     return builder.build();
@@ -613,7 +620,11 @@ public class GameService {
             .addLifecycleObserver(new GameLifecycleListener<>());
     for (final UserEntity user : entity.getPlayers()) {
       if (user.isBot()) {
-        builder.addPlayerObserver(user.toPlayer(), new AdaptiveStrategy());
+        final LoggingHeartsBotObserver observer =
+            new LoggingHeartsBotObserver(
+                new AdaptiveStrategy(), entity.getId(), user.toPlayer(), botDecisionLogService);
+        builder.addPlayerObserver(user.toPlayer(), observer);
+        builder.addListener(observer);
       }
     }
     return builder.build();
