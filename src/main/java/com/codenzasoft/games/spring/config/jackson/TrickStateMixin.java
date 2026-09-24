@@ -28,9 +28,6 @@ abstract class TrickStateMixin {
   @JsonIgnore
   abstract Optional<?> getWinner();
 
-  @JsonIgnore
-  abstract Optional<?> getNextPlayer(Object gameState);
-
   @JsonProperty("score")
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   abstract Map<String, Integer> getScore();

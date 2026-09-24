@@ -32,12 +32,6 @@ abstract class RoundStateMixin {
   abstract boolean isPassComplete();
 
   @JsonIgnore
-  abstract List<?> getPass(String player);
-
-  @JsonIgnore
-  abstract Optional<?> getNextPlayer(Object gameState);
-
-  @JsonIgnore
   abstract Optional<?> getCurrentTrick();
 
   @JsonIgnore
@@ -48,7 +42,4 @@ abstract class RoundStateMixin {
 
   @JsonIgnore
   abstract List<?> getRemainingCards();
-
-  @JsonIgnore
-  abstract List<?> getHand(Object player);
 }
