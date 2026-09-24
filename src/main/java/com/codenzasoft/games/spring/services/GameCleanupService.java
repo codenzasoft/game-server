@@ -1,6 +1,7 @@
 package com.codenzasoft.games.spring.services;
 
 import com.codenzasoft.games.spring.repositories.GamesRepository;
+import com.codenzasoft.games.spring.services.hearts.BotDecisionLogService;
 import jakarta.transaction.Transactional;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +17,7 @@ public class GameCleanupService {
 
   @Autowired private GamesRepository gamesRepository;
   @Autowired private GameCache gameCache;
+  @Autowired private BotDecisionLogService botDecisionLogService;
 
   @Scheduled(
       initialDelayString = "${game.cleanup.initialDelay:120000}",
@@ -27,6 +29,7 @@ public class GameCleanupService {
       return;
     }
     ids.forEach(gameCache::removeGame);
+    ids.forEach(botDecisionLogService::clearGame);
     final int deleted = gamesRepository.deleteCompletedGames();
     log.info("Deleted {} completed game(s)", deleted);
   }
