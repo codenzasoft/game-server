@@ -1,6 +1,6 @@
 # game-server
 
-The KingsHand game server — a Spring Boot application serving Tic-Tac-Toe and Hearts card games.
+The KingsHand game server — a Spring Boot application serving KingsHand (a Hearts card game variant) and Tic-Tac-Toe.
 
 ## Prerequisites
 
