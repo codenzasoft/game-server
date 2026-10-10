@@ -16,14 +16,7 @@ Spotless is wired as a pre-compile dependency (`compileJava.dependsOn('spotlessA
 
 ## Local Build Configuration
 
-The build depends on `game-common` and `game-hearts` from the private `codenzasoft/game-libs` GitHub Packages registry. To resolve these locally, add credentials to `~/.gradle/gradle.properties`:
-
-```properties
-gpr.user=<your GitHub username>
-gpr.key=<your GitHub personal access token>
-```
-
-The PAT requires `read:packages` scope. Create one at GitHub → Settings → Developer settings → Personal access tokens. This is a one-time setup; CI uses the built-in `GITHUB_TOKEN` automatically.
+The build depends on `game-common` and `game-hearts` from Maven Central — no credentials required.
 
 The `buildFrontend` Gradle task runs `vite build --mode development` by default. Pass `-PviteMode=production` to use production env vars (the Dockerfile does this automatically).
 
