@@ -24,8 +24,8 @@ repositories {
 
 dependencies {
     implementation(
-            'com.codenzasoft.games:game-common:1.0.0',
-            'com.codenzasoft.games:game-hearts:1.0.0',
+            'com.codenzasoft.games:game-common:1.0.1',
+            'com.codenzasoft.games:game-hearts:1.0.1',
     )
     implementation(
             'org.springframework.boot:spring-boot-starter-security',
