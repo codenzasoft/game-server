@@ -46,7 +46,12 @@ public class GuestCleanupService {
     }
 
     for (UserEntity guest : toDelete) {
-      jdbcTemplate.update("DELETE FROM game_players WHERE user_id = ?", guest.getId());
+      // Delete the guest's games first; ON DELETE CASCADE removes game_players,
+      // xo_game_pieces, xo_game_moves, hearts_round_hands, hearts_round_passes,
+      // and hearts_tricks, leaving no FK references before the user row is removed.
+      jdbcTemplate.update(
+          "DELETE FROM games WHERE id IN (SELECT game_id FROM game_players WHERE user_id = ?)",
+          guest.getId());
       usersRepository.delete(guest);
     }
 

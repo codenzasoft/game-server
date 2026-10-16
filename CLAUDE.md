@@ -155,7 +155,7 @@ Guests can play without creating an account. Progress is not saved across sessio
 
 **Display name vs. stored username:** `UserEntity.getDisplayName()` strips the `#xxxx` suffix for display and for game-engine player identity (seat lookups, state keys). `getUsername()` returns the full stored name and is used only for STOMP routing (`convertAndSendToUser`) and Spring Security principal name — places that must match the session's principal exactly.
 
-**Cleanup:** `GuestCleanupService` runs hourly (1-hour initial delay). It finds `GUEST` users whose `created_at` is older than 1 hour, skips any still in an active game (`over_at IS NULL AND quit_at IS NULL`), deletes their `game_players` rows (no FK cascade from `users`), then deletes the `UserEntity`. Timing is overridable via `guest.cleanup.initialDelay` and `guest.cleanup.fixedDelay` (milliseconds).
+**Cleanup:** `GuestCleanupService` runs hourly (1-hour initial delay). It finds `GUEST` users whose `created_at` is older than 1 hour, skips any still in an active game (`over_at IS NULL AND quit_at IS NULL`), deletes their games (which cascades to `game_players`, `xo_game_pieces`, `xo_game_moves`, `hearts_round_hands`, `hearts_round_passes`, `hearts_tricks`), then deletes the `UserEntity`. Timing is overridable via `guest.cleanup.initialDelay` and `guest.cleanup.fixedDelay` (milliseconds).
 
 **Rate limiting:** `POST /guest/login` is covered by the same `RegistrationRateLimiter` as registration — 5 requests/IP/hour.
 
