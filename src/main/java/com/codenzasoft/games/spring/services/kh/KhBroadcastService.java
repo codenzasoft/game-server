@@ -75,12 +75,14 @@ public class KhBroadcastService implements KhObserver {
       }
       final UserEntity userEntity = usersRepository.findById(seats.get(seat).id()).orElse(null);
       if (userEntity == null) continue;
-      final String username = userEntity.getUsername();
-      final KhContext context = new KhContext(username, game.getId(), seat);
+      final String storedUsername = userEntity.getUsername();
+      final String displayName = userEntity.getDisplayName();
+      final KhContext context = new KhContext(displayName, game.getId(), seat);
       // Per-seat view: the recipient's own kingdom in full, opponents redacted (hidden info).
       final KhMessage message = new KhMessage(context, KhMatchView.forSeat(state, seat));
-      messagingTemplate.convertAndSendToUser(username, "/queue/games/" + game.getId(), message);
-      log.debug("Sent game state to user '{}' (seat {})", username, seat);
+      messagingTemplate.convertAndSendToUser(
+          storedUsername, "/queue/games/" + game.getId(), message);
+      log.debug("Sent game state to user '{}' (seat {})", storedUsername, seat);
     }
   }
 
