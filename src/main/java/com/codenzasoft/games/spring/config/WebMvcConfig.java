@@ -11,6 +11,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
   public void addInterceptors(InterceptorRegistry registry) {
     registry
         .addInterceptor(new RegistrationRateLimiter())
-        .addPathPatterns("/register", "/verify-email/resend");
+        .addPathPatterns("/register", "/verify-email/resend", "/guest/login");
   }
 }

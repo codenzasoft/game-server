@@ -107,7 +107,15 @@ public class UserEntity {
   }
 
   public Player toPlayer() {
-    return new Player(getId(), getUsername());
+    return new Player(getId(), getDisplayName());
+  }
+
+  public String getDisplayName() {
+    if (isGuest()) {
+      int idx = userName.lastIndexOf('#');
+      return idx >= 0 ? userName.substring(0, idx) : userName;
+    }
+    return userName;
   }
 
   public void setEmailVerifiedAt(final Instant emailVerifiedAt) {
@@ -124,5 +132,9 @@ public class UserEntity {
 
   public boolean isBot() {
     return getRoles().stream().anyMatch(role -> role.getRole().equals(Role.BOT));
+  }
+
+  public boolean isGuest() {
+    return getRoles().stream().anyMatch(role -> role.getRole().equals(Role.GUEST));
   }
 }

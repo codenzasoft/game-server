@@ -7,6 +7,7 @@ import com.codenzasoft.games.kingshand.KhObserver;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.KhContext;
 import com.codenzasoft.games.spring.messages.KhMessage;
+import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.views.kh.KhMatchView;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 public class KhBroadcastService implements KhObserver {
   private static final Logger log = LoggerFactory.getLogger(KhBroadcastService.class);
 
+  @Autowired private UsersRepository usersRepository;
   @Autowired private SimpMessagingTemplate messagingTemplate;
 
   // ----- KhObserver: engine-driven pushes -----
@@ -71,14 +73,16 @@ public class KhBroadcastService implements KhObserver {
       if (game.isBotSeat(seat)) {
         continue; // bots have no client to receive state
       }
-      // A player's name is their username (validated when the game was created), so it can address
-      // the STOMP user destination directly — no per-broadcast user lookup needed.
-      final String username = seats.get(seat).name();
-      final KhContext context = new KhContext(username, game.getId(), seat);
+      final UserEntity userEntity = usersRepository.findById(seats.get(seat).id()).orElse(null);
+      if (userEntity == null) continue;
+      final String storedUsername = userEntity.getUsername();
+      final String displayName = userEntity.getDisplayName();
+      final KhContext context = new KhContext(displayName, game.getId(), seat);
       // Per-seat view: the recipient's own kingdom in full, opponents redacted (hidden info).
       final KhMessage message = new KhMessage(context, KhMatchView.forSeat(state, seat));
-      messagingTemplate.convertAndSendToUser(username, "/queue/games/" + game.getId(), message);
-      log.debug("Sent game state to user '{}' (seat {})", username, seat);
+      messagingTemplate.convertAndSendToUser(
+          storedUsername, "/queue/games/" + game.getId(), message);
+      log.debug("Sent game state to user '{}' (seat {})", storedUsername, seat);
     }
   }
 
@@ -104,7 +108,7 @@ public class KhBroadcastService implements KhObserver {
    * @param players The seated users so far (the host, until a second human joins).
    */
   public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
-    final List<String> names = players.stream().map(UserEntity::getUsername).toList();
+    final List<String> names = players.stream().map(UserEntity::getDisplayName).toList();
     final Map<String, Object> payload =
         Map.of("lobby", Map.of("gameId", gameId.toString(), "players", names));
     for (final UserEntity player : players) {
