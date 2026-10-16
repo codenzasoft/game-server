@@ -107,6 +107,8 @@ public class SecurityConfig {
               .permitAll()
               .requestMatchers("/guest/login")
               .permitAll()
+              .requestMatchers("/profile")
+              .hasAuthority("USER")
               .requestMatchers("/admin/**")
               .hasAuthority("ADMIN")
               .anyRequest()
