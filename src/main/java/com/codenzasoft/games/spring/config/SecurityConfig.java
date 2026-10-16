@@ -34,7 +34,8 @@ public class SecurityConfig {
         """
         ADMIN > DEVELOPER
         DEVELOPER > USER
-        USER > BOT
+        USER > GUEST
+        GUEST > BOT
         """);
   }
 
@@ -103,6 +104,8 @@ public class SecurityConfig {
               .requestMatchers("/verify-email/resend")
               .permitAll()
               .requestMatchers("/register/check-email")
+              .permitAll()
+              .requestMatchers("/guest/login")
               .permitAll()
               .requestMatchers("/admin/**")
               .hasAuthority("ADMIN")

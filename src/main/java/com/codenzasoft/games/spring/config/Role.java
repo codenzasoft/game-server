@@ -8,6 +8,7 @@ public enum Role {
   ADMIN,
   DEVELOPER,
   USER,
+  GUEST,
   BOT;
 
   public static Role fromString(String role) {
@@ -15,6 +16,7 @@ public enum Role {
       case "ADMIN" -> Role.ADMIN;
       case "DEVELOPER" -> Role.DEVELOPER;
       case "USER" -> Role.USER;
+      case "GUEST" -> Role.GUEST;
       case "BOT" -> Role.BOT;
       default -> null;
     };
