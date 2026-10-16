@@ -8,8 +8,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.ColumnTransformer;
 
 /**
  * Persisted mid-game state for one King's Hand match: the entire immutable {@code GameState}
@@ -26,7 +25,7 @@ public class KhGameStateEntity {
   @Column(name = "game_id")
   private UUID gameId;
 
-  @JdbcTypeCode(SqlTypes.JSON)
+  @ColumnTransformer(write = "?::jsonb")
   @Column(name = "state", columnDefinition = "jsonb", nullable = false)
   private String state;
 
