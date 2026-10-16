@@ -85,14 +85,15 @@ Spring Boot 4 / Java 17 server-side-rendered web app using Thymeleaf. No REST AP
 
 ### Security model
 
-- Form login redirects to `/login`; public paths: `/img/**`, `/login`, `/register`, `/register/check-email`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`
-- Roles: `ADMIN`, `DEVELOPER`, `USER`, `BOT` (defined in `Role` enum); new self-registered accounts receive `USER`
-- Role hierarchy (`ADMIN > DEVELOPER > USER > BOT`) is defined in `SecurityConfig` and auto-wired into both URL and method security by Spring Security 6.3+
+- Form login redirects to `/login`; public paths: `/img/**`, `/login`, `/register`, `/register/check-email`, `/forgot-password`, `/reset-password`, `/verify-email`, `/verify-email/resend`, `/guest/login`
+- Roles: `ADMIN`, `DEVELOPER`, `USER`, `GUEST`, `BOT` (defined in `Role` enum); new self-registered accounts receive `USER`; guest sessions receive `GUEST`
+- Role hierarchy (`ADMIN > DEVELOPER > USER > GUEST > BOT`) is defined in `SecurityConfig` and auto-wired into both URL and method security by Spring Security 6.3+
+- `/profile` requires `USER` or above — guests are redirected to login
 - Password encoding uses `DelegatingPasswordEncoder` (default bcrypt; supports legacy PBKDF2/scrypt/Argon2)
 - `RoleEntity` uses a composite primary key (`userId` + `role`)
 - Unverified accounts (`email_verified_at IS NULL`) are blocked at login — `GamesUserDetailsService` sets `enabled=false` on the Spring Security `UserDetails` object
 - Self-service password reset: 30-minute single-use token stored in `password_reset_tokens`, delivered via Mailgun (`PasswordResetService`)
-- Rate limiting on registration endpoints: `RegistrationRateLimiter` (`HandlerInterceptor`) — 5 requests/IP/hour on `POST /register` and `POST /verify-email/resend`
+- Rate limiting on registration endpoints: `RegistrationRateLimiter` (`HandlerInterceptor`) — 5 requests/IP/hour on `POST /register`, `POST /verify-email/resend`, and `POST /guest/login`
 
 ### Templates
 
@@ -136,10 +137,27 @@ Registration is open to anyone with a valid email address.
 **Rate limiting:** A `RegistrationRateLimiter` (`HandlerInterceptor`) applies a per-IP sliding-window limit of 5 requests/hour to `POST /register` and `POST /verify-email/resend`. The limiter is per-instance (no shared state across Cloud Run replicas), which is acceptable because email verification is still required to activate any account created through it.
 
 **Mailgun configuration** (`application.yaml`):
+
 ```
 MAILGUN_API_KEY, MAILGUN_DOMAIN, MAILGUN_FROM
 ```
 Both `EmailVerificationService` and `PasswordResetService` extend `MailgunEmailService`, which holds the shared Mailgun config fields and `sendEmail()` implementation.
+
+### Guest login flow
+
+Guests can play without creating an account. Progress is not saved across sessions.
+
+1. User enters a display name (3–25 chars, `[a-zA-Z0-9_-]+`) in the "Play Now" section on the login page and submits `POST /guest/login` (`GuestLoginController`).
+2. The controller generates a unique internal username: `displayName#xxxx` (4 random hex digits). The `#` separator cannot appear in validated regular usernames, so it is a safe namespace boundary. Up to 5 suffix candidates are tried before returning an error.
+3. A `UserEntity` is created with no email or password, `email_verified_at = NOW()` (so Spring Security considers the account enabled), and the `GUEST` role.
+4. A Spring Security session is established programmatically — a `UsernamePasswordAuthenticationToken` with a `UserDetails` principal is written to the `HttpSession` under `SPRING_SECURITY_CONTEXT_KEY`.
+5. The guest is redirected to `/`. The "Profile" nav link is hidden (`th:unless="${user.isGuest()}"`), and `/profile` is blocked at the security layer (`hasAuthority("USER")`).
+
+**Display name vs. stored username:** `UserEntity.getDisplayName()` strips the `#xxxx` suffix for display and for game-engine player identity (seat lookups, state keys). `getUsername()` returns the full stored name and is used only for STOMP routing (`convertAndSendToUser`) and Spring Security principal name — places that must match the session's principal exactly.
+
+**Cleanup:** `GuestCleanupService` runs hourly (1-hour initial delay). It finds `GUEST` users whose `created_at` is older than 1 hour, skips any still in an active game (`over_at IS NULL AND quit_at IS NULL`), deletes their `game_players` rows (no FK cascade from `users`), then deletes the `UserEntity`. Timing is overridable via `guest.cleanup.initialDelay` and `guest.cleanup.fixedDelay` (milliseconds).
+
+**Rate limiting:** `POST /guest/login` is covered by the same `RegistrationRateLimiter` as registration — 5 requests/IP/hour.
 
 ### Session persistence
 
