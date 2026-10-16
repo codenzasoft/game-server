@@ -16,6 +16,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -75,8 +77,9 @@ public class GuestLoginController {
     usersRepository.save(saved);
 
     final List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("GUEST"));
+    final UserDetails userDetails = new User(storedName, "", true, true, true, true, authorities);
     final Authentication auth =
-        UsernamePasswordAuthenticationToken.authenticated(storedName, null, authorities);
+        UsernamePasswordAuthenticationToken.authenticated(userDetails, null, authorities);
     final SecurityContext context = SecurityContextHolder.createEmptyContext();
     context.setAuthentication(auth);
     SecurityContextHolder.setContext(context);
