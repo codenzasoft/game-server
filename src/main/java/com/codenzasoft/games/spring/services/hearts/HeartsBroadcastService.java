@@ -9,6 +9,7 @@ import com.codenzasoft.games.spring.config.Role;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.HeartsContext;
 import com.codenzasoft.games.spring.messages.HeartsMessage;
+import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ public class HeartsBroadcastService implements HeartsListener {
   private static final Logger log = LoggerFactory.getLogger(HeartsBroadcastService.class);
 
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
+  @Autowired private UsersRepository usersRepository;
   @Autowired private SimpMessagingTemplate messagingTemplate;
 
   /**
@@ -88,7 +90,7 @@ public class HeartsBroadcastService implements HeartsListener {
 
   private List<UserEntity> getNonBots(final Game<?> game) {
     return game.getPlayers().stream()
-        .map(player -> gamesUserDetailsService.getUserByUsernameOrEmail(player.name()))
+        .map(player -> usersRepository.findById(player.id()))
         .filter(Optional::isPresent)
         .map(Optional::get)
         .filter(user -> !user.isBot())
@@ -103,7 +105,7 @@ public class HeartsBroadcastService implements HeartsListener {
    * @param players The players currently in the lobby (human only; bots are not in lobby phase).
    */
   public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
-    final List<String> names = players.stream().map(UserEntity::getUsername).toList();
+    final List<String> names = players.stream().map(UserEntity::getDisplayName).toList();
     final Map<String, Object> payload =
         Map.of("lobby", Map.of("gameId", gameId.toString(), "players", names));
     for (final UserEntity player : players) {

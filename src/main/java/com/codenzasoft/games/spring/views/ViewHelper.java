@@ -53,15 +53,15 @@ public class ViewHelper {
    */
   public String getGamePlayersDescription(final List<UserEntity> players) {
     if (players.isEmpty()) return "";
-    if (players.size() == 1) return players.get(0).getUsername();
-    final String first = players.get(0).getUsername();
+    if (players.size() == 1) return players.get(0).getDisplayName();
+    final String first = players.get(0).getDisplayName();
     final List<UserEntity> opponents = players.subList(1, players.size());
     if (opponents.stream().allMatch(UserEntity::isBot)) {
       return first + " vs. Bots";
     }
     return first
         + " vs. "
-        + opponents.stream().map(UserEntity::getUsername).collect(Collectors.joining(", "));
+        + opponents.stream().map(UserEntity::getDisplayName).collect(Collectors.joining(", "));
   }
 
   /**

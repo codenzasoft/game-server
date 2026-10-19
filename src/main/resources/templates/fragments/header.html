@@ -16,8 +16,8 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Account</a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" th:href="@{/profile}">Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
+                        <li th:unless="${user.isGuest()}"><a class="dropdown-item" th:href="@{/profile}">Profile</a></li>
+                        <li th:unless="${user.isGuest()}"><hr class="dropdown-divider"></li>
                         <li>
                             <form th:action="@{/logout}" method="POST">
                                 <button type="submit" class="dropdown-item">Logout</button>

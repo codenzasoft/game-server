@@ -240,7 +240,7 @@ public class KhController {
         .getOrBuildKhGame(id)
         .ifPresent(
             game -> {
-              final int seat = game.seatOf(userEntity.get().getUsername());
+              final int seat = game.seatOf(userEntity.get().getDisplayName());
               if (seat >= 0
                   && game.getState().playerCount() > 1
                   && !game.getState().isMatchOver()) {
@@ -280,7 +280,7 @@ public class KhController {
         .getOrBuildKhGame(UUID.fromString(gameId))
         .ifPresent(
             game -> {
-              final String username = userOpt.get().getUsername();
+              final String username = userOpt.get().getDisplayName();
               final int seat = game.seatOf(username);
               if (seat < 0) {
                 log.warn("{} rejected for game {}: user '{}' is not seated", op, gameId, username);

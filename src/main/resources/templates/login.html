@@ -2,13 +2,33 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
     <head th:replace="~{fragments/links :: head-js-css}"></head>
     <body>
-        <div class="position-absolute top-50 start-50 translate-middle">
+        <div class="position-absolute top-50 start-50 translate-middle" style="width: 320px;">
             <img src="/img/codenza-sdi-tech-banner.png" width="300" class="mb-5"/>
+
+            <!-- Guest / quick-play section -->
+            <div class="mb-4">
+                <h6 class="text-muted mb-2">Play Now</h6>
+                <div th:if="${guestError}" class="alert alert-danger py-1 px-2 mb-2 small" th:text="${guestError}"></div>
+                <form th:action="@{/guest/login}" method="post">
+                    <div class="input-group">
+                        <input type="text" name="displayName" class="form-control"
+                               placeholder="Enter a name" maxlength="25"
+                               th:value="${guestName}"
+                               autocomplete="off"/>
+                        <button class="btn btn-success" type="submit">Play &#8594;</button>
+                    </div>
+                    <div class="form-text text-muted">No account needed. Progress is not saved.</div>
+                </form>
+            </div>
+
+            <hr class="my-3"/>
+
+            <!-- Registered user sign-in -->
             <div class="row g-3">
-                <div th:if="${param.error}">
-                    Invalid username and password.
+                <div th:if="${param.error}" class="alert alert-danger py-1 px-2 small">
+                    Invalid username or password.
                 </div>
-                <div th:if="${param.logout}">
+                <div th:if="${param.logout}" class="alert alert-secondary py-1 px-2 small">
                     You have been logged out.
                 </div>
                 <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
@@ -16,17 +36,17 @@
             <div class="row">
                 <form th:action="@{/login}" method="post">
                     <div class="row mb-3">
-                        <input type="text" name="username" placeholder="Username or email"/>
+                        <input type="text" name="username" class="form-control" placeholder="Username or email"/>
                     </div>
                     <div class="row mb-3">
-                        <input type="password" name="password" placeholder="Password"/>
+                        <input type="password" name="password" class="form-control" placeholder="Password"/>
                     </div>
                     <div class="row mb-3">
                         <input class="btn btn-primary" type="submit" value="Sign in" />
                     </div>
                 </form>
             </div>
-            <div class="row mt-3">
+            <div class="row mt-1">
                 <small class="text-muted">
                     Don't have an account?
                     <a th:href="@{/register}">Create one</a>

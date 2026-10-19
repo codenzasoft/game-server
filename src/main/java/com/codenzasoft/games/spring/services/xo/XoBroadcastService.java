@@ -5,6 +5,7 @@ import com.codenzasoft.games.common.Player;
 import com.codenzasoft.games.spring.entities.UserEntity;
 import com.codenzasoft.games.spring.messages.XoContext;
 import com.codenzasoft.games.spring.messages.XoMessage;
+import com.codenzasoft.games.spring.repositories.UsersRepository;
 import com.codenzasoft.games.spring.services.GamesUserDetailsService;
 import com.codenzasoft.games.xo.XoGame;
 import com.codenzasoft.games.xo.XoGameListener;
@@ -28,6 +29,7 @@ public class XoBroadcastService implements XoGameListener {
   private static final Logger log = LoggerFactory.getLogger(XoBroadcastService.class);
 
   @Autowired private GamesUserDetailsService gamesUserDetailsService;
+  @Autowired private UsersRepository usersRepository;
   @Autowired private SimpMessagingTemplate messagingTemplate;
 
   @Override
@@ -55,7 +57,7 @@ public class XoBroadcastService implements XoGameListener {
   }
 
   public void broadcastLobby(final UUID gameId, final List<UserEntity> players) {
-    final List<String> playerNames = players.stream().map(UserEntity::getUsername).toList();
+    final List<String> playerNames = players.stream().map(UserEntity::getDisplayName).toList();
     for (final UserEntity player : players) {
       if (!player.isBot()) {
         messagingTemplate.convertAndSendToUser(
@@ -96,7 +98,7 @@ public class XoBroadcastService implements XoGameListener {
 
   private List<UserEntity> getNonBots(final Game<?> game) {
     return game.getPlayers().stream()
-        .map(player -> gamesUserDetailsService.getUserByUsernameOrEmail(player.name()))
+        .map(player -> usersRepository.findById(player.id()))
         .filter(Optional::isPresent)
         .map(Optional::get)
         .filter(user -> !user.isBot())
