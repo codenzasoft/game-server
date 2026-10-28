@@ -55,7 +55,7 @@ public class HeartsController {
         .ifPresentOrElse(
             game -> {
               if (game.getGameState().getCurrentRound().isEmpty()) {
-                game.startNewRound();
+                game.resumePlay();
               } else {
                 heartsBroadcastService.gameStarted(game, game.getGameState());
               }
@@ -73,7 +73,7 @@ public class HeartsController {
       gameService
           .getOrBuildHeartsGame(id)
           .ifPresentOrElse(
-              game -> game.startNewRound(),
+              game -> game.resumePlay(),
               () -> log.warn("start: hearts game {} could not be built after starting", id));
     } catch (IllegalStateException e) {
       log.warn("start: {}", e.getMessage());
