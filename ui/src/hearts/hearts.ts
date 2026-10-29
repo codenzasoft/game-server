@@ -689,7 +689,9 @@ export class HeartsGameHandler {
     const och = this.oppCardH;
     const R = this.oppArcRadius;
     const TOP_MARGIN = 50;
-    const SIDE_MARGIN = 16;
+    // Side cards are rotated 90°, so their on-screen width is och (card height).
+    // Scale the margin so the full rotated fan stays inside the viewport.
+    const SIDE_MARGIN = Math.round(och * 0.55);
 
     if (this.cardBackTexture && cardCount > 0) {
       const container = new Container();
@@ -713,14 +715,15 @@ export class HeartsGameHandler {
             break;
           }
           case "W": {
-            const arcCenterX = SIDE_MARGIN + ocw / 2 - R;
+            // Use och/2 (not ocw/2): rotated card's half-width on screen equals card height / 2.
+            const arcCenterX = SIDE_MARGIN + och / 2 - R;
             sprite.x = arcCenterX + R * Math.cos(θ);
             sprite.y = sh / 2 + R * Math.sin(θ);
             sprite.rotation = θ - Math.PI / 2;
             break;
           }
           case "E": {
-            const arcCenterX = sw - SIDE_MARGIN - ocw / 2 + R;
+            const arcCenterX = sw - SIDE_MARGIN - och / 2 + R;
             sprite.x = arcCenterX - R * Math.cos(θ);
             sprite.y = sh / 2 + R * Math.sin(θ);
             sprite.rotation = Math.PI / 2 - θ;
@@ -743,12 +746,12 @@ export class HeartsGameHandler {
         break;
       case "W":
         label.anchor.set(0, 0.5);
-        label.x = SIDE_MARGIN + ocw / 2 + och / 2 + 6;
+        label.x = SIDE_MARGIN + och + 8;
         label.y = sh / 2;
         break;
       case "E":
         label.anchor.set(1, 0.5);
-        label.x = sw - SIDE_MARGIN - ocw / 2 - och / 2 - 6;
+        label.x = sw - SIDE_MARGIN - och - 8;
         label.y = sh / 2;
         break;
     }
@@ -1346,7 +1349,7 @@ export class HeartsGameHandler {
     const sortedHand = sortHand(context.hand);
     const n = sortedHand.length;
     const arcCenterX = sw / 2;
-    const arcCenterY = sh - ch / 2 - 50 + ar;
+    const arcCenterY = sh - ch / 2 - 80 + ar;
 
     // Player's cards land at their arc positions (face-up)
     const playerDests: Array<[number, number]> = sortedHand.map((_, i) => {
@@ -1448,7 +1451,7 @@ export class HeartsGameHandler {
     const ch = this.cardH;
     const ar = this.arcRadius;
     const arcCenterX = this.app.screen.width / 2;
-    const arcCenterY = this.app.screen.height - ch / 2 - 50 + ar;
+    const arcCenterY = this.app.screen.height - ch / 2 - 80 + ar;
 
     const container = new Container();
     container.filters = [
@@ -1492,7 +1495,7 @@ export class HeartsGameHandler {
     const ar = this.arcRadius;
 
     const arcCenterX = this.app.screen.width / 2;
-    const arcCenterY = this.app.screen.height - ch / 2 - 50 + ar;
+    const arcCenterY = this.app.screen.height - ch / 2 - 80 + ar;
 
     const container = new Container();
     const dropShadow = new DropShadowFilter({
@@ -1836,8 +1839,8 @@ export class HeartsGameHandler {
 
     const overlay = document.createElement("div");
     overlay.id = "hearts-pass-overlay";
-    // Position above the top of the center card: center card top = cardH + 50px from bottom
-    overlay.style.bottom = `${this.cardH + 50 + 12}px`;
+    // Position above the top of the center card: center card top = cardH + 80px from bottom
+    overlay.style.bottom = `${this.cardH + 80 + 12}px`;
 
     const dir = round.pass;
     const info = document.createElement("div");
